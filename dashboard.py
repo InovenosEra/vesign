@@ -4,6 +4,11 @@ import yfinance as yf
 from sqlalchemy import create_engine
 from datetime import datetime, time, UTC
 import pytz
+import os
+from main import main   # your pipeline runner
+
+if not os.path.exists("vesign.db"):
+    main()   # build database automatically
 
 if "signal_filter" not in st.session_state:
     st.session_state.signal_filter = "ALL"
