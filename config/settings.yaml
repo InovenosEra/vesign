@@ -1,0 +1,9 @@
+start_years_history: 3
+risk_free_rate: 0.03
+
+scoring:
+  buy_threshold: 0.01
+  sell_threshold: 0.01
+
+database:
+  name: vesign.db
