@@ -39,6 +39,14 @@ st.markdown(
 
 engine = create_engine("sqlite:///vesign.db")
 
+# wait until tables exist
+for _ in range(30):
+    try:
+        pd.read_sql("SELECT 1 FROM signals LIMIT 1", engine)
+        break
+    except:
+        time.sleep(5)
+
 st.title("Vesign Trading System")
 
 search_col, _ = st.columns([2, 9])  # left small column, right empty space
