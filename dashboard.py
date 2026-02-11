@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 from sqlalchemy import create_engine
-from datetime import datetime, time, UTC
+from datetime import datetime, time as dt_time, UTC
 import pytz
+import time
 import os
 from main import main   # your pipeline runner
 
@@ -68,7 +69,7 @@ def style_variance(val):
 def market_is_open():
     et = pytz.timezone("US/Eastern")
     now = datetime.now(UTC).astimezone(et)
-    return now.weekday() < 5 and time(9, 30) <= now.time() <= time(16, 0)
+    return now.weekday() < 5 and dt_time(9, 30) <= now.time() <= dt_time(16, 0)
 
 
 def add_live_price(df):
