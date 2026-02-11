@@ -34,9 +34,9 @@ st.markdown(
 
 engine = create_engine("sqlite:///vesign.db")
 
-st.title("Vesign Trading Dashboard")
+st.title("Vesign Trading System")
 
-search_col, _ = st.columns([1, 9])  # left small column, right empty space
+search_col, _ = st.columns([2, 9])  # left small column, right empty space
 
 with search_col:
     search = st.text_input("Search Company or Ticker")
@@ -192,7 +192,9 @@ def format_table(df):
         "rsi_below_30", "rsi_3day_flag",
         "bb_factor", "rsi_factor", "macd_factor",
         "sector", "pred_5d", "pred_20d", "regime_pass",
-        "allocation_pct", "prediction_score", "score"
+        "allocation_pct", "prediction_score", "score",
+        "analyst_condition", "bb_condition", "recommendation_mean", "num_analysts", "volume",
+        "bb_ratio", "rank"
     ]
 
     for col in drop_cols:
@@ -220,8 +222,11 @@ def format_table(df):
         df = df[cols]
 
     # round numeric columns
-    numeric_cols = df.select_dtypes(include="number").columns
-    df[numeric_cols] = df[numeric_cols].round(2)
+    # numeric_cols = df.select_dtypes(include="number").columns
+    # df[numeric_cols] = df[numeric_cols].round(2)
+
+    if "Fair_value_upside" in df.columns:
+        df["Fair_value_upside"] = df["Fair_value_upside"] * 100
 
     return df
 
@@ -231,13 +236,16 @@ column_config = {
     "Date": st.column_config.Column(width="small"),
     "Company": st.column_config.Column(width="large"),
 
-    "Close": st.column_config.NumberColumn(format="%.2f"),
+    "Close": st.column_config.NumberColumn("Price",format="%.2f"),
     "Volume": st.column_config.NumberColumn(format="%.2f"),
-    "Market cap": st.column_config.NumberColumn("Market Cap (B$)", format="%.2f"),
+    "Market cap": st.column_config.NumberColumn("Market Cap ($B)", format="%.1f"),
     "Trend_factor": st.column_config.NumberColumn("Trend Factor", format="%.2f"),
     "Rsi": st.column_config.NumberColumn("RSI", format="%.2f"),
     "Rank": st.column_config.NumberColumn(format="%.0f"),
-
+    "Target_mean_price": st.column_config.NumberColumn("Target Mean", format="%.2f"),
+    "Target_high_price": st.column_config.NumberColumn("Target High", format="%.0f"),
+    "Target_low_price": st.column_config.NumberColumn("Target Low", format="%.0f"),
+    "Fair_value_upside": st.column_config.NumberColumn("Fair Value", format="%.1f%%"),
 }
 
 
@@ -330,6 +338,6 @@ display_section(
     LEFT JOIN companies c
     ON s.ticker = c.ticker
     ORDER BY s.date DESC
-    LIMIT 10000
+    LIMIT 1000
     """
 )

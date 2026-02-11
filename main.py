@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from pipelines.daily_update import update_prices
 from pipelines.feature_pipeline import run_feature_pipeline
 from features.forward_returns import compute_forward_returns
+from features.analyst_data import update_analyst_data
 from scoring.scoring_engine import run_scoring
 from scoring.weight_training import train_factor_weights
 from scoring.prediction_score_engine import run_prediction_engine
@@ -17,8 +18,8 @@ def main():
     update_prices()
     run_feature_pipeline()
     compute_forward_returns()
-
     train_factor_weights()
+    update_analyst_data()
     run_prediction_engine()
     run_scoring()
     run_backtest()
