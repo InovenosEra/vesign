@@ -30,7 +30,7 @@ def run_scoring():
                                       df["target_mean_price"] - df["close"]
                               ) / df["close"]
 
-    df["analyst_condition"] = df["fair_value_upside"] >= 0.10
+    df["analyst_condition"] = df["fair_value_upside"] >= 0.05
 
     # preds = pd.read_sql("SELECT * FROM predictions", engine)
 
@@ -38,7 +38,7 @@ def run_scoring():
 
 
     df["bb_ratio"] = df["bb_low"] / df["bb_high"]
-    df["bb_condition"] = df["bb_ratio"] > 0.75
+    df["bb_condition"] = df["bb_ratio"] > 0.8
 
     df = df.sort_values(["ticker", "date"])
 

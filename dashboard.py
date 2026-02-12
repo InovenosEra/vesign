@@ -248,7 +248,7 @@ def format_table(df):
 column_config = {
     "Logo": st.column_config.ImageColumn("Logo", width="small"),
     "Date": st.column_config.Column(width="small"),
-    "Company": st.column_config.Column(width="large"),
+    "Company": st.column_config.Column(width="medium"),
 
     "Close": st.column_config.NumberColumn("Price",format="%.2f"),
     "Volume": st.column_config.NumberColumn(format="%.2f"),
@@ -259,7 +259,9 @@ column_config = {
     "Target_mean_price": st.column_config.NumberColumn("Target Mean", format="%.2f"),
     "Target_high_price": st.column_config.NumberColumn("Target High", format="%.0f"),
     "Target_low_price": st.column_config.NumberColumn("Target Low", format="%.0f"),
-    "Fair_value_upside": st.column_config.NumberColumn("Fair Value", format="%.1f%%"),
+    "Fair_value_upside": st.column_config.NumberColumn("Fair Value", format="+%.1f%%"),
+    "Live price": st.column_config.NumberColumn("Live Price", format="%.2f"),
+
 }
 
 
