@@ -161,18 +161,15 @@ def apply_signal_filter(df):
 # ---------- Market Cap ----------
 def add_market_cap(df):
 
-    if df.empty or "ticker" not in df.columns:
-        df["Market Cap"] = None
-        return df
+    caps = pd.read_sql(
+        "SELECT ticker, market_cap FROM fundamentals",
+        engine
+    )
 
-    tickers = df["ticker"].unique().tolist()
-
-    caps = fetch_market_caps(tickers)
-
-    df["Market Cap"] = df["ticker"].map(caps)
+    df = df.merge(caps, on="ticker", how="left")
 
     # convert to billions
-    df["Market Cap"] = df["Market Cap"] / 1_000_000_000
+    df["market_cap"] = df["market_cap"] / 1_000_000_000
 
     return df
 
@@ -208,7 +205,7 @@ def format_table(df):
         "sector", "pred_5d", "pred_20d", "regime_pass",
         "allocation_pct", "prediction_score", "score",
         "analyst_condition", "bb_condition", "recommendation_mean", "num_analysts", "volume",
-        "bb_ratio", "rank"
+        "rank", "trend_factor"
     ]
 
     for col in drop_cols:
@@ -255,13 +252,13 @@ column_config = {
     "Market cap": st.column_config.NumberColumn("Market Cap ($B)", format="%.1f"),
     "Trend_factor": st.column_config.NumberColumn("Trend Factor", format="%.2f"),
     "Rsi": st.column_config.NumberColumn("RSI", format="%.2f"),
+    "Bb_ratio": st.column_config.NumberColumn("Boll Ratio", format="%.2f"),
     "Rank": st.column_config.NumberColumn(format="%.0f"),
     "Target_mean_price": st.column_config.NumberColumn("Target Mean", format="%.2f"),
     "Target_high_price": st.column_config.NumberColumn("Target High", format="%.0f"),
     "Target_low_price": st.column_config.NumberColumn("Target Low", format="%.0f"),
     "Fair_value_upside": st.column_config.NumberColumn("Fair Value", format="+%.1f%%"),
     "Live price": st.column_config.NumberColumn("Live Price", format="%.2f"),
-
 }
 
 
@@ -354,6 +351,17 @@ display_section(
     LEFT JOIN companies c
     ON s.ticker = c.ticker
     ORDER BY s.date DESC
-    LIMIT 1000
+    LIMIT 250
+    """
+)
+
+display_section(
+    "BUY→SELL Success Rate by Company (12M)",
+    """
+    SELECT s.*, c.company, c.logo_url
+    FROM signal_success_by_company s
+    LEFT JOIN companies c
+    ON s.ticker = c.ticker
+    ORDER BY success_rate DESC
     """
 )
