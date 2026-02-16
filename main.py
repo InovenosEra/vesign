@@ -16,6 +16,8 @@ from scoring.weight_training import train_factor_weights
 from scoring.prediction_score_engine import run_prediction_engine
 from scoring.scoring_engine import run_scoring
 
+from backtesting.trade_builder import build_trade_log
+
 # ---------- Portfolio / evaluation ----------
 from backtesting.backtest_engine import run_backtest
 from risk.ranking_engine import run_ranking
@@ -41,6 +43,7 @@ def main():
 
     # ---------- Signal generation ----------
     run_scoring()
+    build_trade_log()
 
     # ---------- Evaluation / allocation ----------
     run_backtest()

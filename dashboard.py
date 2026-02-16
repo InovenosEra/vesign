@@ -192,7 +192,8 @@ def format_table(df):
     if df.empty:
         return df
 
-    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%d/%m/%y")
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"]).dt.strftime("%d/%m/%y")
 
     if "volume" in df.columns:
         df["volume"] = df["volume"] / 1_000_000
@@ -221,7 +222,11 @@ def format_table(df):
         )
 
     base_cols = ["date", "Logo", "company", "ticker"]
-    cols = base_cols + [c for c in df.columns if c not in base_cols]
+
+    existing_base_cols = [c for c in base_cols if c in df.columns]
+
+    cols = existing_base_cols + [c for c in df.columns if c not in existing_base_cols]
+
     df = df[cols]
 
     df.columns = [c.capitalize() for c in df.columns]
@@ -259,6 +264,7 @@ column_config = {
     "Target_low_price": st.column_config.NumberColumn("Target Low", format="%.0f"),
     "Fair_value_upside": st.column_config.NumberColumn("Fair Value", format="+%.1f%%"),
     "Live price": st.column_config.NumberColumn("Live Price", format="%.2f"),
+    "Success_rate": st.column_config.NumberColumn("Success Rate", format="%.1f%%"),
 }
 
 
@@ -295,8 +301,9 @@ def display_section(title, query):
         st.header(f"{title} ({len(df):,})")
 
     df = add_market_cap(df)
-    df = add_live_price(df)
-    df = add_live_variance(df)
+    if "close" in df.columns:
+        df = add_live_price(df)
+        df = add_live_variance(df)
 
     if title == "Signals":
         df = apply_signal_filter(df)
@@ -317,6 +324,49 @@ def display_section(title, query):
         hide_index=True,
         column_config=column_config
     )
+
+    if title == "BUY→SELL Success Rate by Company (12M)" and not df.empty:
+
+        selected_ticker = st.selectbox(
+            "Select company to view trades",
+            df["Ticker"].unique()
+        )
+
+        trades = pd.read_sql(f"""
+            SELECT *
+            FROM trade_log
+            WHERE ticker = '{selected_ticker}'
+            ORDER BY buy_date
+        """, engine)
+
+        df = pd.read_sql(query, engine)
+
+        # remove duplicates by latest date per ticker
+        if "ticker" in df.columns and "date" in df.columns:
+            df = (
+                df.sort_values("date", ascending=False)
+                .drop_duplicates(subset=["ticker"], keep="first")
+            )
+
+        # format dates
+        trades["buy_date"] = pd.to_datetime(trades["buy_date"]).dt.strftime("%d/%m/%y")
+        trades["sell_date"] = pd.to_datetime(trades["sell_date"]).dt.strftime("%d/%m/%y")
+
+        # convert return to %
+        trades["return_pct"] = trades["return_pct"] * 100
+
+        if not trades.empty:
+            st.subheader(f"{selected_ticker} - Trades (Last 24M)")
+            st.dataframe(
+                trades,
+                hide_index=True,
+                column_config={
+                    "return_pct": st.column_config.NumberColumn(
+                        "% Yield",
+                        format="%.2f%%"
+                    )
+                }
+            )
 
 
 display_section(
