@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------- Data pipelines ----------
-from pipelines.daily_update import update_prices
+from data.market_data import update_prices
 from pipelines.fundamentals_update import update_fundamentals
 from features.analyst_data import update_analyst_data
 
