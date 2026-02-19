@@ -13,7 +13,7 @@ from data.loaders import load_prices, save_features
 from features.technical import compute_features
 
 # ---------- Modeling ----------
-from scoring.prediction_score_engine import run_prediction_engine
+from models.predict import run_prediction_engine
 from scoring.scoring_engine import run_scoring
 
 from backtesting.trade_builder import build_trade_log
