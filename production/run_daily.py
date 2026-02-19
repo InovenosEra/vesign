@@ -9,7 +9,8 @@ from pipelines.fundamentals_update import update_fundamentals
 from features.analyst_data import update_analyst_data
 
 # ---------- Feature engineering ----------
-from pipelines.feature_pipeline import run_feature_pipeline
+from data.loaders import load_prices, save_features
+from features.technical import compute_features
 
 # ---------- Modeling ----------
 from scoring.prediction_score_engine import run_prediction_engine
@@ -27,7 +28,9 @@ def run_daily():
     update_fundamentals()
     update_analyst_data()
 
-    run_feature_pipeline()
+    prices = load_prices()
+    features_df = compute_features(prices)
+    save_features(features_df)
 
     run_prediction_engine()
     run_scoring()
