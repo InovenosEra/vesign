@@ -15,3 +15,7 @@ echo "To start the system run:"
 echo "source .venv/bin/activate"
 echo "python main.py"
 echo "streamlit run dashboard.py"
+
+
+# SWITCH TO MAIN BRANCH --> git checkout main
+# SWITCH TO REFACTOR BRANCH --> git checkout architecture-refactor
