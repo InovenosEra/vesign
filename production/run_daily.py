@@ -19,7 +19,7 @@ from signals.engine import run_scoring
 from backtesting.trade_builder import build_trade_log
 
 # ---------- Portfolio ----------
-from risk.ranking_engine import run_ranking
+from portfolio.ranking import run_ranking
 from portfolio.allocator import run_allocator
 
 
