@@ -1,15 +1,26 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from datetime import datetime, time as dt_time, UTC
 import pytz
 import time
 import os
-from main import daily_run   # your pipeline runner
 
-if not os.path.exists("vesign.db"):
-    daily_run()   # build database automatically
+# ------------------------------
+# SAFETY CHECK - DO NOT RUN PIPELINE HERE
+# ------------------------------
+
+DB_PATH = "vesign.db"
+
+if not os.path.exists(DB_PATH):
+    st.error(
+        "Database not found.\n\n"
+        "Please run production/run_daily.py first to generate signals."
+    )
+    st.stop()
+
+# ------------------------------
 
 if "signal_filter" not in st.session_state:
     st.session_state.signal_filter = "ALL"
@@ -27,30 +38,22 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# st.markdown(
-#     """
-#     <style>
-#     div[data-testid="stDataFrame"] td {
-#         text-align: left !important;
-#     }
-#     </style>
-#     """,
-#     unsafe_allow_html=True
-# )
+engine = create_engine(f"sqlite:///{DB_PATH}")
 
-engine = create_engine("sqlite:///vesign.db")
-
-# wait until tables exist
-for _ in range(30):
+# Wait until signals table exists (max ~30 seconds)
+for _ in range(6):
     try:
         pd.read_sql("SELECT 1 FROM signals LIMIT 1", engine)
         break
-    except:
+    except Exception:
         time.sleep(5)
+else:
+    st.error("Signals table not found. Run production pipeline first.")
+    st.stop()
 
 st.title("Vesign Trading System")
 
-search_col, _ = st.columns([2, 9])  # left small column, right empty space
+search_col, _ = st.columns([2, 9])
 
 with search_col:
     search = st.text_input("Search Company or Ticker")
@@ -64,7 +67,6 @@ def style_variance(val):
             return "color: red"
     return ""
 
-
 # ---------- Market helpers ----------
 def market_is_open():
     et = pytz.timezone("US/Eastern")
@@ -73,7 +75,6 @@ def market_is_open():
 
 
 def add_live_price(df):
-
     if not market_is_open():
         df["Live Price"] = "Market is closed"
         return df
@@ -88,25 +89,18 @@ def add_live_price(df):
     )
 
     prices = {}
-
     for t in tickers:
         try:
             prices[t] = live_data["Close"][t].dropna().iloc[-1]
-        except:
+        except Exception:
             prices[t] = None
 
     df["Live Price"] = df["ticker"].map(prices)
-
     return df
 
 
 def add_live_variance(df):
-
-    if df.empty:
-        df["Live Variance"] = "-"
-        return df
-
-    if "Live Price" not in df.columns:
+    if df.empty or "Live Price" not in df.columns:
         df["Live Variance"] = "-"
         return df
 
@@ -126,39 +120,29 @@ def add_live_variance(df):
         return f"{arrow} {row['price_diff']:.2f} ({row['pct_diff']:.2f}%)"
 
     df["Live Variance"] = df.apply(format_var, axis=1)
-
     df.drop(columns=["price_diff", "pct_diff"], inplace=True)
 
     return df
 
 
-@st.cache_data(ttl=3600)  # cache for 1 hour
+@st.cache_data(ttl=3600)
 def fetch_market_caps(tickers):
-
     ticker_objs = yf.Tickers(" ".join(tickers))
-
     caps = {}
     for t in tickers:
         try:
             caps[t] = ticker_objs.tickers[t].info.get("marketCap")
-        except:
+        except Exception:
             caps[t] = None
-
     return caps
 
 
 def apply_signal_filter(df):
-
-    if "signal_filter" not in st.session_state:
-        st.session_state.signal_filter = "ALL"
-
     if st.session_state.signal_filter != "ALL":
         df = df[df["signal"] == st.session_state.signal_filter]
-
     return df
 
 
-# ---------- Market Cap ----------
 def add_market_cap(df):
     caps = pd.read_sql("""
         SELECT ticker, MAX(market_cap) AS market_cap
@@ -171,7 +155,6 @@ def add_market_cap(df):
     return df
 
 
-# ---------- Search ----------
 def apply_search(df):
     if search:
         mask = (
@@ -182,104 +165,26 @@ def apply_search(df):
     return df
 
 
-# ---------- Formatting ----------
-def format_table(df):
-
-    if df.empty:
-        return df
-
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"]).dt.strftime("%d/%m/%y")
-
-    if "volume" in df.columns:
-        df["volume"] = df["volume"] / 1_000_000
-
-    drop_cols = [
-        "open", "high", "low", "Adj Close",
-        "bb_high", "bb_low", "macd",
-        "rsi_below_30", "rsi_3day_flag",
-        "bb_factor", "rsi_factor", "macd_factor",
-        "sector", "pred_5d", "pred_20d", "regime_pass",
-        "allocation_pct", "prediction_score", "score",
-        "analyst_condition", "bb_condition", "recommendation_mean", "num_analysts", "volume",
-        "rank", "trend_factor"
-    ]
-
-    for col in drop_cols:
-        if col in df.columns:
-            df.drop(columns=[col], inplace=True)
-
-    if "logo_url" in df.columns:
-        df.rename(columns={"logo_url": "Logo"}, inplace=True)
-
-    if "Logo" in df.columns:
-        df["Logo"] = df["Logo"].fillna(
-            "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg"
-        )
-
-    base_cols = ["date", "Logo", "company", "ticker"]
-
-    existing_base_cols = [c for c in base_cols if c in df.columns]
-
-    cols = existing_base_cols + [c for c in df.columns if c not in existing_base_cols]
-
-    df = df[cols]
-
-    df.columns = [c.capitalize() for c in df.columns]
-
-    # place Market Cap after Ticker
-    if "Market cap" in df.columns and "Ticker" in df.columns:
-        cols = df.columns.tolist()
-        cols.insert(cols.index("Ticker") + 1, cols.pop(cols.index("Market cap")))
-        df = df[cols]
-
-    # round numeric columns
-    # numeric_cols = df.select_dtypes(include="number").columns
-    # df[numeric_cols] = df[numeric_cols].round(2)
-
-    if "Fair_value_upside" in df.columns:
-        df["Fair_value_upside"] = df["Fair_value_upside"] * 100
-
-    return df
-
-
-column_config = {
-    "Logo": st.column_config.ImageColumn("Logo", width="small"),
-    "Date": st.column_config.Column(width="small"),
-    "Company": st.column_config.Column(width="medium"),
-
-    "Close": st.column_config.NumberColumn("Price",format="%.2f"),
-    "Volume": st.column_config.NumberColumn(format="%.2f"),
-    "Market cap": st.column_config.NumberColumn("Market Cap ($B)", format="%.1f"),
-    "Trend_factor": st.column_config.NumberColumn("Trend Factor", format="%.2f"),
-    "Rsi": st.column_config.NumberColumn("RSI", format="%.2f"),
-    "Bb_ratio": st.column_config.NumberColumn("Boll Ratio", format="%.2f"),
-    "Rank": st.column_config.NumberColumn(format="%.0f"),
-    "Target_mean_price": st.column_config.NumberColumn("Target Mean", format="%.2f"),
-    "Target_high_price": st.column_config.NumberColumn("Target High", format="%.0f"),
-    "Target_low_price": st.column_config.NumberColumn("Target Low", format="%.0f"),
-    "Fair_value_upside": st.column_config.NumberColumn("Fair Value", format="+%.1f%%"),
-    "Live price": st.column_config.NumberColumn("Live Price", format="%.2f"),
-    "Success_rate": st.column_config.NumberColumn("Success Rate", format="%.1f%%"),
-}
-
+# ------------------------------
+# DISPLAY FUNCTION
+# ------------------------------
 
 def display_section(title, query):
 
     df = pd.read_sql(query, engine)
 
     if "ticker" in df.columns and "date" in df.columns:
-        df = df.sort_values("date", ascending=False) \
-            .drop_duplicates(subset=["ticker", "date"], keep="first")
+        df = (
+            df.sort_values("date", ascending=False)
+              .drop_duplicates(subset=["ticker", "date"], keep="first")
+        )
 
     df = apply_search(df)
 
-    # Sort Today's BUY signals
     if title == "Today's BUY signals" and "rank" in df.columns:
         df = df.sort_values("rank", ascending=True)
 
     if title == "Signals":
-
         header_col, spacer, control_col = st.columns([8, 1, 2])
 
         with header_col:
@@ -296,78 +201,21 @@ def display_section(title, query):
             )
 
         df = apply_signal_filter(df)
-
     else:
         st.header(f"{title} ({len(df):,})")
 
     df = add_market_cap(df)
+
     if "close" in df.columns:
         df = add_live_price(df)
         df = add_live_variance(df)
 
-    if title == "Signals":
-        df = apply_signal_filter(df)
+    st.dataframe(df, width="stretch", hide_index=True)
 
-    df = format_table(df)
 
-    if title == "Signals" and "Rank" in df.columns:
-        df.drop(columns=["Rank"], inplace=True)
-
-    styled_df = df.style.set_properties(**{"text-align": "left"})
-
-    if "Live variance" in df.columns:
-        styled_df = styled_df.map(style_variance, subset=["Live variance"])
-
-    st.dataframe(
-        styled_df,
-        width="stretch",
-        hide_index=True,
-        column_config=column_config
-    )
-
-    if title == "BUY→SELL Success Rate by Company (12M)" and not df.empty:
-
-        selected_ticker = st.selectbox(
-            "Select company to view trades",
-            df["Ticker"].unique()
-        )
-
-        trades = pd.read_sql(f"""
-            SELECT *
-            FROM trade_log
-            WHERE ticker = '{selected_ticker}'
-            ORDER BY buy_date
-        """, engine)
-
-        df = pd.read_sql(query, engine)
-
-        # remove duplicates by latest date per ticker
-        if "ticker" in df.columns and "date" in df.columns:
-            df = (
-                df.sort_values("date", ascending=False)
-                .drop_duplicates(subset=["ticker"], keep="first")
-            )
-
-        # format dates
-        trades["buy_date"] = pd.to_datetime(trades["buy_date"]).dt.strftime("%d/%m/%y")
-        trades["sell_date"] = pd.to_datetime(trades["sell_date"]).dt.strftime("%d/%m/%y")
-
-        # convert return to %
-        trades["return_pct"] = trades["return_pct"] * 100
-
-        if not trades.empty:
-            st.subheader(f"{selected_ticker} - Trades (Last 24M)")
-            st.dataframe(
-                trades,
-                hide_index=True,
-                column_config={
-                    "return_pct": st.column_config.NumberColumn(
-                        "% Yield",
-                        format="%.2f%%"
-                    )
-                }
-            )
-
+# ------------------------------
+# SECTIONS
+# ------------------------------
 
 display_section(
     "Today's BUY signals",
@@ -383,19 +231,6 @@ display_section(
     """
 )
 
-
-# display_section(
-#     "Ranked Signals",
-#     """
-#     SELECT r.*, c.company, c.logo_url
-#     FROM daily_ranked r
-#     LEFT JOIN companies c
-#     ON r.ticker = c.ticker
-#     WHERE r.date = (SELECT MAX(date) FROM daily_ranked)
-#     """
-# )
-
-
 display_section(
     "Signals",
     """
@@ -407,8 +242,6 @@ display_section(
     LIMIT 500
     """
 )
-
-from sqlalchemy import inspect
 
 inspector = inspect(engine)
 
@@ -423,4 +256,3 @@ if "signal_success_by_company" in inspector.get_table_names():
         ORDER BY success_rate DESC
         """
     )
-

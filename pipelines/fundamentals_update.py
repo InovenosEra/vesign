@@ -1,6 +1,6 @@
 import pandas as pd
 import yfinance as yf
-from database.db_connection import engine
+from data.loaders import engine
 from utils.update_guard import should_run, mark_run
 
 

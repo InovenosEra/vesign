@@ -1,7 +1,7 @@
 import pandas as pd
 import requests
 from io import StringIO
-from database.db_connection import engine
+from data.loaders import engine
 
 
 def load_universe():

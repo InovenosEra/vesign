@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.linear_model import LinearRegression
-from database.db_connection import engine
+from data.loaders import engine
 
 
 def train_factor_weights():

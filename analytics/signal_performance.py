@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime, timedelta
-from database.db_connection import engine
+from data.loaders import engine
 
 
 def compute_signal_success_rate():

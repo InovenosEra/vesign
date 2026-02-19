@@ -1,7 +1,7 @@
 import pandas as pd
 import yaml
 import os
-from database.db_connection import engine
+from data.loaders import engine
 from sqlalchemy import text, inspect
 
 

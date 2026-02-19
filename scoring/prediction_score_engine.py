@@ -1,5 +1,5 @@
 import pandas as pd
-from database.db_connection import engine
+from data.loaders import engine
 
 
 def run_prediction_engine():

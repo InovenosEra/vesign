@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime, timedelta, UTC
-from database.db_connection import engine
+from data.loaders import engine
 
 
 def should_run(job_name: str, frequency_hours: int = 24) -> bool:

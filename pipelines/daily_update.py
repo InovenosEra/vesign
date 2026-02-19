@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta, UTC
 from utils.universe_loader import load_universe
-from database.db_connection import engine
+from data.loaders import engine
 import pandas_market_calendars as mcal
 
 
