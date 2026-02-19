@@ -16,7 +16,7 @@ from features.technical import compute_features
 from models.predict import run_prediction_engine
 from signals.engine import run_scoring
 
-from backtesting.trade_builder import build_trade_log
+from backtesting.engine import build_trade_log
 
 # ---------- Portfolio ----------
 from portfolio.ranking import run_ranking
