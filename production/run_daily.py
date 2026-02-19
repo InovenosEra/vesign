@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------- Data pipelines ----------
 from data.market_data import update_prices
-from pipelines.fundamentals_update import update_fundamentals
+from data.market_data import update_fundamentals
 from features.analyst_data import update_analyst_data
 
 # ---------- Feature engineering ----------
