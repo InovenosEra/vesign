@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from features.forward_returns import compute_forward_returns
-from scoring.weight_training import train_factor_weights
+from models.train import train_factor_weights
 from backtesting.backtest_engine import run_backtest
 
 
