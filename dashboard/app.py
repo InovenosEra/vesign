@@ -75,26 +75,44 @@ def market_is_open():
 
 
 def add_live_price(df):
+
+    # ---------- 1. empty dataframe ----------
+    if df.empty:
+        df["Live Price"] = "-"
+        return df
+
+    # ---------- 2. market closed ----------
     if not market_is_open():
         df["Live Price"] = "Market is closed"
         return df
 
-    tickers = df["ticker"].unique().tolist()
+    # ---------- 3. get tickers safely ----------
+    tickers = df["ticker"].dropna().unique().tolist()
 
-    live_data = yf.download(
-        tickers,
-        period="1d",
-        interval="1m",
-        progress=False
-    )
+    if len(tickers) == 0:
+        df["Live Price"] = "-"
+        return df
 
+    # ---------- 4. download safely ----------
     prices = {}
+
     for t in tickers:
         try:
-            prices[t] = live_data["Close"][t].dropna().iloc[-1]
+            live_data = yf.download(
+                t,
+                period="1d",
+                interval="1m",
+                progress=False
+            )
+
+            # If yfinance returns empty dataframe
+            if live_data is None or live_data.empty:
+                prices[t] = None
+            else:
+                prices[t] = live_data["close"].dropna().iloc[-1]
+
         except Exception:
             prices[t] = None
-
     df["Live Price"] = df["ticker"].map(prices)
     return df
 
