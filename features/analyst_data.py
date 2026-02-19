@@ -43,7 +43,7 @@ def update_analyst_data():
     df = pd.DataFrame(rows)
 
     df.to_sql(
-        "analyst_targets",
+        "analyst_expectations",
         engine,
         if_exists="replace",
         index=False

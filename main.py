@@ -24,32 +24,37 @@ from risk.ranking_engine import run_ranking
 from portfolio.allocator import run_allocator
 
 
-def main():
-
-    # ---------- Market data ----------
+def daily_run():
+    # data updates
     update_prices()
-
-    # ---------- Heavy daily fundamentals ----------
     update_fundamentals()
     update_analyst_data()
 
-    # ---------- Feature pipeline ----------
+    # features
     run_feature_pipeline()
-    compute_forward_returns()
 
-    # ---------- Model training / prediction ----------
-    train_factor_weights()
+    # prediction & signals
     run_prediction_engine()
-
-    # ---------- Signal generation ----------
     run_scoring()
+
+    # trade tracking
     build_trade_log()
 
-    # ---------- Evaluation / allocation ----------
-    run_backtest()
+    # portfolio
     run_ranking()
     run_allocator()
 
 
+def training_run():
+    compute_forward_returns()
+    train_factor_weights()
+    run_backtest()
+
+
 if __name__ == "__main__":
-    main()
+    mode = "daily"   # change to "training" when needed
+
+    if mode == "daily":
+        daily_run()
+    elif mode == "training":
+        training_run()

@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta, UTC
 from utils.universe_loader import load_universe
 from database.db_connection import engine
+import pandas_market_calendars as mcal
 
 
 def update_prices():
@@ -11,7 +12,12 @@ def update_prices():
 
     tickers = load_universe()
 
-    end_date = datetime.now(UTC).date()
+    today = datetime.now(UTC).date()
+
+    nyse = mcal.get_calendar("NYSE")
+    schedule = nyse.schedule(start_date=today - timedelta(days=10), end_date=today)
+
+    end_date = schedule.index[-1].date()
 
     # ---------- detect last stored date ----------
     try:
@@ -43,11 +49,29 @@ def update_prices():
     all_frames = []
 
     for ticker in tickers:
-
         try:
-            df = data[ticker].copy()
-            df.reset_index(inplace=True)
+            if ticker not in data.columns.get_level_values(0):
+                print(f"{ticker} download failed - retrying single download")
+                retry = yf.download(
+                    ticker,
+                    start=start_date,
+                    end=end_date,
+                    auto_adjust=False,
+                    progress=False
+                )
 
+                if retry is None or retry.empty:
+                    print(f"{ticker} retry failed - skipping")
+                    continue
+                df = retry.copy()
+            else:
+                df = data[ticker].copy()
+
+            if df is None or df.empty:
+                print(f"{ticker} returned empty data - skipping")
+                continue
+
+            df.reset_index(inplace=True)
             df["ticker"] = ticker
 
             df.rename(columns={
@@ -65,7 +89,8 @@ def update_prices():
 
             all_frames.append(df)
 
-        except Exception:
+        except Exception as e:
+            print(f"{ticker} failed: {e}")
             continue
 
     if len(all_frames) == 0:
@@ -73,6 +98,8 @@ def update_prices():
         return
 
     final_df = pd.concat(all_frames)
+
+    final_df.drop_duplicates(subset=["date", "ticker"], inplace=True)
 
     # append instead of replace
     final_df.to_sql("daily_prices", engine, if_exists="append", index=False)

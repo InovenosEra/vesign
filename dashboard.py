@@ -6,10 +6,10 @@ from datetime import datetime, time as dt_time, UTC
 import pytz
 import time
 import os
-from main import main   # your pipeline runner
+from main import daily_run   # your pipeline runner
 
 if not os.path.exists("vesign.db"):
-    main()   # build database automatically
+    daily_run()   # build database automatically
 
 if "signal_filter" not in st.session_state:
     st.session_state.signal_filter = "ALL"
@@ -160,19 +160,15 @@ def apply_signal_filter(df):
 
 # ---------- Market Cap ----------
 def add_market_cap(df):
-
-    caps = pd.read_sql(
-        "SELECT ticker, market_cap FROM fundamentals",
-        engine
-    )
+    caps = pd.read_sql("""
+        SELECT ticker, MAX(market_cap) AS market_cap
+        FROM fundamentals
+        GROUP BY ticker
+    """, engine)
 
     df = df.merge(caps, on="ticker", how="left")
-
-    # convert to billions
     df["market_cap"] = df["market_cap"] / 1_000_000_000
-
     return df
-
 
 
 # ---------- Search ----------
@@ -271,6 +267,10 @@ column_config = {
 def display_section(title, query):
 
     df = pd.read_sql(query, engine)
+
+    if "ticker" in df.columns and "date" in df.columns:
+        df = df.sort_values("date", ascending=False) \
+            .drop_duplicates(subset=["ticker", "date"], keep="first")
 
     df = apply_search(df)
 
@@ -372,11 +372,14 @@ def display_section(title, query):
 display_section(
     "Today's BUY signals",
     """
-    SELECT p.*, c.company, c.logo_url
-    FROM daily_portfolio p
+    SELECT s.*, c.company, c.logo_url
+    FROM signals s
     LEFT JOIN companies c
-    ON p.ticker = c.ticker
-    WHERE p.date = (SELECT MAX(date) FROM daily_portfolio)
+    ON s.ticker = c.ticker
+    WHERE DATE (s.date) = (
+        SELECT DATE(MAX(date)) FROM signals
+    )
+    AND s.signal = 'BUY'
     """
 )
 
@@ -401,17 +404,23 @@ display_section(
     LEFT JOIN companies c
     ON s.ticker = c.ticker
     ORDER BY s.date DESC
-    LIMIT 250
+    LIMIT 500
     """
 )
 
-display_section(
-    "BUY→SELL Success Rate by Company (12M)",
-    """
-    SELECT s.*, c.company, c.logo_url
-    FROM signal_success_by_company s
-    LEFT JOIN companies c
-    ON s.ticker = c.ticker
-    ORDER BY success_rate DESC
-    """
-)
+from sqlalchemy import inspect
+
+inspector = inspect(engine)
+
+if "signal_success_by_company" in inspector.get_table_names():
+    display_section(
+        "BUY→SELL Success Rate by Company (12M)",
+        """
+        SELECT s.*, c.company, c.logo_url
+        FROM signal_success_by_company s
+        LEFT JOIN companies c
+        ON s.ticker = c.ticker
+        ORDER BY success_rate DESC
+        """
+    )
+
