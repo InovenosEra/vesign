@@ -63,8 +63,19 @@ def load_universe():
             companies["ticker"] + ".png"
     )
 
-    # Save companies table
+    # Save companies table, preserving any manually added custom tickers
+    # (tickers not in the S&P 500 list that were inserted outside this function).
+    try:
+        existing = pd.read_sql("SELECT * FROM companies", engine)
+        sp500_tickers = set(companies["ticker"])
+        custom = existing[~existing["ticker"].isin(sp500_tickers)]
+    except Exception:
+        custom = pd.DataFrame()
+
     companies.to_sql("companies", engine, if_exists="replace", index=False)
+
+    if not custom.empty:
+        custom.to_sql("companies", engine, if_exists="append", index=False)
 
     tickers = companies["ticker"].tolist()
 

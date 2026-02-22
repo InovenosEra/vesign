@@ -94,18 +94,21 @@ def run_scoring():
         df["prediction_score"] = float("nan")
 
     # ---------- Write to DB ----------
+    # Only persist today's signals. All historical rows are already stored
+    # from previous runs; re-appending the full history every run creates
+    # cumulative duplicates.
     today = df["date"].max()
+    today_df = df[df["date"] == today]
 
     inspector = inspect(engine)
 
     if "signals" in inspector.get_table_names():
-
         with engine.begin() as conn:
             conn.execute(
-                text("DELETE FROM signals WHERE date = :date "),
+                text("DELETE FROM signals WHERE date = :date"),
                 {"date": today}
             )
 
-    df.to_sql("signals", engine, if_exists="append", index=False)
+    today_df.to_sql("signals", engine, if_exists="append", index=False)
 
     print("Hybrid signals generated successfully")
