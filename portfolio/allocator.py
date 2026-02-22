@@ -1,10 +1,52 @@
+import os
+import yaml
 import pandas as pd
 from data.loaders import engine
+from sqlalchemy import inspect
+
+
+def _get_vix_multiplier(config):
+    """Return a position-size multiplier based on the latest VIX close."""
+    vix_cfg = config.get("vix", {})
+
+    try:
+        inspector = inspect(engine)
+        if "vix" not in inspector.get_table_names():
+            return 1.0
+        row = pd.read_sql("SELECT close FROM vix ORDER BY date DESC LIMIT 1", engine)
+        if row.empty:
+            return 1.0
+        vix = float(row["close"].iloc[0])
+    except Exception:
+        return 1.0
+
+    low_t     = vix_cfg.get("low_threshold", 15)
+    high_t    = vix_cfg.get("high_threshold", 25)
+    extreme_t = vix_cfg.get("extreme_threshold", 35)
+
+    if vix > extreme_t:
+        return vix_cfg.get("extreme_multiplier", 2.0)
+    elif vix > high_t:
+        return vix_cfg.get("high_multiplier", 1.5)
+    elif vix >= low_t:
+        return 1.0
+    else:
+        return vix_cfg.get("low_multiplier", 0.8)
 
 
 def run_allocator():
 
     print("Running portfolio allocator...")
+
+    # ---------- Load config ----------
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(BASE_DIR, "config", "settings.yaml")
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    vix_multiplier = _get_vix_multiplier(config)
+    position_cap = config.get("vix", {}).get("position_cap", 0.15)
+    print(f"VIX multiplier: {vix_multiplier:.2f}, position cap: {position_cap:.0%}")
 
     ranked = pd.read_sql("SELECT * FROM daily_ranked", engine)
     companies = pd.read_sql("SELECT ticker, sector FROM companies", engine)
@@ -24,10 +66,6 @@ def run_allocator():
     for sector in sectors:
         sector_df = buys[buys["sector"] == sector].copy()
 
-        # Use ML prediction_score for within-sector position sizing.
-        # Clip at 0 so weights stay positive (negative predictions → 0 weight).
-        # Fall back to RSI-based score if predictions are unavailable.
-        # If every stock in the sector clips to 0, allocate equally.
         if "prediction_score" in sector_df.columns:
             sector_df["alloc_score"] = (
                 sector_df["prediction_score"]
@@ -45,6 +83,11 @@ def run_allocator():
             sector_df["allocation_pct"] = (
                 (sector_df["alloc_score"] / total_score) * sector_weight
             )
+
+        # Apply VIX multiplier then cap per position
+        sector_df["allocation_pct"] = (
+            sector_df["allocation_pct"] * vix_multiplier
+        ).clip(upper=position_cap)
 
         allocations.append(sector_df)
 

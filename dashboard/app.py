@@ -197,7 +197,8 @@ HIDDEN_COLUMNS = {"open", "high", "low", "Adj Close", "volume",
                   "bb_high", "bb_low", "macd", "rsi_factor", "macd_factor", "trend_factor", "bb_factor",
                   "prediction_score",
                   "number_of_analysts", "last_update", "analyst_condition",
-                  "bb_condition", "rsi_below_30", "rsi_3day_flag"}
+                  "bb_condition", "rsi_below_30", "rsi_3day_flag",
+                  "volume_sma_20", "week52_high"}
 
 def reorder_columns(df):
     df = df.drop(columns=[c for c in HIDDEN_COLUMNS if c in df.columns])

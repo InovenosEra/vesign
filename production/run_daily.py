@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # ---------- Data pipelines ----------
 from data.market_data import update_prices
 from data.market_data import update_fundamentals
+from data.market_data import update_vix
 from features.analyst_data import update_analyst_data
 
 # ---------- Feature engineering ----------
@@ -25,6 +26,7 @@ from portfolio.allocator import run_allocator
 
 def run_daily():
     update_prices()
+    update_vix()
     update_fundamentals()
     update_analyst_data()
 

@@ -20,4 +20,12 @@ def add_indicators(df):
 
     df["trend_factor"] = df["close"].pct_change(20, fill_method=None)
 
+    # ---------- Volume confirmation ----------
+    df["volume_sma_20"] = df["volume"].rolling(20).mean()
+    df["volume_ratio"] = df["volume"] / df["volume_sma_20"]
+
+    # ---------- 52-week high distance ----------
+    df["week52_high"] = df["close"].rolling(252).max()
+    df["pct_from_52w_high"] = (df["close"] - df["week52_high"]) / df["week52_high"]
+
     return df

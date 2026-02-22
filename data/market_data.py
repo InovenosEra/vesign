@@ -113,6 +113,58 @@ def update_prices():
 
 
 
+def update_vix():
+
+    print("Updating VIX data incrementally...")
+
+    try:
+        existing = pd.read_sql("SELECT MAX(date) as last_date FROM vix", engine)
+        last_date = pd.to_datetime(existing["last_date"][0]).date()
+        start_date = last_date + timedelta(days=1)
+    except Exception:
+        start_date = datetime.now(UTC).date() - timedelta(days=3 * 365)
+
+    today = datetime.now(UTC).date()
+
+    if start_date >= today:
+        print("VIX already up to date")
+        return
+
+    print(f"Downloading VIX from {start_date} to {today}")
+
+    try:
+        data = yf.download(
+            "^VIX",
+            start=start_date,
+            end=today,
+            auto_adjust=False,
+            progress=False
+        )
+
+        if data is None or data.empty:
+            print("VIX download returned empty data")
+            return
+
+        data.reset_index(inplace=True)
+
+        # Handle MultiIndex columns from yfinance
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = [col[0] if col[1] == "" else col[0] for col in data.columns]
+
+        data.rename(columns={"Date": "date", "Close": "close"}, inplace=True)
+        data = data[["date", "close"]].dropna()
+
+        today_ts = pd.Timestamp(datetime.now(UTC).date())
+        data = data[data["date"] < today_ts]
+
+        data.drop_duplicates(subset=["date"], inplace=True)
+        data.to_sql("vix", engine, if_exists="append", index=False)
+        print("VIX updated successfully")
+
+    except Exception as e:
+        print(f"VIX update failed: {e}")
+
+
 def update_fundamentals():
 
     # ---------- run only if needed ----------
