@@ -21,8 +21,15 @@ def update_prices():
     end_date = schedule.index[-1].date()
 
     # ---------- detect last stored date ----------
+    # Use MIN(MAX(date) per ticker) so that if any single ticker has more
+    # recent data than the rest (e.g. a manually added custom ticker), the
+    # other tickers still get updated rather than being silently skipped.
     try:
-        existing = pd.read_sql("SELECT MAX(date) as last_date FROM daily_prices", engine)
+        existing = pd.read_sql(
+            "SELECT MIN(max_date) as last_date FROM "
+            "(SELECT ticker, MAX(date) as max_date FROM daily_prices GROUP BY ticker)",
+            engine
+        )
         last_date = pd.to_datetime(existing["last_date"][0]).date()
 
         start_date = last_date + timedelta(days=1)

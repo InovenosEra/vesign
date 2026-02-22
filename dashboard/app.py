@@ -297,14 +297,28 @@ display_section(
 )
 
 display_section(
+    "Today's SELL signals",
+    """
+    SELECT s.*, c.company, c.logo_url
+    FROM signals s
+    LEFT JOIN companies c
+    ON s.ticker = c.ticker
+    WHERE DATE(s.date) = (
+        SELECT DATE(MAX(date)) FROM signals
+    )
+    AND s.signal = 'SELL'
+    """
+)
+
+display_section(
     "Signals",
     """
     SELECT s.*, c.company, c.logo_url
     FROM signals s
     LEFT JOIN companies c
     ON s.ticker = c.ticker
+    WHERE DATE(s.date) >= DATE('now', '-12 months')
     ORDER BY s.date DESC
-    LIMIT 500
     """
 )
 
