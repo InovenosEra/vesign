@@ -258,6 +258,13 @@ def display_section(title, query):
     if "fair_value_upside" in df.columns:
         df["fair_value_upside"] = df["fair_value_upside"] * 100
 
+    # Sorting by market_cap is already done; convert to formatted string now
+    # so large numbers show with comma separators (e.g. 4,576.75).
+    if "market_cap" in df.columns:
+        df["market_cap"] = df["market_cap"].apply(
+            lambda x: f"{x:,.2f}" if pd.notna(x) else "-"
+        )
+
     df = format_dates(df)
     df = reorder_columns(df)
 
