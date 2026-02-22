@@ -34,8 +34,14 @@ def run_scoring():
     df["analyst_condition"] = df["fair_value_upside"] >= 0.05
 
     # ---------- Bollinger condition ----------
-    df["bb_ratio"] = df["bb_low"] / df["bb_high"]
-    df["bb_condition"] = df["bb_ratio"] > 0.8
+    # BB %B: where the closing price sits within the band range.
+    #   0 = at the lower band, 0.5 = middle, 1 = upper band.
+    # For a BUY signal we want the price in the bottom 20% of the range,
+    # confirming the stock is genuinely oversold relative to its own volatility.
+    # The old check (bb_low / bb_high > 0.8) measured band WIDTH, which is
+    # inversely correlated with sell-offs and was always blocking BUY signals.
+    df["bb_pct_b"] = (df["close"] - df["bb_low"]) / (df["bb_high"] - df["bb_low"])
+    df["bb_condition"] = df["bb_pct_b"] < 0.2
 
     # ensure strict ordering for rolling windows
     df = df.sort_values(["ticker", "date"]).reset_index(drop=True)

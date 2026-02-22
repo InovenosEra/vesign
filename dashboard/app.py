@@ -193,10 +193,17 @@ def format_dates(df):
     return df
 
 
+HIDDEN_COLUMNS = {"open", "high", "low", "Adj Close", "volume",
+                  "bb_high", "bb_low", "macd", "rsi_factor", "macd_factor", "trend_factor", "bb_factor",
+                  "prediction_score",
+                  "number_of_analysts", "last_update", "analyst_condition",
+                  "bb_condition", "rsi_below_30", "rsi_3day_flag"}
+
 def reorder_columns(df):
+    df = df.drop(columns=[c for c in HIDDEN_COLUMNS if c in df.columns])
     cols = list(df.columns)
     priority = []
-    for col in ["date", "company", "logo_url", "ticker"]:
+    for col in ["date", "company", "logo_url", "ticker", "market_cap", "close"]:
         if col in cols:
             priority.append(col)
     remaining = [c for c in cols if c not in priority]
@@ -218,9 +225,6 @@ def display_section(title, query):
         )
 
     df = apply_search(df)
-
-    if title == "Today's BUY signals" and "rank" in df.columns:
-        df = df.sort_values("rank", ascending=True)
 
     if title == "Signals":
         header_col, spacer, control_col = st.columns([8, 1, 2])
@@ -244,20 +248,34 @@ def display_section(title, query):
 
     df = add_market_cap(df)
 
+    if "market_cap" in df.columns:
+        df = df.sort_values("market_cap", ascending=False, na_position="last")
+
     if "close" in df.columns:
         df = add_live_price(df)
         df = add_live_variance(df)
 
+    if "fair_value_upside" in df.columns:
+        df["fair_value_upside"] = df["fair_value_upside"] * 100
+
     df = format_dates(df)
     df = reorder_columns(df)
 
-    column_config = {}
-    if "logo_url" in df.columns:
-        column_config["logo_url"] = st.column_config.ImageColumn(
-            label="Logo", width="small"
-        )
+    LABEL_OVERRIDES = {"rsi": "RSI", "fair_value_upside": "Potential Upside", "target_mean_price": "Base Price", "target_high_price": "High Price", "target_low_price": "Low Price"}
 
-    st.dataframe(df, use_container_width=True, hide_index=True, column_config=column_config or None)
+    column_config = {}
+    for col in df.columns:
+        label = LABEL_OVERRIDES.get(col, col.replace("_", " ").title())
+        if col == "logo_url":
+            column_config[col] = st.column_config.ImageColumn(label="Logo", width="small")
+        elif col == "fair_value_upside":
+            column_config[col] = st.column_config.NumberColumn(label=label, format="%.2f%%")
+        elif pd.api.types.is_numeric_dtype(df[col]):
+            column_config[col] = st.column_config.NumberColumn(label=label, format="%.2f")
+        else:
+            column_config[col] = st.column_config.Column(label=label)
+
+    st.dataframe(df, use_container_width=True, hide_index=True, column_config=column_config)
 
 
 # ------------------------------
