@@ -342,3 +342,90 @@ if "signal_success_by_company" in inspector.get_table_names():
         ORDER BY success_rate DESC
         """
     )
+
+# ------------------------------
+# HISTORICAL TRANSACTIONS
+# ------------------------------
+
+st.header("Historical Transactions")
+
+min_date = pd.read_sql("SELECT DATE(MIN(date)) as d FROM signals", engine)["d"][0]
+max_date = pd.read_sql("SELECT DATE(MAX(date)) as d FROM signals", engine)["d"][0]
+
+date_col1, date_col2, _ = st.columns([2, 2, 7])
+with date_col1:
+    start_filter = st.date_input("From", value=pd.Timestamp.today() - pd.DateOffset(years=1),
+                                 min_value=pd.Timestamp(min_date), max_value=pd.Timestamp(max_date),
+                                 key="tx_start")
+with date_col2:
+    end_filter = st.date_input("To", value=pd.Timestamp(max_date),
+                               min_value=pd.Timestamp(min_date), max_value=pd.Timestamp(max_date),
+                               key="tx_end")
+
+signals_df = pd.read_sql(f"""
+    SELECT s.date, s.ticker, s.signal, s.close, c.company, c.logo_url
+    FROM signals s
+    LEFT JOIN companies c ON s.ticker = c.ticker
+    WHERE DATE(s.date) BETWEEN '{start_filter}' AND '{end_filter}'
+    ORDER BY s.ticker, s.date
+""", engine)
+
+signals_df["date"] = pd.to_datetime(signals_df["date"])
+
+trades = []
+for ticker, grp in signals_df.groupby("ticker"):
+    open_trade = None
+    for _, row in grp.iterrows():
+        if row["signal"] == "BUY" and open_trade is None:
+            open_trade = row
+        elif row["signal"] == "SELL" and open_trade is not None:
+            ret = (row["close"] - open_trade["close"]) / open_trade["close"]
+            trades.append({
+                "company":    open_trade["company"],
+                "logo_url":   open_trade["logo_url"],
+                "ticker":     ticker,
+                "buy_date":   open_trade["date"],
+                "sell_date":  row["date"],
+                "buy_price":  open_trade["close"],
+                "sell_price": row["close"],
+                "return_pct": ret * 100,
+                "days_held":  (row["date"] - open_trade["date"]).days,
+                "result":     "Win" if ret > 0 else "Loss",
+            })
+            open_trade = None
+
+trades_df = pd.DataFrame(trades)
+
+if trades_df.empty:
+    st.info("No completed BUY→SELL trades in the selected period.")
+else:
+    wins  = (trades_df["return_pct"] > 0).sum()
+    total = len(trades_df)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Trades",        total)
+    m2.metric("Win Rate",      f"{wins/total:.1%}")
+    m3.metric("Avg Return",    f"{trades_df['return_pct'].mean():+.2f}%")
+    m4.metric("Avg Days Held", f"{trades_df['days_held'].mean():.0f}")
+
+    trades_df = trades_df.sort_values("return_pct", ascending=False)
+
+    trades_df["buy_date"]  = trades_df["buy_date"].dt.strftime("%d/%m/%y")
+    trades_df["sell_date"] = trades_df["sell_date"].dt.strftime("%d/%m/%y")
+    trades_df["buy_price"]  = trades_df["buy_price"].apply(lambda x: f"{x:,.2f}" if pd.notna(x) else "-")
+    trades_df["sell_price"] = trades_df["sell_price"].apply(lambda x: f"{x:,.2f}" if pd.notna(x) else "-")
+
+    tx_col_cfg = {}
+    for col in trades_df.columns:
+        label = col.replace("_", " ").title()
+        if col == "logo_url":
+            tx_col_cfg[col] = st.column_config.ImageColumn(label="Logo", width="small")
+        elif col == "return_pct":
+            tx_col_cfg[col] = st.column_config.NumberColumn(label="Return %", format="%.2f%%")
+        elif col in ("buy_price", "sell_price"):
+            tx_col_cfg[col] = st.column_config.TextColumn(label=label)
+        elif col == "rsi":
+            tx_col_cfg[col] = st.column_config.NumberColumn(label="RSI", format="%.2f")
+        else:
+            tx_col_cfg[col] = st.column_config.Column(label=label)
+
+    st.dataframe(trades_df, use_container_width=True, hide_index=True, column_config=tx_col_cfg)
