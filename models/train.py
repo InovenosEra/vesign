@@ -3,7 +3,18 @@ from sklearn.linear_model import LinearRegression
 from data.loaders import engine
 
 
-def train_factor_weights():
+def train_factor_weights(train_end_date=None):
+    """
+    Train linear regression weights for multi-horizon return prediction.
+
+    Parameters
+    ----------
+    train_end_date : str or None
+        Exclusive upper bound for training data (format "YYYY-MM-DD").
+        Pass this in the research pipeline to prevent the model from
+        seeing data from the evaluation period (look-ahead bias).
+        Defaults to None, which uses all available data (production mode).
+    """
 
     print("Training rolling factor weights (multi-horizon)...")
 
@@ -12,6 +23,11 @@ def train_factor_weights():
 
     df = features.merge(fwd, on=["date", "ticker"]).dropna()
     df["date"] = pd.to_datetime(df["date"])
+
+    if train_end_date is not None:
+        train_end_date = pd.Timestamp(train_end_date)
+        df = df[df["date"] < train_end_date]
+        print(f"Training on data before {train_end_date.date()} (out-of-sample guard)")
 
     cutoff = df["date"].max() - pd.Timedelta(days=730)
     train_df = df[df["date"] >= cutoff]

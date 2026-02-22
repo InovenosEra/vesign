@@ -71,8 +71,21 @@ def run_scoring():
 
     df["signal"] = df.apply(assign_signal, axis=1)
 
-    # ranking score
+    # RSI-based fallback score (always defined, always positive for BUY signals)
     df["score"] = 50 - df["rsi"]
+
+    # ---------- Merge ML prediction scores ----------
+    # predictions table is populated by run_prediction_engine() earlier in
+    # the daily pipeline, so it is available here. Left-join so the table
+    # degrades gracefully if the model hasn't been trained yet.
+    if "predictions" in inspect(engine).get_table_names():
+        predictions = pd.read_sql(
+            "SELECT date, ticker, prediction_score FROM predictions",
+            engine
+        )
+        df = df.merge(predictions, on=["date", "ticker"], how="left")
+    else:
+        df["prediction_score"] = float("nan")
 
     # ---------- Write to DB ----------
     today = df["date"].max()

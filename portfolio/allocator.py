@@ -24,11 +24,27 @@ def run_allocator():
     for sector in sectors:
         sector_df = buys[buys["sector"] == sector].copy()
 
-        total_score = sector_df["score"].sum()
+        # Use ML prediction_score for within-sector position sizing.
+        # Clip at 0 so weights stay positive (negative predictions → 0 weight).
+        # Fall back to RSI-based score if predictions are unavailable.
+        # If every stock in the sector clips to 0, allocate equally.
+        if "prediction_score" in sector_df.columns:
+            sector_df["alloc_score"] = (
+                sector_df["prediction_score"]
+                .fillna(sector_df["score"])
+                .clip(lower=0)
+            )
+        else:
+            sector_df["alloc_score"] = sector_df["score"]
 
-        sector_df["allocation_pct"] = (
-            (sector_df["score"] / total_score) * sector_weight
-        )
+        total_score = sector_df["alloc_score"].sum()
+
+        if total_score == 0:
+            sector_df["allocation_pct"] = sector_weight / len(sector_df)
+        else:
+            sector_df["allocation_pct"] = (
+                (sector_df["alloc_score"] / total_score) * sector_weight
+            )
 
         allocations.append(sector_df)
 

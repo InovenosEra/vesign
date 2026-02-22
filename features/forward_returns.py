@@ -16,4 +16,8 @@ def compute_forward_returns():
         prices.groupby("ticker")["close"].shift(-20) / prices["close"] - 1
     )
 
+    # Drop rows where either forward return is unknown (last 20 trading days
+    # per ticker). These rows cannot serve as valid training labels.
+    prices = prices.dropna(subset=["fwd_5d", "fwd_20d"])
+
     prices.to_sql("forward_returns", engine, if_exists="replace", index=False)

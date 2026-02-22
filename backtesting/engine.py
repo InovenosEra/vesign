@@ -51,7 +51,18 @@ def build_trade_log():
     print("Trade log created")
 
 
-def run_backtest():
+def run_backtest(eval_start_date=None):
+    """
+    Evaluate strategy returns on historical signals.
+
+    Parameters
+    ----------
+    eval_start_date : str or None
+        Only evaluate signals on or after this date (format "YYYY-MM-DD").
+        Pass this in the research pipeline so the backtest covers only the
+        out-of-sample period — dates the model was never trained on.
+        Defaults to None, which evaluates all available signals.
+    """
 
     print("Running backtest...")
 
@@ -60,6 +71,11 @@ def run_backtest():
 
     merged = signals.merge(prices, on=["date", "ticker"])
     merged = merged.sort_values(["ticker", "date"])
+
+    if eval_start_date is not None:
+        eval_start_date = pd.Timestamp(eval_start_date)
+        merged = merged[merged["date"] >= eval_start_date]
+        print(f"Evaluating signals from {eval_start_date.date()} onwards (out-of-sample)")
 
     merged["next_close"] = merged.groupby("ticker")["close"].shift(-1)
 

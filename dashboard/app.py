@@ -183,6 +183,26 @@ def apply_search(df):
     return df
 
 
+def format_dates(df):
+    date_cols = [c for c in df.columns if "date" in c.lower()]
+    for col in date_cols:
+        try:
+            df[col] = pd.to_datetime(df[col]).dt.strftime("%d/%m/%y")
+        except Exception:
+            pass
+    return df
+
+
+def reorder_columns(df):
+    cols = list(df.columns)
+    priority = []
+    for col in ["date", "company", "logo_url", "ticker"]:
+        if col in cols:
+            priority.append(col)
+    remaining = [c for c in cols if c not in priority]
+    return df[priority + remaining]
+
+
 # ------------------------------
 # DISPLAY FUNCTION
 # ------------------------------
@@ -228,7 +248,16 @@ def display_section(title, query):
         df = add_live_price(df)
         df = add_live_variance(df)
 
-    st.dataframe(df, width="stretch", hide_index=True)
+    df = format_dates(df)
+    df = reorder_columns(df)
+
+    column_config = {}
+    if "logo_url" in df.columns:
+        column_config["logo_url"] = st.column_config.ImageColumn(
+            label="Logo", width="small"
+        )
+
+    st.dataframe(df, use_container_width=True, hide_index=True, column_config=column_config or None)
 
 
 # ------------------------------
