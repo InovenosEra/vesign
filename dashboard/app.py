@@ -100,7 +100,7 @@ st.markdown(f"""
 <div id="sticky-header">
   <h1>Vesign Trading System</h1>
   <div>
-    <div class="refresh-label">Last refresh: {st.session_state.last_refresh}</div>
+    <div class="refresh-label">Last Update: <span id="last-update-time"></span></div>
     <div id="market-status"></div>
   </div>
 </div>
@@ -151,6 +151,13 @@ components.html("""
   }
   tick();
   setInterval(tick, 1000);
+
+  // Set last update time in user's local timezone
+  const timeEl = window.parent.document.getElementById("last-update-time");
+  if (timeEl) {
+    timeEl.textContent = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false});
+  }
+
 })();
 </script>
 """, height=0)
@@ -187,7 +194,7 @@ def market_is_open():
     return now.weekday() < 5 and dt_time(9, 30) <= now.time() <= dt_time(16, 0)
 
 
-def add_live_price(df):
+def add_live_price(df, allowed_tickers=None):
 
     # ---------- 1. empty dataframe ----------
     if df.empty:
@@ -201,6 +208,8 @@ def add_live_price(df):
 
     # ---------- 3. get tickers safely ----------
     tickers = df["ticker"].dropna().unique().tolist()
+    if allowed_tickers is not None:
+        tickers = [t for t in tickers if t in allowed_tickers]
 
     if len(tickers) == 0:
         df["Live Price"] = "-"
@@ -321,7 +330,7 @@ def reorder_columns(df):
 # DISPLAY FUNCTION
 # ------------------------------
 
-def display_section(title, query):
+def display_section(title, query, show_live=True, allowed_tickers=None):
 
     df = pd.read_sql(query, engine)
 
@@ -358,8 +367,8 @@ def display_section(title, query):
     if "market_cap" in df.columns:
         df = df.sort_values("market_cap", ascending=False, na_position="last")
 
-    if "close" in df.columns:
-        df = add_live_price(df)
+    if show_live and "close" in df.columns:
+        df = add_live_price(df, allowed_tickers=allowed_tickers)
         df = add_live_variance(df)
 
     if "fair_value_upside" in df.columns:
@@ -400,33 +409,37 @@ def display_section(title, query):
 # SECTIONS
 # ------------------------------
 
-display_section(
-    "Today's BUY signals",
-    """
-    SELECT s.*, c.company, c.logo_url
-    FROM signals s
-    LEFT JOIN companies c
-    ON s.ticker = c.ticker
-    WHERE DATE (s.date) = (
-        SELECT DATE(MAX(date)) FROM signals
+@st.fragment(run_every="2m")
+def live_signals():
+    display_section(
+        "Today's BUY signals",
+        """
+        SELECT s.*, c.company, c.logo_url
+        FROM signals s
+        LEFT JOIN companies c
+        ON s.ticker = c.ticker
+        WHERE DATE (s.date) = (
+            SELECT DATE(MAX(date)) FROM signals
+        )
+        AND s.signal = 'BUY'
+        """
     )
-    AND s.signal = 'BUY'
-    """
-)
 
-display_section(
-    "Today's SELL signals",
-    """
-    SELECT s.*, c.company, c.logo_url
-    FROM signals s
-    LEFT JOIN companies c
-    ON s.ticker = c.ticker
-    WHERE DATE(s.date) = (
-        SELECT DATE(MAX(date)) FROM signals
+    display_section(
+        "Today's SELL signals",
+        """
+        SELECT s.*, c.company, c.logo_url
+        FROM signals s
+        LEFT JOIN companies c
+        ON s.ticker = c.ticker
+        WHERE DATE(s.date) = (
+            SELECT DATE(MAX(date)) FROM signals
+        )
+        AND s.signal = 'SELL'
+        """
     )
-    AND s.signal = 'SELL'
-    """
-)
+
+live_signals()
 
 display_section(
     "Signals",
@@ -437,7 +450,8 @@ display_section(
     ON s.ticker = c.ticker
     WHERE DATE(s.date) >= DATE('now', '-12 months')
     ORDER BY s.date DESC
-    """
+    """,
+    show_live=False
 )
 
 inspector = inspect(engine)
