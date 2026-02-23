@@ -545,7 +545,7 @@ else:
         if col == "logo_url":
             tx_col_cfg[col] = st.column_config.ImageColumn(label="Logo", width="small")
         elif col == "return_pct":
-            tx_col_cfg[col] = st.column_config.NumberColumn(label="Return %", format="%.2f%%")
+            tx_col_cfg[col] = st.column_config.NumberColumn(label="% Yield", format="%.2f%%")
         elif col in ("buy_price", "sell_price"):
             tx_col_cfg[col] = st.column_config.TextColumn(label=label)
         elif col == "rsi":
