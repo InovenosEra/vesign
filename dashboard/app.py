@@ -538,6 +538,9 @@ else:
     trades_df["sell_date"] = trades_df["sell_date"].dt.strftime("%d/%m/%y")
     trades_df["buy_price"]  = trades_df["buy_price"].apply(lambda x: f"{x:,.2f}" if pd.notna(x) else "-")
     trades_df["sell_price"] = trades_df["sell_price"].apply(lambda x: f"{x:,.2f}" if pd.notna(x) else "-")
+    trades_df["return_pct"] = trades_df["return_pct"].apply(
+        lambda x: f"▲ {x:.2f}%" if x > 0 else f"▼ {x:.2f}%"
+    )
 
     tx_col_cfg = {}
     for col in trades_df.columns:
@@ -545,7 +548,7 @@ else:
         if col == "logo_url":
             tx_col_cfg[col] = st.column_config.ImageColumn(label="Logo", width="small")
         elif col == "return_pct":
-            tx_col_cfg[col] = st.column_config.NumberColumn(label="% Yield", format="%.2f%%")
+            tx_col_cfg[col] = st.column_config.TextColumn(label="% Yield")
         elif col in ("buy_price", "sell_price"):
             tx_col_cfg[col] = st.column_config.TextColumn(label=label)
         elif col == "rsi":
@@ -553,4 +556,5 @@ else:
         else:
             tx_col_cfg[col] = st.column_config.Column(label=label)
 
-    st.dataframe(trades_df, use_container_width=True, hide_index=True, column_config=tx_col_cfg)
+    styled_trades = trades_df.style.map(style_variance, subset=["return_pct"])
+    st.dataframe(styled_trades, use_container_width=True, hide_index=True, column_config=tx_col_cfg)
