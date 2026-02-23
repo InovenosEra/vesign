@@ -411,6 +411,15 @@ def display_section(title, query, show_live=True, allowed_tickers=None):
 
 @st.fragment(run_every="2m")
 def live_signals():
+    components.html("""
+    <script>
+    const timeEl = window.parent.document.getElementById("last-update-time");
+    if (timeEl) {
+      timeEl.textContent = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false});
+    }
+    </script>
+    """, height=0)
+
     display_section(
         "Today's BUY signals",
         """
