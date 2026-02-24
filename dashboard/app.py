@@ -2,7 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import yfinance as yf
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text, event as sa_event
+from sqlalchemy.pool import NullPool
 from datetime import datetime, time as dt_time, UTC
 import pytz
 import time
@@ -46,7 +47,14 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-engine = create_engine(f"sqlite:///{DB_PATH}")
+engine = create_engine(f"sqlite:///{DB_PATH}", poolclass=NullPool)
+
+@sa_event.listens_for(engine, "connect")
+def _set_sqlite_pragmas(dbapi_conn, _):
+    cur = dbapi_conn.cursor()
+    cur.execute("PRAGMA journal_mode=WAL")   # concurrent reads + single writer
+    cur.execute("PRAGMA busy_timeout=30000") # wait up to 30 s before raising
+    cur.close()
 
 # Wait until signals table exists (max ~30 seconds)
 for _ in range(6):
@@ -58,6 +66,56 @@ for _ in range(6):
 else:
     st.error("Signals table not found. Run production pipeline first.")
     st.stop()
+
+# --- Watchlist schema setup / migration ---
+_wl_insp = inspect(engine)
+_wl_existing = set(_wl_insp.get_table_names())
+
+with engine.begin() as conn:
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS watchlist_lists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        )
+    """))
+
+if "watchlist" in _wl_existing:
+    _wl_cols = {c["name"] for c in _wl_insp.get_columns("watchlist")}
+    if "list_id" not in _wl_cols:
+        # Migrate old single-table schema → new schema, preserving data under "Default"
+        _wl_old = pd.read_sql("SELECT ticker, note FROM watchlist", engine)
+        with engine.begin() as conn:
+            conn.execute(text("INSERT OR IGNORE INTO watchlist_lists (name) VALUES ('Default')"))
+        _wl_default_id = int(
+            pd.read_sql("SELECT id FROM watchlist_lists WHERE name='Default'", engine)["id"].iloc[0]
+        )
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE watchlist"))
+            conn.execute(text("""
+                CREATE TABLE watchlist (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    list_id INTEGER NOT NULL REFERENCES watchlist_lists(id),
+                    ticker TEXT NOT NULL,
+                    note TEXT DEFAULT '',
+                    UNIQUE(list_id, ticker)
+                )
+            """))
+            for _, _r in _wl_old.iterrows():
+                conn.execute(
+                    text("INSERT OR IGNORE INTO watchlist (list_id, ticker, note) VALUES (:lid, :t, :n)"),
+                    {"lid": _wl_default_id, "t": _r["ticker"], "n": _r["note"]}
+                )
+else:
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS watchlist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                list_id INTEGER NOT NULL REFERENCES watchlist_lists(id),
+                ticker TEXT NOT NULL,
+                note TEXT DEFAULT '',
+                UNIQUE(list_id, ticker)
+            )
+        """))
 
 if "last_refresh" not in st.session_state:
     et = pytz.timezone("US/Eastern")
@@ -165,6 +223,24 @@ components.html("""
 if "search_input" not in st.session_state:
     st.session_state.search_input = ""
 
+if "wl_selected_list" not in st.session_state:
+    st.session_state.wl_selected_list = ""
+
+if "wl_create_msg" not in st.session_state:
+    st.session_state.wl_create_msg = None
+
+if "wl_add_msg" not in st.session_state:
+    st.session_state.wl_add_msg = None
+
+if "wl_save_msg" not in st.session_state:
+    st.session_state.wl_save_msg = None
+
+if "wl_ticker" not in st.session_state:
+    st.session_state.wl_ticker = ""
+
+if "wl_note" not in st.session_state:
+    st.session_state.wl_note = ""
+
 def clear_search():
     st.session_state.search_input = ""
 
@@ -194,6 +270,31 @@ def market_is_open():
     return now.weekday() < 5 and dt_time(9, 30) <= now.time() <= dt_time(16, 0)
 
 
+@st.cache_data(ttl=60)
+def _fetch_live_prices(tickers_tuple: tuple) -> dict:
+    """Batch-fetch latest prices for all tickers in one yf.download call. Cached 60 s."""
+    tickers = list(tickers_tuple)
+    try:
+        query = tickers[0] if len(tickers) == 1 else tickers
+        raw = yf.download(query, period="1d", interval="1m",
+                          progress=False, auto_adjust=True)
+        close = raw.get("Close", pd.DataFrame() if len(tickers) > 1 else pd.Series(dtype=float))
+        prices = {}
+        if len(tickers) == 1:
+            series = close.dropna() if isinstance(close, pd.Series) else pd.Series(dtype=float)
+            prices[tickers[0]] = float(series.iloc[-1]) if not series.empty else None
+        else:
+            for t in tickers:
+                try:
+                    series = close[t].dropna()
+                    prices[t] = float(series.iloc[-1]) if not series.empty else None
+                except Exception:
+                    prices[t] = None
+    except Exception:
+        prices = {t: None for t in tickers}
+    return prices
+
+
 def add_live_price(df, allowed_tickers=None):
 
     # ---------- 1. empty dataframe ----------
@@ -215,18 +316,8 @@ def add_live_price(df, allowed_tickers=None):
         df["Live Price"] = "-"
         return df
 
-    # ---------- 4. download safely ----------
-    prices = {}
-
-    for t in tickers:
-        try:
-            hist = yf.Ticker(t).history(period="1d", interval="1m")
-            if hist is None or hist.empty:
-                prices[t] = None
-            else:
-                prices[t] = float(hist["Close"].dropna().iloc[-1])
-        except Exception:
-            prices[t] = None
+    # ---------- 4. batch download (cached 60 s) ----------
+    prices = _fetch_live_prices(tuple(sorted(tickers)))
     df["Live Price"] = df["ticker"].map(prices)
     return df
 
@@ -327,6 +418,100 @@ def reorder_columns(df):
 
 
 # ------------------------------
+# WATCHLIST HELPERS
+# ------------------------------
+
+def load_list_names():
+    return pd.read_sql("SELECT name FROM watchlist_lists ORDER BY id", engine)["name"].tolist()
+
+
+def _cb_delete_list():
+    name = st.session_state.wl_selected_list
+    if not name:
+        return
+    list_id = get_list_id(name)
+    if list_id is not None:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM watchlist WHERE list_id = :lid"), {"lid": list_id})
+            conn.execute(text("DELETE FROM watchlist_lists WHERE id = :lid"), {"lid": list_id})
+    st.session_state.wl_selected_list = ""
+
+
+def _cb_add_ticker():
+    list_id = get_list_id(st.session_state.wl_selected_list)
+    if list_id is None:
+        st.session_state.wl_add_msg = ("error", "List not found.")
+        return
+    tv = st.session_state.wl_ticker.strip().upper()
+    nv = st.session_state.wl_note.strip()
+    if not tv:
+        st.session_state.wl_add_msg = ("warning", "Please enter a ticker symbol.")
+        return
+    try:
+        with engine.begin() as conn:
+            r = conn.execute(
+                text("INSERT OR IGNORE INTO watchlist (list_id, ticker, note) VALUES (:lid, :ticker, :note)"),
+                {"lid": list_id, "ticker": tv, "note": nv}
+            )
+        if r.rowcount > 0:
+            st.session_state.wl_add_msg = ("success", f"Added {tv}.")
+        else:
+            st.session_state.wl_add_msg = ("warning", f"{tv} is already in this list.")
+    except Exception as e:
+        st.session_state.wl_add_msg = ("error", str(e))
+
+
+def _cb_create_list():
+    name = st.session_state.wl_new_list_name.strip()
+    if not name:
+        st.session_state.wl_create_msg = ("warning", "Please enter a list name.")
+        return
+    try:
+        with engine.begin() as conn:
+            r = conn.execute(
+                text("INSERT OR IGNORE INTO watchlist_lists (name) VALUES (:name)"),
+                {"name": name}
+            )
+        if r.rowcount > 0:
+            st.session_state.wl_selected_list = name
+            st.session_state.wl_create_msg = ("success", f"Created '{name}'.")
+        else:
+            st.session_state.wl_create_msg = ("warning", f"A list named '{name}' already exists.")
+    except Exception as e:
+        st.session_state.wl_create_msg = ("error", str(e))
+
+
+def get_list_id(list_name):
+    result = pd.read_sql(
+        "SELECT id FROM watchlist_lists WHERE name = :name", engine, params={"name": list_name}
+    )
+    return int(result["id"].iloc[0]) if not result.empty else None
+
+
+def load_watchlist(list_id):
+    return pd.read_sql(
+        "SELECT id, ticker, note FROM watchlist WHERE list_id = :lid ORDER BY id",
+        engine, params={"lid": list_id}
+    )
+
+
+def watchlist_signal_data(tickers):
+    if not tickers:
+        return pd.DataFrame()
+    ticker_list = "','".join(tickers)
+    return pd.read_sql(f"""
+        SELECT s.ticker, c.company, c.logo_url, s.close, s.signal, s.rsi,
+               s.fair_value_upside, s.target_mean_price
+        FROM signals s
+        LEFT JOIN companies c ON s.ticker = c.ticker
+        WHERE s.ticker IN ('{ticker_list}')
+          AND DATE(s.date) = (
+              SELECT DATE(MAX(s2.date)) FROM signals s2 WHERE s2.ticker = s.ticker
+          )
+    """, engine)
+
+
+# ------------------------------
 # DISPLAY FUNCTION
 # ------------------------------
 
@@ -400,9 +585,9 @@ def display_section(title, query, show_live=True, allowed_tickers=None):
 
     if "Live Variance" in df.columns:
         styled = df.style.map(style_variance, subset=["Live Variance"])
-        st.dataframe(styled, use_container_width=True, hide_index=True, column_config=column_config)
+        st.dataframe(styled, width='stretch', hide_index=True, column_config=column_config)
     else:
-        st.dataframe(df, use_container_width=True, hide_index=True, column_config=column_config)
+        st.dataframe(df, width='stretch', hide_index=True, column_config=column_config)
 
 
 # ------------------------------
@@ -448,6 +633,159 @@ def live_signals():
         AND s.signal = 'SELL'
         """
     )
+
+# ------------------------------
+# WATCHLIST SECTION
+# ------------------------------
+
+st.header("My Watchlists")
+
+# --- List selector + create / delete ---
+sel_col, del_col, name_col, btn_col = st.columns([3, 1, 3, 1])
+
+with sel_col:
+    _wl_list_names = load_list_names()
+    st.selectbox(
+        "Load a list",
+        options=[""] + _wl_list_names,
+        key="wl_selected_list",
+        format_func=lambda x: "— select a list —" if x == "" else x,
+    )
+
+with del_col:
+    st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
+    st.button(
+        "Delete",
+        key="wl_delete_list",
+        disabled=not st.session_state.wl_selected_list,
+        on_click=_cb_delete_list,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with name_col:
+    st.text_input("New list name", key="wl_new_list_name", placeholder="e.g. Tech Picks")
+
+with btn_col:
+    st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
+    st.button("Create", key="wl_create_list", on_click=_cb_create_list)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+_create_msg = st.session_state.pop("wl_create_msg", None)
+if _create_msg:
+    level, msg = _create_msg
+    getattr(st, level)(msg)
+
+# --- Ticker management (only when a list is selected) ---
+_selected_list = st.session_state.wl_selected_list
+if _selected_list:
+    _list_id = get_list_id(_selected_list)
+
+    if _list_id is not None:
+        st.markdown(f"**{_selected_list}**")
+
+        # Add ticker row
+        tc1, tc2, tc3 = st.columns([2, 4, 1])
+        with tc1:
+            st.text_input("Ticker", key="wl_ticker")
+        with tc2:
+            st.text_input("Note (optional)", key="wl_note")
+        with tc3:
+            st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
+            st.button("Add", key="wl_add", on_click=_cb_add_ticker)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        _add_msg = st.session_state.pop("wl_add_msg", None)
+        if _add_msg:
+            level, msg = _add_msg
+            getattr(st, level)(msg)
+
+        # Data editor
+        wl_df = load_watchlist(_list_id)
+        if wl_df.empty:
+            st.info("This list is empty. Add a ticker above.")
+        else:
+            try:
+                signal_data = watchlist_signal_data(wl_df["ticker"].tolist())
+                display_df = wl_df.merge(signal_data, on="ticker", how="left")
+
+                # Fill NaN for all string/image columns to avoid column config errors
+                for _col in ["note", "company", "signal", "logo_url"]:
+                    if _col in display_df.columns:
+                        display_df[_col] = display_df[_col].fillna("").astype(str)
+
+                display_df = add_live_price(display_df)
+                display_df = add_live_variance(display_df)
+
+                # Normalise Live Price → always a plain string (TextColumn requirement)
+                if "Live Price" in display_df.columns:
+                    display_df["Live Price"] = display_df["Live Price"].apply(
+                        lambda x: f"{x:,.2f}" if isinstance(x, (int, float)) and not pd.isna(x)
+                        else (str(x) if x is not None else "-")
+                    )
+
+                if "fair_value_upside" in display_df.columns:
+                    display_df["fair_value_upside"] = pd.to_numeric(
+                        display_df["fair_value_upside"], errors="coerce"
+                    ) * 100
+
+                desired_cols = ["logo_url", "ticker", "company", "signal", "close",
+                                "rsi", "fair_value_upside", "target_mean_price",
+                                "Live Price", "Live Variance", "note"]
+                available_cols = [c for c in desired_cols if c in display_df.columns]
+                editor_df = display_df[available_cols].copy().reset_index(drop=True)
+
+                wl_col_config = {
+                    "logo_url":          st.column_config.ImageColumn("Logo", width="small"),
+                    "ticker":            st.column_config.TextColumn("Ticker", disabled=True),
+                    "company":           st.column_config.TextColumn("Company", disabled=True),
+                    "note":              st.column_config.TextColumn("Note"),
+                    "signal":            st.column_config.TextColumn("Signal", disabled=True),
+                    "close":             st.column_config.NumberColumn("Close", format="%.2f", disabled=True),
+                    "Live Price":        st.column_config.TextColumn("Live Price", disabled=True),
+                    "Live Variance":     st.column_config.TextColumn("Live Variance", disabled=True),
+                    "rsi":               st.column_config.NumberColumn("RSI", format="%.2f", disabled=True),
+                    "fair_value_upside": st.column_config.NumberColumn("Analyst Upside", format="%.2f%%", disabled=True),
+                    "target_mean_price": st.column_config.NumberColumn("Target Price", format="%.2f", disabled=True),
+                }
+
+                edited = st.data_editor(
+                    editor_df,
+                    column_config=wl_col_config,
+                    num_rows="dynamic",
+                    hide_index=True,
+                    key=f"wl_editor_{_selected_list}",
+                )
+
+                # Save uses `edited` directly — avoids the session-state delta-dict issue
+                if st.button("Save changes", key="wl_save"):
+                    original_tickers = set(wl_df["ticker"].tolist())
+                    remaining_tickers = set(edited["ticker"].dropna().tolist())
+                    try:
+                        with engine.begin() as conn:
+                            for removed in original_tickers - remaining_tickers:
+                                conn.execute(
+                                    text("DELETE FROM watchlist WHERE list_id = :lid AND ticker = :ticker"),
+                                    {"lid": _list_id, "ticker": removed}
+                                )
+                            for _, row in edited.iterrows():
+                                if row.get("ticker") in original_tickers:
+                                    conn.execute(
+                                        text("UPDATE watchlist SET note = :note WHERE list_id = :lid AND ticker = :ticker"),
+                                        {"note": str(row["note"]) if pd.notna(row.get("note", "")) else "",
+                                         "lid": _list_id, "ticker": row["ticker"]}
+                                    )
+                        st.success("Watchlist saved.")
+                    except Exception as _e:
+                        st.error(str(_e))
+
+            except Exception as e:
+                import traceback as _tb
+                st.error(f"Watchlist error: {e}")
+                st.code(_tb.format_exc())
+
+# ------------------------------
+# LIVE SIGNALS
+# ------------------------------
 
 live_signals()
 
@@ -567,4 +905,4 @@ else:
             tx_col_cfg[col] = st.column_config.Column(label=label)
 
     styled_trades = trades_df.style.map(style_variance, subset=["return_pct"])
-    st.dataframe(styled_trades, use_container_width=True, hide_index=True, column_config=tx_col_cfg)
+    st.dataframe(styled_trades, width='stretch', hide_index=True, column_config=tx_col_cfg)
