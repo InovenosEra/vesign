@@ -79,6 +79,40 @@ def load_universe():
 
     tickers = companies["ticker"].tolist()
 
-    print(f"Loaded {len(tickers)} tickers")
+    print(f"Loaded {len(tickers)} S&P 500 tickers")
+
+    # ── Extend universe with any watchlist tickers outside the S&P 500 ──
+    try:
+        watchlist_tickers = pd.read_sql(
+            "SELECT DISTINCT ticker FROM watchlist", engine
+        )["ticker"].tolist()
+
+        extra = [t for t in watchlist_tickers if t not in set(tickers)]
+
+        if extra:
+            print(f"Adding {len(extra)} watchlist ticker(s) to universe: {extra}")
+
+            # Ensure each extra ticker has a row in the companies table
+            existing_co = set(
+                pd.read_sql("SELECT ticker FROM companies", engine)["ticker"]
+            )
+            new_co = [t for t in extra if t not in existing_co]
+            if new_co:
+                pd.DataFrame({
+                    "ticker":   new_co,
+                    "company":  new_co,
+                    "sector":   [""] * len(new_co),
+                    "logo_url": [
+                        f"https://financialmodelingprep.com/image-stock/{t}.png"
+                        for t in new_co
+                    ],
+                }).to_sql("companies", engine, if_exists="append", index=False)
+
+            tickers = tickers + extra
+
+    except Exception as e:
+        print(f"Could not add watchlist tickers to universe: {e}")
+
+    print(f"Total universe: {len(tickers)} tickers")
 
     return tickers
