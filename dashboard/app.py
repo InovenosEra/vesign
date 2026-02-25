@@ -1,6 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+
+pd.set_option("styler.render.max_elements", 5_000_000)
 import yfinance as yf
 from sqlalchemy import create_engine, inspect, text, event as sa_event
 from sqlalchemy.pool import NullPool
@@ -694,7 +696,7 @@ def display_section(title, query, show_live=True, allowed_tickers=None):
     df = format_dates(df)
     df = reorder_columns(df)
 
-    LABEL_OVERRIDES = {"rsi": "RSI", "fair_value_upside": "Potential Upside", "target_mean_price": "Base Price", "target_high_price": "High Price", "target_low_price": "Low Price"}
+    LABEL_OVERRIDES = {"rsi": "RSI", "close": "Current Price", "fair_value_upside": "Prediction", "target_mean_price": "Base Price", "target_high_price": "High Price", "target_low_price": "Low Price"}
 
     column_config = {}
     for col in df.columns:
@@ -708,11 +710,16 @@ def display_section(title, query, show_live=True, allowed_tickers=None):
         else:
             column_config[col] = st.column_config.Column(label=label)
 
+    styled = df.style
     if "Live Variance" in df.columns:
-        styled = df.style.map(style_variance, subset=["Live Variance"])
-        st.dataframe(styled, width='stretch', hide_index=True, column_config=column_config)
-    else:
-        st.dataframe(df, width='stretch', hide_index=True, column_config=column_config)
+        styled = styled.map(style_variance, subset=["Live Variance"])
+    if "fair_value_upside" in df.columns:
+        styled = styled.map(
+            lambda v: "color: green" if isinstance(v, (int, float)) and v > 0
+                      else ("color: red" if isinstance(v, (int, float)) and v < 0 else ""),
+            subset=["fair_value_upside"]
+        )
+    st.dataframe(styled, width='stretch', hide_index=True, column_config=column_config)
 
 
 # ------------------------------
@@ -867,7 +874,7 @@ def watchlist_section():
                         "company":           st.column_config.TextColumn("Company", disabled=True),
                         "note":              st.column_config.TextColumn("Note"),
                         "signal":            st.column_config.TextColumn("Signal", disabled=True),
-                        "close":             st.column_config.NumberColumn("Close", format="%.2f", disabled=True),
+                        "close":             st.column_config.NumberColumn("Current Price", format="%.2f", disabled=True),
                         "Live Price":        st.column_config.TextColumn("Live Price", disabled=True),
                         "Live Variance":     st.column_config.TextColumn("Live Variance", disabled=True),
                         "rsi":               st.column_config.NumberColumn("RSI", format="%.2f", disabled=True),
