@@ -46,7 +46,6 @@ st.markdown(
             height: 0 !important;
             width: 0 !important;
             overflow: hidden !important;
-            pointer-events: none !important;
         }
         [data-testid="stToolbar"],
         [data-testid="stStatusWidget"],
@@ -872,16 +871,19 @@ def watchlist_section():
                         "Live Price":        st.column_config.TextColumn("Live Price", disabled=True),
                         "Live Variance":     st.column_config.TextColumn("Live Variance", disabled=True),
                         "rsi":               st.column_config.NumberColumn("RSI", format="%.2f", disabled=True),
-                        "fair_value_upside": st.column_config.NumberColumn("Analyst Upside", format="%.2f%%", disabled=True),
+                        "fair_value_upside": st.column_config.NumberColumn("Prediction", format="%.2f%%", disabled=True),
                         "target_mean_price": st.column_config.NumberColumn("Target Price", format="%.2f", disabled=True),
                     }
 
+                    styled_df = editor_df.style
                     if "Live Variance" in editor_df.columns:
-                        styled_df = editor_df.style.map(
-                            style_variance, subset=["Live Variance"]
+                        styled_df = styled_df.map(style_variance, subset=["Live Variance"])
+                    if "fair_value_upside" in editor_df.columns:
+                        styled_df = styled_df.map(
+                            lambda v: "color: green" if isinstance(v, (int, float)) and v > 0
+                                      else ("color: red" if isinstance(v, (int, float)) and v < 0 else ""),
+                            subset=["fair_value_upside"]
                         )
-                    else:
-                        styled_df = editor_df
 
                     edited = st.data_editor(
                         styled_df,
