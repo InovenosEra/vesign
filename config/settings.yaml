@@ -8,7 +8,7 @@ scoring:
 database:
   name: vesign.db
 
-trailing_stop_pct: 0.07
+trailing_stop_pct: 0.10
 volume_ratio_threshold: 1.5
 pct_from_52w_high_min: 0.10
 

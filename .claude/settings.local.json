@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/inovenos/PycharmProjects/Vesign/*.py 2>/dev/null || echo \"No top-level Python files\")",
+      "Bash(streamlit run dashboard/app.py)",
+      "Bash(pkill -f \"streamlit run dashboard/app.py\" 2>/dev/null; sleep 1; streamlit run dashboard/app.py)",
+      "Bash(.venv/bin/streamlit run dashboard/app.py --server.port 8501)"
+    ]
+  }
+}
