@@ -4,7 +4,11 @@
       "Bash(ls -la /Users/inovenos/PycharmProjects/Vesign/*.py 2>/dev/null || echo \"No top-level Python files\")",
       "Bash(streamlit run dashboard/app.py)",
       "Bash(pkill -f \"streamlit run dashboard/app.py\" 2>/dev/null; sleep 1; streamlit run dashboard/app.py)",
-      "Bash(.venv/bin/streamlit run dashboard/app.py --server.port 8501)"
+      "Bash(.venv/bin/streamlit run dashboard/app.py --server.port 8501)",
+      "Bash(pkill -f \"streamlit run dashboard/app.py\" && sleep 2 && .venv/bin/streamlit run dashboard/app.py --server.port 8501)",
+      "Bash(git -C /Users/inovenos/PycharmProjects/Vesign status && git -C /Users/inovenos/PycharmProjects/Vesign diff --stat)",
+      "Bash(git -C /Users/inovenos/PycharmProjects/Vesign diff .claude/settings.local.json)",
+      "Bash(git -C /Users/inovenos/PycharmProjects/Vesign add .claude/settings.local.json && git -C /Users/inovenos/PycharmProjects/Vesign commit -m \"$\\(cat <<'EOF'\nUpdate Claude local permissions with new allowed commands\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git -C /Users/inovenos/PycharmProjects/Vesign push origin main)"
     ]
   }
 }
