@@ -39,12 +39,15 @@ export const getMarketStatus = () => get('/market/status')
 export const getSignalsToday = (signal) =>
   get('/signals/today' + (signal ? `?signal=${signal}` : ''))
 
-export const getSignals = ({ signal, search, months = 12 } = {}) => {
-  const params = new URLSearchParams({ months })
+export const getSignals = ({ signal, search, months = 12, page = 1, page_size = 100, sort_by = 'date', sort_dir = 'desc' } = {}) => {
+  const params = new URLSearchParams({ months, page, page_size, sort_by, sort_dir })
   if (signal) params.set('signal', signal)
   if (search) params.set('search', search)
   return get(`/signals?${params}`)
 }
+
+export const getSignalsByTickers = (tickers) =>
+  get(`/signals/by-tickers?tickers=${tickers.join(',')}`)
 
 // --- Live prices -----------------------------------------------------------
 export const getLivePrices = (tickers) =>

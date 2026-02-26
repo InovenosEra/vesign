@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -173,33 +174,90 @@ def signals_today(signal: Optional[str] = None):
     return _records(df)
 
 
+_SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price"}
+_TICKER_RE = re.compile(r'^[A-Z0-9.\-]{1,10}$')
+
+
 @app.get("/api/signals")
 def signals(
     signal: Optional[str] = None,
     search: Optional[str] = None,
     months: int = Query(default=12, ge=1, le=120),
+    sort_by: str = Query(default="date"),
+    sort_dir: str = Query(default="desc"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=10, le=500),
 ):
-    """Signals for the last N months. Optional filters: signal type, search term."""
-    with engine.connect() as conn:
-        df = pd.read_sql(text(f"""
-            SELECT s.*, c.company, c.logo_url
-            FROM signals s
-            LEFT JOIN companies c ON s.ticker = c.ticker
-            WHERE DATE(s.date) >= DATE('now', '-{months} months')
-            ORDER BY s.date DESC
-        """), conn)
+    """Signals for the last N months with server-side sort and pagination."""
+    sort_col = sort_by if sort_by in _SORTABLE else "date"
+    direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
+
+    conditions = [f"DATE(s.date) >= DATE('now', '-{months} months')"]
+    params: dict = {}
 
     if signal:
-        df = df[df["signal"] == signal.upper()]
+        conditions.append("s.signal = :signal")
+        params["signal"] = signal.upper()
 
     if search:
-        s = search.lower()
-        mask = (
-            df["ticker"].str.lower().str.contains(s, na=False) |
-            df["company"].str.lower().str.contains(s, na=False)
-        )
-        df = df[mask]
+        conditions.append("(LOWER(s.ticker) LIKE :search OR LOWER(c.company) LIKE :search)")
+        params["search"] = f"%{search.lower()}%"
 
+    where = "WHERE " + " AND ".join(conditions)
+
+    with engine.connect() as conn:
+        count_row = conn.execute(text(f"""
+            SELECT COUNT(*) AS total
+            FROM signals s
+            LEFT JOIN companies c ON s.ticker = c.ticker
+            {where}
+        """), params).fetchone()
+        total = count_row[0] if count_row else 0
+
+        df = pd.read_sql(text(f"""
+            SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
+                   s.target_mean_price, s.signal, c.company, c.logo_url
+            FROM signals s
+            LEFT JOIN companies c ON s.ticker = c.ticker
+            {where}
+            ORDER BY {sort_col} {direction}
+            LIMIT :limit OFFSET :offset
+        """), conn, params={**params, "limit": page_size, "offset": (page - 1) * page_size})
+
+    return {
+        "data": _records(df),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": max(1, -(-total // page_size)),  # ceiling division
+    }
+
+
+@app.get("/api/signals/by-tickers")
+def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ticker symbols")):
+    """Latest signal row for each of the given tickers (used by watchlist)."""
+    ticker_list = [
+        t.strip().upper() for t in tickers.split(",")
+        if t.strip() and _TICKER_RE.match(t.strip().upper())
+    ]
+    if not ticker_list:
+        raise HTTPException(status_code=400, detail="No valid tickers provided")
+
+    placeholders = "','".join(ticker_list)
+    with engine.connect() as conn:
+        df = pd.read_sql(text(f"""
+            SELECT s.ticker, c.company, c.logo_url,
+                   s.close, s.signal, s.rsi,
+                   s.fair_value_upside, s.target_mean_price
+            FROM signals s
+            INNER JOIN (
+                SELECT ticker, MAX(date) AS max_date
+                FROM signals
+                WHERE ticker IN ('{placeholders}')
+                GROUP BY ticker
+            ) latest ON s.ticker = latest.ticker AND s.date = latest.max_date
+            LEFT JOIN companies c ON s.ticker = c.ticker
+        """), conn)
     return _records(df)
 
 

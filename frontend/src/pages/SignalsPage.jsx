@@ -2,6 +2,11 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, getSignals, runPipeline, getPipelineStatus } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
+import { useSort } from '../hooks/useSort'
+
+// ---------------------------------------------------------------------------
+// Shared primitives
+// ---------------------------------------------------------------------------
 
 function SignalBadge({ signal }) {
   return <span className={`badge badge-${signal}`}>{signal}</span>
@@ -15,15 +20,12 @@ function PredictionCell({ value }) {
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>mkt closed</td>
-
   const live = prices[ticker]
   if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
-
-  const diff = live - closePrice
-  const pct  = closePrice ? (diff / closePrice) * 100 : 0
-  const cls  = diff >= 0 ? 'up' : 'down'
+  const diff  = live - closePrice
+  const pct   = closePrice ? (diff / closePrice) * 100 : 0
+  const cls   = diff >= 0 ? 'up' : 'down'
   const arrow = diff >= 0 ? '▲' : '▼'
-
   return (
     <td>
       <div>{live.toFixed(2)}</div>
@@ -34,10 +36,55 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   )
 }
 
-function SignalsTable({ rows, showSignal = true, prices = {}, marketOpen = false, showLive = false }) {
-  if (!rows || rows.length === 0) {
-    return <p className="empty">No signals found.</p>
-  }
+// Sortable <th> — used by client-side tables
+function Th({ label, col, sort, onSort }) {
+  const active = sort.key === col
+  return (
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }}>
+      {label}
+      <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
+        {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
+      </span>
+    </th>
+  )
+}
+
+// Server-side sortable <th> — used by the paginated all-signals table
+function ServerTh({ label, col, sortBy, sortDir, onSort }) {
+  const active = sortBy === col
+  return (
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }}>
+      {label}
+      <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
+        {active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
+      </span>
+    </th>
+  )
+}
+
+function Pagination({ page, pages, onChange }) {
+  if (pages <= 1) return null
+  return (
+    <div className="pagination">
+      <button disabled={page === 1} onClick={() => onChange(1)}>«</button>
+      <button disabled={page === 1} onClick={() => onChange(page - 1)}>‹ Prev</button>
+      <span>{page} / {pages}</span>
+      <button disabled={page === pages} onClick={() => onChange(page + 1)}>Next ›</button>
+      <button disabled={page === pages} onClick={() => onChange(pages)}>»</button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Today's table — small dataset, client-side sort, live prices
+// ---------------------------------------------------------------------------
+
+function TodayTable({ rows, prices, marketOpen }) {
+  const { sorted, sort, toggle } = useSort(rows, 'close', 'desc')
+
+  if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
+
+  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
 
   return (
     <div className="data-table-wrap">
@@ -45,38 +92,23 @@ function SignalsTable({ rows, showSignal = true, prices = {}, marketOpen = false
         <thead>
           <tr>
             <th></th>
-            <th>Ticker</th>
-            <th>Company</th>
-            <th>Date</th>
-            {showSignal && <th>Signal</th>}
-            <th>Price</th>
-            {showLive && <th>Live Price</th>}
-            <th>RSI</th>
-            <th>Prediction</th>
-            <th>Base Price</th>
+            {th('Ticker',      'ticker')}
+            {th('Company',     'company')}
+            {th('Price',       'close')}
+            <th>Live Price</th>
+            {th('RSI',         'rsi')}
+            {th('Prediction',  'fair_value_upside')}
+            {th('Base Price',  'target_mean_price')}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
+          {sorted.map((r, i) => (
             <tr key={i}>
-              <td>
-                {r.logo_url
-                  ? <img className="logo" src={r.logo_url} alt="" />
-                  : null}
-              </td>
+              <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
               <td><strong>{r.ticker}</strong></td>
               <td>{r.company ?? '—'}</td>
-              <td>{r.date ? r.date.slice(0, 10) : '—'}</td>
-              {showSignal && <td><SignalBadge signal={r.signal} /></td>}
               <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
-              {showLive && (
-                <LivePriceCell
-                  ticker={r.ticker}
-                  closePrice={r.close}
-                  prices={prices}
-                  marketOpen={marketOpen}
-                />
-              )}
+              <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
               <PredictionCell value={r.fair_value_upside} />
               <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
@@ -88,9 +120,64 @@ function SignalsTable({ rows, showSignal = true, prices = {}, marketOpen = false
   )
 }
 
+// ---------------------------------------------------------------------------
+// All-signals table — server-side sort + pagination
+// ---------------------------------------------------------------------------
+
+function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage }) {
+  if (!result) return null
+  const { data: rows, pages } = result
+
+  if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
+
+  const th = (label, col) =>
+    <ServerTh label={label} col={col} sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+
+  return (
+    <>
+      <div className="data-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              {th('Ticker',     'ticker')}
+              {th('Company',    'company')}
+              {th('Date',       'date')}
+              {th('Signal',     'signal')}
+              {th('Price',      'close')}
+              {th('RSI',        'rsi')}
+              {th('Prediction', 'fair_value_upside')}
+              {th('Base Price', 'target_mean_price')}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
+                <td><strong>{r.ticker}</strong></td>
+                <td>{r.company ?? '—'}</td>
+                <td>{r.date ? r.date.slice(0, 10) : '—'}</td>
+                <td><SignalBadge signal={r.signal} /></td>
+                <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
+                <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
+                <PredictionCell value={r.fair_value_upside} />
+                <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page} pages={pages} onChange={onPage} />
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline bar
+// ---------------------------------------------------------------------------
+
 function PipelineBar() {
   const [triggered, setTriggered] = useState(false)
-
   const { data: status, refetch } = useQuery({
     queryKey: ['pipeline-status'],
     queryFn: getPipelineStatus,
@@ -108,7 +195,6 @@ function PipelineBar() {
   }
 
   const running = status?.status === 'running'
-
   return (
     <div className="pipeline-bar">
       <button className="primary" onClick={handleRun} disabled={running}>
@@ -126,9 +212,36 @@ function PipelineBar() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function SignalsPage() {
   const [signalFilter, setSignalFilter] = useState('ALL')
-  const [search, setSearch] = useState('')
+  const [search, setSearch]             = useState('')
+  const [page, setPage]                 = useState(1)
+  const [sortBy, setSortBy]             = useState('date')
+  const [sortDir, setSortDir]           = useState('desc')
+
+  function handleSort(col) {
+    if (col === sortBy) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(col)
+      setSortDir('asc')
+    }
+    setPage(1)
+  }
+
+  function handleSearch(val) {
+    setSearch(val)
+    setPage(1)
+  }
+
+  function handleFilter(val) {
+    setSignalFilter(val)
+    setPage(1)
+  }
 
   const { data: todayBuy,  isLoading: loadingBuy  } = useQuery({
     queryKey: ['signals-today', 'BUY'],
@@ -142,15 +255,18 @@ export default function SignalsPage() {
     refetchInterval: 120_000,
   })
 
-  const { data: allSignals, isLoading: loadingAll } = useQuery({
-    queryKey: ['signals', signalFilter, search],
+  const { data: allResult, isLoading: loadingAll } = useQuery({
+    queryKey: ['signals', signalFilter, search, page, sortBy, sortDir],
     queryFn: () => getSignals({
-      signal: signalFilter === 'ALL' ? undefined : signalFilter,
-      search: search || undefined,
+      signal:   signalFilter === 'ALL' ? undefined : signalFilter,
+      search:   search || undefined,
+      page,
+      sort_by:  sortBy,
+      sort_dir: sortDir,
     }),
+    keepPreviousData: true,
   })
 
-  // Collect unique tickers from today's sections for live price polling
   const todayTickers = useMemo(() => {
     const set = new Set()
     todayBuy?.forEach(r => r.ticker && set.add(r.ticker))
@@ -171,7 +287,7 @@ export default function SignalsPage() {
         </p>
         {loadingBuy
           ? <p className="loading">Loading…</p>
-          : <SignalsTable rows={todayBuy} showSignal={false} prices={prices} marketOpen={marketOpen} showLive />}
+          : <TodayTable rows={todayBuy} prices={prices} marketOpen={marketOpen} />}
       </div>
 
       <div className="section">
@@ -181,32 +297,40 @@ export default function SignalsPage() {
         </p>
         {loadingSell
           ? <p className="loading">Loading…</p>
-          : <SignalsTable rows={todaySell} showSignal={false} prices={prices} marketOpen={marketOpen} showLive />}
+          : <TodayTable rows={todaySell} prices={prices} marketOpen={marketOpen} />}
       </div>
 
       <div className="section">
-        <p className="section-title">All Signals (last 12 months)</p>
+        <p className="section-title">
+          All Signals — last 12 months
+          {allResult && <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 10 }}>
+            {allResult.total.toLocaleString()} rows
+          </span>}
+        </p>
         <div className="controls">
           <input
             placeholder="🔍 Search ticker or company"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             style={{ width: 240 }}
           />
           {['ALL', 'BUY', 'HOLD', 'SELL'].map(s => (
-            <button
-              key={s}
-              onClick={() => setSignalFilter(s)}
-              className={signalFilter === s ? 'primary' : ''}
-            >
+            <button key={s} onClick={() => handleFilter(s)} className={signalFilter === s ? 'primary' : ''}>
               {s}
             </button>
           ))}
-          {search && <button onClick={() => setSearch('')}>Clear</button>}
+          {search && <button onClick={() => handleSearch('')}>Clear</button>}
         </div>
-        {loadingAll
+        {loadingAll && !allResult
           ? <p className="loading">Loading…</p>
-          : <SignalsTable rows={allSignals} />}
+          : <AllSignalsTable
+              result={allResult}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+              page={page}
+              onPage={setPage}
+            />}
       </div>
     </div>
   )

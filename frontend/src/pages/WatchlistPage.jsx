@@ -1,22 +1,61 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker, updateTickerNote,
+  getSignalsByTickers,
 } from '../api'
+import { useLivePrices } from '../hooks/useLivePrices'
+import { useSort } from '../hooks/useSort'
 
 function SignalBadge({ signal }) {
-  if (!signal) return '—'
+  if (!signal) return <span style={{ color: 'var(--muted)' }}>—</span>
   return <span className={`badge badge-${signal}`}>{signal}</span>
+}
+
+function Th({ label, col, sort, onSort }) {
+  const active = sort.key === col
+  return (
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }}>
+      {label}
+      <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
+        {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
+      </span>
+    </th>
+  )
+}
+
+function PredictionCell({ value }) {
+  if (value == null) return <td>—</td>
+  const pct = (value * 100).toFixed(2)
+  return <td className={value > 0 ? 'up' : 'down'}>{value > 0 ? '▲' : '▼'} {Math.abs(pct)}%</td>
+}
+
+function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
+  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>mkt closed</td>
+  const live = prices[ticker]
+  if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
+  const diff  = live - closePrice
+  const pct   = closePrice ? (diff / closePrice) * 100 : 0
+  const cls   = diff >= 0 ? 'up' : 'down'
+  const arrow = diff >= 0 ? '▲' : '▼'
+  return (
+    <td>
+      <div>{live.toFixed(2)}</div>
+      <div className={cls} style={{ fontSize: 11 }}>
+        {arrow} {Math.abs(diff).toFixed(2)} ({Math.abs(pct).toFixed(2)}%)
+      </div>
+    </td>
+  )
 }
 
 export default function WatchlistPage() {
   const qc = useQueryClient()
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId, setSelectedId]   = useState(null)
   const [newListName, setNewListName] = useState('')
-  const [newTicker, setNewTicker] = useState('')
-  const [newNote, setNewNote] = useState('')
-  const [editNotes, setEditNotes] = useState({})
+  const [newTicker, setNewTicker]     = useState('')
+  const [newNote, setNewNote]         = useState('')
+  const [editNotes, setEditNotes]     = useState({})
 
   const { data: lists = [] } = useQuery({
     queryKey: ['watchlists'],
@@ -29,33 +68,40 @@ export default function WatchlistPage() {
     enabled: selectedId != null,
   })
 
-  const invalidateLists = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
+  const tickerSymbols = useMemo(() => tickers.map(t => t.ticker), [tickers])
+
+  const { data: signalData = [] } = useQuery({
+    queryKey: ['watchlist-signals', tickerSymbols.join(',')],
+    queryFn: () => getSignalsByTickers(tickerSymbols),
+    enabled: tickerSymbols.length > 0,
+    staleTime: 60_000,
+  })
+
+  // Merge watchlist rows with signal data
+  const merged = useMemo(() => {
+    const sigMap = Object.fromEntries(signalData.map(s => [s.ticker, s]))
+    return tickers.map(t => ({ ...t, ...(sigMap[t.ticker] ?? {}) }))
+  }, [tickers, signalData])
+
+  const { prices, marketOpen } = useLivePrices(tickerSymbols)
+  const { sorted, sort, toggle } = useSort(merged, 'ticker', 'asc')
+
+  const invalidateLists   = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
   const invalidateTickers = () => qc.invalidateQueries({ queryKey: ['watchlist-tickers', selectedId] })
 
   const createMut = useMutation({
     mutationFn: () => createWatchlist(newListName.trim()),
-    onSuccess: (created) => {
-      invalidateLists()
-      setNewListName('')
-      setSelectedId(created.id)
-    },
+    onSuccess: (created) => { invalidateLists(); setNewListName(''); setSelectedId(created.id) },
   })
 
   const deleteMut = useMutation({
     mutationFn: (id) => deleteWatchlist(id),
-    onSuccess: () => {
-      invalidateLists()
-      if (selectedId === deleteMut.variables) setSelectedId(null)
-    },
+    onSuccess: (_, id) => { invalidateLists(); if (selectedId === id) setSelectedId(null) },
   })
 
   const addMut = useMutation({
     mutationFn: () => addTicker(selectedId, newTicker, newNote),
-    onSuccess: () => {
-      invalidateTickers()
-      setNewTicker('')
-      setNewNote('')
-    },
+    onSuccess: () => { invalidateTickers(); setNewTicker(''); setNewNote('') },
   })
 
   const removeMut = useMutation({
@@ -69,6 +115,8 @@ export default function WatchlistPage() {
   })
 
   const selectedList = lists.find(l => l.id === selectedId)
+
+  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
 
   return (
     <div>
@@ -93,7 +141,6 @@ export default function WatchlistPage() {
               >✕</button>
             </div>
           ))}
-
           <div className="new-list-row">
             <input
               placeholder="New list name…"
@@ -107,7 +154,9 @@ export default function WatchlistPage() {
               disabled={!newListName.trim() || createMut.isPending}
             >+</button>
           </div>
-          {createMut.isError && <p className="error" style={{ fontSize: 12, marginTop: 6 }}>{createMut.error.message}</p>}
+          {createMut.isError && (
+            <p className="error" style={{ fontSize: 12, marginTop: 6 }}>{createMut.error.message}</p>
+          )}
         </div>
 
         {/* ── Main panel ── */}
@@ -116,7 +165,12 @@ export default function WatchlistPage() {
             <p className="empty">Select or create a watchlist.</p>
           ) : (
             <>
-              <p className="section-title">{selectedList.name}</p>
+              <p className="section-title">
+                {selectedList.name}
+                {marketOpen && tickerSymbols.length > 0 && (
+                  <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>● live</span>
+                )}
+              </p>
 
               {/* Add ticker row */}
               <div className="controls" style={{ marginBottom: 20 }}>
@@ -149,15 +203,34 @@ export default function WatchlistPage() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Ticker</th>
+                        <th></th>
+                        {th('Ticker',     'ticker')}
+                        {th('Company',    'company')}
+                        {th('Signal',     'signal')}
+                        {th('Price',      'close')}
+                        <th>Live Price</th>
+                        {th('RSI',        'rsi')}
+                        {th('Prediction', 'fair_value_upside')}
                         <th>Note</th>
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {tickers.map(t => (
+                      {sorted.map(t => (
                         <tr key={t.ticker}>
+                          <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                           <td><strong>{t.ticker}</strong></td>
+                          <td>{t.company ?? '—'}</td>
+                          <td><SignalBadge signal={t.signal} /></td>
+                          <td>{t.close != null ? t.close.toFixed(2) : '—'}</td>
+                          <LivePriceCell
+                            ticker={t.ticker}
+                            closePrice={t.close}
+                            prices={prices}
+                            marketOpen={marketOpen}
+                          />
+                          <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
+                          <PredictionCell value={t.fair_value_upside} />
                           <td>
                             <input
                               style={{
@@ -166,7 +239,7 @@ export default function WatchlistPage() {
                                 color: 'var(--text)',
                                 padding: '4px 8px',
                                 borderRadius: 4,
-                                width: 260,
+                                width: 200,
                                 fontFamily: 'inherit',
                                 fontSize: 13,
                               }}
@@ -178,9 +251,8 @@ export default function WatchlistPage() {
                                   noteMut.mutate({ ticker: t.ticker, note })
                                 }
                               }}
-                              onFocus={e => {
-                                e.target.style.borderColor = 'var(--border)'
-                              }}
+                              onFocus={e => { e.target.style.borderColor = 'var(--border)' }}
+                              onBlurCapture={e => { e.target.style.borderColor = 'transparent' }}
                               placeholder="Add a note…"
                             />
                           </td>
