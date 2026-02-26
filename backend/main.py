@@ -9,24 +9,30 @@ from typing import Optional
 import pandas as pd
 import pytz
 import yfinance as yf
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text, event as sa_event
 from sqlalchemy.pool import NullPool
 
 # ---------------------------------------------------------------------------
-# App setup
+# Config  (.env overrides defaults; .env is gitignored)
 # ---------------------------------------------------------------------------
 
 _APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(_APP_ROOT, "vesign.db")
+load_dotenv(os.path.join(_APP_ROOT, ".env"))
+
+DB_PATH = os.getenv("DB_PATH", os.path.join(_APP_ROOT, "vesign.db"))
+_CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")]
 
 app = FastAPI(title="Vesign Trading API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -539,3 +545,26 @@ def pipeline_status():
         return {"status": "running", "log": log_tail}
 
     return {"status": "success" if ret == 0 else "error", "exit_code": ret, "log": log_tail}
+
+
+# ---------------------------------------------------------------------------
+# SPA static file serving (production)
+# Serve React build from FastAPI so only one process is needed.
+# API routes defined above take precedence; this catches everything else.
+# Only active when frontend/dist exists (i.e. after `npm run build`).
+# ---------------------------------------------------------------------------
+
+_DIST = os.path.join(_APP_ROOT, "frontend", "dist")
+
+if os.path.isdir(_DIST):
+    _ASSETS = os.path.join(_DIST, "assets")
+    if os.path.isdir(_ASSETS):
+        app.mount("/assets", StaticFiles(directory=_ASSETS), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa(full_path: str):
+        # Serve any existing static file (e.g. vite.svg, favicon.ico)
+        candidate = os.path.join(_DIST, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_DIST, "index.html"))
