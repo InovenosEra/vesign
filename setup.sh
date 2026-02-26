@@ -1,21 +1,53 @@
 #!/bin/bash
+# Fresh-install script.
+# Run once after cloning the repo to wire everything up.
+set -e
 
-echo "Creating virtual environment..."
-python3 -m venv .venv
+ROOT="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Activating environment..."
-source .venv/bin/activate
+# ── 1. Python virtual environment ──────────────────────────────────────────
+if [ ! -d "$ROOT/venv" ]; then
+    echo "Creating Python virtual environment..."
+    python3 -m venv "$ROOT/venv"
+fi
 
-echo "Installing dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+echo "Installing Python dependencies..."
+"$ROOT/venv/bin/pip" install --upgrade pip -q
+"$ROOT/venv/bin/pip" install -r "$ROOT/requirements.txt" -q
+echo "Python dependencies installed."
 
-echo "Setup completed successfully."
-echo "To start the system run:"
-echo "source .venv/bin/activate"
-echo "python main.py"
-echo "streamlit run dashboard.py"
+# ── 2. Node / frontend ─────────────────────────────────────────────────────
+echo "Installing Node dependencies..."
+cd "$ROOT/frontend"
+npm install
+echo "Building React frontend..."
+npm run build
+cd "$ROOT"
 
+# ── 3. .env ────────────────────────────────────────────────────────────────
+if [ ! -f "$ROOT/.env" ]; then
+    echo "Creating .env from .env.example..."
+    cp "$ROOT/.env.example" "$ROOT/.env"
+fi
 
-# SWITCH TO MAIN BRANCH --> git checkout main
-# SWITCH TO REFACTOR BRANCH --> git checkout architecture-refactor
+# ── 4. launchd service (macOS only) ────────────────────────────────────────
+PLIST_SRC="$ROOT/deploy/com.vesign.plist"
+PLIST_DST="$HOME/Library/LaunchAgents/com.vesign.plist"
+
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Installing launchd service..."
+    # Patch the plist so paths match this machine
+    sed "s|/Users/inovenos/PycharmProjects/Vesign|$ROOT|g" \
+        "$PLIST_SRC" > "$PLIST_DST"
+
+    launchctl unload "$PLIST_DST" 2>/dev/null || true
+    launchctl load -w "$PLIST_DST"
+    echo "launchd service installed and started."
+    echo "Logs: tail -f /tmp/vesign.log"
+else
+    echo "Non-macOS: skipping launchd. Start manually with:"
+    echo "  $ROOT/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000"
+fi
+
+echo ""
+echo "Setup complete. Open http://localhost:8000 in your browser."
