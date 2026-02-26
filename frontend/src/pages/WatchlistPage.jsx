@@ -204,13 +204,14 @@ export default function WatchlistPage() {
                     <thead>
                       <tr>
                         <th></th>
-                        {th('Ticker',     'ticker')}
-                        {th('Company',    'company')}
-                        {th('Signal',     'signal')}
-                        {th('Price',      'close')}
+                        {th('Ticker',      'ticker')}
+                        {th('Company',     'company')}
+                        {th('Mkt Cap (B)', 'market_cap')}
+                        {th('Signal',      'signal')}
+                        {th('Price',       'close')}
                         <th>Live Price</th>
-                        {th('RSI',        'rsi')}
-                        {th('Prediction', 'fair_value_upside')}
+                        {th('RSI',         'rsi')}
+                        {th('Prediction',  'fair_value_upside')}
                         <th>Note</th>
                         <th></th>
                       </tr>
@@ -221,6 +222,7 @@ export default function WatchlistPage() {
                           <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                           <td><strong>{t.ticker}</strong></td>
                           <td>{t.company ?? '—'}</td>
+                          <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
                           <td><SignalBadge signal={t.signal} /></td>
                           <td>{t.close != null ? t.close.toFixed(2) : '—'}</td>
                           <LivePriceCell

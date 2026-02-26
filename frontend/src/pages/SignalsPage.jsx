@@ -94,6 +94,7 @@ function TodayTable({ rows, prices, marketOpen }) {
             <th></th>
             {th('Ticker',      'ticker')}
             {th('Company',     'company')}
+            {th('Mkt Cap (B)', 'market_cap')}
             {th('Price',       'close')}
             <th>Live Price</th>
             {th('RSI',         'rsi')}
@@ -107,6 +108,7 @@ function TodayTable({ rows, prices, marketOpen }) {
               <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
               <td><strong>{r.ticker}</strong></td>
               <td>{r.company ?? '—'}</td>
+              <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
               <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
               <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
@@ -140,14 +142,15 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage }) {
           <thead>
             <tr>
               <th></th>
-              {th('Ticker',     'ticker')}
-              {th('Company',    'company')}
-              {th('Date',       'date')}
-              {th('Signal',     'signal')}
-              {th('Price',      'close')}
-              {th('RSI',        'rsi')}
-              {th('Prediction', 'fair_value_upside')}
-              {th('Base Price', 'target_mean_price')}
+              {th('Ticker',      'ticker')}
+              {th('Company',     'company')}
+              {th('Mkt Cap (B)', 'market_cap')}
+              {th('Date',        'date')}
+              {th('Signal',      'signal')}
+              {th('Price',       'close')}
+              {th('RSI',         'rsi')}
+              {th('Prediction',  'fair_value_upside')}
+              {th('Base Price',  'target_mean_price')}
             </tr>
           </thead>
           <tbody>
@@ -156,6 +159,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage }) {
                 <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
                 <td><strong>{r.ticker}</strong></td>
                 <td>{r.company ?? '—'}</td>
+                <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
                 <td>{r.date ? r.date.slice(0, 10) : '—'}</td>
                 <td><SignalBadge signal={r.signal} /></td>
                 <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>

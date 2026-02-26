@@ -157,14 +157,24 @@ def market_status():
 
 # --- Signals ----------------------------------------------------------------
 
+_MARKET_CAP_JOIN = """
+    LEFT JOIN (
+        SELECT ticker, MAX(market_cap) AS market_cap
+        FROM fundamentals GROUP BY ticker
+    ) f ON s.ticker = f.ticker
+"""
+
 @app.get("/api/signals/today")
 def signals_today(signal: Optional[str] = None):
     """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD filter."""
     with engine.connect() as conn:
-        df = pd.read_sql(text("""
-            SELECT s.*, c.company, c.logo_url
+        df = pd.read_sql(text(f"""
+            SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
+                   s.target_mean_price, s.signal, c.company, c.logo_url,
+                   f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
+            {_MARKET_CAP_JOIN}
             WHERE DATE(s.date) = (SELECT DATE(MAX(date)) FROM signals)
         """), conn)
 
@@ -174,8 +184,12 @@ def signals_today(signal: Optional[str] = None):
     return _records(df)
 
 
-_SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price"}
+_SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap"}
 _TICKER_RE = re.compile(r'^[A-Z0-9.\-]{1,10}$')
+_SORT_COL_SQL = {
+    "company":    "c.company",
+    "market_cap": "f.market_cap",
+}
 
 
 @app.get("/api/signals")
@@ -189,7 +203,8 @@ def signals(
     page_size: int = Query(default=100, ge=10, le=500),
 ):
     """Signals for the last N months with server-side sort and pagination."""
-    sort_col = sort_by if sort_by in _SORTABLE else "date"
+    _key = sort_by if sort_by in _SORTABLE else "date"
+    sort_col = _SORT_COL_SQL.get(_key, f"s.{_key}")
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
     conditions = [f"DATE(s.date) >= DATE('now', '-{months} months')"]
@@ -216,9 +231,11 @@ def signals(
 
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
-                   s.target_mean_price, s.signal, c.company, c.logo_url
+                   s.target_mean_price, s.signal, c.company, c.logo_url,
+                   f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
+            {_MARKET_CAP_JOIN}
             {where}
             ORDER BY {sort_col} {direction}
             LIMIT :limit OFFSET :offset
@@ -248,7 +265,8 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
         df = pd.read_sql(text(f"""
             SELECT s.ticker, c.company, c.logo_url,
                    s.close, s.signal, s.rsi,
-                   s.fair_value_upside, s.target_mean_price
+                   s.fair_value_upside, s.target_mean_price,
+                   f.market_cap
             FROM signals s
             INNER JOIN (
                 SELECT ticker, MAX(date) AS max_date
@@ -257,6 +275,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
                 GROUP BY ticker
             ) latest ON s.ticker = latest.ticker AND s.date = latest.max_date
             LEFT JOIN companies c ON s.ticker = c.ticker
+            {_MARKET_CAP_JOIN}
         """), conn)
     return _records(df)
 
