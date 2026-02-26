@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSignalsToday, getSignals, runPipeline, getPipelineStatus } from '../api'
+import { getSignalsToday, getSignals, getSuccessRate, runPipeline, getPipelineStatus } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
 
@@ -177,6 +177,53 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage }) {
 }
 
 // ---------------------------------------------------------------------------
+// Success rate table — client-side sort, no pagination needed
+// ---------------------------------------------------------------------------
+
+function SuccessRateTable({ rows }) {
+  const { sorted, sort, toggle } = useSort(rows, 'success_rate', 'desc')
+
+  if (!rows || rows.length === 0) return <p className="empty">No completed trades found.</p>
+
+  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
+
+  return (
+    <div className="data-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            {th('Ticker',      'ticker')}
+            {th('Company',     'company')}
+            {th('Mkt Cap (B)', 'market_cap')}
+            {th('Trades',      'total_trades')}
+            {th('Win Rate',    'success_rate')}
+            {th('Avg Return',  'avg_return_pct')}
+            {th('Avg Days',    'avg_days_held')}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r, i) => (
+            <tr key={i}>
+              <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
+              <td><strong>{r.ticker}</strong></td>
+              <td>{r.company ?? '—'}</td>
+              <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
+              <td>{r.total_trades}</td>
+              <td className={r.success_rate >= 50 ? 'up' : 'down'}>{r.success_rate}%</td>
+              <td className={r.avg_return_pct >= 0 ? 'up' : 'down'}>
+                {r.avg_return_pct >= 0 ? '+' : ''}{r.avg_return_pct.toFixed(2)}%
+              </td>
+              <td>{r.avg_days_held}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline bar
 // ---------------------------------------------------------------------------
 
@@ -224,6 +271,7 @@ export default function SignalsPage() {
   const [signalFilter, setSignalFilter] = useState('ALL')
   const [search, setSearch]             = useState('')
   const [page, setPage]                 = useState(1)
+  const [pageSize, setPageSize]         = useState(100)
   const [sortBy, setSortBy]             = useState('date')
   const [sortDir, setSortDir]           = useState('desc')
 
@@ -237,15 +285,9 @@ export default function SignalsPage() {
     setPage(1)
   }
 
-  function handleSearch(val) {
-    setSearch(val)
-    setPage(1)
-  }
-
-  function handleFilter(val) {
-    setSignalFilter(val)
-    setPage(1)
-  }
+  function handleSearch(val) { setSearch(val); setPage(1) }
+  function handleFilter(val) { setSignalFilter(val); setPage(1) }
+  function handlePageSize(val) { setPageSize(Number(val)); setPage(1) }
 
   const { data: todayBuy,  isLoading: loadingBuy  } = useQuery({
     queryKey: ['signals-today', 'BUY'],
@@ -260,15 +302,22 @@ export default function SignalsPage() {
   })
 
   const { data: allResult, isLoading: loadingAll } = useQuery({
-    queryKey: ['signals', signalFilter, search, page, sortBy, sortDir],
+    queryKey: ['signals', signalFilter, search, page, pageSize, sortBy, sortDir],
     queryFn: () => getSignals({
-      signal:   signalFilter === 'ALL' ? undefined : signalFilter,
-      search:   search || undefined,
+      signal:    signalFilter === 'ALL' ? undefined : signalFilter,
+      search:    search || undefined,
       page,
-      sort_by:  sortBy,
-      sort_dir: sortDir,
+      page_size: pageSize,
+      sort_by:   sortBy,
+      sort_dir:  sortDir,
     }),
     keepPreviousData: true,
+  })
+
+  const { data: successRate, isLoading: loadingRate } = useQuery({
+    queryKey: ['success-rate'],
+    queryFn: () => getSuccessRate(12),
+    staleTime: 300_000,
   })
 
   const todayTickers = useMemo(() => {
@@ -324,6 +373,14 @@ export default function SignalsPage() {
             </button>
           ))}
           {search && <button onClick={() => handleSearch('')}>Clear</button>}
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+            <select value={pageSize} onChange={e => handlePageSize(e.target.value)}>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+            </select>
+          </span>
         </div>
         {loadingAll && !allResult
           ? <p className="loading">Loading…</p>
@@ -335,6 +392,18 @@ export default function SignalsPage() {
               page={page}
               onPage={setPage}
             />}
+      </div>
+
+      <div className="section">
+        <p className="section-title">
+          BUY→SELL Success Rate by Company — last 12 months
+          {successRate && <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 10 }}>
+            {successRate.length} companies
+          </span>}
+        </p>
+        {loadingRate
+          ? <p className="loading">Loading…</p>
+          : <SuccessRateTable rows={successRate} />}
       </div>
     </div>
   )

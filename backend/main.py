@@ -280,6 +280,62 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
     return _records(df)
 
 
+# --- Signal success rate ----------------------------------------------------
+
+@app.get("/api/signals/success-rate")
+def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
+    """BUY→SELL success rate aggregated per company over the last N months."""
+    with engine.connect() as conn:
+        df = pd.read_sql(text(f"""
+            SELECT s.ticker, s.date, s.signal, s.close,
+                   c.company, c.logo_url, f.market_cap
+            FROM signals s
+            LEFT JOIN companies c ON s.ticker = c.ticker
+            {_MARKET_CAP_JOIN}
+            WHERE s.signal IN ('BUY', 'SELL')
+            AND DATE(s.date) >= DATE('now', '-{months} months')
+            ORDER BY s.ticker, s.date
+        """), conn)
+
+    df["date"] = pd.to_datetime(df["date"])
+
+    rows = []
+    for ticker, grp in df.groupby("ticker", sort=False):
+        meta = grp.iloc[0]
+        trades = []
+        open_trade = None
+        for _, row in grp.iterrows():
+            if row["signal"] == "BUY" and open_trade is None:
+                open_trade = row
+            elif row["signal"] == "SELL" and open_trade is not None:
+                ret = (row["close"] - open_trade["close"]) / open_trade["close"]
+                trades.append({
+                    "return_pct": ret * 100,
+                    "days_held":  (row["date"] - open_trade["date"]).days,
+                    "win":        ret > 0,
+                })
+                open_trade = None
+
+        if not trades:
+            continue
+
+        total = len(trades)
+        wins  = sum(t["win"] for t in trades)
+        rows.append({
+            "ticker":         ticker,
+            "company":        meta["company"],
+            "logo_url":       meta["logo_url"],
+            "market_cap":     int(meta["market_cap"]) if pd.notna(meta["market_cap"]) else None,
+            "total_trades":   total,
+            "wins":           wins,
+            "success_rate":   round(wins / total * 100, 1),
+            "avg_return_pct": round(sum(t["return_pct"] for t in trades) / total, 2),
+            "avg_days_held":  round(sum(t["days_held"]  for t in trades) / total, 1),
+        })
+
+    return sorted(rows, key=lambda x: x["success_rate"], reverse=True)
+
+
 # --- Live prices ------------------------------------------------------------
 
 @app.get("/api/prices/live")

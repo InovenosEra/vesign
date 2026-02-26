@@ -49,6 +49,9 @@ export const getSignals = ({ signal, search, months = 12, page = 1, page_size = 
 export const getSignalsByTickers = (tickers) =>
   get(`/signals/by-tickers?tickers=${tickers.join(',')}`)
 
+export const getSuccessRate = (months = 12) =>
+  get(`/signals/success-rate?months=${months}`)
+
 // --- Live prices -----------------------------------------------------------
 export const getLivePrices = (tickers) =>
   get(`/prices/live?tickers=${tickers.join(',')}`)
