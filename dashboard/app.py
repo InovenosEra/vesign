@@ -10,6 +10,9 @@ from datetime import datetime, time as dt_time, UTC
 import pytz
 import time
 import os
+import subprocess
+import sys
+import tempfile
 
 # ------------------------------
 # SAFETY CHECK - DO NOT RUN PIPELINE HERE
@@ -171,6 +174,15 @@ else:
 if "last_refresh" not in st.session_state:
     et = pytz.timezone("US/Eastern")
     st.session_state.last_refresh = datetime.now(UTC).astimezone(et).strftime("%H:%M:%S ET")
+
+if "pipeline_running" not in st.session_state:
+    st.session_state.pipeline_running = False
+if "pipeline_proc" not in st.session_state:
+    st.session_state.pipeline_proc = None
+if "pipeline_log_file" not in st.session_state:
+    st.session_state.pipeline_log_file = None
+if "pipeline_last_result" not in st.session_state:
+    st.session_state.pipeline_last_result = None  # None | "success" | "error"
 
 st.markdown(f"""
 <style>
@@ -402,7 +414,12 @@ def _fetch_live_prices(tickers_tuple: tuple) -> dict:
         close = raw.get("Close", pd.DataFrame() if len(tickers) > 1 else pd.Series(dtype=float))
         prices = {}
         if len(tickers) == 1:
-            series = close.dropna() if isinstance(close, pd.Series) else pd.Series(dtype=float)
+            if isinstance(close, pd.Series):
+                series = close.dropna()
+            elif isinstance(close, pd.DataFrame) and not close.empty:
+                series = close.iloc[:, 0].dropna()
+            else:
+                series = pd.Series(dtype=float)
             prices[tickers[0]] = float(series.iloc[-1]) if not series.empty else None
         else:
             for t in tickers:
@@ -723,6 +740,75 @@ def display_section(title, query, show_live=True, allowed_tickers=None):
 
 
 # ------------------------------
+# PIPELINE CONTROL
+# ------------------------------
+
+_APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _start_pipeline():
+    log_path = tempfile.mktemp(suffix="_pipeline.log")
+    log_f = open(log_path, "w", buffering=1)
+    proc = subprocess.Popen(
+        [sys.executable, "-c",
+         "import sys, os; sys.path.insert(0, os.getcwd()); "
+         "from production.run_daily import run_daily; run_daily()"],
+        stdout=log_f,
+        stderr=subprocess.STDOUT,
+        cwd=_APP_ROOT,
+        text=True,
+    )
+    st.session_state.pipeline_proc = proc
+    st.session_state.pipeline_log_file = log_path
+    st.session_state.pipeline_running = True
+    st.session_state.pipeline_last_result = None
+
+
+@st.fragment(run_every=3)
+def pipeline_control():
+    running = st.session_state.pipeline_running
+    proc = st.session_state.pipeline_proc
+
+    # Check if a running process has finished
+    if running and proc is not None:
+        ret = proc.poll()
+        if ret is not None:
+            st.session_state.pipeline_running = False
+            st.session_state.pipeline_last_result = "success" if ret == 0 else "error"
+            running = False
+
+    btn_col, status_col = st.columns([1, 5])
+
+    with btn_col:
+        if st.button("🔄 Run Pipeline", disabled=st.session_state.pipeline_running,
+                     use_container_width=True):
+            _start_pipeline()
+            st.rerun(scope="fragment")
+
+    with status_col:
+        if st.session_state.pipeline_running:
+            log_path = st.session_state.pipeline_log_file
+            output = ""
+            if log_path and os.path.exists(log_path):
+                with open(log_path) as f:
+                    output = f.read()
+            last_lines = "\n".join(output.strip().splitlines()[-6:]) if output else "Starting..."
+            st.info(f"Pipeline running…\n\n```\n{last_lines}\n```")
+        elif st.session_state.pipeline_last_result == "success":
+            st.success("Pipeline completed. Reload the page to see updated data.")
+        elif st.session_state.pipeline_last_result == "error":
+            log_path = st.session_state.pipeline_log_file
+            tail = ""
+            if log_path and os.path.exists(log_path):
+                with open(log_path) as f:
+                    tail = f.read()[-3000:]
+            st.error("Pipeline failed.")
+            if tail:
+                with st.expander("Show error log"):
+                    st.code(tail)
+
+
+# ------------------------------
 # SECTIONS
 # ------------------------------
 
@@ -926,6 +1012,8 @@ def watchlist_section():
                     import traceback as _tb
                     st.error(f"Watchlist error: {e}")
                     st.code(_tb.format_exc())
+
+pipeline_control()
 
 watchlist_section()
 
