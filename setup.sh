@@ -44,6 +44,16 @@ if [[ "$(uname)" == "Darwin" ]]; then
     launchctl load -w "$PLIST_DST"
     echo "launchd service installed and started."
     echo "Logs: tail -f /tmp/vesign.log"
+
+    # Daily pipeline scheduler (Mon–Fri at 17:00 local time)
+    DAILY_SRC="$ROOT/deploy/com.vesign.daily.plist"
+    DAILY_DST="$HOME/Library/LaunchAgents/com.vesign.daily.plist"
+    sed "s|/Users/inovenos/PycharmProjects/Vesign|$ROOT|g" \
+        "$DAILY_SRC" > "$DAILY_DST"
+    launchctl unload "$DAILY_DST" 2>/dev/null || true
+    launchctl load -w "$DAILY_DST"
+    echo "Daily pipeline scheduler installed (Mon–Fri 17:00)."
+    echo "Pipeline logs: tail -f /tmp/vesign-pipeline.log"
 else
     echo "Non-macOS: skipping launchd. Start manually with:"
     echo "  $ROOT/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000"
