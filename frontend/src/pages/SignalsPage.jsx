@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSignalsToday, getSignals, getSuccessRate, runPipeline, getPipelineStatus } from '../api'
+import { getSignalsToday, getSignals, getSuccessRate } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
 
@@ -224,46 +224,6 @@ function SuccessRateTable({ rows }) {
 }
 
 // ---------------------------------------------------------------------------
-// Pipeline bar
-// ---------------------------------------------------------------------------
-
-function PipelineBar() {
-  const [triggered, setTriggered] = useState(false)
-  const { data: status, refetch } = useQuery({
-    queryKey: ['pipeline-status'],
-    queryFn: getPipelineStatus,
-    refetchInterval: triggered ? 3000 : false,
-  })
-
-  async function handleRun() {
-    try {
-      await runPipeline()
-      setTriggered(true)
-      refetch()
-    } catch (e) {
-      alert(e.message)
-    }
-  }
-
-  const running = status?.status === 'running'
-  return (
-    <div className="pipeline-bar">
-      <button className="primary" onClick={handleRun} disabled={running}>
-        {running ? 'Running…' : '↺ Run Pipeline'}
-      </button>
-      {status && status.status !== 'idle' && (
-        <div className="pipeline-log">
-          <strong style={{ color: status.status === 'error' ? 'var(--red)' : 'var(--muted)' }}>
-            {status.status.toUpperCase()}
-          </strong>
-          {status.log ? '\n' + status.log : ''}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -331,8 +291,6 @@ export default function SignalsPage() {
 
   return (
     <div>
-      <PipelineBar />
-
       <div className="section">
         <p className="section-title">
           Today's BUY Signals ({loadingBuy ? '…' : (todayBuy?.length ?? 0)})

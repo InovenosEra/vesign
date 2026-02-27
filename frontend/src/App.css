@@ -275,26 +275,6 @@ td img.logo {
 }
 .new-list-row input:focus { border-color: var(--accent); }
 
-/* ── Pipeline bar ── */
-.pipeline-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 24px;
-  padding: 12px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.pipeline-log {
-  font-family: monospace;
-  font-size: 12px;
-  color: var(--muted);
-  white-space: pre-wrap;
-  flex: 1;
-  overflow: hidden;
-}
 
 /* ── Sortable headers ── */
 .sort-icon { color: var(--muted); font-size: 11px; }
