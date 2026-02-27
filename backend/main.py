@@ -507,20 +507,17 @@ def historical_trades(
 
     df["date"] = pd.to_datetime(df["date"])
 
-    trades = []
+    # Build individual trade pairs, then group by ticker
+    ticker_trades: dict = {}
     for ticker, grp in df.groupby("ticker"):
         open_trade = None
+        pairs = []
         for _, row in grp.iterrows():
             if row["signal"] == "BUY" and open_trade is None:
                 open_trade = row
             elif row["signal"] == "SELL" and open_trade is not None:
                 ret = (row["close"] - open_trade["close"]) / open_trade["close"]
-                mc = open_trade.get("market_cap")
-                trades.append({
-                    "company":    open_trade["company"],
-                    "logo_url":   open_trade["logo_url"],
-                    "ticker":     ticker,
-                    "market_cap": int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
+                pairs.append({
                     "buy_date":   open_trade["date"].date().isoformat(),
                     "sell_date":  row["date"].date().isoformat(),
                     "buy_price":  round(float(open_trade["close"]), 2),
@@ -530,8 +527,25 @@ def historical_trades(
                     "result":     "Win" if ret > 0 else "Loss",
                 })
                 open_trade = None
+        if not pairs:
+            continue
+        mc = grp.iloc[0].get("market_cap")
+        wins = sum(1 for p in pairs if p["result"] == "Win")
+        avg_ret = sum(p["return_pct"] for p in pairs) / len(pairs)
+        avg_days = sum(p["days_held"] for p in pairs) / len(pairs)
+        ticker_trades[ticker] = {
+            "ticker":       ticker,
+            "company":      grp.iloc[0]["company"],
+            "logo_url":     grp.iloc[0]["logo_url"],
+            "market_cap":   int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
+            "trade_count":  len(pairs),
+            "win_count":    wins,
+            "avg_return":   round(avg_ret, 2),
+            "avg_days":     round(avg_days, 1),
+            "trades":       pairs,   # full list of pairs for the chart
+        }
 
-    return trades
+    return list(ticker_trades.values())
 
 
 # --- Pipeline ---------------------------------------------------------------

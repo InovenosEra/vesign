@@ -365,3 +365,14 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   margin-left: auto;
 }
 .modal-close:hover { color: var(--text); border-color: var(--text); }
+
+.trade-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+}

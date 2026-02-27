@@ -41,19 +41,15 @@ function Th({ label, col, sort, onSort }) {
 }
 
 // ---------------------------------------------------------------------------
-// Trade chart modal
+// Trade chart modal — supports multiple BUY/SELL pairs
 // ---------------------------------------------------------------------------
 
-function TradeModal({ trade, onClose }) {
+function TradeModal({ row, onClose }) {
   const { data: history = [], isLoading } = useQuery({
-    queryKey: ['price-history', trade.ticker],
-    queryFn: () => getPriceHistory(trade.ticker, 12),
+    queryKey: ['price-history', row.ticker],
+    queryFn: () => getPriceHistory(row.ticker, 12),
     staleTime: 300_000,
   })
-
-  // Normalise buy/sell date strings to YYYY-MM-DD for comparison
-  const buyKey  = trade.buy_date  ? trade.buy_date.slice(0, 10)  : null
-  const sellKey = trade.sell_date ? trade.sell_date.slice(0, 10) : null
 
   const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
   const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
@@ -61,35 +57,44 @@ function TradeModal({ trade, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
         <div className="modal-header">
-          <span>
-            {trade.logo_url && <img className="logo" src={trade.logo_url} alt="" style={{ marginRight: 8 }} />}
-            <strong>{trade.ticker}</strong>
-            {trade.company ? ` — ${trade.company}` : ''}
+          <span style={{ display: 'flex', alignItems: 'center', fontSize: 16, flex: 1 }}>
+            {row.logo_url && <img className="logo" src={row.logo_url} alt="" style={{ marginRight: 8 }} />}
+            <strong>{row.ticker}</strong>
+            {row.company ? ` — ${row.company}` : ''}
           </span>
-          <div className="modal-meta">
-            <span className="up">▲ BUY {fmtDate(trade.buy_date)} @ {fmt(trade.buy_price)}</span>
-            <span className="down">▼ SELL {fmtDate(trade.sell_date)} @ {fmt(trade.sell_price)}</span>
-            <span className={trade.return_pct >= 0 ? 'up' : 'down'}>
-              {trade.return_pct >= 0 ? '+' : ''}{fmt(trade.return_pct)}% · {trade.days_held}d
-            </span>
-          </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
+        {/* Trade summary chips */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+          {row.trades.map((t, i) => (
+            <div key={i} className="trade-chip">
+              <span style={{ color: 'var(--muted)', fontSize: 11, marginRight: 6 }}>#{i + 1}</span>
+              <span className="up">▲ {fmtDate(t.buy_date)} @ {fmt(t.buy_price)}</span>
+              <span style={{ color: 'var(--muted)', margin: '0 4px' }}>→</span>
+              <span className="down">▼ {fmtDate(t.sell_date)} @ {fmt(t.sell_price)}</span>
+              <span style={{ color: 'var(--muted)', margin: '0 4px' }}>·</span>
+              <span className={t.return_pct >= 0 ? 'up' : 'down'}>
+                {t.return_pct >= 0 ? '+' : ''}{fmt(t.return_pct)}% · {t.days_held}d
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart */}
         {isLoading ? (
           <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
         ) : (
           <ResponsiveContainer width="100%" height={340}>
-            <LineChart data={history} margin={{ top: 20, right: 24, bottom: 8, left: 8 }}>
+            <LineChart data={history} margin={{ top: 24, right: 24, bottom: 8, left: 8 }}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
                 tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                tickFormatter={d => {
-                  const [, m, day] = d.split('-')
-                  return `${day}/${m}`
-                }}
+                tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
                 interval="preserveStartEnd"
                 minTickGap={50}
               />
@@ -105,29 +110,27 @@ function TradeModal({ trade, onClose }) {
                 itemStyle={{ color: 'var(--text)' }}
                 formatter={v => [`$${v.toFixed(2)}`, 'Close']}
               />
-              {buyKey && (
-                <ReferenceLine
-                  x={buyKey}
-                  stroke="var(--green)"
-                  strokeWidth={2}
-                  label={{ value: 'BUY', position: 'top', fill: 'var(--green)', fontSize: 11, fontWeight: 700 }}
-                />
-              )}
-              {sellKey && (
-                <ReferenceLine
-                  x={sellKey}
-                  stroke="var(--red)"
-                  strokeWidth={2}
-                  label={{ value: 'SELL', position: 'top', fill: 'var(--red)', fontSize: 11, fontWeight: 700 }}
-                />
-              )}
-              <Line
-                type="monotone"
-                dataKey="close"
-                stroke="var(--accent)"
-                dot={false}
-                strokeWidth={2}
-              />
+              {row.trades.map((t, i) => [
+                t.buy_date && (
+                  <ReferenceLine
+                    key={`buy-${i}`}
+                    x={t.buy_date.slice(0, 10)}
+                    stroke="var(--green)"
+                    strokeWidth={2}
+                    label={{ value: `B${row.trades.length > 1 ? i + 1 : ''}`, position: 'top', fill: 'var(--green)', fontSize: 11, fontWeight: 700 }}
+                  />
+                ),
+                t.sell_date && (
+                  <ReferenceLine
+                    key={`sell-${i}`}
+                    x={t.sell_date.slice(0, 10)}
+                    stroke="var(--red)"
+                    strokeWidth={2}
+                    label={{ value: `S${row.trades.length > 1 ? i + 1 : ''}`, position: 'top', fill: 'var(--red)', fontSize: 11, fontWeight: 700 }}
+                  />
+                ),
+              ])}
+              <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -153,12 +156,17 @@ export default function TradesPage() {
     queryFn: () => getTrades({ start, end }),
   })
 
-  const { sorted, sort, toggle } = useSort(trades, 'return_pct', 'desc')
+  const { sorted, sort, toggle } = useSort(trades, 'avg_return', 'desc')
 
-  const wins      = trades ? trades.filter(t => t.result === 'Win').length : 0
   const total     = trades ? trades.length : 0
-  const avgReturn = total > 0 ? trades.reduce((s, t) => s + t.return_pct, 0) / total : null
-  const avgDays   = total > 0 ? trades.reduce((s, t) => s + t.days_held,   0) / total : null
+  const totalPairs = trades ? trades.reduce((s, t) => s + t.trade_count, 0) : 0
+  const wins      = trades ? trades.reduce((s, t) => s + t.win_count, 0) : 0
+  const avgReturn = total > 0
+    ? trades.reduce((s, t) => s + t.avg_return * t.trade_count, 0) / totalPairs
+    : null
+  const avgDays   = total > 0
+    ? trades.reduce((s, t) => s + t.avg_days * t.trade_count, 0) / totalPairs
+    : null
 
   const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
 
@@ -186,12 +194,16 @@ export default function TradesPage() {
       {trades && total > 0 && (
         <div className="metrics">
           <div className="metric-card">
-            <div className="label">Trades</div>
+            <div className="label">Tickers</div>
             <div className="value">{total}</div>
           </div>
           <div className="metric-card">
+            <div className="label">Total Trades</div>
+            <div className="value">{totalPairs}</div>
+          </div>
+          <div className="metric-card">
             <div className="label">Win Rate</div>
-            <div className="value">{((wins / total) * 100).toFixed(1)}%</div>
+            <div className="value">{totalPairs > 0 ? ((wins / totalPairs) * 100).toFixed(1) : '—'}%</div>
           </div>
           <div className="metric-card">
             <div className="label">Avg Return</div>
@@ -219,43 +231,36 @@ export default function TradesPage() {
                 {th('Ticker',      'ticker')}
                 {th('Company',     'company')}
                 {th('Mkt Cap (B)', 'market_cap')}
-                {th('Buy Date',    'buy_date')}
-                {th('Sell Date',  'sell_date')}
-                {th('Buy Price',  'buy_price')}
-                {th('Sell Price', 'sell_price')}
-                {th('Return',     'return_pct')}
-                {th('Days Held',  'days_held')}
-                {th('Result',     'result')}
+                {th('Trades',      'trade_count')}
+                {th('Win Rate',    'win_count')}
+                {th('Avg Return',  'avg_return')}
+                {th('Avg Days',    'avg_days')}
               </tr>
             </thead>
             <tbody>
-              {sorted.map((t, i) => (
-                <tr
-                  key={i}
-                  className="clickable-row"
-                  onClick={() => setSelected(t)}
-                >
-                  <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                  <td><strong>{t.ticker}</strong></td>
-                  <td>{t.company ?? '—'}</td>
-                  <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
-                  <td>{fmtDate(t.buy_date)}</td>
-                  <td>{fmtDate(t.sell_date)}</td>
-                  <td>{fmt(t.buy_price)}</td>
-                  <td>{fmt(t.sell_price)}</td>
-                  <td className={t.return_pct >= 0 ? 'up' : 'down'}>
-                    {t.return_pct >= 0 ? '▲' : '▼'} {Math.abs(t.return_pct).toFixed(2)}%
-                  </td>
-                  <td>{t.days_held}</td>
-                  <td className={t.result === 'Win' ? 'up' : 'down'}>{t.result}</td>
-                </tr>
-              ))}
+              {sorted.map((t, i) => {
+                const winRate = t.trade_count > 0 ? (t.win_count / t.trade_count) * 100 : 0
+                return (
+                  <tr key={i} className="clickable-row" onClick={() => setSelected(t)}>
+                    <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
+                    <td><strong>{t.ticker}</strong></td>
+                    <td>{t.company ?? '—'}</td>
+                    <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
+                    <td>{t.trade_count}</td>
+                    <td className={winRate >= 50 ? 'up' : 'down'}>{winRate.toFixed(0)}%</td>
+                    <td className={t.avg_return >= 0 ? 'up' : 'down'}>
+                      {t.avg_return >= 0 ? '+' : ''}{fmt(t.avg_return)}%
+                    </td>
+                    <td>{Math.round(t.avg_days)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {selected && <TradeModal trade={selected} onClose={() => setSelected(null)} />}
+      {selected && <TradeModal row={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }
