@@ -77,6 +77,3 @@ export const getTrades = ({ start, end } = {}) => {
   return get('/trades' + (qs ? `?${qs}` : ''))
 }
 
-// --- Pipeline --------------------------------------------------------------
-export const runPipeline = () => post('/pipeline/run')
-export const getPipelineStatus = () => get('/pipeline/status')
