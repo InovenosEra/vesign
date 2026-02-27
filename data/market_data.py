@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta, UTC
 from utils.universe_loader import load_universe
 from data.loaders import engine
+from sqlalchemy import text
 import pandas_market_calendars as mcal
 from utils.update_guard import should_run, mark_run
 
@@ -104,6 +105,17 @@ def update_prices():
 
     final_df = pd.concat(all_frames)
     final_df.drop_duplicates(subset=["date", "ticker"], inplace=True)
+
+    # Delete any existing rows for the same date/ticker before inserting
+    # (guards against re-runs on the same day producing duplicates or
+    # overwriting NULL-close rows that were inserted before market open)
+    dates = final_df["date"].dt.strftime("%Y-%m-%d").unique().tolist()
+    if dates:
+        placeholders = ",".join(f"'{d}'" for d in dates)
+        with engine.begin() as conn:
+            conn.execute(text(
+                f"DELETE FROM daily_prices WHERE date(date) IN ({placeholders})"
+            ))
 
     final_df.to_sql("daily_prices", engine, if_exists="append", index=False)
 
