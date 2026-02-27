@@ -9,6 +9,21 @@ function fmt(n, decimals = 2) {
     : '—'
 }
 
+function fmtDate(str) {
+  if (!str) return '—'
+  const d = new Date(str)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yy = String(d.getFullYear()).slice(2)
+  return `${dd}/${mm}/${yy}`
+}
+
+function isoMonthsAgo(n) {
+  const d = new Date()
+  d.setMonth(d.getMonth() - n)
+  return d.toISOString().slice(0, 10)
+}
+
 function Th({ label, col, sort, onSort }) {
   const active = sort.key === col
   return (
@@ -51,6 +66,13 @@ export default function TradesPage() {
         <input type="date" value={start} onChange={e => setStart(e.target.value)} />
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
         <input type="date" value={end} onChange={e => setEnd(e.target.value)} />
+        {[3, 6].map(m => (
+          <button
+            key={m}
+            className="period-chip"
+            onClick={() => { setStart(isoMonthsAgo(m)); setEnd(new Date().toISOString().slice(0, 10)) }}
+          >{m}M</button>
+        ))}
       </div>
 
       {isLoading && <p className="loading">Loading…</p>}
@@ -106,8 +128,8 @@ export default function TradesPage() {
                   <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                   <td><strong>{t.ticker}</strong></td>
                   <td>{t.company ?? '—'}</td>
-                  <td>{t.buy_date}</td>
-                  <td>{t.sell_date}</td>
+                  <td>{fmtDate(t.buy_date)}</td>
+                  <td>{fmtDate(t.sell_date)}</td>
                   <td>{fmt(t.buy_price)}</td>
                   <td>{fmt(t.sell_price)}</td>
                   <td className={t.return_pct >= 0 ? 'up' : 'down'}>

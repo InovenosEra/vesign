@@ -105,6 +105,21 @@ html, body, #root {
 
 .controls input:focus, .controls select:focus { border-color: var(--accent); }
 
+.period-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.period-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ── Buttons ── */
 button {
   cursor: pointer;
