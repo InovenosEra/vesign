@@ -216,9 +216,10 @@ export default function TradesPage() {
             <thead>
               <tr>
                 <th></th>
-                {th('Ticker',     'ticker')}
-                {th('Company',    'company')}
-                {th('Buy Date',   'buy_date')}
+                {th('Ticker',      'ticker')}
+                {th('Company',     'company')}
+                {th('Mkt Cap (B)', 'market_cap')}
+                {th('Buy Date',    'buy_date')}
                 {th('Sell Date',  'sell_date')}
                 {th('Buy Price',  'buy_price')}
                 {th('Sell Price', 'sell_price')}
@@ -237,6 +238,7 @@ export default function TradesPage() {
                   <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                   <td><strong>{t.ticker}</strong></td>
                   <td>{t.company ?? '—'}</td>
+                  <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
                   <td>{fmtDate(t.buy_date)}</td>
                   <td>{fmtDate(t.sell_date)}</td>
                   <td>{fmt(t.buy_price)}</td>

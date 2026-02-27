@@ -496,9 +496,11 @@ def historical_trades(
 
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, s.signal, s.close, c.company, c.logo_url
+            SELECT s.date, s.ticker, s.signal, s.close, c.company, c.logo_url,
+                   f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
+            {_MARKET_CAP_JOIN}
             {where}
             ORDER BY s.ticker, s.date
         """), conn, params=params)
@@ -513,10 +515,12 @@ def historical_trades(
                 open_trade = row
             elif row["signal"] == "SELL" and open_trade is not None:
                 ret = (row["close"] - open_trade["close"]) / open_trade["close"]
+                mc = open_trade.get("market_cap")
                 trades.append({
                     "company":    open_trade["company"],
                     "logo_url":   open_trade["logo_url"],
                     "ticker":     ticker,
+                    "market_cap": int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
                     "buy_date":   open_trade["date"].date().isoformat(),
                     "sell_date":  row["date"].date().isoformat(),
                     "buy_price":  round(float(open_trade["close"]), 2),
