@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getTrades } from '../api'
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
+  ResponsiveContainer, CartesianGrid,
+} from 'recharts'
+import { getTrades, getPriceHistory } from '../api'
 import { useSort } from '../hooks/useSort'
 
 function fmt(n, decimals = 2) {
@@ -36,12 +40,113 @@ function Th({ label, col, sort, onSort }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Trade chart modal
+// ---------------------------------------------------------------------------
+
+function TradeModal({ trade, onClose }) {
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ['price-history', trade.ticker],
+    queryFn: () => getPriceHistory(trade.ticker, 12),
+    staleTime: 300_000,
+  })
+
+  // Normalise buy/sell date strings to YYYY-MM-DD for comparison
+  const buyKey  = trade.buy_date  ? trade.buy_date.slice(0, 10)  : null
+  const sellKey = trade.sell_date ? trade.sell_date.slice(0, 10) : null
+
+  const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
+  const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <span>
+            {trade.logo_url && <img className="logo" src={trade.logo_url} alt="" style={{ marginRight: 8 }} />}
+            <strong>{trade.ticker}</strong>
+            {trade.company ? ` — ${trade.company}` : ''}
+          </span>
+          <div className="modal-meta">
+            <span className="up">▲ BUY {fmtDate(trade.buy_date)} @ {fmt(trade.buy_price)}</span>
+            <span className="down">▼ SELL {fmtDate(trade.sell_date)} @ {fmt(trade.sell_price)}</span>
+            <span className={trade.return_pct >= 0 ? 'up' : 'down'}>
+              {trade.return_pct >= 0 ? '+' : ''}{fmt(trade.return_pct)}% · {trade.days_held}d
+            </span>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {isLoading ? (
+          <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={history} margin={{ top: 20, right: 24, bottom: 8, left: 8 }}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                tickFormatter={d => {
+                  const [, m, day] = d.split('-')
+                  return `${day}/${m}`
+                }}
+                interval="preserveStartEnd"
+                minTickGap={50}
+              />
+              <YAxis
+                domain={[minPrice, maxPrice]}
+                tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                tickFormatter={v => v.toFixed(0)}
+                width={48}
+              />
+              <Tooltip
+                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                labelStyle={{ color: 'var(--muted)' }}
+                itemStyle={{ color: 'var(--text)' }}
+                formatter={v => [`$${v.toFixed(2)}`, 'Close']}
+              />
+              {buyKey && (
+                <ReferenceLine
+                  x={buyKey}
+                  stroke="var(--green)"
+                  strokeWidth={2}
+                  label={{ value: 'BUY', position: 'top', fill: 'var(--green)', fontSize: 11, fontWeight: 700 }}
+                />
+              )}
+              {sellKey && (
+                <ReferenceLine
+                  x={sellKey}
+                  stroke="var(--red)"
+                  strokeWidth={2}
+                  label={{ value: 'SELL', position: 'top', fill: 'var(--red)', fontSize: 11, fontWeight: 700 }}
+                />
+              )}
+              <Line
+                type="monotone"
+                dataKey="close"
+                stroke="var(--accent)"
+                dot={false}
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function TradesPage() {
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
-  const [start, setStart] = useState(oneYearAgo.toISOString().slice(0, 10))
-  const [end,   setEnd]   = useState(new Date().toISOString().slice(0, 10))
+  const [start, setStart]       = useState(oneYearAgo.toISOString().slice(0, 10))
+  const [end,   setEnd]         = useState(new Date().toISOString().slice(0, 10))
+  const [selected, setSelected] = useState(null)
 
   const { data: trades, isLoading, isError } = useQuery({
     queryKey: ['trades', start, end],
@@ -124,7 +229,11 @@ export default function TradesPage() {
             </thead>
             <tbody>
               {sorted.map((t, i) => (
-                <tr key={i}>
+                <tr
+                  key={i}
+                  className="clickable-row"
+                  onClick={() => setSelected(t)}
+                >
                   <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                   <td><strong>{t.ticker}</strong></td>
                   <td>{t.company ?? '—'}</td>
@@ -143,6 +252,8 @@ export default function TradesPage() {
           </table>
         </div>
       )}
+
+      {selected && <TradeModal trade={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }

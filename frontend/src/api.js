@@ -56,6 +56,9 @@ export const getSuccessRate = (months = 12) =>
 export const getLivePrices = (tickers) =>
   get(`/prices/live?tickers=${tickers.join(',')}`)
 
+export const getPriceHistory = (ticker, months = 12) =>
+  get(`/prices/history?ticker=${ticker}&months=${months}`)
+
 // --- Watchlists ------------------------------------------------------------
 export const getWatchlists = () => get('/watchlists')
 export const createWatchlist = (name) => post('/watchlists', { name })

@@ -350,6 +350,27 @@ def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
 
 # --- Live prices ------------------------------------------------------------
 
+@app.get("/api/prices/history")
+def price_history(
+    ticker: str = Query(..., description="Ticker symbol"),
+    months: int = Query(default=12, ge=1, le=60),
+):
+    """Daily close prices for the last N months (used for trade charts)."""
+    ticker = ticker.strip().upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+    with engine.connect() as conn:
+        df = pd.read_sql(text("""
+            SELECT date(date) AS date, close
+            FROM daily_prices
+            WHERE ticker = :ticker
+              AND date >= date('now', :offset)
+              AND close IS NOT NULL
+            ORDER BY date ASC
+        """), conn, params={"ticker": ticker, "offset": f"-{months} months"})
+    return _records(df)
+
+
 @app.get("/api/prices/live")
 def live_prices(tickers: str = Query(..., description="Comma-separated ticker symbols")):
     """Fetch real-time prices. Returns empty prices dict when market is closed."""
