@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
-  getWatchlistTickers, addTicker, removeTicker, updateTickerNote,
+  getWatchlistTickers, addTicker, removeTicker,
   getSignalsByTickers,
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
@@ -54,8 +54,6 @@ export default function WatchlistPage() {
   const [selectedId, setSelectedId]   = useState(null)
   const [newListName, setNewListName] = useState('')
   const [newTicker, setNewTicker]     = useState('')
-  const [newNote, setNewNote]         = useState('')
-  const [editNotes, setEditNotes]     = useState({})
 
   const { data: lists = [] } = useQuery({
     queryKey: ['watchlists'],
@@ -100,17 +98,12 @@ export default function WatchlistPage() {
   })
 
   const addMut = useMutation({
-    mutationFn: () => addTicker(selectedId, newTicker, newNote),
-    onSuccess: () => { invalidateTickers(); setNewTicker(''); setNewNote('') },
+    mutationFn: () => addTicker(selectedId, newTicker),
+    onSuccess: () => { invalidateTickers(); setNewTicker('') },
   })
 
   const removeMut = useMutation({
     mutationFn: (ticker) => removeTicker(selectedId, ticker),
-    onSuccess: invalidateTickers,
-  })
-
-  const noteMut = useMutation({
-    mutationFn: ({ ticker, note }) => updateTickerNote(selectedId, ticker, note),
     onSuccess: invalidateTickers,
   })
 
@@ -178,13 +171,8 @@ export default function WatchlistPage() {
                   placeholder="Ticker (e.g. AAPL)"
                   value={newTicker}
                   onChange={e => setNewTicker(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === 'Enter' && newTicker && addMut.mutate()}
                   style={{ width: 120 }}
-                />
-                <input
-                  placeholder="Note (optional)"
-                  value={newNote}
-                  onChange={e => setNewNote(e.target.value)}
-                  style={{ width: 220 }}
                 />
                 <button
                   className="primary"
@@ -212,7 +200,6 @@ export default function WatchlistPage() {
                         <th>Live Price</th>
                         {th('RSI',         'rsi')}
                         {th('Prediction',  'fair_value_upside')}
-                        <th>Note</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -233,31 +220,6 @@ export default function WatchlistPage() {
                           />
                           <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
                           <PredictionCell value={t.fair_value_upside} />
-                          <td>
-                            <input
-                              style={{
-                                background: 'transparent',
-                                border: '1px solid transparent',
-                                color: 'var(--text)',
-                                padding: '4px 8px',
-                                borderRadius: 4,
-                                width: 200,
-                                fontFamily: 'inherit',
-                                fontSize: 13,
-                              }}
-                              value={editNotes[t.ticker] ?? t.note ?? ''}
-                              onChange={e => setEditNotes(n => ({ ...n, [t.ticker]: e.target.value }))}
-                              onBlur={() => {
-                                const note = editNotes[t.ticker]
-                                if (note !== undefined && note !== t.note) {
-                                  noteMut.mutate({ ticker: t.ticker, note })
-                                }
-                              }}
-                              onFocus={e => { e.target.style.borderColor = 'var(--border)' }}
-                              onBlurCapture={e => { e.target.style.borderColor = 'transparent' }}
-                              placeholder="Add a note…"
-                            />
-                          </td>
                           <td>
                             <button
                               className="danger"
