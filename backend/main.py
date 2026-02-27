@@ -140,7 +140,13 @@ class NoteUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _records(df: pd.DataFrame) -> list[dict]:
-    return df.where(pd.notna(df), None).to_dict(orient="records")
+    import math
+    records = df.to_dict(orient="records")
+    return [
+        {k: (None if (isinstance(v, float) and math.isnan(v)) else v)
+         for k, v in row.items()}
+        for row in records
+    ]
 
 
 # ===========================================================================
