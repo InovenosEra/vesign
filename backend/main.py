@@ -354,20 +354,33 @@ def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
 def price_history(
     ticker: str = Query(..., description="Ticker symbol"),
     months: int = Query(default=12, ge=1, le=60),
+    start: Optional[str] = Query(default=None),
+    end:   Optional[str] = Query(default=None),
 ):
-    """Daily close prices for the last N months (used for trade charts)."""
+    """Daily close prices. If start/end are provided, use them; otherwise use last N months."""
     ticker = ticker.strip().upper()
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker")
     with engine.connect() as conn:
-        df = pd.read_sql(text("""
-            SELECT date(date) AS date, close
-            FROM daily_prices
-            WHERE ticker = :ticker
-              AND date >= date('now', :offset)
-              AND close IS NOT NULL
-            ORDER BY date ASC
-        """), conn, params={"ticker": ticker, "offset": f"-{months} months"})
+        if start and end:
+            df = pd.read_sql(text("""
+                SELECT date(date) AS date, close
+                FROM daily_prices
+                WHERE ticker = :ticker
+                  AND date >= :start
+                  AND date <= :end
+                  AND close IS NOT NULL
+                ORDER BY date ASC
+            """), conn, params={"ticker": ticker, "start": start, "end": end})
+        else:
+            df = pd.read_sql(text("""
+                SELECT date(date) AS date, close
+                FROM daily_prices
+                WHERE ticker = :ticker
+                  AND date >= date('now', :offset)
+                  AND close IS NOT NULL
+                ORDER BY date ASC
+            """), conn, params={"ticker": ticker, "offset": f"-{months} months"})
     return _records(df)
 
 

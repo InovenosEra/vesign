@@ -44,10 +44,10 @@ function Th({ label, col, sort, onSort }) {
 // Trade chart modal — supports multiple BUY/SELL pairs
 // ---------------------------------------------------------------------------
 
-function TradeModal({ row, onClose }) {
+function TradeModal({ row, start, end, onClose }) {
   const { data: history = [], isLoading } = useQuery({
-    queryKey: ['price-history', row.ticker],
-    queryFn: () => getPriceHistory(row.ticker, 12),
+    queryKey: ['price-history', row.ticker, start, end],
+    queryFn: () => getPriceHistory(row.ticker, { start, end }),
     staleTime: 300_000,
   })
 
@@ -194,10 +194,6 @@ export default function TradesPage() {
       {trades && total > 0 && (
         <div className="metrics">
           <div className="metric-card">
-            <div className="label">Tickers</div>
-            <div className="value">{total}</div>
-          </div>
-          <div className="metric-card">
             <div className="label">Total Trades</div>
             <div className="value">{totalPairs}</div>
           </div>
@@ -206,7 +202,7 @@ export default function TradesPage() {
             <div className="value">{totalPairs > 0 ? ((wins / totalPairs) * 100).toFixed(1) : '—'}%</div>
           </div>
           <div className="metric-card">
-            <div className="label">Avg Return</div>
+            <div className="label">Avg Yield/Trade</div>
             <div className={`value ${avgReturn >= 0 ? 'up' : 'down'}`}>
               {avgReturn >= 0 ? '+' : ''}{fmt(avgReturn)}%
             </div>
@@ -214,6 +210,19 @@ export default function TradesPage() {
           <div className="metric-card">
             <div className="label">Avg Days Held</div>
             <div className="value">{avgDays != null ? Math.round(avgDays) : '—'}</div>
+          </div>
+          <div className="metric-card">
+            <div className="label">Annual Yield</div>
+            {(() => {
+              const annualYield = avgReturn != null && avgDays != null && avgDays > 0
+                ? (avgReturn / avgDays) * 365
+                : null
+              return (
+                <div className={`value ${annualYield >= 0 ? 'up' : 'down'}`}>
+                  {annualYield != null ? `${annualYield >= 0 ? '+' : ''}${fmt(annualYield)}%` : '—'}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -260,7 +269,7 @@ export default function TradesPage() {
         </div>
       )}
 
-      {selected && <TradeModal row={selected} onClose={() => setSelected(null)} />}
+      {selected && <TradeModal row={selected} start={start} end={end} onClose={() => setSelected(null)} />}
     </div>
   )
 }
