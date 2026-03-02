@@ -239,7 +239,7 @@ export default function TradesPage() {
                 <th></th>
                 {th('Ticker',      'ticker')}
                 {th('Company',     'company')}
-                {th('Mkt Cap (B)', 'market_cap')}
+                {th('Market Cap (B)', 'market_cap')}
                 {th('Trades',      'trade_count')}
                 {th('Win Rate',    'win_count')}
                 {th('Avg Return',  'avg_return')}

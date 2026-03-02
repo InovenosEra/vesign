@@ -32,7 +32,7 @@ function PredictionCell({ value }) {
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
-  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>mkt closed</td>
+  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Close</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
   const diff  = live - closePrice
@@ -194,7 +194,7 @@ export default function WatchlistPage() {
                         <th></th>
                         {th('Ticker',      'ticker')}
                         {th('Company',     'company')}
-                        {th('Mkt Cap (B)', 'market_cap')}
+                        {th('Market Cap (B)', 'market_cap')}
                         {th('Signal',      'signal')}
                         {th('Price',       'close')}
                         <th>Live Price</th>

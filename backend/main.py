@@ -182,7 +182,8 @@ def signals_today(signal: Optional[str] = None):
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
-                   s.target_mean_price, s.signal, c.company, c.logo_url,
+                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   s.signal, c.company, c.logo_url,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -243,7 +244,8 @@ def signals(
 
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
-                   s.target_mean_price, s.signal, c.company, c.logo_url,
+                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   s.signal, c.company, c.logo_url,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker

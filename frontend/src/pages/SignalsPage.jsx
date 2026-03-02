@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSignalsToday, getSignals, getSuccessRate } from '../api'
+import { getSignalsToday, getSignals } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
 
@@ -8,9 +8,6 @@ import { useSort } from '../hooks/useSort'
 // Shared primitives
 // ---------------------------------------------------------------------------
 
-function SignalBadge({ signal }) {
-  return <span className={`badge badge-${signal}`}>{signal}</span>
-}
 
 function PredictionCell({ value }) {
   if (value == null) return <td>—</td>
@@ -19,7 +16,7 @@ function PredictionCell({ value }) {
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
-  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>mkt closed</td>
+  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Close</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
   const diff  = live - closePrice
@@ -37,18 +34,6 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
 }
 
 // Sortable <th> — used by client-side tables
-function Th({ label, col, sort, onSort }) {
-  const active = sort.key === col
-  return (
-    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }}>
-      {label}
-      <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
-        {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
-      </span>
-    </th>
-  )
-}
-
 // Server-side sortable <th> — used by the paginated all-signals table
 function ServerTh({ label, col, sortBy, sortDir, onSort }) {
   const active = sortBy === col
@@ -79,46 +64,107 @@ function Pagination({ page, pages, onChange }) {
 // Today's table — small dataset, client-side sort, live prices
 // ---------------------------------------------------------------------------
 
+// Fixed column widths shared by both Today tables so columns align across BUY/SELL sections
+const TODAY_COL_WIDTHS = ['44px', '160px', '110px', '80px', '64px', '90px', '90px', '90px', '100px', '130px']
+
+function TodayTableBody({ rows, prices, marketOpen }) {
+  return (
+    <table style={{ tableLayout: 'fixed', width: '100%' }}>
+      <colgroup>
+        {TODAY_COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
+      </colgroup>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Company</th>
+          <th>Market Cap (B)</th>
+          <th>Price</th>
+          <th>RSI</th>
+          <th>Low Price</th>
+          <th>Base Price</th>
+          <th>High Price</th>
+          <th>Prediction</th>
+          <th>Live Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
+            <td>{r.company ?? '—'}</td>
+            <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
+            <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
+            <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
+            <td>{r.target_low_price != null ? r.target_low_price.toFixed(2) : '—'}</td>
+            <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
+            <td>{r.target_high_price != null ? r.target_high_price.toFixed(2) : '—'}</td>
+            <PredictionCell value={r.fair_value_upside} />
+            <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 function TodayTable({ rows, prices, marketOpen }) {
-  const { sorted, sort, toggle } = useSort(rows, 'close', 'desc')
+  const { sorted } = useSort(rows, 'close', 'desc')
 
   if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
 
-  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
-
   return (
     <div className="data-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th></th>
-            {th('Ticker',      'ticker')}
-            {th('Company',     'company')}
-            {th('Mkt Cap (B)', 'market_cap')}
-            {th('Price',       'close')}
-            <th>Live Price</th>
-            {th('RSI',         'rsi')}
-            {th('Prediction',  'fair_value_upside')}
-            {th('Base Price',  'target_mean_price')}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((r, i) => (
-            <tr key={i}>
-              <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
-              <td><strong>{r.ticker}</strong></td>
-              <td>{r.company ?? '—'}</td>
-              <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
-              <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
-              <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
-              <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-              <PredictionCell value={r.fair_value_upside} />
-              <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <TodayTableBody rows={sorted} prices={prices} marketOpen={marketOpen} />
     </div>
+  )
+}
+
+function TodaySellTable({ rows, prices, marketOpen }) {
+  const { sorted } = useSort(rows, 'market_cap', 'desc')
+  const [page, setPage]         = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [search, setSearch]     = useState('')
+
+  if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
+
+  const filtered = search
+    ? sorted.filter(r =>
+        r.ticker?.toLowerCase().includes(search.toLowerCase()) ||
+        r.company?.toLowerCase().includes(search.toLowerCase())
+      )
+    : sorted
+
+  const pages     = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  function handlePageSize(val) { setPageSize(Number(val)); setPage(1) }
+  function handleSearch(val)   { setSearch(val);           setPage(1) }
+
+  return (
+    <>
+      <div className="controls">
+        <input
+          placeholder="🔍 Search ticker or company"
+          value={search}
+          onChange={e => handleSearch(e.target.value)}
+          style={{ width: 240 }}
+        />
+        {search && <button onClick={() => handleSearch('')}>Clear</button>}
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+          <select value={pageSize} onChange={e => handlePageSize(e.target.value)}>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </span>
+      </div>
+      <div className="data-table-wrap">
+        <TodayTableBody rows={paginated} prices={prices} marketOpen={marketOpen} />
+      </div>
+      <Pagination page={page} pages={pages} onChange={setPage} />
+    </>
   )
 }
 
@@ -138,34 +184,37 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage }) {
   return (
     <>
       <div className="data-table-wrap">
-        <table>
+        <table style={{ tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {TODAY_COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
+          </colgroup>
           <thead>
             <tr>
               <th></th>
-              {th('Ticker',      'ticker')}
-              {th('Company',     'company')}
-              {th('Mkt Cap (B)', 'market_cap')}
-              {th('Date',        'date')}
-              {th('Signal',      'signal')}
-              {th('Price',       'close')}
-              {th('RSI',         'rsi')}
-              {th('Prediction',  'fair_value_upside')}
-              {th('Base Price',  'target_mean_price')}
+              {th('Company',        'company')}
+              {th('Market Cap (B)', 'market_cap')}
+              {th('Price',          'close')}
+              {th('RSI',            'rsi')}
+              {th('Low Price',      'target_low_price')}
+              {th('Base Price',     'target_mean_price')}
+              {th('High Price',     'target_high_price')}
+              {th('Prediction',     'fair_value_upside')}
+              {th('Date',           'date')}
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
                 <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
-                <td><strong>{r.ticker}</strong></td>
                 <td>{r.company ?? '—'}</td>
                 <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
-                <td>{r.date ? r.date.slice(0, 10) : '—'}</td>
-                <td><SignalBadge signal={r.signal} /></td>
                 <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
                 <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-                <PredictionCell value={r.fair_value_upside} />
+                <td>{r.target_low_price != null ? r.target_low_price.toFixed(2) : '—'}</td>
                 <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
+                <td>{r.target_high_price != null ? r.target_high_price.toFixed(2) : '—'}</td>
+                <PredictionCell value={r.fair_value_upside} />
+                <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -180,49 +229,6 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage }) {
 // Success rate table — client-side sort, no pagination needed
 // ---------------------------------------------------------------------------
 
-function SuccessRateTable({ rows }) {
-  const { sorted, sort, toggle } = useSort(rows, 'success_rate', 'desc')
-
-  if (!rows || rows.length === 0) return <p className="empty">No completed trades found.</p>
-
-  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
-
-  return (
-    <div className="data-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th></th>
-            {th('Ticker',      'ticker')}
-            {th('Company',     'company')}
-            {th('Mkt Cap (B)', 'market_cap')}
-            {th('Trades',      'total_trades')}
-            {th('Win Rate',    'success_rate')}
-            {th('Avg Return',  'avg_return_pct')}
-            {th('Avg Days',    'avg_days_held')}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((r, i) => (
-            <tr key={i}>
-              <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
-              <td><strong>{r.ticker}</strong></td>
-              <td>{r.company ?? '—'}</td>
-              <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
-              <td>{r.total_trades}</td>
-              <td className={r.success_rate >= 50 ? 'up' : 'down'}>{r.success_rate}%</td>
-              <td className={r.avg_return_pct >= 0 ? 'up' : 'down'}>
-                {r.avg_return_pct >= 0 ? '+' : ''}{r.avg_return_pct.toFixed(2)}%
-              </td>
-              <td>{r.avg_days_held}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -231,7 +237,7 @@ export default function SignalsPage() {
   const [signalFilter, setSignalFilter] = useState('ALL')
   const [search, setSearch]             = useState('')
   const [page, setPage]                 = useState(1)
-  const [pageSize, setPageSize]         = useState(100)
+  const [pageSize, setPageSize]         = useState(10)
   const [sortBy, setSortBy]             = useState('date')
   const [sortDir, setSortDir]           = useState('desc')
 
@@ -274,13 +280,7 @@ export default function SignalsPage() {
     keepPreviousData: true,
   })
 
-  const { data: successRate, isLoading: loadingRate } = useQuery({
-    queryKey: ['success-rate'],
-    queryFn: () => getSuccessRate(12),
-    staleTime: 300_000,
-  })
-
-  const todayTickers = useMemo(() => {
+const todayTickers = useMemo(() => {
     const set = new Set()
     todayBuy?.forEach(r => r.ticker && set.add(r.ticker))
     todaySell?.forEach(r => r.ticker && set.add(r.ticker))
@@ -308,12 +308,12 @@ export default function SignalsPage() {
         </p>
         {loadingSell
           ? <p className="loading">Loading…</p>
-          : <TodayTable rows={todaySell} prices={prices} marketOpen={marketOpen} />}
+          : <TodaySellTable rows={todaySell} prices={prices} marketOpen={marketOpen} />}
       </div>
 
       <div className="section">
         <p className="section-title">
-          All Signals — last 12 months
+          All Signals
           {allResult && <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 10 }}>
             {allResult.total.toLocaleString()} rows
           </span>}
@@ -334,9 +334,10 @@ export default function SignalsPage() {
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
             <select value={pageSize} onChange={e => handlePageSize(e.target.value)}>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
               <option value={50}>50</option>
               <option value={100}>100</option>
-              <option value={250}>250</option>
             </select>
           </span>
         </div>
@@ -352,17 +353,6 @@ export default function SignalsPage() {
             />}
       </div>
 
-      <div className="section">
-        <p className="section-title">
-          BUY→SELL Success Rate by Company — last 12 months
-          {successRate && <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 10 }}>
-            {successRate.length} companies
-          </span>}
-        </p>
-        {loadingRate
-          ? <p className="loading">Loading…</p>
-          : <SuccessRateTable rows={successRate} />}
-      </div>
     </div>
   )
 }
