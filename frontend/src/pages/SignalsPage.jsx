@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, getSignals, getPriceHistory } from '../api'
 import {
@@ -85,8 +85,8 @@ function Pagination({ page, pages, onChange }) {
 function SignalModal({ row, onClose }) {
   const today    = new Date().toISOString().slice(0, 10)
   const end12m   = today
-  const start12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
-  const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+  const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
+  const start12m  = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['price-history-signal', row.ticker],
@@ -102,25 +102,6 @@ function SignalModal({ row, onClose }) {
   const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
   const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
 
-  const wrapperRef = useRef(null)
-  const [wrapperWidth, setWrapperWidth] = useState(0)
-  useEffect(() => {
-    if (!wrapperRef.current) return
-    const obs = new ResizeObserver(entries => setWrapperWidth(entries[0].contentRect.width))
-    obs.observe(wrapperRef.current)
-    return () => obs.disconnect()
-  }, [isLoading])
-
-  function dateToX(dateStr) {
-    const idx = history.findIndex(d => d.date === dateStr)
-    if (idx < 0 || history.length <= 1) return null
-    const plotLeft  = 8 + 48
-    const plotWidth = wrapperWidth - plotLeft - 24
-    return plotLeft + (idx / (history.length - 1)) * plotWidth
-  }
-
-  const signalDate  = row.date ? row.date.slice(0, 10) : today
-  const signalColor = row.signal === 'BUY' ? 'var(--green)' : row.signal === 'SELL' ? 'var(--red)' : 'var(--yellow)'
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -152,10 +133,6 @@ function SignalModal({ row, onClose }) {
                 </td>
               </tr>
               <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Date</td>
-                <td style={{ verticalAlign: 'middle' }}>{fmtDate(signalDate)}</td>
-              </tr>
-              <tr>
                 <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Price</td>
                 <td style={{ verticalAlign: 'middle' }}>{row.close != null ? `$${fmt(row.close)}` : '—'}</td>
               </tr>
@@ -169,14 +146,6 @@ function SignalModal({ row, onClose }) {
                   {row.fair_value_upside != null ? `${row.fair_value_upside >= 0 ? '+' : ''}${fmt(row.fair_value_upside * 100)}%` : '—'}
                 </td>
               </tr>
-              {row.target_low_price != null && (
-                <tr>
-                  <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Target Low / Base / High</td>
-                  <td style={{ verticalAlign: 'middle' }}>
-                    ${fmt(row.target_low_price)} / ${fmt(row.target_mean_price)} / ${fmt(row.target_high_price)}
-                  </td>
-                </tr>
-              )}
               <tr>
                 <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>12M Yield (organic)</td>
                 <td style={{ verticalAlign: 'middle' }} className={yield12m == null ? '' : yield12m >= 0 ? 'up' : 'down'}>
@@ -192,62 +161,32 @@ function SignalModal({ row, onClose }) {
         {isLoading ? (
           <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
         ) : (
-          <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
-            <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={history} margin={{ top: 36, right: 24, bottom: 8, left: 8 }}>
-                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                  tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
-                  interval="preserveStartEnd"
-                  minTickGap={50}
-                />
-                <YAxis
-                  domain={[minPrice, maxPrice]}
-                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                  tickFormatter={v => v.toFixed(0)}
-                  width={48}
-                />
-                <Tooltip
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
-                  labelStyle={{ color: 'var(--muted)' }}
-                  itemStyle={{ color: 'var(--text)' }}
-                  labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={v => [`$${v.toFixed(2)}`, 'Close']}
-                />
-                <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-
-            {/* SVG overlay: vertical line at signal date + price box */}
-            {wrapperWidth > 0 && history.length > 1 && (() => {
-              const sigX = dateToX(signalDate)
-              if (sigX == null) return null
-              const PLOT_TOP = 36, PLOT_BOTTOM = 332
-              const label = row.close != null ? `$${fmt(row.close, 1)}` : null
-              const px = 8, fs = 11
-              const bw = label ? label.length * 6.8 + px * 2 : 0
-              const bh = fs + 10
-              const by = PLOT_TOP - bh - 4
-              return (
-                <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
-                  <line x1={sigX} y1={PLOT_TOP} x2={sigX} y2={PLOT_BOTTOM}
-                    style={{ stroke: signalColor, strokeWidth: 2 }} />
-                  {label && (
-                    <g>
-                      <rect x={sigX - bw / 2} y={by} width={bw} height={bh} rx={4}
-                        style={{ fill: 'var(--surface)' }} />
-                      <text x={sigX} y={by + bh / 2} textAnchor="middle" dominantBaseline="central"
-                        fontSize={fs} style={{ fill: signalColor, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                        {label}
-                      </text>
-                    </g>
-                  )}
-                </svg>
-              )
-            })()}
-          </div>
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={history} margin={{ top: 16, right: 24, bottom: 8, left: 8 }}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
+                interval="preserveStartEnd"
+                minTickGap={50}
+              />
+              <YAxis
+                domain={[minPrice, maxPrice]}
+                tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                tickFormatter={v => v.toFixed(0)}
+                width={48}
+              />
+              <Tooltip
+                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                labelStyle={{ color: 'var(--muted)' }}
+                itemStyle={{ color: 'var(--text)' }}
+                labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
+                formatter={v => [`$${v.toFixed(2)}`, 'Close']}
+              />
+              <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
         )}
       </div>
     </div>
@@ -367,7 +306,7 @@ function TodaySellTable({ rows, prices, marketOpen, onRowClick }) {
 // All-signals table — server-side sort + pagination
 // ---------------------------------------------------------------------------
 
-function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowClick }) {
+function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowClick, prices, marketOpen }) {
   if (!result) return null
   const { data: rows, pages } = result
 
@@ -379,10 +318,11 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
   return (
     <>
       <div className="data-table-wrap">
-        <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1118 }}>
-          <colgroup>{['44px','80px','160px','110px','80px','80px','64px','90px','90px','90px','100px','130px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+        <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1218 }}>
+          <colgroup>{['80px','44px','80px','160px','110px','80px','80px','64px','90px','90px','90px','100px','130px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
           <thead>
             <tr>
+              {th('Date',           'date')}
               <th></th>
               {th('Ticker',         'ticker')}
               {th('Company',        'company')}
@@ -394,12 +334,13 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               {th('Base Price',     'target_mean_price')}
               {th('High Price',     'target_high_price')}
               {th('Prediction',     'fair_value_upside')}
-              {th('Date',           'date')}
+              <th>Live Price</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
+                <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
                 <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
                 <td><strong>{r.ticker ?? '—'}</strong></td>
                 <td>{r.company ?? '—'}</td>
@@ -411,7 +352,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
                 <td>{r.target_high_price != null ? r.target_high_price.toFixed(2) : '—'}</td>
                 <PredictionCell value={r.fair_value_upside} />
-                <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
+                <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               </tr>
             ))}
           </tbody>
@@ -474,14 +415,15 @@ export default function SignalsPage() {
     keepPreviousData: true,
   })
 
-const todayTickers = useMemo(() => {
+  const allTickers = useMemo(() => {
     const set = new Set()
     todayBuy?.forEach(r => r.ticker && set.add(r.ticker))
     todaySell?.forEach(r => r.ticker && set.add(r.ticker))
+    ;(allResult?.data ?? []).forEach(r => r.ticker && set.add(r.ticker))
     return [...set]
-  }, [todayBuy, todaySell])
+  }, [todayBuy, todaySell, allResult])
 
-  const { prices, marketOpen } = useLivePrices(todayTickers)
+  const { prices, marketOpen } = useLivePrices(allTickers)
 
   return (
     <div>
@@ -545,6 +487,8 @@ const todayTickers = useMemo(() => {
               page={page}
               onPage={setPage}
               onRowClick={setSelected}
+              prices={prices}
+              marketOpen={marketOpen}
             />}
       </div>
 
