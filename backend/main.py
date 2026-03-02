@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import subprocess
@@ -140,7 +141,6 @@ class NoteUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _records(df: pd.DataFrame) -> list[dict]:
-    import math
     records = df.to_dict(orient="records")
     return [
         {k: (None if (isinstance(v, float) and math.isnan(v)) else v)
@@ -559,6 +559,41 @@ def historical_trades(
             "avg_days":     round(avg_days, 1),
             "trades":       pairs,   # full list of pairs for the chart
         }
+
+    # Enrich each ticker with organic_yield: (last_close - first_close) / first_close
+    # over the selected date range, using daily_prices
+    if ticker_trades and start and end:
+        tickers = list(ticker_trades.keys())
+        placeholders = ", ".join([f":t{i}" for i in range(len(tickers))])
+        p = {f"t{i}": t for i, t in enumerate(tickers)}
+        p["start"] = start
+        p["end"]   = end
+        with engine.connect() as conn:
+            df_org = pd.read_sql(text(f"""
+                WITH bounds AS (
+                    SELECT ticker,
+                           MAX(CASE WHEN date(date) <= :start THEN date(date) END) AS fd,
+                           MAX(CASE WHEN date(date) <= :end   THEN date(date) END) AS ld
+                    FROM daily_prices
+                    WHERE date(date) >= date(:start, '-30 days')
+                      AND date(date) <= :end
+                      AND ticker IN ({placeholders})
+                    GROUP BY ticker
+                )
+                SELECT b.ticker,
+                       d1.close AS first_close,
+                       d2.close AS last_close
+                FROM bounds b
+                JOIN daily_prices d1 ON d1.ticker = b.ticker AND date(d1.date) = b.fd
+                JOIN daily_prices d2 ON d2.ticker = b.ticker AND date(d2.date) = b.ld
+            """), conn, params=p)
+        for _, org_row in df_org.iterrows():
+            t = org_row["ticker"]
+            fc, lc = org_row["first_close"], org_row["last_close"]
+            if t in ticker_trades and fc and float(fc) > 0:
+                ticker_trades[t]["organic_yield"] = round(
+                    float((lc - fc) / fc * 100), 2
+                )
 
     return list(ticker_trades.values())
 

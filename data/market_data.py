@@ -7,108 +7,103 @@ from sqlalchemy import text
 import pandas_market_calendars as mcal
 from utils.update_guard import should_run, mark_run
 
+# Batch size for backfilling large numbers of new tickers (avoids memory/timeout issues)
+_BACKFILL_BATCH = 200
 
-def update_prices():
 
-    print("Updating prices incrementally...")
-
-    tickers = load_universe()
-
-    today = datetime.now(UTC).date()
-
-    nyse = mcal.get_calendar("NYSE")
-    schedule = nyse.schedule(start_date=today - timedelta(days=10), end_date=today)
-
-    end_date = schedule.index[-1].date()
-
-    # ---------- detect last stored date ----------
-    # Use MIN(MAX(date) per ticker) so that if any single ticker has more
-    # recent data than the rest (e.g. a manually added custom ticker), the
-    # other tickers still get updated rather than being silently skipped.
+def _build_ticker_df(raw, ticker, start_date, end_date, single=False):
+    """
+    Extract and clean one ticker's DataFrame from a yfinance download result.
+    Returns a clean DataFrame or None if the ticker had no usable data.
+    """
     try:
-        existing = pd.read_sql(
-            "SELECT MIN(max_date) as last_date FROM "
-            "(SELECT ticker, MAX(date) as max_date FROM daily_prices GROUP BY ticker)",
-            engine
-        )
-        last_date = pd.to_datetime(existing["last_date"][0]).date()
+        df = raw.copy() if single else raw[ticker].copy()
+    except (KeyError, TypeError):
+        return None
 
-        start_date = last_date + timedelta(days=1)
+    if df is None or df.empty:
+        return None
 
-    except Exception:
-        start_date = end_date - timedelta(days=3 * 365)
+    df = df.reset_index()
+    df["ticker"] = ticker
+    df.rename(columns={
+        "Date": "date", "Open": "open", "High": "high",
+        "Low": "low", "Close": "close", "Volume": "volume",
+    }, inplace=True)
 
-    if start_date >= end_date:
-        print("Database already up to date")
+    today_ts = pd.Timestamp(datetime.now(UTC).date())
+    df = df[df["date"] < today_ts]
+
+    # Keep only the standard columns that exist
+    keep = [c for c in ("date", "ticker", "open", "high", "low", "close", "volume") if c in df.columns]
+    return df[keep]
+
+
+def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0):
+    """
+    Download price data for *tickers* between *start_date* and *end_date*,
+    then upsert into daily_prices.
+
+    If batch_size > 0 the list is split into chunks of that size (used for
+    large backfills to avoid memory / rate-limit issues).
+    """
+    if not tickers:
         return
 
-    print(f"Downloading missing data from {start_date} to {end_date}")
-
-    data = yf.download(
-        tickers,
-        start=start_date,
-        end=end_date,
-        group_by="ticker",
-        auto_adjust=False,
-        progress=True
+    batches = (
+        [tickers[i:i + batch_size] for i in range(0, len(tickers), batch_size)]
+        if batch_size > 0
+        else [tickers]
     )
 
     all_frames = []
 
-    for ticker in tickers:
+    for b_idx, batch in enumerate(batches):
+        if len(batches) > 1:
+            print(f"  Batch {b_idx + 1}/{len(batches)} ({len(batch)} tickers)…")
+
+        query = batch[0] if len(batch) == 1 else batch
         try:
-            if ticker not in data.columns.get_level_values(0):
-                print(f"{ticker} download failed - retrying single download")
-                retry = yf.download(
-                    ticker,
-                    start=start_date,
-                    end=end_date,
-                    auto_adjust=False,
-                    progress=False
-                )
-
-                if retry is None or retry.empty:
-                    print(f"{ticker} retry failed - skipping")
-                    continue
-                df = retry.copy()
-            else:
-                df = data[ticker].copy()
-
-            if df is None or df.empty:
-                print(f"{ticker} returned empty data - skipping")
-                continue
-
-            df.reset_index(inplace=True)
-            df["ticker"] = ticker
-
-            df.rename(columns={
-                "Date": "date",
-                "Open": "open",
-                "High": "high",
-                "Low": "low",
-                "Close": "close",
-                "Volume": "volume"
-            }, inplace=True)
-
-            today = pd.Timestamp(datetime.now(UTC).date())
-            df = df[df["date"] < today]
-
-            all_frames.append(df)
-
+            data = yf.download(
+                query,
+                start=start_date,
+                end=end_date,
+                group_by="ticker",
+                auto_adjust=False,
+                progress=len(batches) == 1,   # show bar only for single large batch
+            )
         except Exception as e:
-            print(f"{ticker} failed: {e}")
+            print(f"  Batch download failed: {e}")
             continue
 
-    if len(all_frames) == 0:
-        print("No new data downloaded")
+        single = len(batch) == 1
+
+        for ticker in batch:
+            # Try extracting from the bulk download first
+            df = _build_ticker_df(data, ticker, start_date, end_date, single=single)
+
+            # If missing from bulk result, retry individually
+            if df is None and not single:
+                try:
+                    retry = yf.download(
+                        ticker, start=start_date, end=end_date,
+                        auto_adjust=False, progress=False,
+                    )
+                    df = _build_ticker_df(retry, ticker, start_date, end_date, single=True)
+                except Exception:
+                    pass
+
+            if df is not None and not df.empty:
+                all_frames.append(df)
+
+    if not all_frames:
+        print("  No data downloaded.")
         return
 
-    final_df = pd.concat(all_frames)
+    final_df = pd.concat(all_frames, ignore_index=True)
     final_df.drop_duplicates(subset=["date", "ticker"], inplace=True)
 
-    # Delete any existing rows for the same date/ticker before inserting
-    # (guards against re-runs on the same day producing duplicates or
-    # overwriting NULL-close rows that were inserted before market open)
+    # Delete any conflicting rows for the same dates before inserting
     dates = final_df["date"].dt.strftime("%Y-%m-%d").unique().tolist()
     if dates:
         placeholders = ",".join(f"'{d}'" for d in dates)
@@ -118,11 +113,60 @@ def update_prices():
             ))
 
     final_df.to_sql("daily_prices", engine, if_exists="append", index=False)
-
-    print("Prices incrementally updated successfully")
-
+    print(f"  Saved {len(final_df):,} rows for {final_df['ticker'].nunique():,} tickers.")
 
 
+def update_prices():
+
+    print("Updating prices…")
+
+    tickers = load_universe()
+
+    today    = datetime.now(UTC).date()
+    nyse     = mcal.get_calendar("NYSE")
+    schedule = nyse.schedule(start_date=today - timedelta(days=10), end_date=today)
+    end_date = schedule.index[-1].date()
+
+    # ── Step 1: backfill any tickers that have never been downloaded ──────────
+    # New tickers (e.g. newly added NASDAQ stocks) won't appear in daily_prices
+    # at all, so the MIN(MAX(date)) logic below would only give them a few days
+    # of data.  We backfill them separately with 3 years of history first.
+    try:
+        initialized = set(
+            pd.read_sql("SELECT DISTINCT ticker FROM daily_prices", engine)["ticker"].tolist()
+        )
+    except Exception:
+        initialized = set()
+
+    new_tickers = [t for t in tickers if t not in initialized]
+
+    if new_tickers:
+        backfill_start = end_date - timedelta(days=3 * 365)
+        print(f"Backfilling {len(new_tickers):,} new tickers from {backfill_start} to {end_date}…")
+        _download_and_save(new_tickers, backfill_start, end_date, batch_size=_BACKFILL_BATCH)
+
+    # ── Step 2: incremental update for all tickers ────────────────────────────
+    # Use MIN(MAX(date) per ticker) so that even if one ticker is slightly ahead,
+    # the others still get refreshed.
+    try:
+        existing = pd.read_sql(
+            "SELECT MIN(max_date) as last_date FROM "
+            "(SELECT ticker, MAX(date) as max_date FROM daily_prices GROUP BY ticker)",
+            engine
+        )
+        last_date  = pd.to_datetime(existing["last_date"][0]).date()
+        start_date = last_date + timedelta(days=1)
+    except Exception:
+        start_date = end_date - timedelta(days=3 * 365)
+
+    if start_date >= end_date:
+        print("Database already up to date.")
+        return
+
+    print(f"Incremental update: {start_date} → {end_date} ({len(tickers):,} tickers)")
+    _download_and_save(tickers, start_date, end_date)
+
+    print("Prices updated successfully.")
 
 
 def update_vix():

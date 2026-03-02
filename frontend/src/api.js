@@ -1,7 +1,9 @@
 const BASE = '/api'
 
+const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' }
+
 async function get(path) {
-  const res = await fetch(BASE + path)
+  const res = await fetch(BASE + path, { headers: NGROK_HEADERS })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json()
 }
@@ -9,7 +11,7 @@ async function get(path) {
 async function post(path, body) {
   const res = await fetch(BASE + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS },
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
@@ -20,7 +22,7 @@ async function post(path, body) {
 async function patch(path, body) {
   const res = await fetch(BASE + path, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS },
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
@@ -28,7 +30,7 @@ async function patch(path, body) {
 }
 
 async function del(path) {
-  const res = await fetch(BASE + path, { method: 'DELETE' })
+  const res = await fetch(BASE + path, { method: 'DELETE', headers: NGROK_HEADERS })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
 }
 
