@@ -35,14 +35,18 @@ async function del(path) {
 }
 
 // --- Market ----------------------------------------------------------------
-export const getMarketStatus = () => get('/market/status')
+export const getMarketStatus = (market = 'US') =>
+  get(`/market/status?market=${market}`)
 
 // --- Signals ---------------------------------------------------------------
-export const getSignalsToday = (signal) =>
-  get('/signals/today' + (signal ? `?signal=${signal}` : ''))
+export const getSignalsToday = (signal, market = 'US') => {
+  const params = new URLSearchParams({ market })
+  if (signal) params.set('signal', signal)
+  return get(`/signals/today?${params}`)
+}
 
-export const getSignals = ({ signal, search, months = 12, page = 1, page_size = 100, sort_by = 'date', sort_dir = 'desc' } = {}) => {
-  const params = new URLSearchParams({ months, page, page_size, sort_by, sort_dir })
+export const getSignals = ({ signal, search, months = 12, page = 1, page_size = 100, sort_by = 'date', sort_dir = 'desc', market = 'US' } = {}) => {
+  const params = new URLSearchParams({ months, page, page_size, sort_by, sort_dir, market })
   if (signal) params.set('signal', signal)
   if (search) params.set('search', search)
   return get(`/signals?${params}`)
@@ -77,11 +81,10 @@ export const removeTicker = (id, ticker) =>
   del(`/watchlists/${id}/tickers/${ticker}`)
 
 // --- Trades ----------------------------------------------------------------
-export const getTrades = ({ start, end } = {}) => {
-  const params = new URLSearchParams()
+export const getTrades = ({ start, end, market = 'US' } = {}) => {
+  const params = new URLSearchParams({ market })
   if (start) params.set('start', start)
   if (end) params.set('end', end)
-  const qs = params.toString()
-  return get('/trades' + (qs ? `?${qs}` : ''))
+  return get('/trades?' + params.toString())
 }
 

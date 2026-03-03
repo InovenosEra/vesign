@@ -107,13 +107,18 @@ def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0)
     final_df = pd.concat(all_frames, ignore_index=True)
     final_df.drop_duplicates(subset=["date", "ticker"], inplace=True)
 
-    # Delete any conflicting rows for the same dates before inserting
+    # Delete only the rows for the specific tickers being saved (not all tickers on those dates,
+    # which would wipe unrelated markets' price history when doing a partial backfill).
     dates = final_df["date"].dt.strftime("%Y-%m-%d").unique().tolist()
-    if dates:
-        placeholders = ",".join(f"'{d}'" for d in dates)
+    batch_tickers = final_df["ticker"].unique().tolist()
+    if dates and batch_tickers:
+        date_placeholders   = ",".join(f"'{d}'" for d in dates)
+        ticker_placeholders = "','".join(batch_tickers)
         with engine.begin() as conn:
             conn.execute(text(
-                f"DELETE FROM daily_prices WHERE date(date) IN ({placeholders})"
+                f"DELETE FROM daily_prices "
+                f"WHERE date(date) IN ({date_placeholders}) "
+                f"AND ticker IN ('{ticker_placeholders}')"
             ))
 
     final_df.to_sql("daily_prices", engine, if_exists="append", index=False)

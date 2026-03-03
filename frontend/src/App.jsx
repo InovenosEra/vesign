@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext, useRef } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { getMarketStatus } from './api'
+import { MarketContext, MarketProvider } from './context/MarketContext'
 import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
 import TradesPage from './pages/TradesPage'
@@ -12,8 +13,7 @@ const queryClient = new QueryClient({
 })
 
 // ---------------------------------------------------------------------------
-// Returns the UTC timestamp (ms) of the next NYSE open (9:30 AM ET),
-// correctly accounting for DST via the browser's Intl API.
+// Shared countdown formatter
 // ---------------------------------------------------------------------------
 function fmtCountdown(ms) {
   if (ms <= 0) return '00:00:00'
@@ -24,7 +24,9 @@ function fmtCountdown(ms) {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
 }
 
-// Returns UTC ms for next NYSE close (4:00 PM ET today, since we're open)
+// ---------------------------------------------------------------------------
+// NYSE helpers (America/New_York)
+// ---------------------------------------------------------------------------
 function getMarketCloseUTC() {
   const now = new Date()
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -39,7 +41,7 @@ function getMarketCloseUTC() {
   const m = String(et.month).padStart(2, '0')
   const d = String(et.day).padStart(2, '0')
 
-  const guess = new Date(`${y}-${m}-${d}T21:00:00Z`) // rough 4 PM ET guess
+  const guess = new Date(`${y}-${m}-${d}T21:00:00Z`)
   const gParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     hour: 'numeric', minute: 'numeric', hour12: false,
@@ -54,24 +56,20 @@ function getMarketCloseUTC() {
 
 function getNextMarketOpenUTC() {
   const now = new Date()
-
-  // Current ET date + time components
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     year: 'numeric', month: 'numeric', day: 'numeric',
     hour: 'numeric', minute: 'numeric',
     hour12: false,
   }).formatToParts(now)
-
   const et = {}
   parts.forEach(p => { if (p.type !== 'literal') et[p.type] = parseInt(p.value) })
-  et.hour = (et.hour || 0) % 24 // guard against midnight = 24
+  et.hour = (et.hour || 0) % 24
 
-  const dow = new Date(et.year, et.month - 1, et.day).getDay() // 0=Sun, 6=Sat
+  const dow = new Date(et.year, et.month - 1, et.day).getDay()
   const isWeekday  = dow >= 1 && dow <= 5
   const beforeOpen = et.hour < 9 || (et.hour === 9 && et.minute < 30)
 
-  // Start from today in ET; advance if market already opened today or it's a weekend
   const target = new Date(et.year, et.month - 1, et.day)
   if (!isWeekday || !beforeOpen) {
     target.setDate(target.getDate() + 1)
@@ -83,8 +81,6 @@ function getNextMarketOpenUTC() {
   const m = String(target.getMonth() + 1).padStart(2, '0')
   const d = String(target.getDate()).padStart(2, '0')
 
-  // Use a UTC guess around 14:30 (midpoint between ET-4 and ET-5 offsets)
-  // then correct by checking what ET time that UTC moment actually maps to.
   const guess = new Date(`${y}-${m}-${d}T14:30:00Z`)
   const gParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -98,48 +94,211 @@ function getNextMarketOpenUTC() {
   return guess.getTime() + diffMs
 }
 
-function useCountdown(isOpen) {
+// ---------------------------------------------------------------------------
+// TASE helpers (Asia/Jerusalem, open Sun–Thu 09:59–17:29)
+// ---------------------------------------------------------------------------
+function getTaseCloseUTC() {
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour12: false,
+  }).formatToParts(now)
+  const il = {}
+  parts.forEach(p => { if (p.type !== 'literal') il[p.type] = parseInt(p.value) })
+
+  const y = il.year
+  const m = String(il.month).padStart(2, '0')
+  const d = String(il.day).padStart(2, '0')
+
+  const guess = new Date(`${y}-${m}-${d}T15:29:00Z`) // rough 17:29 IST (UTC+2)
+  const gParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    hour: 'numeric', minute: 'numeric', hour12: false,
+  }).formatToParts(guess)
+  const gp = {}
+  gParts.forEach(p => { if (p.type !== 'literal') gp[p.type] = parseInt(p.value) })
+  gp.hour = (gp.hour || 0) % 24
+
+  const diffMs = ((17 * 60 + 29) - (gp.hour * 60 + (gp.minute || 0))) * 60_000
+  return guess.getTime() + diffMs
+}
+
+function getNextTaseOpenUTC() {
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric',
+    hour12: false,
+  }).formatToParts(now)
+  const il = {}
+  parts.forEach(p => { if (p.type !== 'literal') il[p.type] = parseInt(p.value) })
+  il.hour = (il.hour || 0) % 24
+
+  // JS getDay(): 0=Sun, 1=Mon, ..., 4=Thu, 5=Fri, 6=Sat
+  const dow = new Date(il.year, il.month - 1, il.day).getDay()
+  const isTaseDay  = dow >= 0 && dow <= 4  // Sun–Thu
+  const beforeOpen = il.hour < 9 || (il.hour === 9 && il.minute < 59)
+
+  const target = new Date(il.year, il.month - 1, il.day)
+  if (!isTaseDay || !beforeOpen) {
+    target.setDate(target.getDate() + 1)
+    while (target.getDay() === 5 || target.getDay() === 6) // skip Fri, Sat
+      target.setDate(target.getDate() + 1)
+  }
+
+  const y = target.getFullYear()
+  const m = String(target.getMonth() + 1).padStart(2, '0')
+  const d = String(target.getDate()).padStart(2, '0')
+
+  const guess = new Date(`${y}-${m}-${d}T07:59:00Z`) // rough 9:59 IST (UTC+2)
+  const gParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    hour: 'numeric', minute: 'numeric', hour12: false,
+  }).formatToParts(guess)
+  const gp = {}
+  gParts.forEach(p => { if (p.type !== 'literal') gp[p.type] = parseInt(p.value) })
+  gp.hour = (gp.hour || 0) % 24
+
+  const diffMs = ((9 * 60 + 59) - (gp.hour * 60 + (gp.minute || 0))) * 60_000
+  return guess.getTime() + diffMs
+}
+
+// ---------------------------------------------------------------------------
+// Countdown hook — market-aware
+// ---------------------------------------------------------------------------
+function useCountdown(isOpen, market = 'US') {
   const [countdown, setCountdown] = useState('')
 
   useEffect(() => {
     function tick() {
-      const remaining = isOpen
-        ? getMarketCloseUTC() - Date.now()
-        : getNextMarketOpenUTC() - Date.now()
+      const remaining = market === 'IL'
+        ? (isOpen ? getTaseCloseUTC() - Date.now() : getNextTaseOpenUTC() - Date.now())
+        : (isOpen ? getMarketCloseUTC() - Date.now() : getNextMarketOpenUTC() - Date.now())
       setCountdown(fmtCountdown(remaining))
     }
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [isOpen])
+  }, [isOpen, market])
 
   return countdown
 }
 
+// ---------------------------------------------------------------------------
+// Flag selector — switches global market context
+// ---------------------------------------------------------------------------
+const MARKETS = [
+  { code: 'US', flag: '🇺🇸', label: 'US' },
+  { code: 'IL', flag: '🇮🇱', label: 'IL' },
+]
+
+function FlagSelector() {
+  const { market, setMarket } = useContext(MarketContext)
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onMouseDown(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [])
+
+  const current = MARKETS.find(m => m.code === market) ?? MARKETS[0]
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Switch market"
+        style={{
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: '4px 10px',
+          cursor: 'pointer',
+          fontSize: 20,
+          lineHeight: 1,
+          color: 'var(--text)',
+        }}
+      >
+        {current.flag}
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          top: 'calc(100% + 6px)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          zIndex: 100,
+          minWidth: 'fit-content',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          overflow: 'hidden',
+        }}>
+          {MARKETS.map(opt => (
+            <button
+              key={opt.code}
+              onClick={() => { setMarket(opt.code); setOpen(false) }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                padding: '8px 12px',
+                background: market === opt.code ? 'rgba(0,210,255,0.12)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text)',
+                fontSize: 11,
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{opt.flag}</span>
+              <span>{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Market status badge
+// ---------------------------------------------------------------------------
 function MarketStatus() {
+  const { market } = useContext(MarketContext)
   const { data } = useQuery({
-    queryKey: ['market-status'],
-    queryFn: getMarketStatus,
+    queryKey: ['market-status', market],
+    queryFn: () => getMarketStatus(market),
     refetchInterval: 60_000,
   })
-  const countdown = useCountdown(data?.is_open ?? false)
+  const countdown = useCountdown(data?.is_open ?? false, market)
 
   if (!data) return null
   return data.is_open
     ? (
       <span className="market-open" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-        <span>● Market Open</span>
+        <span><span className="dot-blink">●</span> Market Open</span>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>Closes in {countdown}</span>
       </span>
     )
     : (
       <span className="market-closed" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-        <span>● Market Closed</span>
+        <span>● Market Close</span>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>Opens in {countdown}</span>
       </span>
     )
 }
 
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
 function Header() {
   return (
     <header className="app-header">
@@ -152,24 +311,32 @@ function Header() {
         <NavLink to="/watchlist">Watchlist</NavLink>
         <NavLink to="/trades">Trades</NavLink>
       </nav>
-      <MarketStatus />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+        <MarketStatus />
+        <FlagSelector />
+      </div>
     </header>
   )
 }
 
+// ---------------------------------------------------------------------------
+// App root
+// ---------------------------------------------------------------------------
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Header />
-        <main className="app-main">
-          <Routes>
-            <Route path="/" element={<SignalsPage />} />
-            <Route path="/watchlist" element={<WatchlistPage />} />
-            <Route path="/trades" element={<TradesPage />} />
-          </Routes>
-        </main>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <MarketProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Header />
+          <main className="app-main">
+            <Routes>
+              <Route path="/" element={<SignalsPage />} />
+              <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/trades" element={<TradesPage />} />
+            </Routes>
+          </main>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </MarketProvider>
   )
 }

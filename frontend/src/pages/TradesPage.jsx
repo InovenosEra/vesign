@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 import { getTrades, getPriceHistory } from '../api'
 import { useSort } from '../hooks/useSort'
+import { MarketContext } from '../context/MarketContext'
 
 function fmt(n, decimals = 2) {
   return n != null
@@ -96,6 +97,8 @@ function PriceBoxLabel({ viewBox, value, color }) {
 // ---------------------------------------------------------------------------
 
 function TradeModal({ row, start, end, onClose }) {
+  const { market } = useContext(MarketContext)
+  const currency = market === 'IL' ? '₪' : '$'
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['price-history', row.ticker, start, end],
     queryFn: () => getPriceHistory(row.ticker, { start, end }),
@@ -203,7 +206,7 @@ function TradeModal({ row, start, end, onClose }) {
                   labelStyle={{ color: 'var(--muted)' }}
                   itemStyle={{ color: 'var(--text)' }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={v => [`$${v.toFixed(2)}`, 'Close']}
+                  formatter={v => [`${currency}${v.toFixed(2)}`, 'Close']}
                 />
                 <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
               </LineChart>
@@ -242,13 +245,13 @@ function TradeModal({ row, start, end, onClose }) {
                       {buyX != null && <>
                         <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM}
                           style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
-                        {t.buy_price != null && priceBox(buyX, '$' + fmt(t.buy_price, 1), 'var(--green)')}
+                        {t.buy_price != null && priceBox(buyX, currency + fmt(t.buy_price, 1), 'var(--green)')}
                       </>}
                       {/* Sell vertical line + price box */}
                       {sellX != null && <>
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM}
                           style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
-                        {t.sell_price != null && priceBox(sellX, '$' + fmt(t.sell_price, 1), 'var(--red)')}
+                        {t.sell_price != null && priceBox(sellX, currency + fmt(t.sell_price, 1), 'var(--red)')}
                       </>}
                       {/* Horizontal dotted range line + % gain label */}
                       {buyX != null && sellX != null && t.buy_price != null && t.sell_price != null && (() => {
@@ -282,6 +285,7 @@ function TradeModal({ row, start, end, onClose }) {
 // ---------------------------------------------------------------------------
 
 export default function TradesPage() {
+  const { market } = useContext(MarketContext)
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
@@ -291,8 +295,8 @@ export default function TradesPage() {
   const [search, setSearch]     = useState('')
 
   const { data: trades, isLoading, isError } = useQuery({
-    queryKey: ['trades', start, end],
-    queryFn: () => getTrades({ start, end }),
+    queryKey: ['trades', start, end, market],
+    queryFn: () => getTrades({ start, end, market }),
   })
 
   const { sorted, sort, toggle } = useSort(trades, 'avg_return', 'desc')

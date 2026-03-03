@@ -41,6 +41,63 @@ def _fetch_index_table(url: str) -> pd.DataFrame:
     companies["logo_url"] = (
         "https://financialmodelingprep.com/image-stock/" + companies["ticker"] + ".png"
     )
+    companies["market"] = "US"
+
+    return companies
+
+
+def _fetch_ta_index(url: str) -> pd.DataFrame:
+    """Fetch a Wikipedia TASE index table and return a normalised companies DataFrame.
+
+    Israeli Wikipedia tables use Name/Symbol/Sector column names.
+    Tickers get a .TA suffix for yfinance (e.g. TEVA.TA).
+    """
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    html = StringIO(response.text)
+    tables = pd.read_html(html)
+
+    # Find the table that has a Symbol column
+    table = None
+    for t in tables:
+        if "Symbol" in t.columns:
+            table = t
+            break
+    if table is None:
+        raise ValueError(f"No table with 'Symbol' column found at {url}")
+
+    # Flatten MultiIndex columns if present
+    if isinstance(table.columns, pd.MultiIndex):
+        table.columns = [" ".join(str(c) for c in col).strip() for col in table.columns]
+        # Re-find columns after flattening
+        sym_col = next((c for c in table.columns if "Symbol" in c), None)
+        name_col = next((c for c in table.columns if "Name" in c), None)
+        sec_col  = next((c for c in table.columns if "Sector" in c), None)
+    else:
+        sym_col  = "Symbol"
+        name_col = next((c for c in ("Name", "Company", "Security") if c in table.columns), table.columns[0])
+        sec_col  = next((c for c in ("Sector", "GICS Sector", "Industry") if c in table.columns), None)
+
+    if sym_col is None:
+        raise ValueError(f"Could not locate Symbol column in table from {url}")
+
+    tickers = (
+        table[sym_col]
+        .astype(str)
+        .str.strip()
+        .apply(lambda t: t if t.endswith(".TA") else t + ".TA")
+    )
+
+    companies = pd.DataFrame({
+        "ticker":  tickers,
+        "company": table[name_col].astype(str).str.strip() if name_col else tickers,
+        "sector":  table[sec_col].astype(str).str.strip() if sec_col else "",
+        "market":  "IL",
+    })
+
+    companies["logo_url"] = (
+        "https://financialmodelingprep.com/image-stock/" + companies["ticker"] + ".png"
+    )
 
     return companies
 
@@ -61,14 +118,44 @@ def load_universe():
     sp600 = _fetch_index_table("https://en.wikipedia.org/wiki/List_of_S%26P_600_companies")
     print(f"Loaded {len(sp600)} S&P 600 tickers")
 
-    companies = pd.concat([sp500, sp400, sp600], ignore_index=True).drop_duplicates(subset=["ticker"])
+    us_companies = pd.concat([sp500, sp400, sp600], ignore_index=True).drop_duplicates(subset=["ticker"])
+
+    print("Loading TA-35 universe...")
+    try:
+        ta35 = _fetch_ta_index("https://en.wikipedia.org/wiki/TA-35_Index")
+        print(f"Loaded {len(ta35)} TA-35 tickers")
+    except Exception as e:
+        print(f"Warning: Could not load TA-35: {e}")
+        ta35 = pd.DataFrame()
+
+    print("Loading TA-90 universe...")
+    try:
+        ta90 = _fetch_ta_index("https://en.wikipedia.org/wiki/TA-90_Index")
+        print(f"Loaded {len(ta90)} TA-90 tickers")
+    except Exception as e:
+        print(f"Warning: Could not load TA-90: {e}")
+        ta90 = pd.DataFrame()
+
+    il_frames = [df for df in [ta35, ta90] if not df.empty]
+    if il_frames:
+        il_companies = pd.concat(il_frames, ignore_index=True).drop_duplicates(subset=["ticker"])
+        print(f"Loaded {len(il_companies)} total IL tickers")
+    else:
+        il_companies = pd.DataFrame()
+
+    companies = pd.concat(
+        [df for df in [us_companies, il_companies] if not df.empty],
+        ignore_index=True,
+    ).drop_duplicates(subset=["ticker"])
 
     # Save companies table, preserving any manually added custom tickers
-    # (tickers not in S&P 500/400/600 that were inserted outside this function).
+    # (tickers not in any index that were inserted outside this function).
     try:
         existing = pd.read_sql("SELECT * FROM companies", engine)
         index_tickers = set(companies["ticker"])
-        custom = existing[~existing["ticker"].isin(index_tickers)]
+        custom = existing[~existing["ticker"].isin(index_tickers)].copy()
+        if "market" not in custom.columns:
+            custom["market"] = "US"
     except Exception:
         custom = pd.DataFrame()
 
@@ -79,9 +166,9 @@ def load_universe():
 
     tickers = companies["ticker"].tolist()
 
-    print(f"Loaded {len(tickers)} S&P 500 + S&P 400 + S&P 600 tickers")
+    print(f"Loaded {len(tickers)} total tickers (US + IL)")
 
-    # ── Extend universe with any watchlist tickers outside the S&P 500 ──
+    # ── Extend universe with any watchlist tickers outside the indexed universe ──
     try:
         watchlist_tickers = pd.read_sql(
             "SELECT DISTINCT ticker FROM watchlist", engine
@@ -102,6 +189,7 @@ def load_universe():
                     "ticker":   new_co,
                     "company":  new_co,
                     "sector":   [""] * len(new_co),
+                    "market":   ["US"] * len(new_co),
                     "logo_url": [
                         f"https://financialmodelingprep.com/image-stock/{t}.png"
                         for t in new_co

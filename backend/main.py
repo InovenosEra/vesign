@@ -72,6 +72,15 @@ def _init_tables():
             )
         """))
 
+    # Schema migration in its own connection so a failure doesn't poison the
+    # watchlist transaction above (SQLite marks a connection as "needs rollback"
+    # after any failed statement, even if the exception is caught).
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE companies ADD COLUMN market TEXT DEFAULT 'US'"))
+    except Exception:
+        pass  # column already exists or table doesn't exist yet
+
 
 _init_tables()
 
@@ -83,6 +92,15 @@ def market_is_open() -> bool:
     et = pytz.timezone("US/Eastern")
     now = datetime.now(UTC).astimezone(et)
     return now.weekday() < 5 and dt_time(9, 30) <= now.time() <= dt_time(16, 0)
+
+
+def tase_is_open() -> bool:
+    """TASE is open Sunday–Thursday, 09:59–17:29 IST (Asia/Jerusalem)."""
+    il = pytz.timezone("Asia/Jerusalem")
+    now = datetime.now(UTC).astimezone(il)
+    dow = now.weekday()  # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 6=Sun
+    is_tase_day = dow <= 3 or dow == 6
+    return is_tase_day and dt_time(9, 59) <= now.time() <= dt_time(17, 29)
 
 
 def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Series:
@@ -204,7 +222,9 @@ def health():
 # --- Market status ----------------------------------------------------------
 
 @app.get("/api/market/status")
-def market_status():
+def market_status(market: Optional[str] = None):
+    if market and market.upper() == "IL":
+        return {"is_open": tase_is_open()}
     return {"is_open": market_is_open()}
 
 
@@ -218,8 +238,9 @@ _MARKET_CAP_JOIN = """
 """
 
 @app.get("/api/signals/today")
-def signals_today(signal: Optional[str] = None):
-    """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD filter."""
+def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
+    """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD&market=US|IL filter."""
+    mkt = (market or "US").upper()
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
@@ -229,8 +250,14 @@ def signals_today(signal: Optional[str] = None):
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
             {_MARKET_CAP_JOIN}
-            WHERE DATE(s.date) = (SELECT DATE(MAX(date)) FROM signals)
-        """), conn)
+            WHERE COALESCE(c.market, 'US') = :market
+            AND DATE(s.date) = (
+                SELECT DATE(MAX(s2.date))
+                FROM signals s2
+                LEFT JOIN companies c2 ON s2.ticker = c2.ticker
+                WHERE COALESCE(c2.market, 'US') = :market
+            )
+        """), conn, params={"market": mkt})
 
     if signal:
         df = df[df["signal"] == signal.upper()]
@@ -255,14 +282,19 @@ def signals(
     sort_dir: str = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=10, le=500),
+    market: Optional[str] = None,
 ):
     """Signals for the last N months with server-side sort and pagination."""
     _key = sort_by if sort_by in _SORTABLE else "date"
     sort_col = _SORT_COL_SQL.get(_key, f"s.{_key}")
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
+    mkt = (market or "US").upper()
 
-    conditions = [f"DATE(s.date) >= DATE('now', '-{months} months')"]
-    params: dict = {}
+    conditions = [
+        f"DATE(s.date) >= DATE('now', '-{months} months')",
+        "COALESCE(c.market, 'US') = :market",
+    ]
+    params: dict = {"market": mkt}
 
     if signal:
         conditions.append("s.signal = :signal")
@@ -537,10 +569,12 @@ def remove_ticker(list_id: int, ticker: str):
 def historical_trades(
     start: Optional[str] = None,
     end: Optional[str] = None,
+    market: Optional[str] = None,
 ):
     """BUY→SELL trade pairs within the given date range."""
-    conditions = []
-    params: dict = {}
+    mkt = (market or "US").upper()
+    conditions = ["COALESCE(c.market, 'US') = :market"]
+    params: dict = {"market": mkt}
     if start:
         conditions.append("DATE(s.date) >= :start")
         params["start"] = start
@@ -548,7 +582,7 @@ def historical_trades(
         conditions.append("DATE(s.date) <= :end")
         params["end"] = end
 
-    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    where = "WHERE " + " AND ".join(conditions)
 
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""

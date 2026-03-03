@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, getSignals, getPriceHistory } from '../api'
+import { MarketContext } from '../context/MarketContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -84,6 +85,8 @@ function Pagination({ page, pages, onChange }) {
 // ---------------------------------------------------------------------------
 
 function SignalModal({ row, onClose }) {
+  const { market } = useContext(MarketContext)
+  const currency = market === 'IL' ? '₪' : '$'
   const today    = new Date().toISOString().slice(0, 10)
   const end12m   = today
   const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
@@ -135,7 +138,7 @@ function SignalModal({ row, onClose }) {
               </tr>
               <tr>
                 <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Price</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.close != null ? `$${fmt(row.close)}` : '—'}</td>
+                <td style={{ verticalAlign: 'middle' }}>{row.close != null ? `${currency}${fmt(row.close)}` : '—'}</td>
               </tr>
               <tr>
                 <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>RSI</td>
@@ -183,7 +186,7 @@ function SignalModal({ row, onClose }) {
                 labelStyle={{ color: 'var(--muted)' }}
                 itemStyle={{ color: 'var(--text)' }}
                 labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                formatter={v => [`$${v.toFixed(2)}`, 'Close']}
+                formatter={v => [`${currency}${v.toFixed(2)}`, 'Close']}
               />
               <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
             </LineChart>
@@ -369,6 +372,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
 // ---------------------------------------------------------------------------
 
 export default function SignalsPage() {
+  const { market } = useContext(MarketContext)
   const [signalFilter, setSignalFilter] = useState('ALL')
   const [search, setSearch]             = useState('')
   const [page, setPage]                 = useState(1)
@@ -392,19 +396,19 @@ export default function SignalsPage() {
   function handlePageSize(val) { setPageSize(Number(val)); setPage(1) }
 
   const { data: todayBuy,  isLoading: loadingBuy  } = useQuery({
-    queryKey: ['signals-today', 'BUY'],
-    queryFn: () => getSignalsToday('BUY'),
+    queryKey: ['signals-today', 'BUY', market],
+    queryFn: () => getSignalsToday('BUY', market),
     refetchInterval: 120_000,
   })
 
   const { data: todaySell, isLoading: loadingSell } = useQuery({
-    queryKey: ['signals-today', 'SELL'],
-    queryFn: () => getSignalsToday('SELL'),
+    queryKey: ['signals-today', 'SELL', market],
+    queryFn: () => getSignalsToday('SELL', market),
     refetchInterval: 120_000,
   })
 
   const { data: allResult, isLoading: loadingAll } = useQuery({
-    queryKey: ['signals', signalFilter, search, page, pageSize, sortBy, sortDir],
+    queryKey: ['signals', signalFilter, search, page, pageSize, sortBy, sortDir, market],
     queryFn: () => getSignals({
       signal:    signalFilter === 'ALL' ? undefined : signalFilter,
       search:    search || undefined,
@@ -412,6 +416,7 @@ export default function SignalsPage() {
       page_size: pageSize,
       sort_by:   sortBy,
       sort_dir:  sortDir,
+      market,
     }),
     keepPreviousData: true,
   })

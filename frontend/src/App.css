@@ -71,6 +71,12 @@ html, body, #root {
 .market-open   { color: var(--green); font-weight: 600; margin-left: auto; white-space: nowrap; }
 .market-closed { color: var(--red);   font-weight: 600; margin-left: auto; white-space: nowrap; }
 
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.15; }
+}
+.dot-blink { display: inline-block; animation: blink-dot 2s ease-in-out infinite; }
+
 /* ── Main content ── */
 .app-main {
   margin-top: 60px;
