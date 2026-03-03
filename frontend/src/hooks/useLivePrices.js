@@ -19,6 +19,7 @@ export function useLivePrices(tickers) {
 
   return {
     prices: data?.prices ?? {},
-    marketOpen: data?.market_open ?? false,
+    // null = still loading (no data yet); false = confirmed closed; true = confirmed open
+    marketOpen: data == null ? null : data.market_open,
   }
 }

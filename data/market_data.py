@@ -24,6 +24,10 @@ def _build_ticker_df(raw, ticker, start_date, end_date, single=False):
     if df is None or df.empty:
         return None
 
+    # Flatten MultiIndex columns (yfinance returns these for single-ticker downloads too)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [col[0] for col in df.columns]
+
     df = df.reset_index()
     df["ticker"] = ticker
     df.rename(columns={

@@ -4,40 +4,24 @@ from io import StringIO
 from data.loaders import engine
 
 
-def load_universe():
-
-    print("Loading S&P 500 universe...")
-
-    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-
+def _fetch_index_table(url: str) -> pd.DataFrame:
+    """Fetch a Wikipedia S&P index table and return a normalised companies DataFrame."""
     headers = {"User-Agent": "Mozilla/5.0"}
-
     response = requests.get(url, headers=headers)
     html = StringIO(response.text)
-
     table = pd.read_html(html)[0]
 
-    # Fix ticker formatting for Yahoo Finance
     table["Symbol"] = table["Symbol"].str.replace(".", "-", regex=False)
 
-    # Base company table
     companies = table[["Symbol", "Security", "GICS Sector"]].rename(
-        columns={
-            "Symbol": "ticker",
-            "Security": "company",
-            "GICS Sector": "sector"
-        }
+        columns={"Symbol": "ticker", "Security": "company", "GICS Sector": "sector"}
     )
 
-    # ---------- Website extraction if available ----------
     if "Website" in table.columns:
-
         websites = table[["Symbol", "Website"]].rename(
             columns={"Symbol": "ticker", "Website": "website"}
         )
-
         companies = companies.merge(websites, on="ticker", how="left")
-
         companies["domain"] = (
             companies["website"]
             .astype(str)
@@ -46,9 +30,7 @@ def load_universe():
             .str.split("/")
             .str[0]
         )
-
     else:
-        # Fallback domain guess
         companies["domain"] = (
             companies["company"]
             .str.lower()
@@ -56,19 +38,37 @@ def load_universe():
             .str.replace(" ", "") + ".com"
         )
 
-    # Logo URL
-    # Logo URL based on ticker (reliable)
     companies["logo_url"] = (
-            "https://financialmodelingprep.com/image-stock/" +
-            companies["ticker"] + ".png"
+        "https://financialmodelingprep.com/image-stock/" + companies["ticker"] + ".png"
     )
 
+    return companies
+
+
+def load_universe():
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    print("Loading S&P 500 universe...")
+    sp500 = _fetch_index_table("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+    print(f"Loaded {len(sp500)} S&P 500 tickers")
+
+    print("Loading S&P 400 universe...")
+    sp400 = _fetch_index_table("https://en.wikipedia.org/wiki/List_of_S%26P_400_companies")
+    print(f"Loaded {len(sp400)} S&P 400 tickers")
+
+    print("Loading S&P 600 universe...")
+    sp600 = _fetch_index_table("https://en.wikipedia.org/wiki/List_of_S%26P_600_companies")
+    print(f"Loaded {len(sp600)} S&P 600 tickers")
+
+    companies = pd.concat([sp500, sp400, sp600], ignore_index=True).drop_duplicates(subset=["ticker"])
+
     # Save companies table, preserving any manually added custom tickers
-    # (tickers not in the S&P 500 list that were inserted outside this function).
+    # (tickers not in S&P 500/400/600 that were inserted outside this function).
     try:
         existing = pd.read_sql("SELECT * FROM companies", engine)
-        sp500_tickers = set(companies["ticker"])
-        custom = existing[~existing["ticker"].isin(sp500_tickers)]
+        index_tickers = set(companies["ticker"])
+        custom = existing[~existing["ticker"].isin(index_tickers)]
     except Exception:
         custom = pd.DataFrame()
 
@@ -79,7 +79,7 @@ def load_universe():
 
     tickers = companies["ticker"].tolist()
 
-    print(f"Loaded {len(tickers)} S&P 500 tickers")
+    print(f"Loaded {len(tickers)} S&P 500 + S&P 400 + S&P 600 tickers")
 
     # ── Extend universe with any watchlist tickers outside the S&P 500 ──
     try:

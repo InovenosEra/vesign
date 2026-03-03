@@ -85,29 +85,70 @@ def market_is_open() -> bool:
     return now.weekday() < 5 and dt_time(9, 30) <= now.time() <= dt_time(16, 0)
 
 
+def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Series:
+    """Extract a Close price Series from a yf.download result, handling MultiIndex columns."""
+    if raw.empty:
+        return pd.Series(dtype=float)
+    # Flatten MultiIndex → pick "Close" level
+    if isinstance(raw.columns, pd.MultiIndex):
+        if "Close" not in raw.columns.get_level_values(0):
+            return pd.Series(dtype=float)
+        close_df = raw["Close"]
+        if ticker:
+            return close_df[ticker].dropna() if ticker in close_df.columns else pd.Series(dtype=float)
+        return close_df.iloc[:, 0].dropna()
+    # Flat columns
+    if ticker is None:
+        col = "Close" if "Close" in raw.columns else raw.columns[0]
+        return raw[col].dropna()
+    return raw.get("Close", pd.Series(dtype=float)).dropna()
+
+
 def fetch_live_prices(tickers: list[str]) -> dict:
+    prices: dict = {}
     try:
         query = tickers[0] if len(tickers) == 1 else tickers
-        raw = yf.download(query, period="1d", interval="1m", progress=False, auto_adjust=True)
-        close = raw.get("Close", pd.DataFrame() if len(tickers) > 1 else pd.Series(dtype=float))
-        prices: dict = {}
+        raw = yf.download(query, period="1d", interval="1m", progress=False,
+                          auto_adjust=True, group_by="ticker" if len(tickers) > 1 else "column")
+
         if len(tickers) == 1:
-            if isinstance(close, pd.Series):
-                series = close.dropna()
-            elif isinstance(close, pd.DataFrame) and not close.empty:
-                series = close.iloc[:, 0].dropna()
-            else:
-                series = pd.Series(dtype=float)
+            series = _extract_close_series(raw)
             prices[tickers[0]] = float(series.iloc[-1]) if not series.empty else None
         else:
+            # group_by="ticker" → top-level keys are tickers
             for t in tickers:
                 try:
-                    series = close[t].dropna()
+                    if isinstance(raw.columns, pd.MultiIndex):
+                        # Could be (ticker, field) or (field, ticker) depending on yfinance version
+                        top = raw.columns.get_level_values(0).unique()
+                        if t in top:
+                            series = raw[t]["Close"].dropna()
+                        else:
+                            # (field, ticker) layout — fall through to fallback
+                            series = _extract_close_series(raw, t)
+                    else:
+                        series = pd.Series(dtype=float)
                     prices[t] = float(series.iloc[-1]) if not series.empty else None
                 except Exception:
                     prices[t] = None
     except Exception:
         prices = {t: None for t in tickers}
+
+    # Fallback: retry tickers that got None using a single daily bar
+    missing = [t for t, v in prices.items() if v is None]
+    if missing:
+        try:
+            fb_query = missing[0] if len(missing) == 1 else missing
+            fb_raw = yf.download(fb_query, period="5d", interval="1d", progress=False, auto_adjust=True)
+            for t in missing:
+                try:
+                    series = _extract_close_series(fb_raw, t if len(missing) > 1 else None)
+                    prices[t] = float(series.iloc[-1]) if not series.empty else None
+                except Exception:
+                    prices[t] = None
+        except Exception:
+            pass
+
     return prices
 
 

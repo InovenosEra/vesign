@@ -43,6 +43,14 @@ html, body, #root {
   color: var(--text);
 }
 
+.title-shimmer {
+  background: linear-gradient(180deg, #53e5ef 0%, #2d93cc 55%, #2262a8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 4px rgba(47, 190, 222, 0.5);
+}
+
 .app-header nav {
   display: flex;
   gap: 4px;
@@ -79,8 +87,8 @@ html, body, #root {
 .section { margin-bottom: 40px; }
 
 .section-title {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.4rem;
+  font-weight: 700;
   margin-bottom: 12px;
 }
 

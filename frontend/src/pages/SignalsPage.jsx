@@ -34,7 +34,8 @@ function PredictionCell({ value }) {
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
-  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Close</td>
+  if (marketOpen === null) return <td style={{ color: 'var(--muted)' }}>—</td>
+  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Closed</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
   const diff  = live - closePrice
@@ -242,7 +243,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
 }
 
 function TodayTable({ rows, prices, marketOpen, onRowClick }) {
-  const { sorted } = useSort(rows, 'close', 'desc')
+  const { sorted } = useSort(rows, 'market_cap', 'desc')
 
   if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
 

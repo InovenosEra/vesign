@@ -3,14 +3,125 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker,
-  getSignalsByTickers,
+  getSignalsByTickers, getPriceHistory,
 } from '../api'
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid,
+} from 'recharts'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
 
-function SignalBadge({ signal }) {
-  if (!signal) return <span style={{ color: 'var(--muted)' }}>—</span>
-  return <span className={`badge badge-${signal}`}>{signal}</span>
+function fmt(n, decimals = 2) {
+  return n != null
+    ? Number(n).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    : '—'
+}
+
+function SignalModal({ row, onClose }) {
+  const today     = new Date().toISOString().slice(0, 10)
+  const end12m    = today
+  const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
+  const start12m  = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ['price-history-signal', row.ticker],
+    queryFn: () => getPriceHistory(row.ticker, { start: start12m, end: end12m }),
+    staleTime: 300_000,
+  })
+
+  const base12m  = history.filter(d => d.date <= target12m).at(-1)
+  const yield12m = base12m && history.length > 0
+    ? ((history.at(-1).close - base12m.close) / base12m.close) * 100
+    : null
+
+  const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
+  const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          {row.logo_url && (
+            <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} />
+          )}
+          <table style={{ fontSize: 12, borderCollapse: 'collapse', flex: 1 }}>
+            <tbody>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Ticker</td>
+                <td style={{ verticalAlign: 'middle' }}><strong>{row.ticker ?? '—'}</strong></td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Company</td>
+                <td style={{ verticalAlign: 'middle' }}>{row.company ?? '—'}</td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Market Cap</td>
+                <td style={{ verticalAlign: 'middle' }}>{row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'}</td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Signal</td>
+                <td style={{ verticalAlign: 'middle' }}>
+                  {row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Price</td>
+                <td style={{ verticalAlign: 'middle' }}>{row.close != null ? `$${fmt(row.close)}` : '—'}</td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>RSI</td>
+                <td style={{ verticalAlign: 'middle' }}>{row.rsi != null ? row.rsi.toFixed(1) : '—'}</td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Prediction</td>
+                <td style={{ verticalAlign: 'middle' }} className={row.fair_value_upside == null ? '' : row.fair_value_upside >= 0 ? 'up' : 'down'}>
+                  {row.fair_value_upside != null ? `${row.fair_value_upside >= 0 ? '+' : ''}${fmt(row.fair_value_upside * 100)}%` : '—'}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>12M Yield (organic)</td>
+                <td style={{ verticalAlign: 'middle' }} className={yield12m == null ? '' : yield12m >= 0 ? 'up' : 'down'}>
+                  {yield12m != null ? `${yield12m >= 0 ? '+' : ''}${fmt(yield12m)}%` : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        {isLoading ? (
+          <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={history} margin={{ top: 16, right: 24, bottom: 8, left: 8 }}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
+                interval="preserveStartEnd"
+                minTickGap={50}
+              />
+              <YAxis
+                domain={[minPrice, maxPrice]}
+                tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                tickFormatter={v => v.toFixed(0)}
+                width={48}
+              />
+              <Tooltip
+                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                labelStyle={{ color: 'var(--muted)' }}
+                itemStyle={{ color: 'var(--text)' }}
+                labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
+                formatter={v => [`$${v.toFixed(2)}`, 'Close']}
+              />
+              <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function Th({ label, col, sort, onSort }) {
@@ -32,7 +143,8 @@ function PredictionCell({ value }) {
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
-  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Close</td>
+  if (marketOpen === null) return <td style={{ color: 'var(--muted)' }}>—</td>
+  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Closed</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
   const diff  = live - closePrice
@@ -54,6 +166,7 @@ export default function WatchlistPage() {
   const [selectedId, setSelectedId]   = useState(null)
   const [newListName, setNewListName] = useState('')
   const [newTicker, setNewTicker]     = useState('')
+  const [selected, setSelected]       = useState(null)
 
   const { data: lists = [] } = useQuery({
     queryKey: ['watchlists'],
@@ -192,35 +305,35 @@ export default function WatchlistPage() {
                     <thead>
                       <tr>
                         <th></th>
-                        {th('Company',     'company')}
-                        {th('Ticker',      'ticker')}
+                        {th('Ticker',         'ticker')}
+                        {th('Company',        'company')}
+                        {th('Signal',         'signal')}
                         {th('Market Cap (B)', 'market_cap')}
-                        {th('Signal',      'signal')}
-                        {th('Price',       'close')}
+                        {th('Price',          'close')}
+                        {th('RSI',            'rsi')}
+                        {th('Prediction',     'fair_value_upside')}
                         <th>Live Price</th>
-                        {th('RSI',         'rsi')}
-                        {th('Prediction',  'fair_value_upside')}
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       {sorted.map(t => (
-                        <tr key={t.ticker}>
+                        <tr key={t.ticker} className="clickable-row" onClick={() => setSelected(t)}>
                           <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                          <td>{t.company ?? '—'}</td>
                           <td><strong>{t.ticker}</strong></td>
+                          <td>{t.company ?? '—'}</td>
+                          <td>{t.signal ? <span className={`badge badge-${t.signal}`}>{t.signal}</span> : '—'}</td>
                           <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
-                          <td><SignalBadge signal={t.signal} /></td>
                           <td>{t.close != null ? t.close.toFixed(2) : '—'}</td>
+                          <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
+                          <PredictionCell value={t.fair_value_upside} />
                           <LivePriceCell
                             ticker={t.ticker}
                             closePrice={t.close}
                             prices={prices}
                             marketOpen={marketOpen}
                           />
-                          <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
-                          <PredictionCell value={t.fair_value_upside} />
-                          <td>
+                          <td onClick={e => e.stopPropagation()}>
                             <button
                               className="danger"
                               style={{ padding: '4px 10px', fontSize: 12 }}
@@ -237,6 +350,7 @@ export default function WatchlistPage() {
           )}
         </div>
       </div>
+      {selected && <SignalModal row={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }
