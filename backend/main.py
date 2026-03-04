@@ -123,49 +123,24 @@ def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Se
 
 
 def fetch_live_prices(tickers: list[str]) -> dict:
-    prices: dict = {}
-    try:
-        query = tickers[0] if len(tickers) == 1 else tickers
-        raw = yf.download(query, period="1d", interval="1m", progress=False,
-                          auto_adjust=True, group_by="ticker" if len(tickers) > 1 else "column")
+    """Fetch latest prices using fast_info (lightweight metadata call) in parallel.
+    Falls back to the last known close from daily_prices if fast_info fails.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        if len(tickers) == 1:
-            series = _extract_close_series(raw)
-            prices[tickers[0]] = float(series.iloc[-1]) if not series.empty else None
-        else:
-            # group_by="ticker" → top-level keys are tickers
-            for t in tickers:
-                try:
-                    if isinstance(raw.columns, pd.MultiIndex):
-                        # Could be (ticker, field) or (field, ticker) depending on yfinance version
-                        top = raw.columns.get_level_values(0).unique()
-                        if t in top:
-                            series = raw[t]["Close"].dropna()
-                        else:
-                            # (field, ticker) layout — fall through to fallback
-                            series = _extract_close_series(raw, t)
-                    else:
-                        series = pd.Series(dtype=float)
-                    prices[t] = float(series.iloc[-1]) if not series.empty else None
-                except Exception:
-                    prices[t] = None
-    except Exception:
-        prices = {t: None for t in tickers}
-
-    # Fallback: retry tickers that got None using a single daily bar
-    missing = [t for t, v in prices.items() if v is None]
-    if missing:
+    def _get(t):
         try:
-            fb_query = missing[0] if len(missing) == 1 else missing
-            fb_raw = yf.download(fb_query, period="5d", interval="1d", progress=False, auto_adjust=True)
-            for t in missing:
-                try:
-                    series = _extract_close_series(fb_raw, t if len(missing) > 1 else None)
-                    prices[t] = float(series.iloc[-1]) if not series.empty else None
-                except Exception:
-                    prices[t] = None
+            price = yf.Ticker(t).fast_info.last_price
+            return t, float(price) if price else None
         except Exception:
-            pass
+            return t, None
+
+    prices: dict = {}
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(_get, t): t for t in tickers}
+        for f in as_completed(futures):
+            t, price = f.result()
+            prices[t] = price
 
     return prices
 
@@ -235,6 +210,7 @@ _MARKET_CAP_JOIN = """
         SELECT ticker, MAX(market_cap) AS market_cap
         FROM fundamentals GROUP BY ticker
     ) f ON s.ticker = f.ticker
+    LEFT JOIN company_health h ON s.ticker = h.ticker
 """
 
 @app.get("/api/signals/today")
@@ -245,7 +221,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
                    s.target_mean_price, s.target_low_price, s.target_high_price,
-                   s.signal, c.company, c.logo_url,
+                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -318,7 +294,7 @@ def signals(
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
                    s.target_mean_price, s.target_low_price, s.target_high_price,
-                   s.signal, c.company, c.logo_url,
+                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -606,12 +582,18 @@ def historical_trades(
             if row["signal"] == "BUY" and open_trade is None:
                 open_trade = row
             elif row["signal"] == "SELL" and open_trade is not None:
-                ret = (row["close"] - open_trade["close"]) / open_trade["close"]
+                buy_close  = open_trade["close"]
+                sell_close = row["close"]
+                # Skip pairs where either price is missing (NULL-close signals)
+                if pd.isna(buy_close) or pd.isna(sell_close):
+                    open_trade = None
+                    continue
+                ret = (sell_close - buy_close) / buy_close
                 pairs.append({
                     "buy_date":   open_trade["date"].date().isoformat(),
                     "sell_date":  row["date"].date().isoformat(),
-                    "buy_price":  round(float(open_trade["close"]), 2),
-                    "sell_price": round(float(row["close"]), 2),
+                    "buy_price":  round(float(buy_close), 2),
+                    "sell_price": round(float(sell_close), 2),
                     "return_pct": round(float(ret * 100), 2),
                     "days_held":  int((row["date"] - open_trade["date"]).days),
                     "result":     "Win" if ret > 0 else "Loss",
@@ -623,10 +605,13 @@ def historical_trades(
         wins = sum(1 for p in pairs if p["result"] == "Win")
         avg_ret = sum(p["return_pct"] for p in pairs) / len(pairs)
         avg_days = sum(p["days_held"] for p in pairs) / len(pairs)
+        def _str_or_none(v):
+            return None if (isinstance(v, float) and math.isnan(v)) else v
+
         ticker_trades[ticker] = {
             "ticker":       ticker,
-            "company":      grp.iloc[0]["company"],
-            "logo_url":     grp.iloc[0]["logo_url"],
+            "company":      _str_or_none(grp.iloc[0]["company"]),
+            "logo_url":     _str_or_none(grp.iloc[0]["logo_url"]),
             "market_cap":   int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
             "trade_count":  len(pairs),
             "win_count":    wins,

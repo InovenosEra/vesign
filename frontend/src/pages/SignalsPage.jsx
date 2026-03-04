@@ -28,6 +28,28 @@ function fmtDate(str) {
   return `${dd}/${mm}/${yy}`
 }
 
+const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#27ae60']
+const _HEALTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+
+function HealthCell({ score }) {
+  if (!score) return <td style={{ color: 'var(--muted)' }}>—</td>
+  return (
+    <td title={_HEALTH_LABELS[score]} style={{ whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+        {[1,2,3,4,5].map(i => (
+          <div key={i} style={{
+            width: 10, height: 10, borderRadius: 2,
+            background: i <= score ? _HEALTH_COLORS[score] : 'var(--border)',
+          }} />
+        ))}
+        <span style={{ fontSize: 11, color: _HEALTH_COLORS[score], marginLeft: 3 }}>
+          {_HEALTH_LABELS[score]}
+        </span>
+      </div>
+    </td>
+  )
+}
+
 function PredictionCell({ value }) {
   if (value == null) return <td>—</td>
   const pct = (value * 100).toFixed(2)
@@ -35,16 +57,17 @@ function PredictionCell({ value }) {
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
-  if (marketOpen === null) return <td style={{ color: 'var(--muted)' }}>—</td>
-  if (!marketOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Closed</td>
+  const style = { whiteSpace: 'nowrap' }
+  if (marketOpen === null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
+  if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>Closed</td>
   const live = prices[ticker]
-  if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
+  if (live == null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
   const diff  = live - closePrice
   const pct   = closePrice ? (diff / closePrice) * 100 : 0
   const cls   = diff >= 0 ? 'up' : 'down'
   const arrow = diff >= 0 ? '▲' : '▼'
   return (
-    <td>
+    <td style={style}>
       <div>{live.toFixed(2)}</div>
       <div className={cls} style={{ fontSize: 11 }}>
         {arrow} {Math.abs(diff).toFixed(2)} ({Math.abs(pct).toFixed(2)}%)
@@ -112,52 +135,88 @@ function SignalModal({ row, onClose }) {
       <div className="modal-box" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="modal-header">
-          {row.logo_url && (
-            <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} />
-          )}
-          <table style={{ fontSize: 12, borderCollapse: 'collapse', flex: 1 }}>
+        <div className="modal-header" style={{ alignItems: 'flex-start' }}>
+          {row.logo_url
+            ? <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            : null}
+          <div style={{
+            width: 96, height: 96, flexShrink: 0, borderRadius: 10,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            display: row.logo_url ? 'none' : 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 'bold', color: 'var(--text)',
+          }}>
+            {row.ticker}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+            <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
+            <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+          <table style={{ fontSize: 12, borderCollapse: 'collapse', width: 220, margin: 0 }}>
             <tbody>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Ticker</td>
-                <td style={{ verticalAlign: 'middle' }}><strong>{row.ticker ?? '—'}</strong></td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Company</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.company ?? '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Market Cap</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Signal</td>
-                <td style={{ verticalAlign: 'middle' }}>
-                  {row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Price</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.close != null ? `${currency}${fmt(row.close)}` : '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>RSI</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.rsi != null ? row.rsi.toFixed(1) : '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Prediction</td>
-                <td style={{ verticalAlign: 'middle' }} className={row.fair_value_upside == null ? '' : row.fair_value_upside >= 0 ? 'up' : 'down'}>
-                  {row.fair_value_upside != null ? `${row.fair_value_upside >= 0 ? '+' : ''}${fmt(row.fair_value_upside * 100)}%` : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>12M Yield (organic)</td>
-                <td style={{ verticalAlign: 'middle' }} className={yield12m == null ? '' : yield12m >= 0 ? 'up' : 'down'}>
-                  {yield12m != null ? `${yield12m >= 0 ? '+' : ''}${fmt(yield12m)}%` : '—'}
-                </td>
-              </tr>
+              {[
+                ['Ticker',     <strong>{row.ticker ?? '—'}</strong>],
+                ['Company',    row.company ?? '—'],
+                ['Industry',   row.industry ?? '—'],
+                ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'],
+                ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
+                ['Price',      row.close != null ? `${currency}${fmt(row.close)}` : '—'],
+                ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
+                ['Prediction', row.fair_value_upside != null ? <span className={row.fair_value_upside >= 0 ? 'up' : 'down'}>{row.fair_value_upside >= 0 ? '+' : ''}{fmt(row.fair_value_upside * 100)}%</span> : '—'],
+                ['12M Yield',  yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
+              ].map(([label, value]) => (
+                <tr key={label} style={{ height: 22 }}>
+                  <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>{label}</td>
+                  <td style={{ verticalAlign: 'middle' }}>{value}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
+            </div>
+          </div>
+          {(row.description_short || row.description || row.health_score) && (
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+              {/* Description */}
+              {(row.description_short || row.description) && (<>
+                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
+                <div style={{
+                  fontSize: 12, lineHeight: 1.6, overflowY: 'auto', maxHeight: 120,
+                  padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8,
+                }}>
+                  {row.description_short || row.description}
+                </div>
+              </>)}
+
+              {/* Company Health */}
+              {row.health_score && (() => {
+                const labels = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+                const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#27ae60']
+                const score  = row.health_score
+                return (<>
+                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Company Health</div>
+                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      {[1,2,3,4,5].map(i => (
+                        <div key={i} style={{
+                          width: 28, height: 12, borderRadius: 4,
+                          background: i <= score ? colors[score] : 'var(--border)',
+                        }} />
+                      ))}
+                      <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>
+                        {labels[score]}
+                      </span>
+                    </div>
+                    {row.health_reason && (
+                      <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                        {row.health_reason}
+                      </div>
+                    )}
+                  </div>
+                </>)
+              })()}
+
+            </div>
+          )}
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -203,11 +262,12 @@ function SignalModal({ row, onClose }) {
 
 // Shared fixed widths so BUY and SELL tables align column-by-column
 // Columns: logo, ticker, company, mktcap, price, rsi, low, base, high, prediction, live/date
-const COL_WIDTHS = ['44px', '80px', '160px', '110px', '80px', '64px', '90px', '90px', '90px', '100px', '130px']
+// logo, ticker, company, mktcap, price, rsi, low, base, high, health, prediction, live
+const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '120px', '85px', '100px']
 
 function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
   return (
-    <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1038 }}>
+    <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1024 }}>
       <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
       <thead>
         <tr>
@@ -220,6 +280,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
           <th>Low Price</th>
           <th>Base Price</th>
           <th>High Price</th>
+          <th>Health</th>
           <th>Prediction</th>
           <th>Live Price</th>
         </tr>
@@ -227,7 +288,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
-            <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
+            <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
             <td><strong>{r.ticker ?? '—'}</strong></td>
             <td>{r.company ?? '—'}</td>
             <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
@@ -236,6 +297,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
             <td>{r.target_low_price != null ? r.target_low_price.toFixed(2) : '—'}</td>
             <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
             <td>{r.target_high_price != null ? r.target_high_price.toFixed(2) : '—'}</td>
+            <HealthCell score={r.health_score} />
             <PredictionCell value={r.fair_value_upside} />
             <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
           </tr>
@@ -322,8 +384,8 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
   return (
     <>
       <div className="data-table-wrap">
-        <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1218 }}>
-          <colgroup>{['80px','44px','80px','160px','110px','80px','80px','64px','90px','90px','90px','100px','130px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+        <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1174 }}>
+          <colgroup>{['80px','44px','70px','150px','90px','70px','70px','55px','80px','80px','80px','120px','85px','100px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
           <thead>
             <tr>
               {th('Date',           'date')}
@@ -337,6 +399,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               {th('Low Price',      'target_low_price')}
               {th('Base Price',     'target_mean_price')}
               {th('High Price',     'target_high_price')}
+              <th>Health</th>
               {th('Prediction',     'fair_value_upside')}
               <th>Live Price</th>
             </tr>
@@ -345,7 +408,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
             {rows.map((r, i) => (
               <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
                 <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
-                <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" /> : null}</td>
+                <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
                 <td><strong>{r.ticker ?? '—'}</strong></td>
                 <td>{r.company ?? '—'}</td>
                 <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
@@ -355,6 +418,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{r.target_low_price != null ? r.target_low_price.toFixed(2) : '—'}</td>
                 <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
                 <td>{r.target_high_price != null ? r.target_high_price.toFixed(2) : '—'}</td>
+                <HealthCell score={r.health_score} />
                 <PredictionCell value={r.fair_value_upside} />
                 <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               </tr>

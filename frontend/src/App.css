@@ -349,10 +349,9 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
 
 .modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 20px;
-  flex-wrap: wrap;
 }
 
 .modal-header > span:first-child {

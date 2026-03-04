@@ -1,5 +1,7 @@
+import os
 import yfinance as yf
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, UTC
 from utils.universe_loader import load_universe
 from data.loaders import engine
@@ -40,7 +42,14 @@ def _build_ticker_df(raw, ticker, start_date, end_date, single=False):
 
     # Keep only the standard columns that exist
     keep = [c for c in ("date", "ticker", "open", "high", "low", "close", "volume") if c in df.columns]
-    return df[keep]
+    df = df[keep]
+
+    # Drop rows with no close price — these are non-trading days or incomplete data
+    # that would corrupt feature computation downstream.
+    if "close" in df.columns:
+        df = df[df["close"].notna()]
+
+    return df if not df.empty else None
 
 
 def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0):
@@ -230,46 +239,283 @@ def update_vix():
         print(f"VIX update failed: {e}")
 
 
-def update_fundamentals():
+def update_company_info():
+    """Fetch fundamentals + analyst targets in a single parallel pass (one .info call per ticker)."""
 
-    # ---------- run only if needed ----------
-    if not should_run("fundamentals_update", 24):
+    needs_fundamentals = should_run("fundamentals_update", 168)   # weekly
+    needs_analyst      = should_run("analyst_update", 24)         # daily
+
+    if not needs_fundamentals and not needs_analyst:
         return
 
-    print("Updating fundamentals...")
+    print("Updating company info (fundamentals + analyst)...")
 
-    tickers = pd.read_sql(
-        "SELECT ticker FROM companies",
-        engine
-    )["ticker"].tolist()
+    tickers = pd.read_sql("SELECT ticker FROM companies", engine)["ticker"].tolist()
+    now = datetime.now(UTC)
 
-    rows = []
-
-    for t in tickers:
+    def _fetch(t):
         try:
             info = yf.Ticker(t).info
-
-            rows.append({
-                "ticker": t,
-                "market_cap": info.get("marketCap")
-            })
-
+            return {
+                "ticker":               t,
+                "market_cap":           info.get("marketCap"),
+                "industry":             info.get("industry"),
+                "description":          info.get("longBusinessSummary"),
+                "target_mean_price":    info.get("targetMeanPrice"),
+                "target_high_price":    info.get("targetHighPrice"),
+                "target_low_price":     info.get("targetLowPrice"),
+                "number_of_analysts":   info.get("numberOfAnalystOpinions"),
+                "last_update":          now,
+            }
         except Exception:
-            continue
+            return None
 
-    if len(rows) == 0:
-        print("No fundamentals downloaded")
+    # Warm up the yfinance session (crumb) before threading to avoid race conditions
+    try:
+        yf.Ticker(tickers[0]).info
+    except Exception:
+        pass
+
+    rows = []
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {ex.submit(_fetch, t): t for t in tickers}
+        done = 0
+        for f in as_completed(futures):
+            done += 1
+            result = f.result()
+            if result:
+                rows.append(result)
+            if done % 200 == 0:
+                print(f"  {done}/{len(tickers)} done, {len(rows)} fetched")
+
+    if not rows:
+        print("No company info downloaded")
         return
 
     df = pd.DataFrame(rows)
 
-    df.to_sql(
-        "fundamentals",
-        engine,
-        if_exists="replace",
-        index=False
+    if needs_fundamentals:
+        fund_df = df[["ticker", "market_cap"]]
+        fetched = fund_df["ticker"].tolist()
+        with engine.begin() as conn:
+            placeholders = ",".join(f"'{t}'" for t in fetched)
+            conn.execute(text(f"DELETE FROM fundamentals WHERE ticker IN ({placeholders})"))
+        fund_df.to_sql("fundamentals", engine, if_exists="append", index=False)
+        # Also update industry + description in companies table
+        with engine.begin() as conn:
+            for _, row in df[["ticker", "industry", "description"]].iterrows():
+                if row["industry"] or row["description"]:
+                    conn.execute(text(
+                        "UPDATE companies SET industry = :ind, description = :desc WHERE ticker = :t"
+                    ), {"ind": row["industry"], "desc": row["description"], "t": row["ticker"]})
+        mark_run("fundamentals_update")
+
+    if needs_analyst:
+        analyst_df = df[["ticker", "target_mean_price", "target_high_price",
+                          "target_low_price", "number_of_analysts", "last_update"]]
+        fetched = analyst_df["ticker"].tolist()
+        with engine.begin() as conn:
+            placeholders = ",".join(f"'{t}'" for t in fetched)
+            conn.execute(text(f"DELETE FROM analyst_expectations WHERE ticker IN ({placeholders})"))
+        analyst_df.to_sql("analyst_expectations", engine, if_exists="append", index=False)
+        mark_run("analyst_update")
+
+    print(f"Company info updated ({len(rows)} tickers)")
+
+
+def update_company_health():
+    """Score company financial health (1-5) using yfinance fundamentals + news via Claude Haiku.
+    Runs weekly; only re-scores tickers whose score is missing or older than 7 days.
+    """
+    import json as _json
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("ANTHROPIC_API_KEY not set — skipping health scoring.")
+        return
+
+    try:
+        import anthropic
+    except ImportError:
+        print("anthropic package not installed — skipping.")
+        return
+
+    all_tickers = pd.read_sql(
+        "SELECT ticker FROM companies", engine
+    )["ticker"].tolist()
+
+    try:
+        existing = pd.read_sql("SELECT ticker, last_update FROM company_health", engine)
+        existing["last_update"] = pd.to_datetime(existing["last_update"])
+        cutoff = pd.Timestamp.now() - pd.Timedelta(days=7)
+        fresh = set(existing[existing["last_update"] >= cutoff]["ticker"].tolist())
+    except Exception:
+        fresh = set()
+
+    pending = [t for t in all_tickers if t not in fresh]
+    if not pending:
+        print("Company health scores are up to date.")
+        return
+
+    print(f"Scoring health for {len(pending)} companies…")
+    client = anthropic.Anthropic(api_key=api_key)
+    now = datetime.now(UTC)
+
+    _SYSTEM = (
+        "You are a strict financial analyst rating company health on a FULL 1-5 scale. "
+        "Use the ENTIRE range — do NOT cluster scores around 2-3.\n\n"
+        "Scale definition (use each level freely):\n"
+        "  1 = Weak:      Negative or near-zero margins, heavy debt load, negative/weak cash flow, "
+        "shrinking revenue, or near-distress signals.\n"
+        "  2 = Fair:      Below-average profitability, elevated leverage, modest or inconsistent cash flow, "
+        "slow/flat growth. Survivable but uninspiring.\n"
+        "  3 = Good:      Solid, average performance for the industry. Profitable, manageable debt, "
+        "positive cash flow, stable growth.\n"
+        "  4 = Great:     Above-average margins, strong free cash flow, low-to-moderate debt, "
+        "healthy revenue/earnings growth. Financially sound.\n"
+        "  5 = Excellent: Exceptional across ALL metrics — industry-leading margins, minimal debt, "
+        "strong growing free cash flow, consistent double-digit growth.\n\n"
+        "Rules:\n"
+        "- If debtToEquity > 200 or profitMargins < 0, lean toward 1-2.\n"
+        "- If freeCashflow < 0 and revenueGrowth < 0, that is a 1 or 2.\n"
+        "- If profitMargins > 0.20 and debtToEquity < 50 and revenueGrowth > 0.10, lean toward 4-5.\n"
+        "- Score 5 requires excellence in ALL dimensions simultaneously.\n"
+        "- Context matters: benchmark within the company's industry.\n\n"
+        "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
     )
 
-    mark_run("fundamentals_update")
+    def _score(ticker):
+        try:
+            info = yf.Ticker(ticker).info
+            metrics = {k: info.get(k) for k in (
+                "profitMargins", "operatingMargins", "grossMargins",
+                "returnOnEquity", "returnOnAssets",
+                "currentRatio", "quickRatio",
+                "debtToEquity", "totalDebt", "totalCash",
+                "freeCashflow", "operatingCashflow",
+                "revenueGrowth", "earningsGrowth",
+            )}
+            metrics = {k: v for k, v in metrics.items() if v is not None}
 
-    print("Fundamentals updated successfully")
+            try:
+                headlines = [n["title"] for n in (yf.Ticker(ticker).news or [])[:5] if n.get("title")]
+            except Exception:
+                headlines = []
+
+            prompt = (
+                f"Company: {info.get('longName') or ticker} ({ticker})\n"
+                f"Industry: {info.get('industry') or 'Unknown'}\n\n"
+            )
+            if metrics:
+                prompt += "Financial metrics:\n"
+                for k, v in metrics.items():
+                    prompt += f"  {k}: {round(v, 4) if isinstance(v, float) else f'{v:,}'}\n"
+            if headlines:
+                prompt += "\nRecent news:\n" + "".join(f"  - {h}\n" for h in headlines)
+
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=120,
+                system=_SYSTEM,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = msg.content[0].text.strip()
+            # Strip markdown code block if present
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            result = _json.loads(raw.strip())
+            return {
+                "ticker":      ticker,
+                "score":       max(1, min(5, int(result["score"]))),
+                "reason":      result["reason"],
+                "last_update": now,
+            }
+        except Exception:
+            return None
+
+    # Warmup crumb before threading
+    try:
+        yf.Ticker(pending[0]).info
+    except Exception:
+        pass
+
+    done = 0
+    success = 0
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {ex.submit(_score, t): t for t in pending}
+        for f in as_completed(futures):
+            done += 1
+            r = f.result()
+            if r:
+                success += 1
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        INSERT OR REPLACE INTO company_health (ticker, score, reason, last_update)
+                        VALUES (:ticker, :score, :reason, :last_update)
+                    """), r)
+            if done % 100 == 0:
+                print(f"  {done}/{len(pending)} scored ({success} successful)")
+
+    print(f"Health scoring complete: {success}/{len(pending)} scored.")
+
+
+def summarize_descriptions():
+    """Use Claude Haiku to generate short (2-sentence) summaries for company descriptions.
+    Only processes rows that have a raw description but no summary yet.
+    """
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("ANTHROPIC_API_KEY not set — skipping description summarization.")
+        return
+
+    try:
+        import anthropic
+    except ImportError:
+        print("anthropic package not installed — skipping.")
+        return
+
+    pending = pd.read_sql(
+        "SELECT ticker, description FROM companies "
+        "WHERE description IS NOT NULL AND description != '' "
+        "AND (description_short IS NULL OR description_short = '')",
+        engine
+    )
+
+    if pending.empty:
+        print("All descriptions already summarized.")
+        return
+
+    print(f"Summarizing {len(pending)} company descriptions…")
+    client = anthropic.Anthropic(api_key=api_key)
+
+    updated = 0
+    for _, row in pending.iterrows():
+        try:
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=80,
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Summarize the following company description in exactly 1-2 short sentences. "
+                        f"Be factual and concise. No fluff.\n\n{row['description']}"
+                    ),
+                }],
+            )
+            summary = msg.content[0].text.strip()
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE companies SET description_short = :s WHERE ticker = :t"
+                ), {"s": summary, "t": row["ticker"]})
+            updated += 1
+        except Exception as e:
+            print(f"  {row['ticker']}: {e}")
+
+    print(f"Summarized {updated}/{len(pending)} descriptions.")
