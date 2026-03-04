@@ -326,10 +326,12 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
     placeholders = "','".join(ticker_list)
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.ticker, c.company, c.logo_url,
+            SELECT s.ticker, c.company, c.logo_url, c.industry,
+                   c.description, c.description_short,
                    s.close, s.signal, s.rsi,
                    s.fair_value_upside, s.target_mean_price,
-                   f.market_cap
+                   f.market_cap,
+                   h.score AS health_score, h.reason AS health_reason
             FROM signals s
             INNER JOIN (
                 SELECT ticker, MAX(date) AS max_date

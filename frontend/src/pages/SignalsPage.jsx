@@ -28,7 +28,7 @@ function fmtDate(str) {
   return `${dd}/${mm}/${yy}`
 }
 
-const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#27ae60']
+const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
 const _HEALTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
 
 function HealthCell({ score }) {
@@ -174,7 +174,7 @@ function SignalModal({ row, onClose }) {
             </div>
           </div>
           {(row.description_short || row.description || row.health_score) && (
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
 
               {/* Description */}
               {(row.description_short || row.description) && (<>
@@ -190,10 +190,10 @@ function SignalModal({ row, onClose }) {
               {/* Company Health */}
               {row.health_score && (() => {
                 const labels = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
-                const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#27ae60']
+                const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
                 const score  = row.health_score
                 return (<>
-                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Company Health</div>
+                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold', marginTop: 8 }}>Company Health</div>
                   <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       {[1,2,3,4,5].map(i => (
@@ -280,7 +280,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
           <th>Low Price</th>
           <th>Base Price</th>
           <th>High Price</th>
-          <th>Health</th>
+          <th>Health Score</th>
           <th>Prediction</th>
           <th>Live Price</th>
         </tr>
@@ -399,7 +399,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               {th('Low Price',      'target_low_price')}
               {th('Base Price',     'target_mean_price')}
               {th('High Price',     'target_high_price')}
-              <th>Health</th>
+              <th>Health Score</th>
               {th('Prediction',     'fair_value_upside')}
               <th>Live Price</th>
             </tr>

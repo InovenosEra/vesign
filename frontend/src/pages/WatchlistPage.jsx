@@ -22,8 +22,8 @@ function fmt(n, decimals = 2) {
 function SignalModal({ row, onClose }) {
   const { market } = useContext(MarketContext)
   const currency = market === 'IL' ? '₪' : '$'
-  const today     = new Date().toISOString().slice(0, 10)
-  const end12m    = today
+  const today    = new Date().toISOString().slice(0, 10)
+  const end12m   = today
   const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
   const start12m  = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
@@ -44,54 +44,94 @@ function SignalModal({ row, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          {row.logo_url && (
-            <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} />
+
+        {/* Header */}
+        <div className="modal-header" style={{ alignItems: 'flex-start' }}>
+          {row.logo_url
+            ? <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            : null}
+          <div style={{
+            width: 96, height: 96, flexShrink: 0, borderRadius: 10,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            display: row.logo_url ? 'none' : 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 'bold', color: 'var(--text)',
+          }}>
+            {row.ticker}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+            <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
+            <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <table style={{ fontSize: 12, borderCollapse: 'collapse', width: 220, margin: 0 }}>
+                <tbody>
+                  {[
+                    ['Ticker',     <strong>{row.ticker ?? '—'}</strong>],
+                    ['Company',    row.company ?? '—'],
+                    ['Industry',   row.industry ?? '—'],
+                    ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'],
+                    ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
+                    ['Price',      row.close != null ? `${currency}${fmt(row.close)}` : '—'],
+                    ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
+                    ['Prediction', row.fair_value_upside != null ? <span className={row.fair_value_upside >= 0 ? 'up' : 'down'}>{row.fair_value_upside >= 0 ? '+' : ''}{fmt(row.fair_value_upside * 100)}%</span> : '—'],
+                    ['12M Yield',  yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
+                  ].map(([label, value]) => (
+                    <tr key={label} style={{ height: 22 }}>
+                      <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>{label}</td>
+                      <td style={{ verticalAlign: 'middle' }}>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {(row.description_short || row.description || row.health_score) && (
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+              {/* Description */}
+              {(row.description_short || row.description) && (<>
+                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
+                <div style={{
+                  fontSize: 12, lineHeight: 1.6, overflowY: 'auto', maxHeight: 120,
+                  padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8,
+                }}>
+                  {row.description_short || row.description}
+                </div>
+              </>)}
+
+              {/* Company Health */}
+              {row.health_score && (() => {
+                const labels = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+                const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
+                const score  = row.health_score
+                return (<>
+                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold', marginTop: 8 }}>Company Health</div>
+                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      {[1,2,3,4,5].map(i => (
+                        <div key={i} style={{
+                          width: 28, height: 12, borderRadius: 4,
+                          background: i <= score ? colors[score] : 'var(--border)',
+                        }} />
+                      ))}
+                      <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>
+                        {labels[score]}
+                      </span>
+                    </div>
+                    {row.health_reason && (
+                      <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                        {row.health_reason}
+                      </div>
+                    )}
+                  </div>
+                </>)
+              })()}
+
+            </div>
           )}
-          <table style={{ fontSize: 12, borderCollapse: 'collapse', flex: 1 }}>
-            <tbody>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Ticker</td>
-                <td style={{ verticalAlign: 'middle' }}><strong>{row.ticker ?? '—'}</strong></td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Company</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.company ?? '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Market Cap</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Signal</td>
-                <td style={{ verticalAlign: 'middle' }}>
-                  {row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Price</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.close != null ? `${currency}${fmt(row.close)}` : '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>RSI</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.rsi != null ? row.rsi.toFixed(1) : '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Prediction</td>
-                <td style={{ verticalAlign: 'middle' }} className={row.fair_value_upside == null ? '' : row.fair_value_upside >= 0 ? 'up' : 'down'}>
-                  {row.fair_value_upside != null ? `${row.fair_value_upside >= 0 ? '+' : ''}${fmt(row.fair_value_upside * 100)}%` : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>12M Yield (organic)</td>
-                <td style={{ verticalAlign: 'middle' }} className={yield12m == null ? '' : yield12m >= 0 ? 'up' : 'down'}>
-                  {yield12m != null ? `${yield12m >= 0 ? '+' : ''}${fmt(yield12m)}%` : '—'}
-                </td>
-              </tr>
-            </tbody>
-          </table>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
+
+        {/* Chart */}
         {isLoading ? (
           <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
         ) : (
@@ -124,6 +164,28 @@ function SignalModal({ row, onClose }) {
         )}
       </div>
     </div>
+  )
+}
+
+const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
+const _HEALTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+
+function HealthCell({ score }) {
+  if (!score) return <td style={{ color: 'var(--muted)' }}>—</td>
+  return (
+    <td title={_HEALTH_LABELS[score]} style={{ whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+        {[1,2,3,4,5].map(i => (
+          <div key={i} style={{
+            width: 10, height: 10, borderRadius: 2,
+            background: i <= score ? _HEALTH_COLORS[score] : 'var(--border)',
+          }} />
+        ))}
+        <span style={{ fontSize: 11, color: _HEALTH_COLORS[score], marginLeft: 3 }}>
+          {_HEALTH_LABELS[score]}
+        </span>
+      </div>
+    </td>
   )
 }
 
@@ -315,6 +377,7 @@ export default function WatchlistPage() {
                         {th('Market Cap (B)', 'market_cap')}
                         {th('Price',          'close')}
                         {th('RSI',            'rsi')}
+                        <th>Health Score</th>
                         {th('Prediction',     'fair_value_upside')}
                         <th>Live Price</th>
                         <th></th>
@@ -330,6 +393,7 @@ export default function WatchlistPage() {
                           <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
                           <td>{t.close != null ? t.close.toFixed(2) : '—'}</td>
                           <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
+                          <HealthCell score={t.health_score} />
                           <PredictionCell value={t.fair_value_upside} />
                           <LivePriceCell
                             ticker={t.ticker}
