@@ -349,7 +349,7 @@ def update_company_health():
     try:
         existing = pd.read_sql("SELECT ticker, last_update FROM company_health", engine)
         existing["last_update"] = pd.to_datetime(existing["last_update"])
-        cutoff = pd.Timestamp.now() - pd.Timedelta(days=7)
+        cutoff = pd.Timestamp.now(tz='UTC') - pd.Timedelta(days=7)
         fresh = set(existing[existing["last_update"] >= cutoff]["ticker"].tolist())
     except Exception:
         fresh = set()
