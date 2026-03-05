@@ -52,6 +52,9 @@ export const getSignals = ({ signal, search, months = 12, page = 1, page_size = 
   return get(`/signals?${params}`)
 }
 
+export const getSignalMarkers = (ticker, months = 13) =>
+  get(`/signals/markers?ticker=${encodeURIComponent(ticker)}&months=${months}`)
+
 export const getSignalsByTickers = (tickers) =>
   get(`/signals/by-tickers?tickers=${tickers.join(',')}`)
 

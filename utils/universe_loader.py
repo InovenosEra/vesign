@@ -150,18 +150,34 @@ def load_universe():
 
     # Save companies table, preserving any manually added custom tickers
     # (tickers not in any index that were inserted outside this function).
+    # Also preserve enriched columns (industry, description, description_short)
+    # that are populated separately by update_company_info().
+    EXTRA_COLS = ["industry", "description", "description_short"]
     try:
         existing = pd.read_sql("SELECT * FROM companies", engine)
         index_tickers = set(companies["ticker"])
         custom = existing[~existing["ticker"].isin(index_tickers)].copy()
         if "market" not in custom.columns:
             custom["market"] = "US"
+
+        # Merge back enriched columns so they survive the table replace
+        preserved_cols = [c for c in EXTRA_COLS if c in existing.columns]
+        if preserved_cols:
+            preserved = existing[["ticker"] + preserved_cols]
+            companies = companies.merge(preserved, on="ticker", how="left")
+            # Ensure custom also has those columns
+            for col in preserved_cols:
+                if col not in custom.columns:
+                    custom[col] = None
     except Exception:
         custom = pd.DataFrame()
 
     companies.to_sql("companies", engine, if_exists="replace", index=False)
 
     if not custom.empty:
+        # Only keep columns that now exist in the table
+        existing_cols = pd.read_sql("SELECT * FROM companies LIMIT 0", engine).columns.tolist()
+        custom = custom[[c for c in custom.columns if c in existing_cols]]
         custom.to_sql("companies", engine, if_exists="append", index=False)
 
     tickers = companies["ticker"].tolist()

@@ -313,11 +313,23 @@ def update_company_info():
     if needs_analyst:
         analyst_df = df[["ticker", "target_mean_price", "target_high_price",
                           "target_low_price", "number_of_analysts", "last_update"]]
-        fetched = analyst_df["ticker"].tolist()
+        # Upsert: preserve existing rows for tickers not fetched this run
         with engine.begin() as conn:
-            placeholders = ",".join(f"'{t}'" for t in fetched)
-            conn.execute(text(f"DELETE FROM analyst_expectations WHERE ticker IN ({placeholders})"))
-        analyst_df.to_sql("analyst_expectations", engine, if_exists="append", index=False)
+            for _, row in analyst_df.iterrows():
+                conn.execute(text("""
+                    INSERT INTO analyst_expectations
+                        (ticker, target_mean_price, target_high_price, target_low_price,
+                         number_of_analysts, last_update)
+                    VALUES (:ticker, :mean, :high, :low, :n, :upd)
+                    ON CONFLICT(ticker) DO UPDATE SET
+                        target_mean_price  = excluded.target_mean_price,
+                        target_high_price  = excluded.target_high_price,
+                        target_low_price   = excluded.target_low_price,
+                        number_of_analysts = excluded.number_of_analysts,
+                        last_update        = excluded.last_update
+                """), {"ticker": row["ticker"], "mean": row["target_mean_price"],
+                       "high": row["target_high_price"], "low": row["target_low_price"],
+                       "n": row["number_of_analysts"], "upd": str(row["last_update"])})
         mark_run("analyst_update")
 
     print(f"Company info updated ({len(rows)} tickers)")

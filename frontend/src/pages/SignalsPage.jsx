@@ -1,6 +1,6 @@
-import { useState, useMemo, useContext } from 'react'
+import { useState, useMemo, useContext, useRef, useEffect, useLayoutEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSignalsToday, getSignals, getPriceHistory } from '../api'
+import { getSignalsToday, getSignals, getPriceHistory, getSignalMarkers } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -109,15 +109,20 @@ function Pagination({ page, pages, onChange }) {
 
 function SignalModal({ row, onClose }) {
   const { market } = useContext(MarketContext)
-  const currency = market === 'IL' ? '₪' : '$'
-  const today    = new Date().toISOString().slice(0, 10)
-  const end12m   = today
+  const currency  = market === 'IL' ? '₪' : '$'
+  const today     = new Date().toISOString().slice(0, 10)
   const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
   const start12m  = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['price-history-signal', row.ticker],
-    queryFn: () => getPriceHistory(row.ticker, { start: start12m, end: end12m }),
+    queryFn: () => getPriceHistory(row.ticker, { start: start12m, end: today }),
+    staleTime: 300_000,
+  })
+
+  const { data: markers = [] } = useQuery({
+    queryKey: ['signal-markers', row.ticker],
+    queryFn: () => getSignalMarkers(row.ticker, 13),
     staleTime: 300_000,
   })
 
@@ -129,6 +134,63 @@ function SignalModal({ row, onClose }) {
   const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
   const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
 
+  // General column ref — measures height to constrain right column
+  const generalColRef = useRef(null)
+  const [generalColH, setGeneralColH] = useState(null)
+  useLayoutEffect(() => {
+    if (generalColRef.current) setGeneralColH(generalColRef.current.offsetHeight)
+  })
+
+  // Wrapper ref for SVG overlay positioning
+  const wrapperRef = useRef(null)
+  const [wrapperWidth, setWrapperWidth] = useState(0)
+  useEffect(() => {
+    if (!wrapperRef.current) return
+    const obs = new ResizeObserver(entries => setWrapperWidth(entries[0].contentRect.width))
+    obs.observe(wrapperRef.current)
+    return () => obs.disconnect()
+  }, [isLoading])
+
+  // Mirror Recharts' point scale
+  function dateToX(dateStr) {
+    const idx = history.findIndex(d => d.date === dateStr)
+    if (idx < 0 || history.length <= 1) return null
+    const plotLeft  = 8 + 48
+    const plotWidth = wrapperWidth - plotLeft - 70
+    return plotLeft + (idx / (history.length - 1)) * plotWidth
+  }
+
+  // Build BUY/SELL pairs and detect open position
+  const pairs = []
+  let pendingBuy = null
+  for (const m of markers) {
+    if (m.signal === 'BUY') {
+      pendingBuy = m
+    } else if (m.signal === 'SELL' && pendingBuy) {
+      pairs.push({ buy: pendingBuy, sell: m })
+      pendingBuy = null
+    }
+  }
+  const openBuy = pendingBuy  // last BUY with no subsequent SELL
+
+  const PLOT_TOP    = 70
+  const PLOT_BOTTOM = 332
+
+  function priceBox(cx, value, color, byOverride) {
+    const px = 8, fs = 11
+    const bw = value.length * 6.8 + px * 2
+    const bh = fs + 10
+    const by = byOverride !== undefined ? byOverride : PLOT_TOP - bh - 4
+    return (
+      <g>
+        <rect x={cx - bw / 2} y={by} width={bw} height={bh} rx={4} fill="var(--surface)" stroke={color} strokeWidth={1.5} />
+        <text x={cx} y={by + bh / 2} textAnchor="middle" dominantBaseline="central"
+          fontSize={fs} style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+          {value}
+        </text>
+      </g>
+    )
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -148,73 +210,56 @@ function SignalModal({ row, onClose }) {
           }}>
             {row.ticker}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+          <div ref={generalColRef} style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
-            <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
-          <table style={{ fontSize: 12, borderCollapse: 'collapse', width: 220, margin: 0 }}>
-            <tbody>
-              {[
-                ['Ticker',     <strong>{row.ticker ?? '—'}</strong>],
-                ['Company',    row.company ?? '—'],
-                ['Industry',   row.industry ?? '—'],
-                ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'],
-                ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
-                ['Price',      row.close != null ? `${currency}${fmt(row.close)}` : '—'],
-                ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
-                ['Prediction', row.fair_value_upside != null ? <span className={row.fair_value_upside >= 0 ? 'up' : 'down'}>{row.fair_value_upside >= 0 ? '+' : ''}{fmt(row.fair_value_upside * 100)}%</span> : '—'],
-                ['12M Yield',  yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
-              ].map(([label, value]) => (
-                <tr key={label} style={{ height: 22 }}>
-                  <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>{label}</td>
-                  <td style={{ verticalAlign: 'middle' }}>{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <div style={{ padding: '8px 0px', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
+                <tbody>
+                  {[
+                    ['Ticker',     <strong>{row.ticker ?? '—'}</strong>],
+                    ['Company',    row.company ?? '—'],
+                    ['Industry',   row.industry ?? '—'],
+                    ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'],
+                    ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
+                    ['Price',      row.close != null ? `${currency}${fmt(row.close)}` : '—'],
+                    ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
+                    ['Prediction', row.fair_value_upside != null ? <span className={row.fair_value_upside >= 0 ? 'up' : 'down'}>{row.fair_value_upside >= 0 ? '+' : ''}{fmt(row.fair_value_upside * 100)}%</span> : '—'],
+                    ['12M Yield',  yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
+                  ].map(([label, value]) => (
+                    <tr key={label} style={{ height: 22 }}>
+                      <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 90 }}>{label}</td>
+                      <td style={{ verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
           {(row.description_short || row.description || row.health_score) && (
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-
-              {/* Description */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
               {(row.description_short || row.description) && (<>
                 <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
-                <div style={{
-                  fontSize: 12, lineHeight: 1.6, overflowY: 'auto', maxHeight: 120,
-                  padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8,
-                }}>
+                <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
                   {row.description_short || row.description}
                 </div>
               </>)}
-
-              {/* Company Health */}
               {row.health_score && (() => {
                 const labels = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
                 const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
                 const score  = row.health_score
-                return (<>
-                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold', marginTop: 8 }}>Company Health</div>
-                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                return (
+                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>Company Health</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       {[1,2,3,4,5].map(i => (
-                        <div key={i} style={{
-                          width: 28, height: 12, borderRadius: 4,
-                          background: i <= score ? colors[score] : 'var(--border)',
-                        }} />
+                        <div key={i} style={{ width: 28, height: 12, borderRadius: 4, background: i <= score ? colors[score] : 'var(--border)' }} />
                       ))}
-                      <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>
-                        {labels[score]}
-                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>{labels[score]}</span>
                     </div>
-                    {row.health_reason && (
-                      <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-                        {row.health_reason}
-                      </div>
-                    )}
+                    {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6, flex: 1, minHeight: 0, overflowY: 'auto' }}>{row.health_reason}</div>}
                   </div>
-                </>)
+                )
               })()}
-
             </div>
           )}
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -224,32 +269,152 @@ function SignalModal({ row, onClose }) {
         {isLoading ? (
           <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
         ) : (
-          <ResponsiveContainer width="100%" height={340}>
-            <LineChart data={history} margin={{ top: 16, right: 24, bottom: 8, left: 8 }}>
-              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
-                interval="preserveStartEnd"
-                minTickGap={50}
-              />
-              <YAxis
-                domain={[minPrice, maxPrice]}
-                tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                tickFormatter={v => v.toFixed(0)}
-                width={48}
-              />
-              <Tooltip
-                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: 'var(--muted)' }}
-                itemStyle={{ color: 'var(--text)' }}
-                labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                formatter={v => [`${currency}${v.toFixed(2)}`, 'Close']}
-              />
-              <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={history} margin={{ top: 70, right: 70, bottom: 8, left: 8 }}>
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                  tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
+                  interval="preserveStartEnd"
+                  minTickGap={50}
+                />
+                <YAxis
+                  domain={[minPrice, maxPrice]}
+                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                  tickFormatter={v => v.toFixed(0)}
+                  width={48}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                  labelStyle={{ color: 'var(--muted)' }}
+                  itemStyle={{ color: 'var(--text)' }}
+                  labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
+                  formatter={v => [`${currency}${v.toFixed(2)}`, 'Close']}
+                />
+                <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+
+            {/* SVG overlay: BUY/SELL signal lines */}
+            {wrapperWidth > 0 && history.length > 1 && (
+              <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
+
+                {/* Completed BUY→SELL pairs */}
+                {pairs.map((p, i) => {
+                  const buyX  = dateToX(p.buy.date)
+                  const sellX = dateToX(p.sell.date)
+                  const pct   = p.buy.close && p.sell.close
+                    ? ((p.sell.close - p.buy.close) / p.buy.close) * 100
+                    : null
+                  const color = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
+                  const lineY = PLOT_TOP + 18
+                  return (
+                    <g key={i}>
+                      {buyX  != null && <>
+                        <line x1={buyX}  y1={PLOT_TOP} x2={buyX}  y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
+                        {p.buy.close  != null && priceBox(buyX,  currency + fmt(p.buy.close,  1), 'var(--green)')}
+                      </>}
+                      {sellX != null && <>
+                        <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)',   strokeWidth: 2 }} />
+                        {p.sell.close != null && priceBox(sellX, currency + fmt(p.sell.close, 1), 'var(--red)')}
+                      </>}
+                      {buyX != null && sellX != null && pct != null && (() => {
+                        const label = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
+                        const bw = label.length * 6.8 + 16
+                        const plotRight = wrapperWidth - 24
+                        const cx = Math.min(Math.max((buyX + sellX) / 2, 56 + bw / 2), plotRight - bw / 2)
+                        const bh = 18
+                        return <>
+                          <line x1={buyX} y1={lineY} x2={sellX} y2={lineY}
+                            style={{ stroke: color, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
+                          <rect x={cx - bw / 2} y={lineY + 4} width={bw} height={bh} rx={3}
+                            fill="var(--surface)" stroke={color} strokeWidth={1.5} />
+                          <text x={cx} y={lineY + 4 + bh / 2} textAnchor="middle" dominantBaseline="central" fontSize={10}
+                            style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                            {label}
+                          </text>
+                        </>
+                      })()}
+                    </g>
+                  )
+                })}
+
+                {/* Open BUY (no subsequent SELL) */}
+                {openBuy && (() => {
+                  const buyX  = dateToX(openBuy.date)
+                  const lastX = dateToX(history.at(-1).date)
+                  if (!buyX) return null
+                  const currentPrice = history.at(-1).close
+                  const pct       = openBuy.close ? ((currentPrice - openBuy.close) / openBuy.close) * 100 : null
+                  const gainColor = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
+                  const priceText = openBuy.close != null ? currency + fmt(openBuy.close, 1) : ''
+                  const yieldText = pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%` : ''
+
+                  const price_bh = 21, gain_bh = 18, gap = 4
+                  const bw_price = priceText.length * 6.8 + 16
+                  const bw_gain  = yieldText.length * 6.8 + 16
+
+                  // Collision detection: check if price box overlaps a pair price box
+                  const pairBoxes = []
+                  for (const p of pairs) {
+                    const bx = dateToX(p.buy.date)
+                    const sx = dateToX(p.sell.date)
+                    if (bx != null && p.buy.close != null)
+                      pairBoxes.push({ x: bx, w: (currency + fmt(p.buy.close, 1)).length * 6.8 + 16 })
+                    if (sx != null && p.sell.close != null)
+                      pairBoxes.push({ x: sx, w: (currency + fmt(p.sell.close, 1)).length * 6.8 + 16 })
+                  }
+                  const hasCollision = pairBoxes.some(b => Math.abs(buyX - b.x) < (bw_price + b.w) / 2)
+
+                  // Price box: same row as pair price boxes; raised one row when colliding
+                  const price_by = hasCollision
+                    ? PLOT_TOP - price_bh - 4 - price_bh - 6
+                    : PLOT_TOP - price_bh - 4
+                  // Gain box: separate box sitting above the price box
+                  const gain_by  = price_by - gain_bh - gap
+
+                  return (
+                    <g>
+                      <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
+                      {openBuy.close != null && priceBox(buyX, priceText, 'var(--green)', price_by)}
+                      {/* Gain box: yield only, above price box */}
+                      {yieldText && <>
+                        <rect x={buyX - bw_gain / 2} y={gain_by} width={bw_gain} height={gain_bh} rx={4}
+                          fill="var(--surface)" stroke={gainColor} strokeWidth={1.5} />
+                        <text x={buyX} y={gain_by + gain_bh / 2} textAnchor="middle" dominantBaseline="central"
+                          fontSize={11} style={{ fill: gainColor, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                          {yieldText}
+                        </text>
+                      </>}
+                      {/* "Open" label rotated vertically on the BUY line */}
+                      {(() => {
+                        const midY = (PLOT_TOP + PLOT_BOTTOM) / 2
+                        const tw = 32, th = 16
+                        return (
+                          <g transform={`rotate(-90, ${buyX}, ${midY})`}>
+                            <rect x={buyX - tw / 2} y={midY - th / 2} width={tw} height={th} rx={3}
+                              fill="var(--surface)" opacity={0.85} />
+                            <text x={buyX} y={midY} textAnchor="middle" dominantBaseline="central"
+                              fontSize={10} style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                              Open
+                            </text>
+                          </g>
+                        )
+                      })()}
+                      {/* Dashed line showing open duration */}
+                      {lastX != null && (
+                        <line x1={buyX} y1={PLOT_TOP + 18} x2={lastX} y2={PLOT_TOP + 18}
+                          style={{ stroke: gainColor, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
+                      )}
+                    </g>
+                  )
+                })()}
+
+              </svg>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -347,6 +347,21 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
 
 # --- Signal success rate ----------------------------------------------------
 
+@app.get("/api/signals/markers")
+def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=60)):
+    """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay)."""
+    with engine.connect() as conn:
+        df = pd.read_sql(text("""
+            SELECT DATE(date) AS date, signal, close
+            FROM signals
+            WHERE ticker = :t
+              AND signal IN ('BUY', 'SELL')
+              AND DATE(date) >= DATE('now', :offset)
+            ORDER BY date ASC
+        """), conn, params={"t": ticker, "offset": f"-{months} months"})
+    return df.to_dict(orient="records")
+
+
 @app.get("/api/signals/success-rate")
 def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
     """BUY→SELL success rate aggregated per company over the last N months."""
