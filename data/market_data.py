@@ -286,40 +286,26 @@ def update_company_info():
         try:
             profile = fmp.company_profile(t) or {}
             targets = fmp.price_target_summary(t) or {}
+            # Build valid (count, avg) pairs for each period
+            _periods = [
+                (targets.get("lastMonthCount") or 0,   targets.get("lastMonthAvgPriceTarget") or 0),
+                (targets.get("lastQuarterCount") or 0, targets.get("lastQuarterAvgPriceTarget") or 0),
+                (targets.get("lastYearCount") or 0,    targets.get("lastYearAvgPriceTarget") or 0),
+            ]
+            _valid = [(cnt, avg) for cnt, avg in _periods if cnt > 0 and avg > 0]
+            # mean = period with most analysts (most representative consensus)
+            _best = max(_valid, key=lambda x: x[0]) if _valid else (0, None)
+            _avgs = [avg for _, avg in _valid]
             return {
                 "ticker":             t,
                 "market_cap":         profile.get("marketCap"),
                 "industry":           profile.get("industry"),
                 "description":        profile.get("description"),
                 "logo_url":           profile.get("image"),
-                # Use period averages as mean/low/high proxies:
-                # mean = most recent (month → quarter → year)
-                # high = max across all periods
-                # low  = lastYearAvgPriceTarget (oldest consensus, typically lowest)
-                "target_mean_price":  (targets.get("lastMonthAvgPriceTarget") or
-                                       targets.get("lastQuarterAvgPriceTarget") or
-                                       targets.get("lastYearAvgPriceTarget") or None),
-                "target_high_price":  (max(filter(None, [
-                                           targets.get("lastMonthAvgPriceTarget"),
-                                           targets.get("lastQuarterAvgPriceTarget"),
-                                           targets.get("lastYearAvgPriceTarget"),
-                                       ])) if any([
-                                           targets.get("lastMonthAvgPriceTarget"),
-                                           targets.get("lastQuarterAvgPriceTarget"),
-                                           targets.get("lastYearAvgPriceTarget"),
-                                       ]) else None),
-                "target_low_price":   (min(filter(None, [
-                                           targets.get("lastMonthAvgPriceTarget"),
-                                           targets.get("lastQuarterAvgPriceTarget"),
-                                           targets.get("lastYearAvgPriceTarget"),
-                                       ])) if any([
-                                           targets.get("lastMonthAvgPriceTarget"),
-                                           targets.get("lastQuarterAvgPriceTarget"),
-                                           targets.get("lastYearAvgPriceTarget"),
-                                       ]) else None),
-                "number_of_analysts": (targets.get("lastMonthCount") or
-                                       targets.get("lastQuarterCount") or
-                                       targets.get("lastYearCount") or None),
+                "target_mean_price":  _best[1],
+                "target_high_price":  max(_avgs) if _avgs else None,
+                "target_low_price":   min(_avgs) if _avgs else None,
+                "number_of_analysts": _best[0] if _best[0] > 0 else None,
                 "last_update":        now,
             }
         except Exception:

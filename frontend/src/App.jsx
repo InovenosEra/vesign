@@ -6,6 +6,7 @@ import { MarketContext, MarketProvider } from './context/MarketContext'
 import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
 import TradesPage from './pages/TradesPage'
+import GlobalSearch from './components/GlobalSearch'
 import './App.css'
 
 const queryClient = new QueryClient({
@@ -311,7 +312,10 @@ function Header() {
         <NavLink to="/watchlist">Watchlist</NavLink>
         <NavLink to="/trades">Trades</NavLink>
       </nav>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+        <GlobalSearch />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <MarketStatus />
         <FlagSelector />
       </div>

@@ -83,6 +83,10 @@ export const updateTickerNote = (id, ticker, note) =>
 export const removeTicker = (id, ticker) =>
   del(`/watchlists/${id}/tickers/${ticker}`)
 
+// --- Search ----------------------------------------------------------------
+export const searchTickers = (q, limit = 10) =>
+  get(`/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+
 // --- Trades ----------------------------------------------------------------
 export const getTrades = ({ start, end, market = 'US' } = {}) => {
   const params = new URLSearchParams({ market })

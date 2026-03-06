@@ -220,7 +220,17 @@ _MARKET_CAP_JOIN = """
         FROM fundamentals GROUP BY ticker
     ) f ON s.ticker = f.ticker
     LEFT JOIN company_health h ON s.ticker = h.ticker
+    LEFT JOIN (
+        SELECT p1.ticker, p1.close AS latest_close
+        FROM daily_prices p1
+        INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
+            ON p1.ticker = p2.ticker AND p1.date = p2.max_date
+    ) lp ON s.ticker = lp.ticker
 """
+
+_ANALYST_UPSIDE_SQL = """CASE WHEN s.target_mean_price IS NOT NULL AND lp.latest_close IS NOT NULL AND lp.latest_close > 0
+                    THEN (s.target_mean_price - lp.latest_close) / lp.latest_close
+                    ELSE s.fair_value_upside END AS fair_value_upside"""
 
 @app.get("/api/signals/today")
 def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
@@ -228,8 +238,10 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
     mkt = (market or "US").upper()
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
+            SELECT s.date, s.ticker, s.close, s.rsi,
+                   {_ANALYST_UPSIDE_SQL},
                    s.target_mean_price, s.target_low_price, s.target_high_price,
+                   s.prediction_score,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
@@ -250,7 +262,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
     return _records(df)
 
 
-_SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap"}
+_SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap", "prediction_score"}
 _TICKER_RE = re.compile(r'^[A-Z0-9.\-]{1,10}$')
 _SORT_COL_SQL = {
     "company":    "c.company",
@@ -301,8 +313,10 @@ def signals(
         total = count_row[0] if count_row else 0
 
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, s.close, s.rsi, s.fair_value_upside,
+            SELECT s.date, s.ticker, s.close, s.rsi,
+                   {_ANALYST_UPSIDE_SQL},
                    s.target_mean_price, s.target_low_price, s.target_high_price,
+                   s.prediction_score,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
@@ -338,7 +352,9 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
             SELECT s.ticker, c.company, c.logo_url, c.industry,
                    c.description, c.description_short,
                    s.close, s.signal, s.rsi,
-                   s.fair_value_upside, s.target_mean_price,
+                   {_ANALYST_UPSIDE_SQL},
+                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   s.prediction_score,
                    f.market_cap,
                    h.score AS health_score, h.reason AS health_reason
             FROM signals s
@@ -355,6 +371,45 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
 
 
 # --- Signal success rate ----------------------------------------------------
+
+@app.get("/api/search")
+def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50)):
+    """Full-text search across ticker and company name."""
+    pattern = f"%{q.strip()}%"
+    with engine.connect() as conn:
+        df = pd.read_sql(text(f"""
+            SELECT c.ticker, c.company, c.logo_url, c.industry,
+                   c.description, c.description_short,
+                   s.signal, s.close, s.rsi,
+                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   s.prediction_score,
+                   f.market_cap,
+                   h.score AS health_score, h.reason AS health_reason
+            FROM companies c
+            LEFT JOIN (
+                SELECT s1.ticker, s1.signal, s1.close, s1.rsi,
+                       s1.target_mean_price, s1.target_low_price, s1.target_high_price,
+                       s1.prediction_score
+                FROM signals s1
+                INNER JOIN (
+                    SELECT ticker, MAX(date) AS max_date FROM signals GROUP BY ticker
+                ) s2 ON s1.ticker = s2.ticker AND s1.date = s2.max_date
+            ) s ON c.ticker = s.ticker
+            LEFT JOIN (
+                SELECT ticker, MAX(market_cap) AS market_cap
+                FROM fundamentals GROUP BY ticker
+            ) f ON c.ticker = f.ticker
+            LEFT JOIN company_health h ON c.ticker = h.ticker
+            WHERE c.ticker LIKE :pat OR c.company LIKE :pat
+            ORDER BY
+                CASE WHEN UPPER(c.ticker) = UPPER(:q) THEN 0
+                     WHEN UPPER(c.ticker) LIKE UPPER(:q) || '%' THEN 1
+                     ELSE 2 END,
+                f.market_cap DESC NULLS LAST
+            LIMIT :lim
+        """), conn, params={"pat": pattern, "q": q.strip(), "lim": limit})
+    return _records(df)
+
 
 @app.get("/api/signals/markers")
 def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=60)):
