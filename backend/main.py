@@ -123,24 +123,33 @@ def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Se
 
 
 def fetch_live_prices(tickers: list[str]) -> dict:
-    """Fetch latest prices using fast_info (lightweight metadata call) in parallel.
-    Falls back to the last known close from daily_prices if fast_info fails.
-    """
+    """Fetch latest prices. US tickers via FMP batch; TASE (.TA) via yfinance in parallel."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    from data import fmp as _fmp
 
-    def _get(t):
-        try:
-            price = yf.Ticker(t).fast_info.last_price
-            return t, float(price) if price else None
-        except Exception:
-            return t, None
+    us_tickers   = [t for t in tickers if not t.endswith('.TA')]
+    il_tickers   = [t for t in tickers if t.endswith('.TA')]
 
     prices: dict = {}
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = {ex.submit(_get, t): t for t in tickers}
-        for f in as_completed(futures):
-            t, price = f.result()
-            prices[t] = price
+
+    # US: single FMP batch call
+    if us_tickers:
+        prices.update(_fmp.live_prices(us_tickers))
+
+    # TASE: yfinance fast_info in parallel
+    if il_tickers:
+        def _get(t):
+            try:
+                price = yf.Ticker(t).fast_info.last_price
+                return t, float(price) if price else None
+            except Exception:
+                return t, None
+
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            futures = {ex.submit(_get, t): t for t in il_tickers}
+            for f in as_completed(futures):
+                t, price = f.result()
+                prices[t] = price
 
     return prices
 

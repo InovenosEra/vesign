@@ -53,7 +53,7 @@ function HealthCell({ score }) {
 function PredictionCell({ value }) {
   if (value == null) return <td>—</td>
   const pct = (value * 100).toFixed(2)
-  return <td className={value > 0 ? 'up' : 'down'}>{value > 0 ? '▲' : '▼'} {Math.abs(pct)}%</td>
+  return <td className={value > 0 ? 'up' : 'down'}>{value > 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%</td>
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
@@ -219,7 +219,7 @@ function SignalModal({ row, onClose }) {
                     ['Ticker',     <strong>{row.ticker ?? '—'}</strong>],
                     ['Company',    row.company ?? '—'],
                     ['Industry',   row.industry ?? '—'],
-                    ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'],
+                    ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}B` : '—'],
                     ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
                     ['Price',      row.close != null ? `${currency}${fmt(row.close)}` : '—'],
                     ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
@@ -456,12 +456,12 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
             <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
             <td><strong>{r.ticker ?? '—'}</strong></td>
             <td>{r.company ?? '—'}</td>
-            <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
-            <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
+            <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+            <td>{r.close != null ? fmt(r.close) : '—'}</td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-            <td>{r.target_low_price != null ? r.target_low_price.toFixed(2) : '—'}</td>
-            <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
-            <td>{r.target_high_price != null ? r.target_high_price.toFixed(2) : '—'}</td>
+            <td>{r.target_low_price != null ? fmt(r.target_low_price) : '—'}</td>
+            <td>{r.target_mean_price != null ? fmt(r.target_mean_price) : '—'}</td>
+            <td>{r.target_high_price != null ? fmt(r.target_high_price) : '—'}</td>
             <HealthCell score={r.health_score} />
             <PredictionCell value={r.fair_value_upside} />
             <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
@@ -576,13 +576,13 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
                 <td><strong>{r.ticker ?? '—'}</strong></td>
                 <td>{r.company ?? '—'}</td>
-                <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
+                <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                 <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}</span> : '—'}</td>
-                <td>{r.close != null ? r.close.toFixed(2) : '—'}</td>
+                <td>{r.close != null ? fmt(r.close) : '—'}</td>
                 <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-                <td>{r.target_low_price != null ? r.target_low_price.toFixed(2) : '—'}</td>
-                <td>{r.target_mean_price != null ? r.target_mean_price.toFixed(2) : '—'}</td>
-                <td>{r.target_high_price != null ? r.target_high_price.toFixed(2) : '—'}</td>
+                <td>{r.target_low_price != null ? fmt(r.target_low_price) : '—'}</td>
+                <td>{r.target_mean_price != null ? fmt(r.target_mean_price) : '—'}</td>
+                <td>{r.target_high_price != null ? fmt(r.target_high_price) : '—'}</td>
                 <HealthCell score={r.health_score} />
                 <PredictionCell value={r.fair_value_upside} />
                 <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />

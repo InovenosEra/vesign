@@ -131,7 +131,7 @@ function SignalModal({ row, onClose }) {
                     ['Ticker',     <strong>{row.ticker ?? '—'}</strong>],
                     ['Company',    row.company ?? '—'],
                     ['Industry',   row.industry ?? '—'],
-                    ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'],
+                    ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}B` : '—'],
                     ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
                     ['Price',      row.close != null ? `${currency}${fmt(row.close)}` : '—'],
                     ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
@@ -364,7 +364,7 @@ function Th({ label, col, sort, onSort }) {
 function PredictionCell({ value }) {
   if (value == null) return <td>—</td>
   const pct = (value * 100).toFixed(2)
-  return <td className={value > 0 ? 'up' : 'down'}>{value > 0 ? '▲' : '▼'} {Math.abs(pct)}%</td>
+  return <td className={value > 0 ? 'up' : 'down'}>{value > 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%</td>
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
@@ -550,7 +550,7 @@ export default function WatchlistPage() {
                           <td><strong>{t.ticker}</strong></td>
                           <td>{t.company ?? '—'}</td>
                           <td>{t.signal ? <span className={`badge badge-${t.signal}`}>{t.signal}</span> : '—'}</td>
-                          <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
+                          <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                           <td>{t.close != null ? t.close.toFixed(2) : '—'}</td>
                           <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
                           <HealthCell score={t.health_score} />
