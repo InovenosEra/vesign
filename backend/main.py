@@ -239,6 +239,43 @@ def me(user=Depends(get_current_user)):
     return user
 
 
+@app.post("/api/auth/request-access")
+def request_access(payload: dict):
+    email   = str(payload.get("email", "")).strip()
+    message = str(payload.get("message", "")).strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email required")
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS access_requests (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                email      TEXT NOT NULL,
+                message    TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """))
+        conn.execute(text("INSERT INTO access_requests (email, message) VALUES (:e, :m)"),
+                     {"e": email, "m": message})
+        conn.commit()
+    admin_email = os.getenv("ADMIN_EMAIL")
+    if admin_email:
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            msg = MIMEText(f"New access request:\n\nEmail: {email}\nMessage: {message or '(none)'}")
+            msg["Subject"] = f"[Vesign] Access request from {email}"
+            msg["From"]    = os.getenv("SMTP_USER", admin_email)
+            msg["To"]      = admin_email
+            with smtplib.SMTP(os.getenv("SMTP_HOST", "smtp.gmail.com"),
+                              int(os.getenv("SMTP_PORT", 587))) as s:
+                s.starttls()
+                s.login(os.getenv("SMTP_USER", ""), os.getenv("SMTP_PASSWORD", ""))
+                s.send_message(msg)
+        except Exception:
+            pass  # Don't fail the request if email fails
+    return {"ok": True}
+
+
 @app.post("/api/access-request", status_code=201)
 def access_request(body: AccessRequestBody):
     email = body.email.strip().lower()
