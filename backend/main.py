@@ -71,7 +71,7 @@ def _send_access_request_email(requester_email: str, message: str):
     msg["From"] = smtp_user
     msg["To"] = admin_email
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as srv:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as srv:
             srv.starttls()
             srv.login(smtp_user, smtp_password)
             srv.send_message(msg)
