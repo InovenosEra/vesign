@@ -58,7 +58,7 @@ async function del(path) {
 
 // --- Access request (public — no auth) ------------------------------------
 export async function requestAccess(email, message = '') {
-  const res = await fetch('/api/access-request', {
+  const res = await fetch('/api/auth/request-access', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, message }),
@@ -122,14 +122,6 @@ export const removeTicker = (id, ticker) =>
 // --- Search ----------------------------------------------------------------
 export const searchTickers = (q, limit = 10) =>
   get(`/search?q=${encodeURIComponent(q)}&limit=${limit}`)
-
-// --- Access requests -------------------------------------------------------
-export const requestAccess = (email, message = '') =>
-  fetch(BASE + '/auth/request-access', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, message }),
-  }).then(res => { if (!res.ok) throw new Error('Request failed'); return res.json() })
 
 // --- Trades ----------------------------------------------------------------
 export const getTrades = ({ start, end, market = 'US' } = {}) => {
