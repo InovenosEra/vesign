@@ -1,13 +1,19 @@
 import { useState, useEffect, useContext, useRef } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { ClerkProvider, RedirectToSignIn, useAuth, useClerk, useUser } from '@clerk/react'
+import { setTokenGetter } from './api'
 import { getMarketStatus } from './api'
 import { MarketContext, MarketProvider } from './context/MarketContext'
 import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
 import TradesPage from './pages/TradesPage'
 import GlobalSearch from './components/GlobalSearch'
+import LoginPage from './pages/LoginPage'
+import CompleteProfilePage from './pages/CompleteProfilePage'
 import './App.css'
+
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -112,7 +118,7 @@ function getTaseCloseUTC() {
   const m = String(il.month).padStart(2, '0')
   const d = String(il.day).padStart(2, '0')
 
-  const guess = new Date(`${y}-${m}-${d}T15:29:00Z`) // rough 17:29 IST (UTC+2)
+  const guess = new Date(`${y}-${m}-${d}T15:29:00Z`)
   const gParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Jerusalem',
     hour: 'numeric', minute: 'numeric', hour12: false,
@@ -137,15 +143,14 @@ function getNextTaseOpenUTC() {
   parts.forEach(p => { if (p.type !== 'literal') il[p.type] = parseInt(p.value) })
   il.hour = (il.hour || 0) % 24
 
-  // JS getDay(): 0=Sun, 1=Mon, ..., 4=Thu, 5=Fri, 6=Sat
   const dow = new Date(il.year, il.month - 1, il.day).getDay()
-  const isTaseDay  = dow >= 0 && dow <= 4  // Sun–Thu
+  const isTaseDay  = dow >= 0 && dow <= 4
   const beforeOpen = il.hour < 9 || (il.hour === 9 && il.minute < 59)
 
   const target = new Date(il.year, il.month - 1, il.day)
   if (!isTaseDay || !beforeOpen) {
     target.setDate(target.getDate() + 1)
-    while (target.getDay() === 5 || target.getDay() === 6) // skip Fri, Sat
+    while (target.getDay() === 5 || target.getDay() === 6)
       target.setDate(target.getDate() + 1)
   }
 
@@ -153,7 +158,7 @@ function getNextTaseOpenUTC() {
   const m = String(target.getMonth() + 1).padStart(2, '0')
   const d = String(target.getDate()).padStart(2, '0')
 
-  const guess = new Date(`${y}-${m}-${d}T07:59:00Z`) // rough 9:59 IST (UTC+2)
+  const guess = new Date(`${y}-${m}-${d}T07:59:00Z`)
   const gParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Jerusalem',
     hour: 'numeric', minute: 'numeric', hour12: false,
@@ -298,9 +303,73 @@ function MarketStatus() {
 }
 
 // ---------------------------------------------------------------------------
+// User menu (Hello [First name] + dropdown)
+// ---------------------------------------------------------------------------
+function UserMenu() {
+  const { signOut, openUserProfile } = useClerk()
+  const { user } = useUser()
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onMouseDown(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [])
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: '4px 12px',
+          cursor: 'pointer',
+          fontSize: 13,
+          color: 'var(--text)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Hello, {user?.firstName} ▾
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: 'calc(100% + 6px)',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 8, zIndex: 200, minWidth: 160,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
+        }}>
+          {[
+            { label: 'Change Password', action: () => { openUserProfile(); setOpen(false) } },
+            { label: 'Sign Out', action: () => signOut({ redirectUrl: '/sign-in' }) },
+          ].map(item => (
+            <button
+              key={item.label}
+              onClick={item.action}
+              style={{
+                display: 'block', width: '100%', padding: '10px 16px',
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: 'var(--text)', fontSize: 13, textAlign: 'left',
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
 function Header() {
+  const { market } = useContext(MarketContext)
   return (
     <header className="app-header">
       <h1 style={{ display: 'flex', alignItems: 'flex-end', gap: 2, fontWeight: 900, fontSize: '2.7rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
@@ -318,8 +387,60 @@ function Header() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <MarketStatus />
         <FlagSelector />
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
+          {market === 'IL' ? '₪' : '$'}
+        </span>
+        <UserMenu />
       </div>
     </header>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Keeps api.js token getter in sync with Clerk session
+// ---------------------------------------------------------------------------
+function TokenSync({ onReady }) {
+  const { getToken, isSignedIn } = useAuth()
+  useEffect(() => {
+    console.log('[TokenSync] isSignedIn:', isSignedIn)
+    if (isSignedIn) {
+      setTokenGetter(getToken)
+      onReady()
+    } else {
+      setTokenGetter(null)
+    }
+  }, [isSignedIn, getToken])
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Protected app layout
+// ---------------------------------------------------------------------------
+function AppLayout() {
+  const { isLoaded, userId } = useAuth()
+  const { user } = useUser()
+  const [tokenReady, setTokenReady] = useState(false)
+
+  if (!isLoaded) return null
+  if (!userId) return <RedirectToSignIn />
+  if (user && (!user.firstName || !user.lastName)) return <CompleteProfilePage />
+
+  return (
+    <MarketProvider>
+      <QueryClientProvider client={queryClient}>
+        <TokenSync onReady={() => setTokenReady(true)} />
+        {tokenReady && <Header />}
+        {tokenReady && (
+          <main className="app-main">
+            <Routes>
+              <Route path="/" element={<SignalsPage />} />
+              <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/trades" element={<TradesPage />} />
+            </Routes>
+          </main>
+        )}
+      </QueryClientProvider>
+    </MarketProvider>
   )
 }
 
@@ -328,19 +449,13 @@ function Header() {
 // ---------------------------------------------------------------------------
 export default function App() {
   return (
-    <MarketProvider>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Header />
-          <main className="app-main">
-            <Routes>
-              <Route path="/" element={<SignalsPage />} />
-              <Route path="/watchlist" element={<WatchlistPage />} />
-              <Route path="/trades" element={<TradesPage />} />
-            </Routes>
-          </main>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </MarketProvider>
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/sign-in">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/sign-in" element={<LoginPage />} />
+          <Route path="/*" element={<AppLayout />} />
+        </Routes>
+      </BrowserRouter>
+    </ClerkProvider>
   )
 }

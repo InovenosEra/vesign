@@ -1,9 +1,11 @@
 import math
 import os
 import re
+import smtplib
 import subprocess
 import sys
 import tempfile
+from email.mime.text import MIMEText
 from datetime import datetime, time as dt_time, UTC
 from typing import Optional
 
@@ -11,13 +13,14 @@ import pandas as pd
 import pytz
 import yfinance as yf
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text, event as sa_event
 from sqlalchemy.pool import NullPool
+from backend.auth import get_current_user
 
 # ---------------------------------------------------------------------------
 # Config  (.env overrides defaults; .env is gitignored)
@@ -54,8 +57,38 @@ def _set_sqlite_pragmas(dbapi_conn, _):
     cur.close()
 
 
+def _send_access_request_email(requester_email: str, message: str):
+    admin_email  = os.getenv("ADMIN_EMAIL")
+    smtp_host    = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port    = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user    = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    if not all([admin_email, smtp_user, smtp_password]):
+        return  # not configured — skip silently
+    body = f"New access request on Vesign:\n\nEmail: {requester_email}\nMessage: {message or '(none)'}"
+    msg = MIMEText(body)
+    msg["Subject"] = f"[Vesign] Access request from {requester_email}"
+    msg["From"] = smtp_user
+    msg["To"] = admin_email
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as srv:
+            srv.starttls()
+            srv.login(smtp_user, smtp_password)
+            srv.send_message(msg)
+    except Exception as exc:
+        print(f"[email] Failed to send access-request notification: {exc}")
+
+
 def _init_tables():
     with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS access_requests (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                email      TEXT NOT NULL,
+                message    TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS watchlist_lists (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -179,6 +212,11 @@ class NoteUpdate(BaseModel):
     note: str
 
 
+class AccessRequestBody(BaseModel):
+    email: str
+    message: str = ""
+
+
 # ---------------------------------------------------------------------------
 # Helper: convert DataFrame to JSON-safe records
 # ---------------------------------------------------------------------------
@@ -193,10 +231,47 @@ def _records(df: pd.DataFrame) -> list[dict]:
 
 
 # ===========================================================================
+# Auth endpoints (public)
+# ===========================================================================
+
+@app.get("/api/auth/me")
+def me(user=Depends(get_current_user)):
+    return user
+
+
+@app.post("/api/access-request", status_code=201)
+def access_request(body: AccessRequestBody):
+    email = body.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email address")
+    with engine.begin() as conn:
+        conn.execute(
+            text("INSERT INTO access_requests (email, message) VALUES (:email, :msg)"),
+            {"email": email, "msg": body.message.strip()},
+        )
+    _send_access_request_email(email, body.message.strip())
+    return {"ok": True}
+
+
+# ===========================================================================
+# Protected router — all existing routes require a valid JWT
+# ===========================================================================
+
+protected = APIRouter(dependencies=[Depends(get_current_user)])
+
+
+@protected.get("/api/access-requests")
+def list_access_requests():
+    with engine.connect() as conn:
+        df = pd.read_sql(text("SELECT id, email, message, created_at FROM access_requests ORDER BY created_at DESC"), conn)
+    return _records(df)
+
+
+# ===========================================================================
 # Endpoints
 # ===========================================================================
 
-# --- Health -----------------------------------------------------------------
+# --- Health (public — for deployment health checks) -------------------------
 
 @app.get("/api/health")
 def health():
@@ -205,7 +280,7 @@ def health():
 
 # --- Market status ----------------------------------------------------------
 
-@app.get("/api/market/status")
+@protected.get("/api/market/status")
 def market_status(market: Optional[str] = None):
     if market and market.upper() == "IL":
         return {"is_open": tase_is_open()}
@@ -226,13 +301,14 @@ _MARKET_CAP_JOIN = """
         INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
             ON p1.ticker = p2.ticker AND p1.date = p2.max_date
     ) lp ON s.ticker = lp.ticker
+    LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
 """
 
-_ANALYST_UPSIDE_SQL = """CASE WHEN s.target_mean_price IS NOT NULL AND lp.latest_close IS NOT NULL AND lp.latest_close > 0
-                    THEN (s.target_mean_price - lp.latest_close) / lp.latest_close
+_ANALYST_UPSIDE_SQL = """CASE WHEN COALESCE(ae.target_mean_price, s.target_mean_price) IS NOT NULL AND lp.latest_close IS NOT NULL AND lp.latest_close > 0
+                    THEN (COALESCE(ae.target_mean_price, s.target_mean_price) - lp.latest_close) / lp.latest_close
                     ELSE s.fair_value_upside END AS fair_value_upside"""
 
-@app.get("/api/signals/today")
+@protected.get("/api/signals/today")
 def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
     """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD&market=US|IL filter."""
     mkt = (market or "US").upper()
@@ -240,7 +316,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
-                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
                    f.market_cap
@@ -270,7 +346,7 @@ _SORT_COL_SQL = {
 }
 
 
-@app.get("/api/signals")
+@protected.get("/api/signals")
 def signals(
     signal: Optional[str] = None,
     search: Optional[str] = None,
@@ -315,7 +391,7 @@ def signals(
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
-                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
                    f.market_cap
@@ -336,7 +412,7 @@ def signals(
     }
 
 
-@app.get("/api/signals/by-tickers")
+@protected.get("/api/signals/by-tickers")
 def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ticker symbols")):
     """Latest signal row for each of the given tickers (used by watchlist)."""
     ticker_list = [
@@ -353,7 +429,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
                    c.description, c.description_short,
                    s.close, s.signal, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
-                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
                    f.market_cap,
                    h.score AS health_score, h.reason AS health_reason
@@ -372,7 +448,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
 
 # --- Signal success rate ----------------------------------------------------
 
-@app.get("/api/search")
+@protected.get("/api/search")
 def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50)):
     """Full-text search across ticker and company name."""
     pattern = f"%{q.strip()}%"
@@ -381,7 +457,7 @@ def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default
             SELECT c.ticker, c.company, c.logo_url, c.industry,
                    c.description, c.description_short,
                    s.signal, s.close, s.rsi,
-                   s.target_mean_price, s.target_low_price, s.target_high_price,
+                   COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
                    f.market_cap,
                    h.score AS health_score, h.reason AS health_reason
@@ -400,6 +476,7 @@ def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default
                 FROM fundamentals GROUP BY ticker
             ) f ON c.ticker = f.ticker
             LEFT JOIN company_health h ON c.ticker = h.ticker
+            LEFT JOIN analyst_expectations ae ON c.ticker = ae.ticker
             WHERE c.ticker LIKE :pat OR c.company LIKE :pat
             ORDER BY
                 CASE WHEN UPPER(c.ticker) = UPPER(:q) THEN 0
@@ -411,7 +488,7 @@ def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default
     return _records(df)
 
 
-@app.get("/api/signals/markers")
+@protected.get("/api/signals/markers")
 def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=60)):
     """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay)."""
     with engine.connect() as conn:
@@ -426,7 +503,7 @@ def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=60)):
     return df.to_dict(orient="records")
 
 
-@app.get("/api/signals/success-rate")
+@protected.get("/api/signals/success-rate")
 def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
     """BUY→SELL success rate aggregated per company over the last N months."""
     with engine.connect() as conn:
@@ -482,7 +559,7 @@ def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
 
 # --- Live prices ------------------------------------------------------------
 
-@app.get("/api/prices/history")
+@protected.get("/api/prices/history")
 def price_history(
     ticker: str = Query(..., description="Ticker symbol"),
     months: int = Query(default=12, ge=1, le=60),
@@ -516,30 +593,49 @@ def price_history(
     return _records(df)
 
 
-@app.get("/api/prices/live")
+@protected.get("/api/prices/live")
 def live_prices(tickers: str = Query(..., description="Comma-separated ticker symbols")):
-    """Fetch real-time prices. Returns empty prices dict when market is closed."""
+    """Fetch real-time prices. Handles US and IL market hours independently."""
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="No tickers provided")
 
-    if not market_is_open():
-        return {"market_open": False, "prices": {t: None for t in ticker_list}}
+    us_open = market_is_open()
+    il_open = tase_is_open()
 
-    prices = fetch_live_prices(ticker_list)
-    return {"market_open": True, "prices": prices}
+    active = []
+    result_prices: dict = {}
+    for t in ticker_list:
+        if t.endswith('.TA'):
+            if il_open:
+                active.append(t)
+            else:
+                result_prices[t] = None
+        else:
+            if us_open:
+                active.append(t)
+            else:
+                result_prices[t] = None
+
+    if active:
+        result_prices.update(fetch_live_prices(active))
+
+    # market_open reflects the market relevant to the majority of requested tickers
+    il_count = sum(1 for t in ticker_list if t.endswith('.TA'))
+    market_open = il_open if il_count > len(ticker_list) / 2 else us_open
+    return {"market_open": market_open, "prices": result_prices}
 
 
 # --- Watchlists -------------------------------------------------------------
 
-@app.get("/api/watchlists")
+@protected.get("/api/watchlists")
 def get_watchlists():
     with engine.connect() as conn:
         df = pd.read_sql(text("SELECT id, name FROM watchlist_lists ORDER BY id"), conn)
     return _records(df)
 
 
-@app.post("/api/watchlists", status_code=201)
+@protected.post("/api/watchlists", status_code=201)
 def create_watchlist(body: WatchlistCreate):
     name = body.name.strip()
     if not name:
@@ -564,14 +660,14 @@ def create_watchlist(body: WatchlistCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/api/watchlists/{list_id}", status_code=204)
+@protected.delete("/api/watchlists/{list_id}", status_code=204)
 def delete_watchlist(list_id: int):
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM watchlist WHERE list_id = :lid"), {"lid": list_id})
         conn.execute(text("DELETE FROM watchlist_lists WHERE id = :lid"), {"lid": list_id})
 
 
-@app.get("/api/watchlists/{list_id}/tickers")
+@protected.get("/api/watchlists/{list_id}/tickers")
 def get_watchlist_tickers(list_id: int):
     with engine.connect() as conn:
         df = pd.read_sql(
@@ -581,7 +677,7 @@ def get_watchlist_tickers(list_id: int):
     return _records(df)
 
 
-@app.post("/api/watchlists/{list_id}/tickers", status_code=201)
+@protected.post("/api/watchlists/{list_id}/tickers", status_code=201)
 def add_ticker(list_id: int, body: TickerAdd):
     ticker = body.ticker.strip().upper()
     if not ticker:
@@ -601,7 +697,7 @@ def add_ticker(list_id: int, body: TickerAdd):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.patch("/api/watchlists/{list_id}/tickers/{ticker}")
+@protected.patch("/api/watchlists/{list_id}/tickers/{ticker}")
 def update_ticker_note(list_id: int, ticker: str, body: NoteUpdate):
     with engine.begin() as conn:
         conn.execute(
@@ -611,7 +707,7 @@ def update_ticker_note(list_id: int, ticker: str, body: NoteUpdate):
     return {"ok": True}
 
 
-@app.delete("/api/watchlists/{list_id}/tickers/{ticker}", status_code=204)
+@protected.delete("/api/watchlists/{list_id}/tickers/{ticker}", status_code=204)
 def remove_ticker(list_id: int, ticker: str):
     with engine.begin() as conn:
         conn.execute(
@@ -622,7 +718,7 @@ def remove_ticker(list_id: int, ticker: str):
 
 # --- Historical trades ------------------------------------------------------
 
-@app.get("/api/trades")
+@protected.get("/api/trades")
 def historical_trades(
     start: Optional[str] = None,
     end: Optional[str] = None,
@@ -741,7 +837,7 @@ def historical_trades(
 
 # --- Pipeline ---------------------------------------------------------------
 
-@app.post("/api/pipeline/run")
+@protected.post("/api/pipeline/run")
 def run_pipeline():
     global _pipeline_proc, _pipeline_log_file
 
@@ -763,7 +859,7 @@ def run_pipeline():
     return {"status": "started"}
 
 
-@app.get("/api/pipeline/status")
+@protected.get("/api/pipeline/status")
 def pipeline_status():
     global _pipeline_proc, _pipeline_log_file
 
@@ -782,6 +878,8 @@ def pipeline_status():
 
     return {"status": "success" if ret == 0 else "error", "exit_code": ret, "log": log_tail}
 
+
+app.include_router(protected)
 
 # ---------------------------------------------------------------------------
 # SPA static file serving (production)

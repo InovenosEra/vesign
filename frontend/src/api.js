@@ -2,36 +2,72 @@ const BASE = '/api'
 
 const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' }
 
-async function get(path) {
-  const res = await fetch(BASE + path, { headers: NGROK_HEADERS })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-  return res.json()
+// Set by TokenSync component in App.jsx once Clerk is ready
+let _getToken = null
+export function setTokenGetter(fn) { _getToken = fn }
+
+async function authHeaders() {
+  try {
+    const token = _getToken
+      ? await _getToken()
+      : await window.Clerk?.session?.getToken()
+    console.log('[api] token:', token ? token.slice(0, 20) + '...' : 'NULL')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch (e) {
+    console.error('[api] authHeaders error:', e)
+    return {}
+  }
 }
 
-async function post(path, body) {
-  const res = await fetch(BASE + path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS },
-    body: JSON.stringify(body),
-  })
+async function handleResponse(res) {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   if (res.status === 204) return null
   return res.json()
 }
 
+async function get(path) {
+  const res = await fetch(BASE + path, { headers: { ...NGROK_HEADERS, ...await authHeaders() } })
+  return handleResponse(res)
+}
+
+async function post(path, body) {
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS, ...await authHeaders() },
+    body: JSON.stringify(body),
+  })
+  return handleResponse(res)
+}
+
 async function patch(path, body) {
   const res = await fetch(BASE + path, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS, ...await authHeaders() },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-  return res.json()
+  return handleResponse(res)
 }
 
 async function del(path) {
-  const res = await fetch(BASE + path, { method: 'DELETE', headers: NGROK_HEADERS })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  const res = await fetch(BASE + path, {
+    method: 'DELETE',
+    headers: { ...NGROK_HEADERS, ...await authHeaders() },
+  })
+  return handleResponse(res)
+}
+
+// --- Access request (public — no auth) ------------------------------------
+export async function requestAccess(email, message = '') {
+  const res = await fetch('/api/access-request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, message }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Request failed')
+  }
+  return res.json()
 }
 
 // --- Market ----------------------------------------------------------------
@@ -94,4 +130,3 @@ export const getTrades = ({ start, end, market = 'US' } = {}) => {
   if (end) params.set('end', end)
   return get('/trades?' + params.toString())
 }
-

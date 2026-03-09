@@ -16,6 +16,24 @@ function fmt(n, decimals = 2) {
     : '—'
 }
 
+// IL prices/targets are stored in agorot (×100). Divide by 100 for display in ₪.
+function isILTicker(ticker) { return ticker?.endsWith('.TA') ?? false }
+
+function fmtPrice(n, ticker) {
+  if (n == null) return '—'
+  const val = isILTicker(ticker) ? n / 100 : n
+  return fmt(val)
+}
+
+function fmtMktCap(n) {
+  if (n == null) return '—'
+  return (n / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+}
+
+function displayTicker(ticker) {
+  return ticker ? ticker.replace(/\.TA$/, '') : '—'
+}
+
 function fmtDate(str) {
   if (!str) return '—'
   const d = new Date(str)
@@ -47,10 +65,11 @@ function HealthCell({ score }) {
   )
 }
 
-function MLScoreCell({ value }) {
-  if (value == null) return <td>—</td>
-  const pct = (value * 100).toFixed(2)
-  return <td className={value > 0 ? 'up' : 'down'}>{value > 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%</td>
+function UpsideCell({ targetMean, close, prices, ticker }) {
+  const currentPrice = (prices && prices[ticker]) || close
+  if (targetMean == null || !currentPrice) return <td>—</td>
+  const pct = ((targetMean - currentPrice) / currentPrice) * 100
+  return <td className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
@@ -59,13 +78,16 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>Closed</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
-  const diff  = live - closePrice
-  const pct   = closePrice ? (diff / closePrice) * 100 : 0
+  const scale = isILTicker(ticker) ? 100 : 1
+  const displayLive = live / scale
+  const displayClose = closePrice / scale
+  const diff  = displayLive - displayClose
+  const pct   = displayClose ? (diff / displayClose) * 100 : 0
   const cls   = diff >= 0 ? 'up' : 'down'
   const arrow = diff >= 0 ? '▲' : '▼'
   return (
     <td style={style}>
-      <div>{live.toFixed(2)}</div>
+      <div>{fmt(displayLive)}</div>
       <div className={cls} style={{ fontSize: 11 }}>
         {arrow} {Math.abs(diff).toFixed(2)} ({Math.abs(pct).toFixed(2)}%)
       </div>
@@ -108,7 +130,7 @@ function Pagination({ page, pages, onChange }) {
 // Columns: logo, ticker, company, mktcap, price, rsi, low, base, high, health, prediction, live
 const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '120px', '85px', '100px']
 
-function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
+function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
   return (
     <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1024 }}>
       <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
@@ -132,16 +154,16 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
         {rows.map((r, i) => (
           <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
             <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
-            <td><strong>{r.ticker ?? '—'}</strong></td>
+            <td><strong>{displayTicker(r.ticker)}</strong></td>
             <td>{r.company ?? '—'}</td>
-            <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
-            <td>{r.close != null ? fmt(r.close) : '—'}</td>
+            <td>{fmtMktCap(r.market_cap)}</td>
+            <td>{fmtPrice(r.close, r.ticker)}</td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-            <td>{r.target_low_price != null ? fmt(r.target_low_price) : '—'}</td>
-            <td>{r.target_mean_price != null ? fmt(r.target_mean_price) : '—'}</td>
-            <td>{r.target_high_price != null ? fmt(r.target_high_price) : '—'}</td>
+            <td>{fmtPrice(r.target_low_price, r.ticker)}</td>
+            <td>{fmtPrice(r.target_mean_price, r.ticker)}</td>
+            <td>{fmtPrice(r.target_high_price, r.ticker)}</td>
             <HealthCell score={r.health_score} />
-            <MLScoreCell value={r.prediction_score} />
+            <UpsideCell targetMean={r.target_mean_price} close={r.close} prices={prices} ticker={r.ticker} />
             <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
           </tr>
         ))}
@@ -150,19 +172,19 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick }) {
   )
 }
 
-function TodayTable({ rows, prices, marketOpen, onRowClick }) {
+function TodayTable({ rows, prices, marketOpen, onRowClick, market }) {
   const { sorted } = useSort(rows, 'market_cap', 'desc')
 
   if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
 
   return (
     <div className="data-table-wrap">
-      <TodayTableBody rows={sorted} prices={prices} marketOpen={marketOpen} onRowClick={onRowClick} />
+      <TodayTableBody rows={sorted} prices={prices} marketOpen={marketOpen} onRowClick={onRowClick} market={market} />
     </div>
   )
 }
 
-function TodaySellTable({ rows, prices, marketOpen, onRowClick }) {
+function TodaySellTable({ rows, prices, marketOpen, onRowClick, market }) {
   const { sorted } = useSort(rows, 'market_cap', 'desc')
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -204,7 +226,7 @@ function TodaySellTable({ rows, prices, marketOpen, onRowClick }) {
         </span>
       </div>
       <div className="data-table-wrap">
-        <TodayTableBody rows={paginated} prices={prices} marketOpen={marketOpen} onRowClick={onRowClick} />
+        <TodayTableBody rows={paginated} prices={prices} marketOpen={marketOpen} onRowClick={onRowClick} market={market} />
       </div>
       <Pagination page={page} pages={pages} onChange={setPage} />
     </>
@@ -215,7 +237,7 @@ function TodaySellTable({ rows, prices, marketOpen, onRowClick }) {
 // All-signals table — server-side sort + pagination
 // ---------------------------------------------------------------------------
 
-function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowClick, prices, marketOpen }) {
+function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowClick, prices, marketOpen, market }) {
   if (!result) return null
   const { data: rows, pages } = result
 
@@ -243,7 +265,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               {th('Base Price',     'target_mean_price')}
               {th('High Price',     'target_high_price')}
               <th>Health Score</th>
-              {th('Prediction', 'prediction_score')}
+              <th>Prediction</th>
               <th>Live Price</th>
             </tr>
           </thead>
@@ -252,17 +274,17 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
                 <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
                 <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
-                <td><strong>{r.ticker ?? '—'}</strong></td>
+                <td><strong>{displayTicker(r.ticker)}</strong></td>
                 <td>{r.company ?? '—'}</td>
-                <td>{r.market_cap != null ? (r.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+                <td>{fmtMktCap(r.market_cap, market)}</td>
                 <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}</span> : '—'}</td>
-                <td>{r.close != null ? fmt(r.close) : '—'}</td>
+                <td>{fmtPrice(r.close, market)}</td>
                 <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-                <td>{r.target_low_price != null ? fmt(r.target_low_price) : '—'}</td>
-                <td>{r.target_mean_price != null ? fmt(r.target_mean_price) : '—'}</td>
-                <td>{r.target_high_price != null ? fmt(r.target_high_price) : '—'}</td>
+                <td>{fmtPrice(r.target_low_price, market)}</td>
+                <td>{fmtPrice(r.target_mean_price, market)}</td>
+                <td>{fmtPrice(r.target_high_price, market)}</td>
                 <HealthCell score={r.health_score} />
-                <MLScoreCell value={r.prediction_score} />
+                <UpsideCell targetMean={r.target_mean_price} close={r.close} prices={prices} ticker={r.ticker} />
                 <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               </tr>
             ))}
@@ -347,7 +369,7 @@ export default function SignalsPage() {
         </p>
         {loadingBuy
           ? <p className="loading">Loading…</p>
-          : <TodayTable rows={todayBuy} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} />}
+          : <TodayTable rows={todayBuy} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} market={market} />}
       </div>
 
       <div className="section">
@@ -357,7 +379,7 @@ export default function SignalsPage() {
         </p>
         {loadingSell
           ? <p className="loading">Loading…</p>
-          : <TodaySellTable rows={todaySell} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} />}
+          : <TodaySellTable rows={todaySell} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} market={market} />}
       </div>
 
       <div className="section">
@@ -402,6 +424,7 @@ export default function SignalsPage() {
               onRowClick={setSelected}
               prices={prices}
               marketOpen={marketOpen}
+              market={market}
             />}
       </div>
 

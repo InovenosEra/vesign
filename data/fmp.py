@@ -111,6 +111,12 @@ def price_target_summary(ticker: str) -> "dict | None":
     return data[0] if data else None
 
 
+def price_target_consensus(ticker: str) -> "dict | None":
+    """Analyst price target consensus with proper low/consensus/high from individual targets."""
+    data = _get("price-target-consensus", {"symbol": ticker})
+    return data[0] if data else None
+
+
 def income_statement(ticker: str, limit: int = 2) -> list:
     """Last N annual income statements (for YoY comparison)."""
     data = _get("income-statement", {"symbol": ticker, "period": "annual", "limit": limit})

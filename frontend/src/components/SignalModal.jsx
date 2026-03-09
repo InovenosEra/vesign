@@ -15,7 +15,9 @@ function fmt(n, decimals = 2) {
 
 export default function SignalModal({ row, onClose }) {
   const { market } = useContext(MarketContext)
-  const currency  = market === 'IL' ? '₪' : '$'
+  const isIL      = row?.ticker?.endsWith('.TA') ?? market === 'IL'
+  const currency  = isIL ? '₪' : '$'
+  const priceScale = isIL ? 100 : 1  // IL prices stored in agorot, display in ₪
   const today     = new Date().toISOString().slice(0, 10)
   const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
   const start12m  = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
@@ -32,13 +34,16 @@ export default function SignalModal({ row, onClose }) {
     staleTime: 300_000,
   })
 
-  const base12m  = history.filter(d => d.date <= target12m).at(-1)
-  const yield12m = base12m && history.length > 0
-    ? ((history.at(-1).close - base12m.close) / base12m.close) * 100
+  // Scale chart data for IL (agorot → ₪)
+  const chartHistory = history.map(d => ({ ...d, close: d.close / priceScale }))
+
+  const base12m  = chartHistory.filter(d => d.date <= target12m).at(-1)
+  const yield12m = base12m && chartHistory.length > 0
+    ? ((chartHistory.at(-1).close - base12m.close) / base12m.close) * 100
     : null
 
-  const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
-  const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
+  const minPrice = chartHistory.length ? Math.min(...chartHistory.map(d => d.close)) * 0.97 : 0
+  const maxPrice = chartHistory.length ? Math.max(...chartHistory.map(d => d.close)) * 1.03 : 0
 
   const generalColRef = useRef(null)
   const [generalColH, setGeneralColH] = useState(null)
@@ -56,11 +61,11 @@ export default function SignalModal({ row, onClose }) {
   }, [isLoading])
 
   function dateToX(dateStr) {
-    const idx = history.findIndex(d => d.date === dateStr)
-    if (idx < 0 || history.length <= 1) return null
+    const idx = chartHistory.findIndex(d => d.date === dateStr)
+    if (idx < 0 || chartHistory.length <= 1) return null
     const plotLeft  = 8 + 48
     const plotWidth = wrapperWidth - plotLeft - 70
-    return plotLeft + (idx / (history.length - 1)) * plotWidth
+    return plotLeft + (idx / (chartHistory.length - 1)) * plotWidth
   }
 
   const pairs = []
@@ -110,7 +115,7 @@ export default function SignalModal({ row, onClose }) {
             alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 'bold', color: 'var(--text)',
           }}>
-            {row.ticker}
+            {row.ticker?.replace(/\.TA$/, '')}
           </div>
           <div ref={generalColRef} style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
@@ -118,14 +123,14 @@ export default function SignalModal({ row, onClose }) {
               <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
                 <tbody>
                   {[
-                    ['Ticker',     <strong>{row.ticker ?? '—'}</strong>],
+                    ['Ticker',     <strong>{row.ticker?.replace(/\.TA$/, '') ?? '—'}</strong>],
                     ['Company',    row.company ?? '—'],
                     ['Industry',   row.industry ?? '—'],
-                    ['Market Cap', row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}B` : '—'],
+                    ['Market Cap (B)', row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
                     ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
-                    ['Price',      row.close != null ? `${currency}${fmt(row.close)}` : '—'],
+                    ['Price',      row.close != null ? fmt(row.close / priceScale) : '—'],
                     ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
-                    ['Prediction', row.prediction_score != null ? <span className={row.prediction_score >= 0 ? 'up' : 'down'}>{row.prediction_score >= 0 ? '+' : ''}{(row.prediction_score * 100).toFixed(2)}%</span> : '—'],
+                    ['Prediction', (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
                     ['12M Yield',  yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
@@ -173,7 +178,7 @@ export default function SignalModal({ row, onClose }) {
         ) : (
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={history} margin={{ top: 70, right: 70, bottom: 8, left: 8 }}>
+              <LineChart data={chartHistory} margin={{ top: 70, right: 70, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
@@ -193,13 +198,13 @@ export default function SignalModal({ row, onClose }) {
                   labelStyle={{ color: 'var(--muted)' }}
                   itemStyle={{ color: 'var(--text)' }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={v => [`${currency}${v.toFixed(2)}`, 'Close']}
+                  formatter={v => [v.toFixed(2), 'Close']}
                 />
                 <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
 
-            {wrapperWidth > 0 && history.length > 1 && (
+            {wrapperWidth > 0 && chartHistory.length > 1 && (
               <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
 
                 {pairs.map((p, i) => {
@@ -214,11 +219,11 @@ export default function SignalModal({ row, onClose }) {
                     <g key={i}>
                       {buyX  != null && <>
                         <line x1={buyX}  y1={PLOT_TOP} x2={buyX}  y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
-                        {p.buy.close  != null && priceBox(buyX,  currency + fmt(p.buy.close,  1), 'var(--green)')}
+                        {p.buy.close  != null && priceBox(buyX,  fmt(p.buy.close  / priceScale, 1), 'var(--green)')}
                       </>}
                       {sellX != null && <>
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)',   strokeWidth: 2 }} />
-                        {p.sell.close != null && priceBox(sellX, currency + fmt(p.sell.close, 1), 'var(--red)')}
+                        {p.sell.close != null && priceBox(sellX, fmt(p.sell.close / priceScale, 1), 'var(--red)')}
                       </>}
                       {buyX != null && sellX != null && pct != null && (() => {
                         const label = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
@@ -243,12 +248,12 @@ export default function SignalModal({ row, onClose }) {
 
                 {openBuy && (() => {
                   const buyX  = dateToX(openBuy.date)
-                  const lastX = dateToX(history.at(-1).date)
+                  const lastX = dateToX(chartHistory.at(-1).date)
                   if (!buyX) return null
-                  const currentPrice = history.at(-1).close
-                  const pct       = openBuy.close ? ((currentPrice - openBuy.close) / openBuy.close) * 100 : null
+                  const currentPrice = chartHistory.at(-1).close
+                  const pct       = openBuy.close ? ((currentPrice - openBuy.close / priceScale) / (openBuy.close / priceScale)) * 100 : null
                   const gainColor = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
-                  const priceText = openBuy.close != null ? currency + fmt(openBuy.close, 1) : ''
+                  const priceText = openBuy.close != null ? fmt(openBuy.close / priceScale, 1) : ''
                   const yieldText = pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%` : ''
 
                   const price_bh = 21, gain_bh = 18, gap = 4
@@ -260,9 +265,9 @@ export default function SignalModal({ row, onClose }) {
                     const bx = dateToX(p.buy.date)
                     const sx = dateToX(p.sell.date)
                     if (bx != null && p.buy.close != null)
-                      pairBoxes.push({ x: bx, w: (currency + fmt(p.buy.close, 1)).length * 6.8 + 16 })
+                      pairBoxes.push({ x: bx, w: fmt(p.buy.close / priceScale, 1).length * 6.8 + 16 })
                     if (sx != null && p.sell.close != null)
-                      pairBoxes.push({ x: sx, w: (currency + fmt(p.sell.close, 1)).length * 6.8 + 16 })
+                      pairBoxes.push({ x: sx, w: fmt(p.sell.close / priceScale, 1).length * 6.8 + 16 })
                   }
                   const hasCollision = pairBoxes.some(b => Math.abs(buyX - b.x) < (bw_price + b.w) / 2)
 

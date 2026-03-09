@@ -285,27 +285,17 @@ def update_company_info():
     def _fetch_us(t):
         try:
             profile = fmp.company_profile(t) or {}
-            targets = fmp.price_target_summary(t) or {}
-            # Build valid (count, avg) pairs for each period
-            _periods = [
-                (targets.get("lastMonthCount") or 0,   targets.get("lastMonthAvgPriceTarget") or 0),
-                (targets.get("lastQuarterCount") or 0, targets.get("lastQuarterAvgPriceTarget") or 0),
-                (targets.get("lastYearCount") or 0,    targets.get("lastYearAvgPriceTarget") or 0),
-            ]
-            _valid = [(cnt, avg) for cnt, avg in _periods if cnt > 0 and avg > 0]
-            # mean = period with most analysts (most representative consensus)
-            _best = max(_valid, key=lambda x: x[0]) if _valid else (0, None)
-            _avgs = [avg for _, avg in _valid]
+            consensus = fmp.price_target_consensus(t) or {}
             return {
                 "ticker":             t,
                 "market_cap":         profile.get("marketCap"),
                 "industry":           profile.get("industry"),
                 "description":        profile.get("description"),
                 "logo_url":           profile.get("image"),
-                "target_mean_price":  _best[1],
-                "target_high_price":  max(_avgs) if _avgs else None,
-                "target_low_price":   min(_avgs) if _avgs else None,
-                "number_of_analysts": _best[0] if _best[0] > 0 else None,
+                "target_mean_price":  consensus.get("targetConsensus") or None,
+                "target_high_price":  consensus.get("targetHigh") or None,
+                "target_low_price":   consensus.get("targetLow") or None,
+                "number_of_analysts": None,
                 "last_update":        now,
             }
         except Exception:
@@ -323,19 +313,51 @@ def update_company_info():
                 if done % 200 == 0:
                     print(f"  FMP: {done}/{len(us_tickers)} US done, {len(rows)} fetched")
 
-    # ── TASE path: yfinance ───────────────────────────────────────────────────
+    # ── TASE path: yfinance + FMP fallback for dual-listed tickers ────────────
+    # Get USD/ILS rate once for converting FMP USD targets to agorot
+    try:
+        _usd_ils = yf.Ticker("ILS=X").fast_info.last_price or 3.6
+    except Exception:
+        _usd_ils = 3.6
+
+    # Pre-fetch FMP consensus sequentially (avoids rate-limit errors from parallel calls)
+    import time as _time
+    _fmp_targets: dict = {}
+    if needs_analyst and tase_tickers:
+        print(f"  Fetching FMP consensus for {len(tase_tickers)} TASE tickers...")
+        scale = _usd_ils * 100  # USD → agorot
+        for _t in tase_tickers:
+            try:
+                c = fmp.price_target_consensus(_t.replace(".TA", ""))
+                if c and c.get("targetConsensus"):
+                    _fmp_targets[_t] = {
+                        "target_mean_price": c["targetConsensus"] * scale,
+                        "target_low_price":  c.get("targetLow",  c["targetConsensus"]) * scale,
+                        "target_high_price": c.get("targetHigh", c["targetConsensus"]) * scale,
+                    }
+            except Exception:
+                pass
+            _time.sleep(0.15)
+        print(f"  FMP TASE coverage: {len(_fmp_targets)}/{len(tase_tickers)}")
+
     def _fetch_tase(t):
         try:
             info = yf.Ticker(t).info
+            if t in _fmp_targets:
+                targets = _fmp_targets[t]
+            else:
+                targets = {
+                    "target_mean_price":  info.get("targetMeanPrice"),
+                    "target_low_price":   info.get("targetLowPrice"),
+                    "target_high_price":  info.get("targetHighPrice"),
+                }
             return {
                 "ticker":             t,
                 "market_cap":         info.get("marketCap"),
                 "industry":           info.get("industry"),
                 "description":        info.get("longBusinessSummary"),
                 "logo_url":           None,
-                "target_mean_price":  info.get("targetMeanPrice"),
-                "target_high_price":  info.get("targetHighPrice"),
-                "target_low_price":   info.get("targetLowPrice"),
+                **targets,
                 "number_of_analysts": info.get("numberOfAnalystOpinions"),
                 "last_update":        now,
             }
