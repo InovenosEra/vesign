@@ -1,116 +1,211 @@
+import os
 import yfinance as yf
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, UTC
 from utils.universe_loader import load_universe
 from data.loaders import engine
+from sqlalchemy import text
 import pandas_market_calendars as mcal
 from utils.update_guard import should_run, mark_run
+from data import fmp
+
+# Batch size for backfilling large numbers of new tickers (avoids memory/timeout issues)
+_BACKFILL_BATCH = 200
+
+
+def _build_ticker_df(raw, ticker, start_date, end_date, single=False):
+    """
+    Extract and clean one ticker's DataFrame from a yfinance download result.
+    Returns a clean DataFrame or None if the ticker had no usable data.
+    """
+    try:
+        df = raw.copy() if single else raw[ticker].copy()
+    except (KeyError, TypeError):
+        return None
+
+    if df is None or df.empty:
+        return None
+
+    # Flatten MultiIndex columns (yfinance returns these for single-ticker downloads too)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [col[0] for col in df.columns]
+
+    df = df.reset_index()
+    df["ticker"] = ticker
+    df.rename(columns={
+        "Date": "date", "Open": "open", "High": "high",
+        "Low": "low", "Close": "close", "Volume": "volume",
+    }, inplace=True)
+
+    today_ts = pd.Timestamp(datetime.now(UTC).date())
+    df = df[df["date"] < today_ts]
+
+    # Keep only the standard columns that exist
+    keep = [c for c in ("date", "ticker", "open", "high", "low", "close", "volume") if c in df.columns]
+    df = df[keep]
+
+    # Drop rows with no close price — these are non-trading days or incomplete data
+    # that would corrupt feature computation downstream.
+    if "close" in df.columns:
+        df = df[df["close"].notna()]
+
+    return df if not df.empty else None
+
+
+def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0):
+    """
+    Download price data for *tickers* between *start_date* and *end_date*,
+    then upsert into daily_prices.
+
+    US tickers: fetched from FMP (parallel, one request per ticker).
+    TASE tickers (.TA suffix): fetched from yfinance (existing logic).
+    batch_size only applies to TASE batches (ignored for US).
+    """
+    if not tickers:
+        return
+
+    us_tickers   = [t for t in tickers if not t.endswith('.TA')]
+    tase_tickers = [t for t in tickers if t.endswith('.TA')]
+
+    all_frames = []
+    today_ts   = pd.Timestamp(datetime.now(UTC).date())
+
+    # ── US path: FMP parallel fetch ──────────────────────────────────────────
+    if us_tickers:
+        def _fetch_us(ticker):
+            return fmp.historical_prices(ticker, start_date, end_date)
+
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            futures = {ex.submit(_fetch_us, t): t for t in us_tickers}
+            done = 0
+            for f in as_completed(futures):
+                done += 1
+                df = f.result()
+                if df is not None and not df.empty:
+                    df = df[df["date"] < today_ts]
+                    if not df.empty:
+                        all_frames.append(df)
+                if done % 200 == 0:
+                    print(f"  FMP: {done}/{len(us_tickers)} US tickers fetched")
+
+    # ── TASE path: existing yfinance batch logic ──────────────────────────────
+    if tase_tickers:
+        batches = (
+            [tase_tickers[i:i + batch_size] for i in range(0, len(tase_tickers), batch_size)]
+            if batch_size > 0
+            else [tase_tickers]
+        )
+
+        for b_idx, batch in enumerate(batches):
+            if len(batches) > 1:
+                print(f"  TASE Batch {b_idx + 1}/{len(batches)} ({len(batch)} tickers)…")
+
+            query = batch[0] if len(batch) == 1 else batch
+            try:
+                data = yf.download(
+                    query,
+                    start=start_date,
+                    end=end_date,
+                    group_by="ticker",
+                    auto_adjust=False,
+                    progress=len(batches) == 1,
+                )
+            except Exception as e:
+                print(f"  TASE batch download failed: {e}")
+                continue
+
+            single = len(batch) == 1
+            for ticker in batch:
+                df = _build_ticker_df(data, ticker, start_date, end_date, single=single)
+                if df is None and not single:
+                    try:
+                        retry = yf.download(
+                            ticker, start=start_date, end=end_date,
+                            auto_adjust=False, progress=False,
+                        )
+                        df = _build_ticker_df(retry, ticker, start_date, end_date, single=True)
+                    except Exception:
+                        pass
+                if df is not None and not df.empty:
+                    all_frames.append(df)
+
+    if not all_frames:
+        print("  No data downloaded.")
+        return
+
+    final_df = pd.concat(all_frames, ignore_index=True)
+    final_df.drop_duplicates(subset=["date", "ticker"], inplace=True)
+
+    # Delete only the rows for the specific tickers being saved (not all tickers on those dates,
+    # which would wipe unrelated markets' price history when doing a partial backfill).
+    dates = final_df["date"].dt.strftime("%Y-%m-%d").unique().tolist()
+    batch_tickers = final_df["ticker"].unique().tolist()
+    if dates and batch_tickers:
+        date_placeholders   = ",".join(f"'{d}'" for d in dates)
+        ticker_placeholders = "','".join(batch_tickers)
+        with engine.begin() as conn:
+            conn.execute(text(
+                f"DELETE FROM daily_prices "
+                f"WHERE date(date) IN ({date_placeholders}) "
+                f"AND ticker IN ('{ticker_placeholders}')"
+            ))
+
+    final_df.to_sql("daily_prices", engine, if_exists="append", index=False)
+    print(f"  Saved {len(final_df):,} rows for {final_df['ticker'].nunique():,} tickers.")
 
 
 def update_prices():
 
-    print("Updating prices incrementally...")
+    print("Updating prices…")
 
     tickers = load_universe()
 
-    today = datetime.now(UTC).date()
-
-    nyse = mcal.get_calendar("NYSE")
+    today    = datetime.now(UTC).date()
+    nyse     = mcal.get_calendar("NYSE")
     schedule = nyse.schedule(start_date=today - timedelta(days=10), end_date=today)
-
     end_date = schedule.index[-1].date()
 
-    # ---------- detect last stored date ----------
-    # Use MIN(MAX(date) per ticker) so that if any single ticker has more
-    # recent data than the rest (e.g. a manually added custom ticker), the
-    # other tickers still get updated rather than being silently skipped.
+    # ── Step 1: backfill any tickers that have never been downloaded ──────────
+    # New tickers (e.g. newly added NASDAQ stocks) won't appear in daily_prices
+    # at all, so the MIN(MAX(date)) logic below would only give them a few days
+    # of data.  We backfill them separately with 3 years of history first.
+    try:
+        initialized = set(
+            pd.read_sql("SELECT DISTINCT ticker FROM daily_prices", engine)["ticker"].tolist()
+        )
+    except Exception:
+        initialized = set()
+
+    new_tickers = [t for t in tickers if t not in initialized]
+
+    if new_tickers:
+        backfill_start = end_date - timedelta(days=3 * 365)
+        print(f"Backfilling {len(new_tickers):,} new tickers from {backfill_start} to {end_date}…")
+        _download_and_save(new_tickers, backfill_start, end_date, batch_size=_BACKFILL_BATCH)
+
+    # ── Step 2: incremental update for all tickers ────────────────────────────
+    # Use MIN(MAX(date) per ticker) so that even if one ticker is slightly ahead,
+    # the others still get refreshed.
     try:
         existing = pd.read_sql(
             "SELECT MIN(max_date) as last_date FROM "
             "(SELECT ticker, MAX(date) as max_date FROM daily_prices GROUP BY ticker)",
             engine
         )
-        last_date = pd.to_datetime(existing["last_date"][0]).date()
-
+        last_date  = pd.to_datetime(existing["last_date"][0]).date()
         start_date = last_date + timedelta(days=1)
-
     except Exception:
         start_date = end_date - timedelta(days=3 * 365)
 
     if start_date >= end_date:
-        print("Database already up to date")
+        print("Database already up to date.")
         return
 
-    print(f"Downloading missing data from {start_date} to {end_date}")
+    print(f"Incremental update: {start_date} → {end_date} ({len(tickers):,} tickers)")
+    _download_and_save(tickers, start_date, end_date)
 
-    data = yf.download(
-        tickers,
-        start=start_date,
-        end=end_date,
-        group_by="ticker",
-        auto_adjust=False,
-        progress=True
-    )
-
-    all_frames = []
-
-    for ticker in tickers:
-        try:
-            if ticker not in data.columns.get_level_values(0):
-                print(f"{ticker} download failed - retrying single download")
-                retry = yf.download(
-                    ticker,
-                    start=start_date,
-                    end=end_date,
-                    auto_adjust=False,
-                    progress=False
-                )
-
-                if retry is None or retry.empty:
-                    print(f"{ticker} retry failed - skipping")
-                    continue
-                df = retry.copy()
-            else:
-                df = data[ticker].copy()
-
-            if df is None or df.empty:
-                print(f"{ticker} returned empty data - skipping")
-                continue
-
-            df.reset_index(inplace=True)
-            df["ticker"] = ticker
-
-            df.rename(columns={
-                "Date": "date",
-                "Open": "open",
-                "High": "high",
-                "Low": "low",
-                "Close": "close",
-                "Volume": "volume"
-            }, inplace=True)
-
-            today = pd.Timestamp(datetime.now(UTC).date())
-            df = df[df["date"] < today]
-
-            all_frames.append(df)
-
-        except Exception as e:
-            print(f"{ticker} failed: {e}")
-            continue
-
-    if len(all_frames) == 0:
-        print("No new data downloaded")
-        return
-
-    final_df = pd.concat(all_frames)
-    final_df.drop_duplicates(subset=["date", "ticker"], inplace=True)
-
-    final_df.to_sql("daily_prices", engine, if_exists="append", index=False)
-
-    print("Prices incrementally updated successfully")
-
-
-
+    print("Prices updated successfully.")
 
 
 def update_vix():
@@ -165,46 +260,456 @@ def update_vix():
         print(f"VIX update failed: {e}")
 
 
-def update_fundamentals():
+def update_company_info():
+    """Fetch fundamentals + analyst targets in a single parallel pass.
+    US tickers: FMP (company_profile + price_target_summary).
+    TASE tickers: yfinance .info (unchanged).
+    """
 
-    # ---------- run only if needed ----------
-    if not should_run("fundamentals_update", 24):
+    needs_fundamentals = should_run("fundamentals_update", 168)   # weekly
+    needs_analyst      = should_run("analyst_update", 24)         # daily
+
+    if not needs_fundamentals and not needs_analyst:
         return
 
-    print("Updating fundamentals...")
+    print("Updating company info (fundamentals + analyst)...")
 
-    tickers = pd.read_sql(
-        "SELECT ticker FROM companies",
-        engine
-    )["ticker"].tolist()
+    tickers      = pd.read_sql("SELECT ticker FROM companies", engine)["ticker"].tolist()
+    us_tickers   = [t for t in tickers if not t.endswith('.TA')]
+    tase_tickers = [t for t in tickers if t.endswith('.TA')]
+    now          = datetime.now(UTC)
 
     rows = []
 
-    for t in tickers:
+    # ── US path: FMP ──────────────────────────────────────────────────────────
+    def _fetch_us(t):
+        try:
+            profile = fmp.company_profile(t) or {}
+            consensus = fmp.price_target_consensus(t) or {}
+            return {
+                "ticker":             t,
+                "market_cap":         profile.get("marketCap"),
+                "industry":           profile.get("industry"),
+                "description":        profile.get("description"),
+                "logo_url":           profile.get("image"),
+                "target_mean_price":  consensus.get("targetConsensus") or None,
+                "target_high_price":  consensus.get("targetHigh") or None,
+                "target_low_price":   consensus.get("targetLow") or None,
+                "number_of_analysts": None,
+                "last_update":        now,
+            }
+        except Exception:
+            return None
+
+    if us_tickers:
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            futures = {ex.submit(_fetch_us, t): t for t in us_tickers}
+            done = 0
+            for f in as_completed(futures):
+                done += 1
+                result = f.result()
+                if result:
+                    rows.append(result)
+                if done % 200 == 0:
+                    print(f"  FMP: {done}/{len(us_tickers)} US done, {len(rows)} fetched")
+
+    # ── TASE path: yfinance + FMP fallback for dual-listed tickers ────────────
+    # Get USD/ILS rate once for converting FMP USD targets to agorot
+    try:
+        _usd_ils = yf.Ticker("ILS=X").fast_info.last_price or 3.6
+    except Exception:
+        _usd_ils = 3.6
+
+    # Pre-fetch FMP consensus sequentially (avoids rate-limit errors from parallel calls)
+    import time as _time
+    _fmp_targets: dict = {}
+    if needs_analyst and tase_tickers:
+        print(f"  Fetching FMP consensus for {len(tase_tickers)} TASE tickers...")
+        scale = _usd_ils * 100  # USD → agorot
+        for _t in tase_tickers:
+            try:
+                c = fmp.price_target_consensus(_t.replace(".TA", ""))
+                if c and c.get("targetConsensus"):
+                    _fmp_targets[_t] = {
+                        "target_mean_price": c["targetConsensus"] * scale,
+                        "target_low_price":  c.get("targetLow",  c["targetConsensus"]) * scale,
+                        "target_high_price": c.get("targetHigh", c["targetConsensus"]) * scale,
+                    }
+            except Exception:
+                pass
+            _time.sleep(0.15)
+        print(f"  FMP TASE coverage: {len(_fmp_targets)}/{len(tase_tickers)}")
+
+    def _fetch_tase(t):
         try:
             info = yf.Ticker(t).info
-
-            rows.append({
-                "ticker": t,
-                "market_cap": info.get("marketCap")
-            })
-
+            if t in _fmp_targets:
+                targets = _fmp_targets[t]
+            else:
+                targets = {
+                    "target_mean_price":  info.get("targetMeanPrice"),
+                    "target_low_price":   info.get("targetLowPrice"),
+                    "target_high_price":  info.get("targetHighPrice"),
+                }
+            return {
+                "ticker":             t,
+                "market_cap":         info.get("marketCap"),
+                "industry":           info.get("industry"),
+                "description":        info.get("longBusinessSummary"),
+                "logo_url":           None,
+                **targets,
+                "number_of_analysts": info.get("numberOfAnalystOpinions"),
+                "last_update":        now,
+            }
         except Exception:
-            continue
+            return None
 
-    if len(rows) == 0:
-        print("No fundamentals downloaded")
+    if tase_tickers:
+        # Warm up yfinance session (crumb) before threading
+        try:
+            yf.Ticker(tase_tickers[0]).info
+        except Exception:
+            pass
+
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            futures = {ex.submit(_fetch_tase, t): t for t in tase_tickers}
+            done = 0
+            for f in as_completed(futures):
+                done += 1
+                result = f.result()
+                if result:
+                    rows.append(result)
+                if done % 200 == 0:
+                    print(f"  yfinance: {done}/{len(tase_tickers)} TASE done")
+
+    if not rows:
+        print("No company info downloaded")
         return
 
     df = pd.DataFrame(rows)
 
-    df.to_sql(
-        "fundamentals",
-        engine,
-        if_exists="replace",
-        index=False
+    if needs_fundamentals:
+        fund_df = df[["ticker", "market_cap"]]
+        fetched = fund_df["ticker"].tolist()
+        with engine.begin() as conn:
+            placeholders = ",".join(f"'{t}'" for t in fetched)
+            conn.execute(text(f"DELETE FROM fundamentals WHERE ticker IN ({placeholders})"))
+        fund_df.to_sql("fundamentals", engine, if_exists="append", index=False)
+        # Update industry, description, and logo_url in companies table
+        with engine.begin() as conn:
+            for _, row in df[["ticker", "industry", "description", "logo_url"]].iterrows():
+                if row["industry"] or row["description"] or row["logo_url"]:
+                    conn.execute(text(
+                        "UPDATE companies SET "
+                        "industry = :ind, "
+                        "description = :desc, "
+                        "logo_url = COALESCE(:logo, logo_url) "
+                        "WHERE ticker = :t"
+                    ), {"ind": row["industry"], "desc": row["description"],
+                        "logo": row["logo_url"], "t": row["ticker"]})
+        mark_run("fundamentals_update")
+
+    if needs_analyst:
+        analyst_df = df[["ticker", "target_mean_price", "target_high_price",
+                          "target_low_price", "number_of_analysts", "last_update"]]
+        with engine.begin() as conn:
+            for _, row in analyst_df.iterrows():
+                conn.execute(text("""
+                    INSERT INTO analyst_expectations
+                        (ticker, target_mean_price, target_high_price, target_low_price,
+                         number_of_analysts, last_update)
+                    VALUES (:ticker, :mean, :high, :low, :n, :upd)
+                    ON CONFLICT(ticker) DO UPDATE SET
+                        target_mean_price  = excluded.target_mean_price,
+                        target_high_price  = excluded.target_high_price,
+                        target_low_price   = excluded.target_low_price,
+                        number_of_analysts = excluded.number_of_analysts,
+                        last_update        = excluded.last_update
+                """), {"ticker": row["ticker"], "mean": row["target_mean_price"],
+                       "high": row["target_high_price"], "low": row["target_low_price"],
+                       "n": row["number_of_analysts"], "upd": str(row["last_update"])})
+        mark_run("analyst_update")
+
+    print(f"Company info updated ({len(rows)} tickers)")
+
+
+def update_company_health():
+    """Score company financial health (1-5) via Claude Haiku.
+    US tickers: FMP fundamentals + news. TASE tickers: yfinance (unchanged).
+    Runs weekly; only re-scores tickers whose score is missing or older than 7 days.
+    """
+    import json as _json
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("ANTHROPIC_API_KEY not set — skipping health scoring.")
+        return
+
+    try:
+        import anthropic
+    except ImportError:
+        print("anthropic package not installed — skipping.")
+        return
+
+    all_tickers = pd.read_sql("SELECT ticker FROM companies", engine)["ticker"].tolist()
+
+    try:
+        existing = pd.read_sql("SELECT ticker, last_update FROM company_health", engine)
+        existing["last_update"] = pd.to_datetime(existing["last_update"])
+        cutoff = pd.Timestamp.now(tz='UTC') - pd.Timedelta(days=7)
+        fresh = set(existing[existing["last_update"] >= cutoff]["ticker"].tolist())
+    except Exception:
+        fresh = set()
+
+    pending = [t for t in all_tickers if t not in fresh]
+    if not pending:
+        print("Company health scores are up to date.")
+        return
+
+    print(f"Scoring health for {len(pending)} companies…")
+    client = anthropic.Anthropic(api_key=api_key)
+    now = datetime.now(UTC)
+
+    _SYSTEM = (
+        "You are a strict financial analyst rating company health on a FULL 1-5 scale. "
+        "Use the ENTIRE range — do NOT cluster scores around 2-3.\n\n"
+        "Scale definition (use each level freely):\n"
+        "  1 = Weak:      Negative or near-zero margins, heavy debt load, negative/weak cash flow, "
+        "shrinking revenue, or near-distress signals.\n"
+        "  2 = Fair:      Below-average profitability, elevated leverage, modest or inconsistent cash flow, "
+        "slow/flat growth. Survivable but uninspiring.\n"
+        "  3 = Good:      Solid, average performance for the industry. Profitable, manageable debt, "
+        "positive cash flow, stable growth.\n"
+        "  4 = Great:     Above-average margins, strong free cash flow, low-to-moderate debt, "
+        "healthy revenue/earnings growth. Financially sound.\n"
+        "  5 = Excellent: Exceptional across ALL metrics — industry-leading margins, minimal debt, "
+        "strong growing free cash flow, consistent double-digit growth.\n\n"
+        "Rules:\n"
+        "- If debtToEquity > 2.0 or profitMargins < 0, lean toward 1-2.\n"
+        "- If freeCashFlow < 0 and revenueGrowth < 0, that is a 1 or 2.\n"
+        "- If profitMargins > 0.20 and debtToEquity < 0.5 and revenueGrowth > 0.10, lean toward 4-5.\n"
+        "- Score 5 requires excellence in ALL dimensions simultaneously.\n"
+        "- If the company had a net loss in the prior year (one year ago), the score MUST be 3 or lower. No exceptions.\n"
+        "- A single strong recovery year after a loss does NOT warrant a 4 or 5.\n"
+        "- Context matters: benchmark within the company's industry.\n\n"
+        "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
     )
 
-    mark_run("fundamentals_update")
+    us_pending   = [t for t in pending if not t.endswith('.TA')]
+    tase_pending = [t for t in pending if t.endswith('.TA')]
 
-    print("Fundamentals updated successfully")
+    done    = 0
+    success = 0
+
+    def _parse_claude(raw):
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return _json.loads(raw.strip())
+
+    def _write_score(r):
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT OR REPLACE INTO company_health (ticker, score, reason, last_update)
+                VALUES (:ticker, :score, :reason, :last_update)
+            """), r)
+
+    # ── US path: FMP data + Claude ────────────────────────────────────────────
+    def _score_us(ticker):
+        try:
+            profile   = fmp.company_profile(ticker) or {}
+            ratios    = fmp.ratios_ttm(ticker) or {}
+            km        = fmp.key_metrics_ttm(ticker) or {}
+            growth    = fmp.financial_growth(ticker) or {}
+            cf        = fmp.cash_flow(ticker) or {}
+            stmts     = fmp.income_statement(ticker, limit=2)
+            headlines = fmp.stock_news(ticker, limit=5)
+
+            metrics = {}
+            for k, v in [
+                ("profitMargins",      ratios.get("netProfitMarginTTM")),
+                ("operatingMargins",   ratios.get("operatingProfitMarginTTM")),
+                ("grossMargins",       ratios.get("grossProfitMarginTTM")),
+                ("returnOnEquity",     km.get("returnOnEquityTTM")),
+                ("returnOnAssets",     km.get("returnOnAssetsTTM")),
+                ("currentRatio",       ratios.get("currentRatioTTM")),
+                ("quickRatio",         ratios.get("quickRatioTTM")),
+                ("debtToEquity",       ratios.get("debtToEquityRatioTTM")),  # true ratio, not ×100
+                ("revenueGrowth",      growth.get("revenueGrowth")),
+                ("netIncomeGrowth",    growth.get("netIncomeGrowth")),
+                ("freeCashFlow",       cf.get("freeCashFlow")),
+                ("operatingCashFlow",  cf.get("operatingCashFlow")),
+            ]:
+                if v is not None:
+                    metrics[k] = v
+
+            prompt = (
+                f"Company: {profile.get('companyName') or ticker} ({ticker})\n"
+                f"Industry: {profile.get('industry') or 'Unknown'}\n\n"
+            )
+            if metrics:
+                prompt += "TTM financial metrics:\n"
+                for k, v in metrics.items():
+                    prompt += f"  {k}: {round(v, 4) if isinstance(v, float) else f'{v:,}'}\n"
+
+            # Add YoY income history so Claude can detect recent losses / volatility
+            if stmts:
+                prompt += "\nAnnual income history (most recent first):\n"
+                for s in stmts:
+                    rev = s.get("revenue")
+                    ni  = s.get("netIncome")
+                    yr  = s.get("fiscalYear") or s.get("date", "")[:4]
+                    margin = round(ni / rev * 100, 1) if rev and ni is not None else None
+                    margin_str = f"{margin}%" if margin is not None else "N/A"
+                    ni_str = f"{ni:,}" if ni is not None else "N/A"
+                    prompt += f"  {yr}: revenue={rev:,}, netIncome={ni_str}, margin={margin_str}\n"
+
+            if headlines:
+                prompt += "\nRecent news:\n" + "".join(f"  - {h}\n" for h in headlines)
+
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=120,
+                system=_SYSTEM,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result = _parse_claude(msg.content[0].text.strip())
+            return {"ticker": ticker, "score": max(1, min(5, int(result["score"]))),
+                    "reason": result["reason"], "last_update": now}
+        except Exception:
+            return None
+
+    if us_pending:
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            futures = {ex.submit(_score_us, t): t for t in us_pending}
+            for f in as_completed(futures):
+                done += 1
+                r = f.result()
+                if r:
+                    success += 1
+                    _write_score(r)
+                if done % 100 == 0:
+                    print(f"  {done}/{len(pending)} scored ({success} successful)")
+
+    # ── TASE path: yfinance data + Claude ─────────────────────────────────────
+    def _score_tase(ticker):
+        try:
+            info = yf.Ticker(ticker).info
+            metrics = {k: info.get(k) for k in (
+                "profitMargins", "operatingMargins", "grossMargins",
+                "returnOnEquity", "returnOnAssets",
+                "currentRatio", "quickRatio",
+                "debtToEquity", "totalDebt", "totalCash",
+                "freeCashflow", "operatingCashflow",
+                "revenueGrowth", "earningsGrowth",
+            )}
+            metrics = {k: v for k, v in metrics.items() if v is not None}
+
+            try:
+                headlines = [n["title"] for n in (yf.Ticker(ticker).news or [])[:5] if n.get("title")]
+            except Exception:
+                headlines = []
+
+            prompt = (
+                f"Company: {info.get('longName') or ticker} ({ticker})\n"
+                f"Industry: {info.get('industry') or 'Unknown'}\n\n"
+            )
+            if metrics:
+                prompt += "Financial metrics:\n"
+                for k, v in metrics.items():
+                    prompt += f"  {k}: {round(v, 4) if isinstance(v, float) else f'{v:,}'}\n"
+            if headlines:
+                prompt += "\nRecent news:\n" + "".join(f"  - {h}\n" for h in headlines)
+
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=120,
+                system=_SYSTEM,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result = _parse_claude(msg.content[0].text.strip())
+            return {"ticker": ticker, "score": max(1, min(5, int(result["score"]))),
+                    "reason": result["reason"], "last_update": now}
+        except Exception:
+            return None
+
+    if tase_pending:
+        # Warm up yfinance session (crumb) before threading
+        try:
+            yf.Ticker(tase_pending[0]).info
+        except Exception:
+            pass
+
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            futures = {ex.submit(_score_tase, t): t for t in tase_pending}
+            for f in as_completed(futures):
+                done += 1
+                r = f.result()
+                if r:
+                    success += 1
+                    _write_score(r)
+                if done % 100 == 0:
+                    print(f"  {done}/{len(pending)} scored ({success} successful)")
+
+    print(f"Health scoring complete: {success}/{len(pending)} scored.")
+
+
+def summarize_descriptions():
+    """Use Claude Haiku to generate short (2-sentence) summaries for company descriptions.
+    Only processes rows that have a raw description but no summary yet.
+    """
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("ANTHROPIC_API_KEY not set — skipping description summarization.")
+        return
+
+    try:
+        import anthropic
+    except ImportError:
+        print("anthropic package not installed — skipping.")
+        return
+
+    pending = pd.read_sql(
+        "SELECT ticker, description FROM companies "
+        "WHERE description IS NOT NULL AND description != '' "
+        "AND (description_short IS NULL OR description_short = '')",
+        engine
+    )
+
+    if pending.empty:
+        print("All descriptions already summarized.")
+        return
+
+    print(f"Summarizing {len(pending)} company descriptions…")
+    client = anthropic.Anthropic(api_key=api_key)
+
+    updated = 0
+    for _, row in pending.iterrows():
+        try:
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=80,
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Summarize the following company description in exactly 1-2 short sentences. "
+                        f"Be factual and concise. No fluff.\n\n{row['description']}"
+                    ),
+                }],
+            )
+            summary = msg.content[0].text.strip()
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE companies SET description_short = :s WHERE ticker = :t"
+                ), {"s": summary, "t": row["ticker"]})
+            updated += 1
+        except Exception as e:
+            print(f"  {row['ticker']}: {e}")
+
+    print(f"Summarized {updated}/{len(pending)} descriptions.")

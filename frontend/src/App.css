@@ -1,0 +1,392 @@
+/* ── Global reset & dark theme ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0e1117;
+  --surface:  #1a1d27;
+  --border:   #2a2d3a;
+  --text:     #e8eaf0;
+  --muted:    #8b90a0;
+  --accent:   #4f8ef7;
+  --green:    #2ecc71;
+  --red:      #e74c3c;
+  --yellow:   #f39c12;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+}
+
+/* ── Header ── */
+.app-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 60px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 0 24px;
+  z-index: 100;
+}
+
+.app-header h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.title-shimmer {
+  background: linear-gradient(180deg, #53e5ef 0%, #2d93cc 55%, #2262a8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 4px rgba(47, 190, 222, 0.5);
+}
+
+.app-header nav {
+  display: flex;
+  gap: 4px;
+}
+
+.app-header nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+}
+
+.app-header nav a:hover  { color: var(--text);   background: var(--surface); }
+.app-header nav a.active { color: var(--accent);  background: var(--surface); }
+
+.market-open   { color: var(--green); font-weight: 600; margin-left: auto; white-space: nowrap; }
+.market-closed { color: var(--red);   font-weight: 600; margin-left: auto; white-space: nowrap; }
+
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.15; }
+}
+.dot-blink { display: inline-block; animation: blink-dot 2s ease-in-out infinite; }
+
+/* ── Main content ── */
+.app-main {
+  margin-top: 60px;
+  padding: 24px;
+}
+
+/* ── Page sections ── */
+.page-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.section { margin-bottom: 40px; }
+
+.section-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+/* ── Controls bar ── */
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.controls input, .controls select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.controls input:focus, .controls select:focus { border-color: var(--accent); }
+
+.period-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.period-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Buttons ── */
+button {
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  padding: 7px 16px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover:not(:disabled) { background: var(--border); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) { filter: brightness(1.1); }
+
+button.danger {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+button.danger:hover:not(:disabled) { background: var(--red); color: #fff; }
+
+/* ── Data table ── */
+.data-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody tr { border-bottom: 1px solid var(--border); }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface); }
+
+td {
+  padding: 9px 14px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+td img.logo {
+  width: 24px; height: 24px;
+  border-radius: 4px;
+  object-fit: contain;
+  display: block;
+}
+
+/* ── Signal badge ── */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.badge-BUY  { background: rgba(46,204,113,0.15); color: var(--green); }
+.badge-SELL { background: rgba(231,76,60,0.15);  color: var(--red);   }
+.badge-HOLD { background: rgba(243,156,18,0.15); color: var(--yellow); }
+
+/* ── Up / down colouring ── */
+.up   { color: var(--green); }
+.down { color: var(--red);   }
+
+/* ── Metrics row ── */
+.metrics {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  min-width: 140px;
+}
+
+.metric-card .label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.metric-card .value { font-size: 1.5rem; font-weight: 700; }
+
+/* ── States ── */
+.loading { color: var(--muted); padding: 20px 0; }
+.error   { color: var(--red);   padding: 20px 0; }
+.empty   { color: var(--muted); padding: 20px 0; font-style: italic; }
+
+/* ── Watchlist layout ── */
+.watchlist-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.watchlist-sidebar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.watchlist-sidebar h3 { font-size: 0.85rem; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.list-item:hover { background: var(--border); }
+.list-item.selected { background: rgba(79,142,247,0.15); color: var(--accent); }
+
+.list-item .del-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--red);
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+.list-item:hover .del-btn { opacity: 1; }
+
+.new-list-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+.new-list-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+.new-list-row input:focus { border-color: var(--accent); }
+
+
+/* ── Sortable headers ── */
+.sort-icon { color: var(--muted); font-size: 11px; }
+.sort-icon.sort-active { color: var(--accent); }
+
+/* ── Pagination ── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.pagination button { min-width: 70px; }
+
+/* ── Clickable table rows ── */
+tr.clickable-row { cursor: pointer; }
+tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
+
+/* ── Trade chart modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(860px, 95vw);
+  padding: 24px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.modal-header > span:first-child {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  flex: 1;
+}
+
+.modal-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.modal-close {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: auto;
+}
+.modal-close:hover { color: var(--text); border-color: var(--text); }
+
+.trade-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+}

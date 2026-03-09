@@ -4,40 +4,24 @@ from io import StringIO
 from data.loaders import engine
 
 
-def load_universe():
-
-    print("Loading S&P 500 universe...")
-
-    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-
+def _fetch_index_table(url: str) -> pd.DataFrame:
+    """Fetch a Wikipedia S&P index table and return a normalised companies DataFrame."""
     headers = {"User-Agent": "Mozilla/5.0"}
-
     response = requests.get(url, headers=headers)
     html = StringIO(response.text)
-
     table = pd.read_html(html)[0]
 
-    # Fix ticker formatting for Yahoo Finance
     table["Symbol"] = table["Symbol"].str.replace(".", "-", regex=False)
 
-    # Base company table
     companies = table[["Symbol", "Security", "GICS Sector"]].rename(
-        columns={
-            "Symbol": "ticker",
-            "Security": "company",
-            "GICS Sector": "sector"
-        }
+        columns={"Symbol": "ticker", "Security": "company", "GICS Sector": "sector"}
     )
 
-    # ---------- Website extraction if available ----------
     if "Website" in table.columns:
-
         websites = table[["Symbol", "Website"]].rename(
             columns={"Symbol": "ticker", "Website": "website"}
         )
-
         companies = companies.merge(websites, on="ticker", how="left")
-
         companies["domain"] = (
             companies["website"]
             .astype(str)
@@ -46,9 +30,7 @@ def load_universe():
             .str.split("/")
             .str[0]
         )
-
     else:
-        # Fallback domain guess
         companies["domain"] = (
             companies["company"]
             .str.lower()
@@ -56,32 +38,153 @@ def load_universe():
             .str.replace(" ", "") + ".com"
         )
 
-    # Logo URL
-    # Logo URL based on ticker (reliable)
     companies["logo_url"] = (
-            "https://financialmodelingprep.com/image-stock/" +
-            companies["ticker"] + ".png"
+        "https://financialmodelingprep.com/image-stock/" + companies["ticker"] + ".png"
+    )
+    companies["market"] = "US"
+
+    return companies
+
+
+def _fetch_ta_index(url: str) -> pd.DataFrame:
+    """Fetch a Wikipedia TASE index table and return a normalised companies DataFrame.
+
+    Israeli Wikipedia tables use Name/Symbol/Sector column names.
+    Tickers get a .TA suffix for yfinance (e.g. TEVA.TA).
+    """
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    html = StringIO(response.text)
+    tables = pd.read_html(html)
+
+    # Find the table that has a Symbol column
+    table = None
+    for t in tables:
+        if "Symbol" in t.columns:
+            table = t
+            break
+    if table is None:
+        raise ValueError(f"No table with 'Symbol' column found at {url}")
+
+    # Flatten MultiIndex columns if present
+    if isinstance(table.columns, pd.MultiIndex):
+        table.columns = [" ".join(str(c) for c in col).strip() for col in table.columns]
+        # Re-find columns after flattening
+        sym_col = next((c for c in table.columns if "Symbol" in c), None)
+        name_col = next((c for c in table.columns if "Name" in c), None)
+        sec_col  = next((c for c in table.columns if "Sector" in c), None)
+    else:
+        sym_col  = "Symbol"
+        name_col = next((c for c in ("Name", "Company", "Security") if c in table.columns), table.columns[0])
+        sec_col  = next((c for c in ("Sector", "GICS Sector", "Industry") if c in table.columns), None)
+
+    if sym_col is None:
+        raise ValueError(f"Could not locate Symbol column in table from {url}")
+
+    tickers = (
+        table[sym_col]
+        .astype(str)
+        .str.strip()
+        .apply(lambda t: t if t.endswith(".TA") else t + ".TA")
     )
 
+    companies = pd.DataFrame({
+        "ticker":  tickers,
+        "company": table[name_col].astype(str).str.strip() if name_col else tickers,
+        "sector":  table[sec_col].astype(str).str.strip() if sec_col else "",
+        "market":  "IL",
+    })
+
+    companies["logo_url"] = (
+        "https://financialmodelingprep.com/image-stock/" + companies["ticker"] + ".png"
+    )
+
+    return companies
+
+
+def load_universe():
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    print("Loading S&P 500 universe...")
+    sp500 = _fetch_index_table("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+    print(f"Loaded {len(sp500)} S&P 500 tickers")
+
+    print("Loading S&P 400 universe...")
+    sp400 = _fetch_index_table("https://en.wikipedia.org/wiki/List_of_S%26P_400_companies")
+    print(f"Loaded {len(sp400)} S&P 400 tickers")
+
+    print("Loading S&P 600 universe...")
+    sp600 = _fetch_index_table("https://en.wikipedia.org/wiki/List_of_S%26P_600_companies")
+    print(f"Loaded {len(sp600)} S&P 600 tickers")
+
+    us_companies = pd.concat([sp500, sp400, sp600], ignore_index=True).drop_duplicates(subset=["ticker"])
+
+    print("Loading TA-35 universe...")
+    try:
+        ta35 = _fetch_ta_index("https://en.wikipedia.org/wiki/TA-35_Index")
+        print(f"Loaded {len(ta35)} TA-35 tickers")
+    except Exception as e:
+        print(f"Warning: Could not load TA-35: {e}")
+        ta35 = pd.DataFrame()
+
+    print("Loading TA-90 universe...")
+    try:
+        ta90 = _fetch_ta_index("https://en.wikipedia.org/wiki/TA-90_Index")
+        print(f"Loaded {len(ta90)} TA-90 tickers")
+    except Exception as e:
+        print(f"Warning: Could not load TA-90: {e}")
+        ta90 = pd.DataFrame()
+
+    il_frames = [df for df in [ta35, ta90] if not df.empty]
+    if il_frames:
+        il_companies = pd.concat(il_frames, ignore_index=True).drop_duplicates(subset=["ticker"])
+        print(f"Loaded {len(il_companies)} total IL tickers")
+    else:
+        il_companies = pd.DataFrame()
+
+    companies = pd.concat(
+        [df for df in [us_companies, il_companies] if not df.empty],
+        ignore_index=True,
+    ).drop_duplicates(subset=["ticker"])
+
     # Save companies table, preserving any manually added custom tickers
-    # (tickers not in the S&P 500 list that were inserted outside this function).
+    # (tickers not in any index that were inserted outside this function).
+    # Also preserve enriched columns (industry, description, description_short)
+    # that are populated separately by update_company_info().
+    EXTRA_COLS = ["industry", "description", "description_short"]
     try:
         existing = pd.read_sql("SELECT * FROM companies", engine)
-        sp500_tickers = set(companies["ticker"])
-        custom = existing[~existing["ticker"].isin(sp500_tickers)]
+        index_tickers = set(companies["ticker"])
+        custom = existing[~existing["ticker"].isin(index_tickers)].copy()
+        if "market" not in custom.columns:
+            custom["market"] = "US"
+
+        # Merge back enriched columns so they survive the table replace
+        preserved_cols = [c for c in EXTRA_COLS if c in existing.columns]
+        if preserved_cols:
+            preserved = existing[["ticker"] + preserved_cols]
+            companies = companies.merge(preserved, on="ticker", how="left")
+            # Ensure custom also has those columns
+            for col in preserved_cols:
+                if col not in custom.columns:
+                    custom[col] = None
     except Exception:
         custom = pd.DataFrame()
 
     companies.to_sql("companies", engine, if_exists="replace", index=False)
 
     if not custom.empty:
+        # Only keep columns that now exist in the table
+        existing_cols = pd.read_sql("SELECT * FROM companies LIMIT 0", engine).columns.tolist()
+        custom = custom[[c for c in custom.columns if c in existing_cols]]
         custom.to_sql("companies", engine, if_exists="append", index=False)
 
     tickers = companies["ticker"].tolist()
 
-    print(f"Loaded {len(tickers)} S&P 500 tickers")
+    print(f"Loaded {len(tickers)} total tickers (US + IL)")
 
-    # ── Extend universe with any watchlist tickers outside the S&P 500 ──
+    # ── Extend universe with any watchlist tickers outside the indexed universe ──
     try:
         watchlist_tickers = pd.read_sql(
             "SELECT DISTINCT ticker FROM watchlist", engine
@@ -102,6 +205,7 @@ def load_universe():
                     "ticker":   new_co,
                     "company":  new_co,
                     "sector":   [""] * len(new_co),
+                    "market":   ["US"] * len(new_co),
                     "logo_url": [
                         f"https://financialmodelingprep.com/image-stock/{t}.png"
                         for t in new_co

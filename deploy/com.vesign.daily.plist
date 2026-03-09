@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vesign.daily</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/inovenos/PycharmProjects/Vesign/venv/bin/python</string>
+        <string>-c</string>
+        <string>from production.run_daily import run_daily; run_daily()</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/inovenos/PycharmProjects/Vesign</string>
+
+    <!-- Run Mon–Fri at 07:00 Israel time -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+
+    <!-- Logs -->
+    <key>StandardOutPath</key>
+    <string>/tmp/vesign-pipeline.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/vesign-pipeline.log</string>
+</dict>
+</plist>

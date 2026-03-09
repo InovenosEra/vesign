@@ -4,10 +4,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------- Data pipelines ----------
-from data.market_data import update_prices
-from data.market_data import update_fundamentals
-from data.market_data import update_vix
-from features.analyst_data import update_analyst_data
+from data.market_data import update_prices, update_vix, update_company_info, summarize_descriptions, update_company_health
 
 # ---------- Feature engineering ----------
 from data.loaders import load_prices, save_features
@@ -27,8 +24,9 @@ from portfolio.allocator import run_allocator
 def run_daily():
     update_prices()
     update_vix()
-    update_fundamentals()
-    update_analyst_data()
+    update_company_info()
+    summarize_descriptions()
+    update_company_health()
 
     prices = load_prices()
     features_df = compute_features(prices)
