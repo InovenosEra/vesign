@@ -372,15 +372,19 @@ function Header() {
   const { market } = useContext(MarketContext)
   return (
     <header className="app-header">
-      <h1 style={{ display: 'flex', alignItems: 'flex-end', gap: 2, fontWeight: 900, fontSize: '2.7rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-        <img src="/favicon.png" alt="V" style={{ height: '3.2rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0, 210, 255, 0.6))' }} />
-        <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
-      </h1>
-      <nav>
-        <NavLink to="/">Signals</NavLink>
-        <NavLink to="/watchlist">Watchlist</NavLink>
-        <NavLink to="/trades">Trades</NavLink>
-      </nav>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
+        <NavLink to="/" style={{ textDecoration: 'none' }}>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 900, fontSize: '2.7rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, marginTop: '-6px', cursor: 'pointer' }}>
+            <img src="/favicon.png" alt="V" style={{ height: '3.2rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0, 210, 255, 0.6))' }} />
+            <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
+          </h1>
+        </NavLink>
+        <nav>
+          <NavLink to="/">Signals</NavLink>
+          <NavLink to="/watchlist">Watchlist</NavLink>
+          <NavLink to="/trades">Trades</NavLink>
+        </nav>
+      </div>
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
         <GlobalSearch />
       </div>

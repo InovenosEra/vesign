@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useContext } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -98,7 +98,9 @@ function PriceBoxLabel({ viewBox, value, color }) {
 
 function TradeModal({ row, start, end, onClose }) {
   const { market } = useContext(MarketContext)
-  const currency = market === 'IL' ? '₪' : '$'
+  const isIL     = row.ticker?.endsWith('.TA') ?? market === 'IL'
+  const currency = isIL ? '₪' : '$'
+
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['price-history', row.ticker, start, end],
     queryFn: () => getPriceHistory(row.ticker, { start, end }),
@@ -121,7 +123,18 @@ function TradeModal({ row, start, end, onClose }) {
   const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
   const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
 
-  // SVG overlay: measure wrapper width so we can calculate x pixel positions
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const generalColRef = useRef(null)
+  const [generalColH, setGeneralColH] = useState(null)
+  useLayoutEffect(() => {
+    if (generalColRef.current) setGeneralColH(generalColRef.current.offsetHeight)
+  })
+
   const wrapperRef = useRef(null)
   const [wrapperWidth, setWrapperWidth] = useState(0)
   useEffect(() => {
@@ -131,52 +144,99 @@ function TradeModal({ row, start, end, onClose }) {
     return () => obs.disconnect()
   }, [isLoading])
 
-  // Mirror Recharts' point scale: evenly distribute n data points across the plot area
   function dateToX(dateStr) {
     const idx = history.findIndex(d => d.date === dateStr)
     if (idx < 0 || history.length <= 1) return null
-    const plotLeft  = 8 + 48                        // margin.left + yAxis.width
-    const plotWidth = wrapperWidth - plotLeft - 24  // minus margin.right
+    const plotLeft  = 8 + 48
+    const plotWidth = wrapperWidth - plotLeft - 24
     return plotLeft + (idx / (history.length - 1)) * plotWidth
   }
+
+  const PLOT_TOP    = 36
+  const PLOT_BOTTOM = 332
+
+  function priceBox(cx, value, color) {
+    const px = 8, fs = 11
+    const bw = value.length * 6.8 + px * 2
+    const bh = fs + 10
+    const by = PLOT_TOP - bh - 4
+    return (
+      <g>
+        <rect x={cx - bw / 2} y={by} width={bw} height={bh} rx={4} style={{ fill: 'var(--surface)' }} />
+        <text x={cx} y={by + bh / 2} textAnchor="middle" dominantBaseline="central"
+          fontSize={fs} style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+          {value}
+        </text>
+      </g>
+    )
+  }
+
+  const healthLabels = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+  const healthColors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="modal-header">
-          {row.logo_url && (
-            <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} />
+        <div className="modal-header" style={{ alignItems: 'flex-start' }}>
+          {row.logo_url
+            ? <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+            : null}
+          <div style={{ width: 96, height: 96, flexShrink: 0, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', display: row.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', color: 'var(--text)' }}>
+            {row.ticker?.replace(/\.TA$/, '')}
+          </div>
+
+          {/* General column */}
+          <div ref={generalColRef} style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
+            <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
+            <div style={{ padding: '8px 0px', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
+                <tbody>
+                  {[
+                    ['Ticker',              <strong>{row.ticker?.replace(/\.TA$/, '') ?? '—'}</strong>],
+                    ['Company',             row.company ?? '—'],
+                    ['Industry',            row.industry ?? '—'],
+                    ['Market Cap (B)',       row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
+                    ['Current Signal',      row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
+                    ['Current Price',       history12m.length > 0 ? fmt(history12m.at(-1).close / (isIL ? 100 : 1)) : '—'],
+                    ['12M Yield (organic)', yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
+                    ['12M Yield (Vesign)',  row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—'],
+                  ].map(([label, value]) => (
+                    <tr key={label} style={{ height: 22 }}>
+                      <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 120 }}>{label}</td>
+                      <td style={{ verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Description + Health column */}
+          {(row.description_short || row.description || row.health_score) && (
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
+              {(row.description_short || row.description) && (<>
+                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
+                <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                  {row.description_short || row.description}
+                </div>
+              </>)}
+              {row.health_score && (
+                <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>Company Health</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    {[1,2,3,4,5].map(i => (
+                      <div key={i} style={{ width: 28, height: 12, borderRadius: 4, background: i <= row.health_score ? healthColors[row.health_score] : 'var(--border)' }} />
+                    ))}
+                    <span style={{ fontSize: 12, fontWeight: 'bold', color: healthColors[row.health_score], marginLeft: 4 }}>{healthLabels[row.health_score]}</span>
+                  </div>
+                  {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6, flex: 1, minHeight: 0, overflowY: 'auto' }}>{row.health_reason}</div>}
+                </div>
+              )}
+            </div>
           )}
-          <table style={{ fontSize: 12, borderCollapse: 'collapse', flex: 1 }}>
-            <tbody>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Ticker</td>
-                <td style={{ verticalAlign: 'middle' }}><strong>{row.ticker ?? '—'}</strong></td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Company</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.company ?? '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>Market Cap</td>
-                <td style={{ verticalAlign: 'middle' }}>{row.market_cap != null ? `$${(row.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 })}B` : '—'}</td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, paddingBottom: 2, verticalAlign: 'middle' }}>12M Yield (organic)</td>
-                <td style={{ verticalAlign: 'middle' }} className={yield12m == null ? '' : yield12m >= 0 ? 'up' : 'down'}>
-                  {yield12m != null ? `${yield12m >= 0 ? '+' : ''}${fmt(yield12m)}%` : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ color: 'var(--muted)', paddingRight: 16, verticalAlign: 'middle' }}>12M Yield (Vesign)</td>
-                <td style={{ verticalAlign: 'middle' }} className={row.avg_return >= 0 ? 'up' : 'down'}>
-                  {row.avg_return != null ? `${row.avg_return >= 0 ? '+' : ''}${fmt(row.avg_return)}%` : '—'}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -212,57 +272,28 @@ function TradeModal({ row, start, end, onClose }) {
               </LineChart>
             </ResponsiveContainer>
 
-            {/* Absolute SVG overlay: vertical buy/sell lines, price boxes, range line + % */}
             {wrapperWidth > 0 && history.length > 1 && (
               <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
                 {row.trades.map((t, i) => {
                   const buyX  = t.buy_date  ? dateToX(t.buy_date.slice(0, 10))  : null
                   const sellX = t.sell_date ? dateToX(t.sell_date.slice(0, 10)) : null
-                  const PLOT_TOP    = 36
-                  const PLOT_BOTTOM = 332  // 340 - margin.bottom(8)
-
-                  // Inline price box renderer
-                  const priceBox = (cx, value, color) => {
-                    const px = 8, fs = 11
-                    const bw = value.length * 6.8 + px * 2
-                    const bh = fs + 10
-                    const by = PLOT_TOP - bh - 4
-                    return (
-                      <g>
-                        <rect x={cx - bw / 2} y={by} width={bw} height={bh} rx={4}
-                          style={{ fill: 'var(--surface)' }} />
-                        <text x={cx} y={by + bh / 2} textAnchor="middle" dominantBaseline="central"
-                          fontSize={fs} style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                          {value}
-                        </text>
-                      </g>
-                    )
-                  }
-
                   return (
                     <g key={i}>
-                      {/* Buy vertical line + price box */}
                       {buyX != null && <>
-                        <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM}
-                          style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
+                        <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
                         {t.buy_price != null && priceBox(buyX, currency + fmt(t.buy_price, 1), 'var(--green)')}
                       </>}
-                      {/* Sell vertical line + price box */}
                       {sellX != null && <>
-                        <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM}
-                          style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
+                        <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
                         {t.sell_price != null && priceBox(sellX, currency + fmt(t.sell_price, 1), 'var(--red)')}
                       </>}
-                      {/* Horizontal dotted range line + % gain label */}
                       {buyX != null && sellX != null && t.buy_price != null && t.sell_price != null && (() => {
                         const pct   = ((t.sell_price - t.buy_price) / t.buy_price) * 100
                         const color = pct >= 0 ? 'var(--green)' : 'var(--red)'
                         const lineY = PLOT_TOP + 18
                         return <>
-                          <line x1={buyX} y1={lineY} x2={sellX} y2={lineY}
-                            style={{ stroke: color, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
-                          <text x={(buyX + sellX) / 2} y={lineY - 6}
-                            textAnchor="middle" fontSize={10}
+                          <line x1={buyX} y1={lineY} x2={sellX} y2={lineY} style={{ stroke: color, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
+                          <text x={(buyX + sellX) / 2} y={lineY - 6} textAnchor="middle" fontSize={10}
                             style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
                             {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
                           </text>
@@ -430,7 +461,7 @@ export default function TradesPage() {
                     <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                     <td>{t.company ?? '—'}</td>
                     <td><strong>{t.ticker}</strong></td>
-                    <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'}</td>
+                    <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{t.trade_count}</td>
                     <td className={winRate >= 50 ? 'up' : 'down'}>{winRate.toFixed(0)}%</td>
                     <td className={t.avg_return >= 0 ? 'up' : 'down'}>

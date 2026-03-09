@@ -45,6 +45,12 @@ export default function SignalModal({ row, onClose }) {
   const minPrice = chartHistory.length ? Math.min(...chartHistory.map(d => d.close)) * 0.97 : 0
   const maxPrice = chartHistory.length ? Math.max(...chartHistory.map(d => d.close)) * 1.03 : 0
 
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   const generalColRef = useRef(null)
   const [generalColH, setGeneralColH] = useState(null)
   useLayoutEffect(() => {

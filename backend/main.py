@@ -740,6 +740,7 @@ def historical_trades(
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.signal, s.close, c.company, c.logo_url,
+                   c.industry, c.description, c.description_short,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -786,15 +787,18 @@ def historical_trades(
             return None if (isinstance(v, float) and math.isnan(v)) else v
 
         ticker_trades[ticker] = {
-            "ticker":       ticker,
-            "company":      _str_or_none(grp.iloc[0]["company"]),
-            "logo_url":     _str_or_none(grp.iloc[0]["logo_url"]),
-            "market_cap":   int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
-            "trade_count":  len(pairs),
-            "win_count":    wins,
-            "avg_return":   round(avg_ret, 2),
-            "avg_days":     round(avg_days, 1),
-            "trades":       pairs,   # full list of pairs for the chart
+            "ticker":            ticker,
+            "company":           _str_or_none(grp.iloc[0]["company"]),
+            "logo_url":          _str_or_none(grp.iloc[0]["logo_url"]),
+            "industry":          _str_or_none(grp.iloc[0]["industry"]) if "industry" in grp.columns else None,
+            "description":       _str_or_none(grp.iloc[0]["description"]) if "description" in grp.columns else None,
+            "description_short": _str_or_none(grp.iloc[0]["description_short"]) if "description_short" in grp.columns else None,
+            "market_cap":        int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
+            "trade_count":       len(pairs),
+            "win_count":         wins,
+            "avg_return":        round(avg_ret, 2),
+            "avg_days":          round(avg_days, 1),
+            "trades":            pairs,   # full list of pairs for the chart
         }
 
     # Enrich each ticker with organic_yield: (last_close - first_close) / first_close
@@ -831,6 +835,36 @@ def historical_trades(
                 ticker_trades[t]["organic_yield"] = round(
                     float((lc - fc) / fc * 100), 2
                 )
+
+    # Enrich with health score and current signal
+    if ticker_trades:
+        tickers_list = list(ticker_trades.keys())
+        ph = ", ".join([f":h{i}" for i in range(len(tickers_list))])
+        hp = {f"h{i}": t for i, t in enumerate(tickers_list)}
+        def _nn(v):
+            return None if (isinstance(v, float) and math.isnan(v)) else v
+        with engine.connect() as conn:
+            df_health = pd.read_sql(text(f"""
+                SELECT ticker, score AS health_score, reason AS health_reason
+                FROM company_health WHERE ticker IN ({ph})
+            """), conn, params=hp)
+            df_curr = pd.read_sql(text(f"""
+                SELECT s.ticker, s.signal AS current_signal
+                FROM signals s
+                JOIN (SELECT ticker, MAX(date) AS md FROM signals
+                      WHERE ticker IN ({ph}) GROUP BY ticker) l
+                  ON s.ticker = l.ticker AND s.date = l.md
+            """), conn, params=hp)
+        for _, hr in df_health.iterrows():
+            t = hr["ticker"]
+            if t in ticker_trades:
+                score = hr["health_score"]
+                ticker_trades[t]["health_score"] = int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None
+                ticker_trades[t]["health_reason"] = _nn(hr["health_reason"])
+        for _, sr in df_curr.iterrows():
+            t = sr["ticker"]
+            if t in ticker_trades:
+                ticker_trades[t]["current_signal"] = sr["current_signal"]
 
     return list(ticker_trades.values())
 
