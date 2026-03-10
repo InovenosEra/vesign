@@ -327,7 +327,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
     mkt = (market or "US").upper()
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, s.close, s.rsi,
+            SELECT s.date, s.ticker, COALESCE(lp.latest_close, s.close) AS close, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
@@ -402,7 +402,7 @@ def signals(
         total = count_row[0] if count_row else 0
 
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, s.close, s.rsi,
+            SELECT s.date, s.ticker, COALESCE(lp.latest_close, s.close) AS close, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
@@ -440,7 +440,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
         df = pd.read_sql(text(f"""
             SELECT s.ticker, c.company, c.logo_url, c.industry,
                    c.description, c.description_short,
-                   s.close, s.signal, s.rsi,
+                   COALESCE(lp.latest_close, s.close) AS close, s.signal, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
