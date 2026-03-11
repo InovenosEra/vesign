@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 from email.mime.text import MIMEText
-from datetime import datetime, time as dt_time, UTC
+from datetime import datetime, time as dt_time, UTC, date
 from typing import Optional
 
 import pandas as pd
@@ -790,12 +790,24 @@ def historical_trades(
                     "result":     "Win" if ret > 0 else "Loss",
                 })
                 open_trade = None
-        if not pairs:
+        # Include any unclosed BUY as an open trade
+        if open_trade is not None and not pd.isna(open_trade["close"]):
+            pairs.append({
+                "buy_date":   open_trade["date"].date().isoformat(),
+                "sell_date":  None,
+                "buy_price":  round(float(open_trade["close"]), 2),
+                "sell_price": None,
+                "return_pct": None,
+                "days_held":  None,
+                "result":     "Open",
+            })
+        closed_pairs = [p for p in pairs if p["result"] != "Open"]
+        if not closed_pairs:
             continue
         mc = grp.iloc[0].get("market_cap")
-        wins = sum(1 for p in pairs if p["result"] == "Win")
-        avg_ret = sum(p["return_pct"] for p in pairs) / len(pairs)
-        avg_days = sum(p["days_held"] for p in pairs) / len(pairs)
+        wins = sum(1 for p in closed_pairs if p["result"] == "Win")
+        avg_ret = sum(p["return_pct"] for p in closed_pairs) / len(closed_pairs)
+        avg_days = sum(p["days_held"] for p in closed_pairs) / len(closed_pairs)
         def _str_or_none(v):
             return None if (isinstance(v, float) and math.isnan(v)) else v
 
@@ -807,7 +819,7 @@ def historical_trades(
             "description":       _str_or_none(grp.iloc[0]["description"]) if "description" in grp.columns else None,
             "description_short": _str_or_none(grp.iloc[0]["description_short"]) if "description_short" in grp.columns else None,
             "market_cap":        int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
-            "trade_count":       len(pairs),
+            "trade_count":       len(closed_pairs),
             "win_count":         wins,
             "avg_return":        round(avg_ret, 2),
             "avg_days":          round(avg_days, 1),
@@ -880,6 +892,84 @@ def historical_trades(
                 ticker_trades[t]["current_signal"] = sr["current_signal"]
 
     return list(ticker_trades.values())
+
+
+@protected.get("/api/trades/open")
+def open_trades(market: Optional[str] = None):
+    """Tickers with a BUY signal and no SELL since — currently open positions."""
+    mkt = (market or "US").upper()
+    with engine.connect() as conn:
+        df = pd.read_sql(text("""
+            SELECT
+                s.ticker,
+                s.date  AS buy_date,
+                s.close AS buy_price,
+                cur.signal AS current_signal,
+                lp.latest_close AS current_price,
+                c.company, c.logo_url, c.industry,
+                f.market_cap,
+                h.score AS health_score
+            FROM signals s
+            INNER JOIN (
+                SELECT ticker, MAX(date) AS last_buy_date
+                FROM signals WHERE signal = 'BUY'
+                GROUP BY ticker
+            ) lb ON s.ticker = lb.ticker AND s.date = lb.last_buy_date
+            LEFT JOIN (
+                SELECT ticker, MAX(date) AS last_sell_date
+                FROM signals WHERE signal = 'SELL'
+                GROUP BY ticker
+            ) ls ON s.ticker = ls.ticker
+            INNER JOIN (
+                SELECT s2.ticker, s2.signal
+                FROM signals s2
+                INNER JOIN (SELECT ticker, MAX(date) AS md FROM signals GROUP BY ticker) mx
+                    ON s2.ticker = mx.ticker AND s2.date = mx.md
+            ) cur ON s.ticker = cur.ticker
+            LEFT JOIN companies c ON s.ticker = c.ticker
+            LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
+                ON s.ticker = f.ticker
+            LEFT JOIN company_health h ON s.ticker = h.ticker
+            LEFT JOIN (
+                SELECT p1.ticker, p1.close AS latest_close
+                FROM daily_prices p1
+                INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
+                    ON p1.ticker = p2.ticker AND p1.date = p2.max_date
+            ) lp ON s.ticker = lp.ticker
+            WHERE (ls.last_sell_date IS NULL OR lb.last_buy_date > ls.last_sell_date)
+            AND cur.signal IN ('BUY', 'HOLD')
+            AND COALESCE(c.market, 'US') = :market
+            ORDER BY s.date DESC
+        """), conn, params={"market": mkt})
+
+    def _v(v):
+        return None if (isinstance(v, float) and math.isnan(v)) else v
+
+    result = []
+    for _, row in df.iterrows():
+        buy_price     = row["buy_price"]
+        current_price = row["current_price"]
+        unrealized    = round(float((current_price - buy_price) / buy_price * 100), 2) \
+                        if buy_price and current_price and float(buy_price) > 0 else None
+        buy_date = pd.to_datetime(row["buy_date"]).date().isoformat() if row["buy_date"] is not None else None
+        days_held = (date.today() - pd.to_datetime(row["buy_date"]).date()).days if row["buy_date"] is not None else None
+        mc = row["market_cap"]
+        score = row["health_score"]
+        result.append({
+            "ticker":          row["ticker"],
+            "company":         _v(row["company"]),
+            "logo_url":        _v(row["logo_url"]),
+            "industry":        _v(row["industry"]),
+            "market_cap":      int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
+            "buy_date":        buy_date,
+            "buy_price":       round(float(buy_price), 2) if buy_price is not None else None,
+            "current_price":   round(float(current_price), 2) if current_price is not None else None,
+            "days_held":       days_held,
+            "unrealized_pct":  unrealized,
+            "current_signal":  _v(row["current_signal"]),
+            "health_score":    int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
+        })
+    return result
 
 
 # --- Pipeline ---------------------------------------------------------------

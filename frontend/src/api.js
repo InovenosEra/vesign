@@ -26,7 +26,7 @@ async function handleResponse(res) {
 }
 
 async function get(path) {
-  const res = await fetch(BASE + path, { headers: { ...NGROK_HEADERS, ...await authHeaders() } })
+  const res = await fetch(BASE + path, { headers: { ...NGROK_HEADERS, ...await authHeaders() }, cache: 'no-store' })
   return handleResponse(res)
 }
 
@@ -130,3 +130,6 @@ export const getTrades = ({ start, end, market = 'US' } = {}) => {
   if (end) params.set('end', end)
   return get('/trades?' + params.toString())
 }
+
+export const getOpenTrades = (market = 'US') =>
+  get(`/trades/open?market=${market}`)

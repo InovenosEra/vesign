@@ -286,16 +286,33 @@ def update_company_info():
         try:
             profile = fmp.company_profile(t) or {}
             consensus = fmp.price_target_consensus(t) or {}
+            target_mean = consensus.get("targetConsensus") or None
+            target_high = consensus.get("targetHigh") or None
+            target_low  = consensus.get("targetLow") or None
+            n_analysts  = None
+
+            # Fallback to yfinance when FMP has no analyst targets
+            if target_mean is None:
+                try:
+                    import yfinance as yf
+                    info = yf.Ticker(t).info or {}
+                    target_mean = info.get("targetMeanPrice") or None
+                    target_low  = info.get("targetLowPrice") or None
+                    target_high = info.get("targetHighPrice") or None
+                    n_analysts  = info.get("numberOfAnalystOpinions") or None
+                except Exception:
+                    pass
+
             return {
                 "ticker":             t,
                 "market_cap":         profile.get("marketCap"),
                 "industry":           profile.get("industry"),
                 "description":        profile.get("description"),
                 "logo_url":           profile.get("image"),
-                "target_mean_price":  consensus.get("targetConsensus") or None,
-                "target_high_price":  consensus.get("targetHigh") or None,
-                "target_low_price":   consensus.get("targetLow") or None,
-                "number_of_analysts": None,
+                "target_mean_price":  target_mean,
+                "target_high_price":  target_high,
+                "target_low_price":   target_low,
+                "number_of_analysts": n_analysts,
                 "last_update":        now,
             }
         except Exception:

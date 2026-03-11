@@ -4,7 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
-import { getTrades, getPriceHistory } from '../api'
+import { getTrades, getOpenTrades, getPriceHistory } from '../api'
 import { useSort } from '../hooks/useSort'
 import { MarketContext } from '../context/MarketContext'
 
@@ -39,6 +39,19 @@ function countTradingDays(startStr, endStr) {
     d.setDate(d.getDate() + 1)
   }
   return count
+}
+
+function Pagination({ page, pages, onChange }) {
+  if (pages <= 1) return null
+  return (
+    <div className="pagination">
+      <button disabled={page === 1} onClick={() => onChange(1)}>«</button>
+      <button disabled={page === 1} onClick={() => onChange(page - 1)}>‹ Prev</button>
+      <span>{page} / {pages}</span>
+      <button disabled={page === pages} onClick={() => onChange(page + 1)}>Next ›</button>
+      <button disabled={page === pages} onClick={() => onChange(pages)}>»</button>
+    </div>
+  )
 }
 
 function Th({ label, col, sort, onSort }) {
@@ -299,6 +312,12 @@ function TradeModal({ row, start, end, onClose }) {
                           </text>
                         </>
                       })()}
+                      {buyX != null && t.result === 'Open' && (
+                        <text x={buyX + 6} y={PLOT_TOP + 30} fontSize={10}
+                          style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                          OPEN
+                        </text>
+                      )}
                     </g>
                   )
                 })}
@@ -308,6 +327,78 @@ function TradeModal({ row, start, end, onClose }) {
         )}
       </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Open Trades table
+// ---------------------------------------------------------------------------
+
+function OpenTradesTable({ data }) {
+  const { sorted, sort, toggle } = useSort(data, 'buy_date', 'desc')
+  const [page, setPage]         = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
+
+  const pages     = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <>
+      <div className="controls">
+        <span style={{ color: 'var(--muted)', fontSize: 13 }}>{sorted.length} open position{sorted.length !== 1 ? 's' : ''}</span>
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </span>
+      </div>
+      <div className="data-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              {th('Company',        'company')}
+              {th('Ticker',         'ticker')}
+              {th('Market Cap (B)', 'market_cap')}
+              {th('Signal',         'current_signal')}
+              {th('Buy Date',       'buy_date')}
+              {th('Buy Price',      'buy_price')}
+              {th('Current Price',  'current_price')}
+              {th('Days Held',      'days_held')}
+              {th('Unrealized',     'unrealized_pct')}
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.length === 0
+              ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>No open positions.</td></tr>
+              : paginated.map((t, i) => (
+                <tr key={i}>
+                  <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
+                  <td>{t.company ?? '—'}</td>
+                  <td><strong>{t.ticker}</strong></td>
+                  <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+                  <td><span className={`badge badge-${t.current_signal}`}>{t.current_signal}</span></td>
+                  <td>{fmtDate(t.buy_date)}</td>
+                  <td>{fmt(t.buy_price)}</td>
+                  <td>{fmt(t.current_price)}</td>
+                  <td>{t.days_held ?? '—'}</td>
+                  <td className={t.unrealized_pct >= 0 ? 'up' : 'down'}>
+                    {t.unrealized_pct != null ? `${t.unrealized_pct >= 0 ? '+' : ''}${fmt(t.unrealized_pct)}%` : '—'}
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page} pages={pages} onChange={setPage} />
+    </>
   )
 }
 
@@ -324,10 +415,17 @@ export default function TradesPage() {
   const [end,   setEnd]         = useState(new Date().toISOString().slice(0, 10))
   const [selected, setSelected] = useState(null)
   const [search, setSearch]     = useState('')
+  const [page, setPage]         = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const { data: trades, isLoading, isError } = useQuery({
     queryKey: ['trades', start, end, market],
     queryFn: () => getTrades({ start, end, market }),
+  })
+
+  const { data: openTrades = [], isLoading: loadingOpen, isError: errorOpen, error: openError } = useQuery({
+    queryKey: ['trades-open', market],
+    queryFn: () => getOpenTrades(market),
   })
 
   const { sorted, sort, toggle } = useSort(trades, 'avg_return', 'desc')
@@ -371,10 +469,17 @@ export default function TradesPage() {
           <input
             placeholder="🔍 Search ticker or company"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
             style={{ width: 220 }}
           />
-          {search && <button onClick={() => setSearch('')}>Clear</button>}
+          {search && <button onClick={() => { setSearch(''); setPage(1) }}>Clear</button>}
+          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
         </span>
       </div>
 
@@ -436,7 +541,10 @@ export default function TradesPage() {
               t.company?.toLowerCase().includes(search.toLowerCase())
             )
           : sorted
+        const pages     = Math.max(1, Math.ceil(filtered.length / pageSize))
+        const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
         return (
+        <>
         <div className="data-table-wrap">
           <table>
             <thead>
@@ -452,9 +560,9 @@ export default function TradesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0
+              {paginated.length === 0
                 ? <tr><td colSpan={8} className="empty" style={{ textAlign: 'center' }}>No matches found.</td></tr>
-                : filtered.map((t, i) => {
+                : paginated.map((t, i) => {
                 const winRate = t.trade_count > 0 ? (t.win_count / t.trade_count) * 100 : 0
                 return (
                   <tr key={i} className="clickable-row" onClick={() => setSelected(t)}>
@@ -474,10 +582,18 @@ export default function TradesPage() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pages={pages} onChange={setPage} />
+        </>
         )
       })()}
 
       {selected && <TradeModal row={selected} start={start} end={end} onClose={() => setSelected(null)} />}
+
+      {/* Open Trades */}
+      <p className="page-title" style={{ marginTop: 40 }}>Open Trades</p>
+      {loadingOpen && <p className="loading">Loading…</p>}
+      {errorOpen && <p className="error">Error: {openError?.message}</p>}
+      {!loadingOpen && !errorOpen && <OpenTradesTable data={openTrades} />}
     </div>
   )
 }
