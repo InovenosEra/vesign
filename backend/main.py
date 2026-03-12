@@ -769,26 +769,33 @@ def historical_trades(
             ORDER BY tl.ticker, tl.buy_date
         """), conn, params=params)
 
+    def _num(v, decimals=2):
+        """Return rounded float or None for NaN/None values."""
+        if v is None or (isinstance(v, float) and math.isnan(v)):
+            return None
+        return round(float(v), decimals)
+
     # Group by ticker
     ticker_trades: dict = {}
     for ticker, grp in df.groupby("ticker"):
         pairs = []
         for _, row in grp.iterrows():
-            ret = row["return_pct"]
-            buy_date  = str(row["buy_date"])[:10]
-            sell_date = str(row["sell_date"])[:10] if row["sell_date"] is not None else None
-            buy_price  = row["buy_price"]
-            sell_price = row["sell_price"]
-            days_held = int((pd.to_datetime(row["sell_date"]) - pd.to_datetime(row["buy_date"])).days) \
-                        if row["sell_date"] is not None else None
+            raw_ret    = row["return_pct"]
+            ret        = _num(raw_ret * 100) if raw_ret is not None and not (isinstance(raw_ret, float) and math.isnan(raw_ret)) else None
+            buy_price  = _num(row["buy_price"])
+            sell_price = _num(row["sell_price"])
+            buy_date   = str(row["buy_date"])[:10]
+            sell_date  = str(row["sell_date"])[:10] if _v(row["sell_date"]) is not None else None
+            days_held  = int((pd.to_datetime(row["sell_date"]) - pd.to_datetime(row["buy_date"])).days) \
+                         if sell_date is not None else None
             pairs.append({
                 "buy_date":   buy_date,
                 "sell_date":  sell_date,
-                "buy_price":  round(float(buy_price), 2) if buy_price is not None else None,
-                "sell_price": round(float(sell_price), 2) if sell_price is not None else None,
-                "return_pct": round(float(ret), 2) if ret is not None else None,
+                "buy_price":  buy_price,
+                "sell_price": sell_price,
+                "return_pct": ret,
                 "days_held":  days_held,
-                "result":     "Win" if ret is not None and float(ret) > 0 else ("Loss" if ret is not None else "Open"),
+                "result":     "Win" if ret is not None and ret > 0 else ("Loss" if ret is not None else "Open"),
             })
 
         closed_pairs = [p for p in pairs if p["result"] != "Open"]
@@ -797,8 +804,9 @@ def historical_trades(
         mc    = grp.iloc[0].get("market_cap")
         score = grp.iloc[0].get("health_score")
         wins  = sum(1 for p in closed_pairs if p["result"] == "Win")
-        avg_ret  = sum(p["return_pct"] for p in closed_pairs) / len(closed_pairs)
-        avg_days = sum(p["days_held"] for p in closed_pairs) / len(closed_pairs)
+        avg_ret  = sum(p["return_pct"] for p in closed_pairs if p["return_pct"] is not None) / len(closed_pairs)
+        days_list = [p["days_held"] for p in closed_pairs if p["days_held"] is not None]
+        avg_days = sum(days_list) / len(days_list) if days_list else 0
 
         ticker_trades[ticker] = {
             "ticker":            ticker,
