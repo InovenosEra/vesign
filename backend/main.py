@@ -2,11 +2,10 @@ import math
 import os
 import time
 import re
-import smtplib
+import requests
 import subprocess
 import sys
 import tempfile
-from email.mime.text import MIMEText
 from datetime import datetime, time as dt_time, UTC, date
 from typing import Optional
 
@@ -59,23 +58,25 @@ def _set_sqlite_pragmas(dbapi_conn, _):
 
 
 def _send_access_request_email(requester_email: str, message: str):
-    admin_email  = os.getenv("ADMIN_EMAIL")
-    smtp_host    = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port    = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user    = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    if not all([admin_email, smtp_user, smtp_password]):
+    api_key     = os.getenv("RESEND_API_KEY")
+    admin_email = os.getenv("ADMIN_EMAIL")
+    from_addr   = os.getenv("RESEND_FROM", "noreply@ve-sign.com")
+    if not all([api_key, admin_email]):
         return  # not configured — skip silently
-    body = f"New access request on Vesign:\n\nEmail: {requester_email}\nMessage: {message or '(none)'}"
-    msg = MIMEText(body)
-    msg["Subject"] = f"[Vesign] Access request from {requester_email}"
-    msg["From"] = smtp_user
-    msg["To"] = admin_email
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as srv:
-            srv.starttls()
-            srv.login(smtp_user, smtp_password)
-            srv.send_message(msg)
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "from": from_addr,
+                "to": [admin_email],
+                "subject": f"[Vesign] Access request from {requester_email}",
+                "text": f"New access request on Vesign:\n\nEmail: {requester_email}\nMessage: {message or '(none)'}",
+            },
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            print(f"[email] Resend error {resp.status_code}: {resp.text}")
     except Exception as exc:
         print(f"[email] Failed to send access-request notification: {exc}")
 
