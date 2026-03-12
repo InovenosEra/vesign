@@ -760,10 +760,10 @@ def historical_trades(
     conditions = ["COALESCE(c.market, 'US') = :market"]
     params: dict = {"market": mkt}
     if start:
-        conditions.append("DATE(tl.buy_date) >= :start")
+        conditions.append("DATE(tl.sell_date) >= :start")
         params["start"] = start
     if end:
-        conditions.append("DATE(tl.buy_date) <= :end")
+        conditions.append("DATE(tl.sell_date) <= :end")
         params["end"] = end
 
     where = "WHERE " + " AND ".join(conditions)
