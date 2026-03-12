@@ -356,8 +356,7 @@ export default function SignalsPage() {
     keepPreviousData: true,
   })
 
-  // Only request live prices for today's signals — not the full paginated table
-  // (avoids a new FMP request on every page/search change)
+  // Today's tickers: stable key — fires once, not on every page/search change
   const todayTickers = useMemo(() => {
     const set = new Set()
     todayBuy?.forEach(r => r.ticker && set.add(r.ticker))
@@ -365,7 +364,16 @@ export default function SignalsPage() {
     return [...set]
   }, [todayBuy, todaySell])
 
-  const { prices, marketOpen } = useLivePrices(todayTickers)
+  // All Signals table tickers: separate hook so it doesn't pollute today's cache key
+  const allResultTickers = useMemo(() =>
+    [...new Set((allResult?.data ?? []).map(r => r.ticker).filter(Boolean))]
+  , [allResult])
+
+  const { prices: todayPrices, marketOpen } = useLivePrices(todayTickers)
+  const { prices: allPrices }               = useLivePrices(allResultTickers)
+
+  // Merge: today's prices take precedence
+  const prices = useMemo(() => ({ ...allPrices, ...todayPrices }), [todayPrices, allPrices])
 
   return (
     <div>
