@@ -334,29 +334,20 @@ function TradeModal({ row, start, end, onClose }) {
 // Open Trades table
 // ---------------------------------------------------------------------------
 
-function OpenTradesTable({ data }) {
+function OpenTradesTable({ data, search, page, pageSize, setPage }) {
   const { sorted, sort, toggle } = useSort(data, 'buy_date', 'desc')
-  const [page, setPage]         = useState(1)
-  const [pageSize, setPageSize] = useState(10)
 
   const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
 
-  const pages     = Math.max(1, Math.ceil(sorted.length / pageSize))
-  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize)
+  const filtered  = search ? sorted.filter(t =>
+    t.ticker?.toLowerCase().includes(search.toLowerCase()) ||
+    t.company?.toLowerCase().includes(search.toLowerCase())
+  ) : sorted
+  const pages     = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <>
-      <div className="controls">
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
-          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
-        </span>
-      </div>
       <div className="data-table-wrap">
         <table>
           <thead>
@@ -410,9 +401,12 @@ export default function TradesPage() {
 
   const [start, setStart]           = useState(oneYearAgo.toISOString().slice(0, 10))
   const [end,   setEnd]             = useState(new Date().toISOString().slice(0, 10))
-  const [openStart, setOpenStart]   = useState(oneYearAgo.toISOString().slice(0, 10))
-  const [openEnd,   setOpenEnd]     = useState(new Date().toISOString().slice(0, 10))
-  const [selected, setSelected]     = useState(null)
+  const [openStart, setOpenStart]       = useState(oneYearAgo.toISOString().slice(0, 10))
+  const [openEnd,   setOpenEnd]         = useState(new Date().toISOString().slice(0, 10))
+  const [openSearch, setOpenSearch]     = useState('')
+  const [openPage, setOpenPage]         = useState(1)
+  const [openPageSize, setOpenPageSize] = useState(10)
+  const [selected, setSelected]         = useState(null)
   const [search, setSearch]         = useState('')
   const [page, setPage]             = useState(1)
   const [pageSize, setPageSize]     = useState(10)
@@ -582,6 +576,22 @@ export default function TradesPage() {
             onClick={() => { setOpenStart(isoMonthsAgo(m)); setOpenEnd(new Date().toISOString().slice(0, 10)) }}
           >{m}M</button>
         ))}
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            placeholder="🔍 Search ticker or company"
+            value={openSearch}
+            onChange={e => { setOpenSearch(e.target.value); setOpenPage(1) }}
+            style={{ width: 220 }}
+          />
+          {openSearch && <button onClick={() => { setOpenSearch(''); setOpenPage(1) }}>Clear</button>}
+          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+          <select value={openPageSize} onChange={e => { setOpenPageSize(Number(e.target.value)); setOpenPage(1) }}>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </span>
       </div>
 
       {loadingOpen && <p className="loading">Loading…</p>}
@@ -620,7 +630,7 @@ export default function TradesPage() {
                 </div>
               </div>
             )}
-            <OpenTradesTable data={filtered} />
+            <OpenTradesTable data={filtered} search={openSearch} page={openPage} pageSize={openPageSize} setPage={setOpenPage} />
           </>
         )
       })()}
