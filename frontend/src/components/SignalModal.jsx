@@ -203,6 +203,7 @@ export default function SignalModal({ row, onClose }) {
                   contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
                   labelStyle={{ color: 'var(--muted)' }}
                   itemStyle={{ color: 'var(--text)' }}
+                  wrapperStyle={{ zIndex: 50 }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
                   formatter={v => [v.toFixed(2), 'Close']}
                 />
@@ -211,7 +212,7 @@ export default function SignalModal({ row, onClose }) {
             </ResponsiveContainer>
 
             {wrapperWidth > 0 && chartHistory.length > 1 && (
-              <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
+              <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible', zIndex: 10 }}>
 
                 {pairs.map((p, i) => {
                   const buyX  = dateToX(p.buy.date)
