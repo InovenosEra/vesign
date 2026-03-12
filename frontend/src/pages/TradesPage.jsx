@@ -506,27 +506,6 @@ export default function TradesPage() {
             <div className="label">Avg Days Held</div>
             <div className="value">{avgDays != null ? Math.round(avgDays) : '—'}</div>
           </div>
-          <div className="metric-card">
-            <div className="label">Period Yield</div>
-            {(() => {
-              const tradingDays = countTradingDays(start, end)
-              const annualYield = avgReturn != null && avgDays != null && avgDays > 0
-                ? (avgReturn / avgDays) * tradingDays
-                : null
-              return (
-                <div className={`value ${annualYield >= 0 ? 'up' : 'down'}`}>
-                  {annualYield != null ? `${annualYield >= 0 ? '+' : ''}${fmt(annualYield)}%` : '—'}
-                </div>
-              )
-            })()}
-          </div>
-          <div className="metric-card">
-            <div className="label">Beat Market</div>
-            <div className="value">
-              {beatMarket != null ? `${beatMarket} / ${totalPairs}` : '—'}
-            </div>
-            <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 2 }}>trades beat organic</div>
-          </div>
         </div>
       )}
 
