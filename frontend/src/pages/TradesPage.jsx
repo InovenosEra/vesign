@@ -578,7 +578,7 @@ export default function TradesPage() {
         <input type="date" value={openStart} onChange={e => setOpenStart(e.target.value)} />
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
         <input type="date" value={openEnd} onChange={e => setOpenEnd(e.target.value)} />
-        {[3, 6, 12, 24].map(m => (
+        {[3, 6, 12].map(m => (
           <button
             key={m}
             className="period-chip"
