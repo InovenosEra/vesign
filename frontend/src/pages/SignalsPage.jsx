@@ -356,15 +356,16 @@ export default function SignalsPage() {
     keepPreviousData: true,
   })
 
-  const allTickers = useMemo(() => {
+  // Only request live prices for today's signals — not the full paginated table
+  // (avoids a new FMP request on every page/search change)
+  const todayTickers = useMemo(() => {
     const set = new Set()
     todayBuy?.forEach(r => r.ticker && set.add(r.ticker))
     todaySell?.forEach(r => r.ticker && set.add(r.ticker))
-    ;(allResult?.data ?? []).forEach(r => r.ticker && set.add(r.ticker))
     return [...set]
-  }, [todayBuy, todaySell, allResult])
+  }, [todayBuy, todaySell])
 
-  const { prices, marketOpen } = useLivePrices(allTickers)
+  const { prices, marketOpen } = useLivePrices(todayTickers)
 
   return (
     <div>

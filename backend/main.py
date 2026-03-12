@@ -1,5 +1,6 @@
 import math
 import os
+import time
 import re
 import smtplib
 import subprocess
@@ -153,6 +154,11 @@ def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Se
         col = "Close" if "Close" in raw.columns else raw.columns[0]
         return raw[col].dropna()
     return raw.get("Close", pd.Series(dtype=float)).dropna()
+
+
+_live_price_cache: dict = {}      # ticker -> price
+_live_price_cache_ts: float = 0.0 # last fetch timestamp
+_LIVE_CACHE_TTL = 60              # seconds
 
 
 def fetch_live_prices(tickers: list[str]) -> dict:
@@ -633,7 +639,16 @@ def live_prices(tickers: str = Query(..., description="Comma-separated ticker sy
                 result_prices[t] = None
 
     if active:
-        result_prices.update(fetch_live_prices(active))
+        global _live_price_cache, _live_price_cache_ts
+        now = time.time()
+        cached    = {t: _live_price_cache[t] for t in active if t in _live_price_cache}
+        stale     = [t for t in active if t not in _live_price_cache or now - _live_price_cache_ts > _LIVE_CACHE_TTL]
+        if stale:
+            fresh = fetch_live_prices(stale)
+            _live_price_cache.update(fresh)
+            _live_price_cache_ts = now
+            cached.update(fresh)
+        result_prices.update(cached)
 
     # market_open reflects the market relevant to the majority of requested tickers
     il_count = sum(1 for t in ticker_list if t.endswith('.TA'))
