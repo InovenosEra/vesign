@@ -99,7 +99,7 @@ def run_scoring():
         df["target_mean_price"] - df["close"]
     ) / df["close"]
 
-    df["analyst_condition"] = df["fair_value_upside"] >= 0.05
+    df["analyst_condition"] = df["fair_value_upside"] >= config.get("analyst_upside_min", 0.30)
 
     # ---------- Bollinger condition ----------
     df["bb_pct_b"] = (df["close"] - df["bb_low"]) / (df["bb_high"] - df["bb_low"])
