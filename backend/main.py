@@ -739,97 +739,85 @@ def historical_trades(
     end: Optional[str] = None,
     market: Optional[str] = None,
 ):
-    """BUY→SELL trade pairs within the given date range."""
+    """BUY→SELL trade pairs from pre-built trade_log table."""
     mkt = (market or "US").upper()
     conditions = ["COALESCE(c.market, 'US') = :market"]
     params: dict = {"market": mkt}
     if start:
-        conditions.append("DATE(s.date) >= :start")
+        conditions.append("DATE(tl.buy_date) >= :start")
         params["start"] = start
     if end:
-        conditions.append("DATE(s.date) <= :end")
+        conditions.append("DATE(tl.buy_date) <= :end")
         params["end"] = end
 
     where = "WHERE " + " AND ".join(conditions)
 
+    def _v(v):
+        return None if (isinstance(v, float) and math.isnan(v)) else v
+
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, s.signal, s.close, c.company, c.logo_url,
-                   c.industry, c.description, c.description_short,
-                   f.market_cap
-            FROM signals s
-            LEFT JOIN companies c ON s.ticker = c.ticker
-            {_MARKET_CAP_JOIN}
+            SELECT tl.ticker, tl.buy_date, tl.buy_price, tl.sell_date, tl.sell_price, tl.return_pct,
+                   c.company, c.logo_url, c.industry, c.description, c.description_short,
+                   f.market_cap, h.score AS health_score, h.reason AS health_reason
+            FROM trade_log tl
+            LEFT JOIN companies c ON tl.ticker = c.ticker
+            LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
+                ON tl.ticker = f.ticker
+            LEFT JOIN company_health h ON tl.ticker = h.ticker
             {where}
-            ORDER BY s.ticker, s.date
+            ORDER BY tl.ticker, tl.buy_date
         """), conn, params=params)
 
-    df["date"] = pd.to_datetime(df["date"])
-
-    # Build individual trade pairs, then group by ticker
+    # Group by ticker
     ticker_trades: dict = {}
     for ticker, grp in df.groupby("ticker"):
-        open_trade = None
         pairs = []
         for _, row in grp.iterrows():
-            if row["signal"] == "BUY" and open_trade is None:
-                open_trade = row
-            elif row["signal"] == "SELL" and open_trade is not None:
-                buy_close  = open_trade["close"]
-                sell_close = row["close"]
-                # Skip pairs where either price is missing (NULL-close signals)
-                if pd.isna(buy_close) or pd.isna(sell_close):
-                    open_trade = None
-                    continue
-                ret = (sell_close - buy_close) / buy_close
-                pairs.append({
-                    "buy_date":   open_trade["date"].date().isoformat(),
-                    "sell_date":  row["date"].date().isoformat(),
-                    "buy_price":  round(float(buy_close), 2),
-                    "sell_price": round(float(sell_close), 2),
-                    "return_pct": round(float(ret * 100), 2),
-                    "days_held":  int((row["date"] - open_trade["date"]).days),
-                    "result":     "Win" if ret > 0 else "Loss",
-                })
-                open_trade = None
-        # Include any unclosed BUY as an open trade
-        if open_trade is not None and not pd.isna(open_trade["close"]):
+            ret = row["return_pct"]
+            buy_date  = str(row["buy_date"])[:10]
+            sell_date = str(row["sell_date"])[:10] if row["sell_date"] is not None else None
+            buy_price  = row["buy_price"]
+            sell_price = row["sell_price"]
+            days_held = int((pd.to_datetime(row["sell_date"]) - pd.to_datetime(row["buy_date"])).days) \
+                        if row["sell_date"] is not None else None
             pairs.append({
-                "buy_date":   open_trade["date"].date().isoformat(),
-                "sell_date":  None,
-                "buy_price":  round(float(open_trade["close"]), 2),
-                "sell_price": None,
-                "return_pct": None,
-                "days_held":  None,
-                "result":     "Open",
+                "buy_date":   buy_date,
+                "sell_date":  sell_date,
+                "buy_price":  round(float(buy_price), 2) if buy_price is not None else None,
+                "sell_price": round(float(sell_price), 2) if sell_price is not None else None,
+                "return_pct": round(float(ret), 2) if ret is not None else None,
+                "days_held":  days_held,
+                "result":     "Win" if ret is not None and float(ret) > 0 else ("Loss" if ret is not None else "Open"),
             })
+
         closed_pairs = [p for p in pairs if p["result"] != "Open"]
         if not closed_pairs:
             continue
-        mc = grp.iloc[0].get("market_cap")
-        wins = sum(1 for p in closed_pairs if p["result"] == "Win")
-        avg_ret = sum(p["return_pct"] for p in closed_pairs) / len(closed_pairs)
+        mc    = grp.iloc[0].get("market_cap")
+        score = grp.iloc[0].get("health_score")
+        wins  = sum(1 for p in closed_pairs if p["result"] == "Win")
+        avg_ret  = sum(p["return_pct"] for p in closed_pairs) / len(closed_pairs)
         avg_days = sum(p["days_held"] for p in closed_pairs) / len(closed_pairs)
-        def _str_or_none(v):
-            return None if (isinstance(v, float) and math.isnan(v)) else v
 
         ticker_trades[ticker] = {
             "ticker":            ticker,
-            "company":           _str_or_none(grp.iloc[0]["company"]),
-            "logo_url":          _str_or_none(grp.iloc[0]["logo_url"]),
-            "industry":          _str_or_none(grp.iloc[0]["industry"]) if "industry" in grp.columns else None,
-            "description":       _str_or_none(grp.iloc[0]["description"]) if "description" in grp.columns else None,
-            "description_short": _str_or_none(grp.iloc[0]["description_short"]) if "description_short" in grp.columns else None,
+            "company":           _v(grp.iloc[0]["company"]),
+            "logo_url":          _v(grp.iloc[0]["logo_url"]),
+            "industry":          _v(grp.iloc[0]["industry"]),
+            "description":       _v(grp.iloc[0]["description"]),
+            "description_short": _v(grp.iloc[0]["description_short"]),
             "market_cap":        int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
+            "health_score":      int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
+            "health_reason":     _v(grp.iloc[0]["health_reason"]),
             "trade_count":       len(closed_pairs),
             "win_count":         wins,
             "avg_return":        round(avg_ret, 2),
             "avg_days":          round(avg_days, 1),
-            "trades":            pairs,   # full list of pairs for the chart
+            "trades":            pairs,
         }
 
-    # Enrich each ticker with organic_yield: (last_close - first_close) / first_close
-    # over the selected date range, using daily_prices
+    # Enrich with organic_yield over date range
     if ticker_trades and start and end:
         tickers = list(ticker_trades.keys())
         placeholders = ", ".join([f":t{i}" for i in range(len(tickers))])
@@ -848,9 +836,7 @@ def historical_trades(
                       AND ticker IN ({placeholders})
                     GROUP BY ticker
                 )
-                SELECT b.ticker,
-                       d1.close AS first_close,
-                       d2.close AS last_close
+                SELECT b.ticker, d1.close AS first_close, d2.close AS last_close
                 FROM bounds b
                 JOIN daily_prices d1 ON d1.ticker = b.ticker AND date(d1.date) = b.fd
                 JOIN daily_prices d2 ON d2.ticker = b.ticker AND date(d2.date) = b.ld
@@ -859,22 +845,14 @@ def historical_trades(
             t = org_row["ticker"]
             fc, lc = org_row["first_close"], org_row["last_close"]
             if t in ticker_trades and fc and float(fc) > 0:
-                ticker_trades[t]["organic_yield"] = round(
-                    float((lc - fc) / fc * 100), 2
-                )
+                ticker_trades[t]["organic_yield"] = round(float((lc - fc) / fc * 100), 2)
 
-    # Enrich with health score and current signal
+    # Enrich with current signal
     if ticker_trades:
         tickers_list = list(ticker_trades.keys())
         ph = ", ".join([f":h{i}" for i in range(len(tickers_list))])
         hp = {f"h{i}": t for i, t in enumerate(tickers_list)}
-        def _nn(v):
-            return None if (isinstance(v, float) and math.isnan(v)) else v
         with engine.connect() as conn:
-            df_health = pd.read_sql(text(f"""
-                SELECT ticker, score AS health_score, reason AS health_reason
-                FROM company_health WHERE ticker IN ({ph})
-            """), conn, params=hp)
             df_curr = pd.read_sql(text(f"""
                 SELECT s.ticker, s.signal AS current_signal
                 FROM signals s
@@ -882,12 +860,6 @@ def historical_trades(
                       WHERE ticker IN ({ph}) GROUP BY ticker) l
                   ON s.ticker = l.ticker AND s.date = l.md
             """), conn, params=hp)
-        for _, hr in df_health.iterrows():
-            t = hr["ticker"]
-            if t in ticker_trades:
-                score = hr["health_score"]
-                ticker_trades[t]["health_score"] = int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None
-                ticker_trades[t]["health_reason"] = _nn(hr["health_reason"])
         for _, sr in df_curr.iterrows():
             t = sr["ticker"]
             if t in ticker_trades:
