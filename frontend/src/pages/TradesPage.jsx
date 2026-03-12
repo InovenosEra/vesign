@@ -347,7 +347,6 @@ function OpenTradesTable({ data }) {
   return (
     <>
       <div className="controls">
-        <span style={{ color: 'var(--muted)', fontSize: 13 }}>{sorted.length} open position{sorted.length !== 1 ? 's' : ''}</span>
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
           <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
@@ -366,7 +365,6 @@ function OpenTradesTable({ data }) {
               {th('Company',        'company')}
               {th('Ticker',         'ticker')}
               {th('Market Cap (B)', 'market_cap')}
-              {th('Signal',         'current_signal')}
               {th('Buy Date',       'buy_date')}
               {th('Buy Price',      'buy_price')}
               {th('Current Price',  'current_price')}
@@ -376,14 +374,13 @@ function OpenTradesTable({ data }) {
           </thead>
           <tbody>
             {paginated.length === 0
-              ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>No open positions.</td></tr>
+              ? <tr><td colSpan={9} className="empty" style={{ textAlign: 'center' }}>No open positions.</td></tr>
               : paginated.map((t, i) => (
                 <tr key={i}>
                   <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                   <td>{t.company ?? '—'}</td>
                   <td><strong>{t.ticker}</strong></td>
                   <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
-                  <td><span className={`badge badge-${t.current_signal}`}>{t.current_signal}</span></td>
                   <td>{fmtDate(t.buy_date)}</td>
                   <td>{fmt(t.buy_price)}</td>
                   <td>{fmt(t.current_price)}</td>
