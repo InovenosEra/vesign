@@ -1,4 +1,4 @@
-import { useState, useMemo, useContext } from 'react'
+import { useState, useMemo, useContext, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, getSignals } from '../api'
 import { MarketContext } from '../context/MarketContext'
@@ -304,11 +304,17 @@ export default function SignalsPage() {
   const { market } = useContext(MarketContext)
   const [signalFilter, setSignalFilter] = useState('ALL')
   const [search, setSearch]             = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage]                 = useState(1)
   const [pageSize, setPageSize]         = useState(10)
   const [sortBy, setSortBy]             = useState('date')
   const [sortDir, setSortDir]           = useState('desc')
   const [selected, setSelected]         = useState(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400)
+    return () => clearTimeout(t)
+  }, [search])
 
   function handleSort(col) {
     if (col === sortBy) {
@@ -337,10 +343,10 @@ export default function SignalsPage() {
   })
 
   const { data: allResult, isLoading: loadingAll } = useQuery({
-    queryKey: ['signals', signalFilter, search, page, pageSize, sortBy, sortDir, market],
+    queryKey: ['signals', signalFilter, debouncedSearch, page, pageSize, sortBy, sortDir, market],
     queryFn: () => getSignals({
       signal:    signalFilter === 'ALL' ? undefined : signalFilter,
-      search:    search || undefined,
+      search:    debouncedSearch || undefined,
       page,
       page_size: pageSize,
       sort_by:   sortBy,
