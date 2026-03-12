@@ -411,12 +411,14 @@ export default function TradesPage() {
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
-  const [start, setStart]       = useState(oneYearAgo.toISOString().slice(0, 10))
-  const [end,   setEnd]         = useState(new Date().toISOString().slice(0, 10))
-  const [selected, setSelected] = useState(null)
-  const [search, setSearch]     = useState('')
-  const [page, setPage]         = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [start, setStart]           = useState(oneYearAgo.toISOString().slice(0, 10))
+  const [end,   setEnd]             = useState(new Date().toISOString().slice(0, 10))
+  const [openStart, setOpenStart]   = useState(oneYearAgo.toISOString().slice(0, 10))
+  const [openEnd,   setOpenEnd]     = useState(new Date().toISOString().slice(0, 10))
+  const [selected, setSelected]     = useState(null)
+  const [search, setSearch]         = useState('')
+  const [page, setPage]             = useState(1)
+  const [pageSize, setPageSize]     = useState(10)
 
   const { data: trades, isLoading, isError } = useQuery({
     queryKey: ['trades', start, end, market],
@@ -570,9 +572,61 @@ export default function TradesPage() {
 
       {/* Open Trades */}
       <p className="page-title" style={{ marginTop: 40 }}>Open Trades</p>
+
+      <div className="controls">
+        <label style={{ color: 'var(--muted)', fontSize: 13 }}>From</label>
+        <input type="date" value={openStart} onChange={e => setOpenStart(e.target.value)} />
+        <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
+        <input type="date" value={openEnd} onChange={e => setOpenEnd(e.target.value)} />
+        {[3, 6, 12, 24].map(m => (
+          <button
+            key={m}
+            className="period-chip"
+            onClick={() => { setOpenStart(isoMonthsAgo(m)); setOpenEnd(new Date().toISOString().slice(0, 10)) }}
+          >{m}M</button>
+        ))}
+      </div>
+
       {loadingOpen && <p className="loading">Loading…</p>}
       {errorOpen && <p className="error">Error: {openError?.message}</p>}
-      {!loadingOpen && !errorOpen && <OpenTradesTable data={openTrades} />}
+      {!loadingOpen && !errorOpen && (() => {
+        const filtered = openTrades.filter(t => {
+          const d = t.buy_date?.slice(0, 10)
+          return (!openStart || d >= openStart) && (!openEnd || d <= openEnd)
+        })
+        const openCount  = filtered.length
+        const winCount   = filtered.filter(t => (t.unrealized_pct ?? 0) > 0).length
+        const winRate    = openCount > 0 ? (winCount / openCount) * 100 : null
+        const avgYield   = openCount > 0 ? filtered.reduce((s, t) => s + (t.unrealized_pct ?? 0), 0) / openCount : null
+        const avgDaysOpen = openCount > 0 ? filtered.reduce((s, t) => s + (t.days_held ?? 0), 0) / openCount : null
+        return (
+          <>
+            {openCount > 0 && (
+              <div className="metrics">
+                <div className="metric-card">
+                  <div className="label">Open Trades</div>
+                  <div className="value">{openCount}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="label">Win Rate</div>
+                  <div className="value">{winRate != null ? `${winRate.toFixed(1)}%` : '—'}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="label">Avg Yield/Trade</div>
+                  <div className={`value ${avgYield >= 0 ? 'up' : 'down'}`}>
+                    {avgYield != null ? `${avgYield >= 0 ? '+' : ''}${fmt(avgYield)}%` : '—'}
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <div className="label">Avg Days Open</div>
+                  <div className="value">{avgDaysOpen != null ? Math.round(avgDaysOpen) : '—'}</div>
+                </div>
+              </div>
+            )}
+            <OpenTradesTable data={filtered} />
+          </>
+        )
+      })()}
     </div>
   )
 }
