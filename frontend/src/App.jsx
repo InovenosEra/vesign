@@ -9,6 +9,7 @@ import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
 import TradesPage from './pages/TradesPage'
 import GlobalSearch from './components/GlobalSearch'
+import ProfilePictureModal from './components/ProfilePictureModal'
 import LoginPage from './pages/LoginPage'
 import CompleteProfilePage from './pages/CompleteProfilePage'
 import './App.css'
@@ -309,6 +310,7 @@ function UserMenu() {
   const { signOut, openUserProfile } = useClerk()
   const { user } = useUser()
   const [open, setOpen] = useState(false)
+  const [showPicModal, setShowPicModal] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -320,48 +322,61 @@ function UserMenu() {
   }, [])
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          background: 'transparent',
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 12px',
-          cursor: 'pointer',
-          fontSize: 13,
-          color: 'var(--text)',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Hello, {user?.firstName} ▾
-      </button>
-      {open && (
-        <div style={{
-          position: 'absolute', right: 0, top: 'calc(100% + 6px)',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 8, zIndex: 200, minWidth: 160,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
-        }}>
-          {[
-            { label: 'Change Password', action: () => { openUserProfile(); setOpen(false) } },
-            { label: 'Sign Out', action: () => signOut({ redirectUrl: '/sign-in' }) },
-          ].map(item => (
-            <button
-              key={item.label}
-              onClick={item.action}
-              style={{
-                display: 'block', width: '100%', padding: '10px 16px',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: 'var(--text)', fontSize: 13, textAlign: 'left',
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <>
+      <div ref={ref} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setOpen(o => !o)}
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--border)',
+            borderRadius: 20,
+            padding: '3px 12px 3px 4px',
+            cursor: 'pointer',
+            fontSize: 13,
+            color: 'var(--text)',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          {user?.imageUrl
+            ? <img src={user.imageUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+            : <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                {user?.firstName?.[0]}
+              </div>
+          }
+          Hello, {user?.firstName} ▾
+        </button>
+        {open && (
+          <div style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 6px)',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 8, zIndex: 200, minWidth: 180,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
+          }}>
+            {[
+              { label: 'Edit Profile Picture', action: () => { setShowPicModal(true); setOpen(false) } },
+              { label: 'Change Password', action: () => { openUserProfile(); setOpen(false) } },
+              { label: 'Sign Out', action: () => signOut({ redirectUrl: '/sign-in' }) },
+            ].map(item => (
+              <button
+                key={item.label}
+                onClick={item.action}
+                style={{
+                  display: 'block', width: '100%', padding: '10px 16px',
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--text)', fontSize: 13, textAlign: 'left',
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {showPicModal && <ProfilePictureModal onClose={() => setShowPicModal(false)} />}
+    </>
   )
 }
 
