@@ -948,7 +948,8 @@ def open_trades(market: Optional[str] = None):
         # Step 5: company info + health + market cap (IN query, small result)
         df_meta = pd.read_sql(text(f"""
             SELECT c.ticker, c.company, c.logo_url, c.industry, c.market,
-                   f.market_cap, h.score AS health_score
+                   c.description_short, f.market_cap,
+                   h.score AS health_score, h.reason AS health_reason
             FROM companies c
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
                 ON c.ticker = f.ticker
@@ -979,18 +980,20 @@ def open_trades(market: Optional[str] = None):
         mc    = m.get("market_cap")
         score = m.get("health_score")
         result.append({
-            "ticker":         ticker,
-            "company":        _v(m.get("company")),
-            "logo_url":       _v(m.get("logo_url")),
-            "industry":       _v(m.get("industry")),
-            "market_cap":     int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
-            "buy_date":       buy_date_str,
-            "buy_price":      round(float(buy_price), 2) if buy_price is not None else None,
-            "current_price":  round(float(current_price), 2) if current_price is not None else None,
-            "days_held":      days_held,
-            "unrealized_pct": unrealized,
-            "current_signal": cur_sig,
-            "health_score":   int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
+            "ticker":            ticker,
+            "company":           _v(m.get("company")),
+            "logo_url":          _v(m.get("logo_url")),
+            "industry":          _v(m.get("industry")),
+            "description_short": _v(m.get("description_short")),
+            "market_cap":        int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
+            "buy_date":          buy_date_str,
+            "buy_price":         round(float(buy_price), 2) if buy_price is not None else None,
+            "current_price":     round(float(current_price), 2) if current_price is not None else None,
+            "days_held":         days_held,
+            "unrealized_pct":    unrealized,
+            "current_signal":    cur_sig,
+            "health_score":      int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
+            "health_reason":     _v(m.get("health_reason")),
         })
 
     result.sort(key=lambda x: x["buy_date"], reverse=True)

@@ -214,7 +214,8 @@ function TradeModal({ row, start, end, onClose }) {
                     ['Current Signal',      row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
                     ['Current Price',       history12m.length > 0 ? fmt(history12m.at(-1).close / (isIL ? 100 : 1)) : '—'],
                     ['12M Yield (organic)', yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
-                    ['12M Yield (Vesign)',  row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—'],
+                    ...(row.unrealized_pct == null ? [['12M Yield (Vesign)', row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
+                    ...(row.unrealized_pct != null ? [['Yield Since Buy', <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
                       <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 120 }}>{label}</td>
@@ -312,12 +313,28 @@ function TradeModal({ row, start, end, onClose }) {
                           </text>
                         </>
                       })()}
-                      {buyX != null && t.result === 'Open' && (
-                        <text x={buyX + 6} y={PLOT_TOP + 30} fontSize={10}
-                          style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                          OPEN
-                        </text>
-                      )}
+                      {buyX != null && t.result === 'Open' && (() => {
+                        const lastX = dateToX(history.at(-1).date)
+                        const currentPrice = history.at(-1).close
+                        const pct = t.buy_price != null && currentPrice != null
+                          ? ((currentPrice - t.buy_price) / t.buy_price) * 100
+                          : null
+                        const color = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
+                        const lineY = PLOT_TOP + 18
+                        return <>
+                          <text x={buyX + 6} y={PLOT_TOP + 30} fontSize={10}
+                            style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                            OPEN
+                          </text>
+                          {lastX != null && pct != null && <>
+                            <line x1={buyX} y1={lineY} x2={lastX} y2={lineY} style={{ stroke: color, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
+                            <text x={(buyX + lastX) / 2} y={lineY - 6} textAnchor="middle" fontSize={10}
+                              style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                              {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
+                            </text>
+                          </>}
+                        </>
+                      })()}
                     </g>
                   )
                 })}
@@ -334,7 +351,7 @@ function TradeModal({ row, start, end, onClose }) {
 // Open Trades table
 // ---------------------------------------------------------------------------
 
-function OpenTradesTable({ data, search, page, pageSize, setPage }) {
+function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
   const { sorted, sort, toggle } = useSort(data, 'buy_date', 'desc')
 
   const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
@@ -367,7 +384,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage }) {
             {paginated.length === 0
               ? <tr><td colSpan={9} className="empty" style={{ textAlign: 'center' }}>No open positions.</td></tr>
               : paginated.map((t, i) => (
-                <tr key={i}>
+                <tr key={i} className="clickable-row" onClick={() => onSelect(t)}>
                   <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                   <td>{t.company ?? '—'}</td>
                   <td><strong>{t.ticker}</strong></td>
@@ -407,6 +424,7 @@ export default function TradesPage() {
   const [openPage, setOpenPage]         = useState(1)
   const [openPageSize, setOpenPageSize] = useState(10)
   const [selected, setSelected]         = useState(null)
+  const [selectedOpen, setSelectedOpen] = useState(null)
   const [search, setSearch]         = useState('')
   const [page, setPage]             = useState(1)
   const [pageSize, setPageSize]     = useState(10)
@@ -560,6 +578,14 @@ export default function TradesPage() {
       })()}
 
       {selected && <TradeModal row={selected} start={start} end={end} onClose={() => setSelected(null)} />}
+      {selectedOpen && (
+        <TradeModal
+          row={{ ...selectedOpen, trades: [{ buy_date: selectedOpen.buy_date, sell_date: null, buy_price: selectedOpen.buy_price, sell_price: null, result: 'Open' }] }}
+          start={isoMonthsAgo(12)}
+          end={new Date().toISOString().slice(0, 10)}
+          onClose={() => setSelectedOpen(null)}
+        />
+      )}
 
       {/* Open Trades */}
       <p className="page-title" style={{ marginTop: 40 }}>Open Trades</p>
@@ -630,7 +656,7 @@ export default function TradesPage() {
                 </div>
               </div>
             )}
-            <OpenTradesTable data={filtered} search={openSearch} page={openPage} pageSize={openPageSize} setPage={setOpenPage} />
+            <OpenTradesTable data={filtered} search={openSearch} page={openPage} pageSize={openPageSize} setPage={setOpenPage} onSelect={setSelectedOpen} />
           </>
         )
       })()}

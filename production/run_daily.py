@@ -138,6 +138,9 @@ def run_daily():
     summarize_descriptions()
     update_company_health()
 
+    # ── Price gap repair before signal engine so no dates are skipped ────────
+    _repair_price_gaps()
+
     prices = load_prices()
     features_df = compute_features(prices)
     save_features(features_df)
@@ -150,8 +153,7 @@ def run_daily():
     run_ranking()
     run_allocator()
 
-    # ── Self-healing repairs ─────────────────────────────────────────────────
-    _repair_price_gaps()
+    # ── Remaining self-healing repairs ───────────────────────────────────────
     _repair_market_caps()
     _repair_analyst_targets()
 
