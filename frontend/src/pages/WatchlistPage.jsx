@@ -4,6 +4,7 @@ import {
   getWatchlists, createWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker,
   getSignalsByTickers, searchTickers,
+  getHoldings, addHolding, deleteHolding,
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
@@ -31,15 +32,17 @@ const _HEALTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
 function HealthCell({ score }) {
   if (!score) return <td style={{ color: 'var(--muted)' }}>—</td>
   return (
-    <td title={_HEALTH_LABELS[score]} style={{ whiteSpace: 'nowrap' }}>
-      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-        {[1,2,3,4,5].map(i => (
-          <div key={i} style={{
-            width: 10, height: 10, borderRadius: 2,
-            background: i <= score ? _HEALTH_COLORS[score] : 'var(--border)',
-          }} />
-        ))}
-        <span style={{ fontSize: 11, color: _HEALTH_COLORS[score], marginLeft: 3 }}>
+    <td title={_HEALTH_LABELS[score]}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {[1,2,3,4,5].map(i => (
+            <div key={i} style={{
+              width: 10, height: 10, borderRadius: 2,
+              background: i <= score ? _HEALTH_COLORS[score] : 'var(--border)',
+            }} />
+          ))}
+        </div>
+        <span style={{ fontSize: 11, color: _HEALTH_COLORS[score] }}>
           {_HEALTH_LABELS[score]}
         </span>
       </div>
@@ -133,8 +136,41 @@ export default function WatchlistPage() {
   const { prices, marketOpen } = useLivePrices(tickerSymbols)
   const { sorted, sort, toggle } = useSort(merged, 'ticker', 'asc')
 
-  const invalidateLists   = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
-  const invalidateTickers = () => qc.invalidateQueries({ queryKey: ['watchlist-tickers', selectedId] })
+  const [expandedTickers, setExpandedTickers] = useState({})
+  const [newLot, setNewLot] = useState({})   // { [ticker]: { quantity, buy_price, buy_date } }
+
+  const { data: holdings = [] } = useQuery({
+    queryKey: ['watchlist-holdings', selectedId],
+    queryFn: () => getHoldings(selectedId),
+    enabled: selectedId != null,
+  })
+
+  // Group holdings by ticker
+  const holdingsByTicker = useMemo(() => {
+    const map = {}
+    for (const h of holdings) {
+      if (!map[h.ticker]) map[h.ticker] = []
+      map[h.ticker].push(h)
+    }
+    return map
+  }, [holdings])
+
+  const invalidateLists    = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
+  const invalidateTickers  = () => qc.invalidateQueries({ queryKey: ['watchlist-tickers', selectedId] })
+  const invalidateHoldings = () => qc.invalidateQueries({ queryKey: ['watchlist-holdings', selectedId] })
+
+  const addHoldingMut = useMutation({
+    mutationFn: (body) => addHolding(selectedId, body),
+    onSuccess: (_, body) => {
+      invalidateHoldings()
+      setNewLot(prev => ({ ...prev, [body.ticker]: { quantity: '', buy_price: '', buy_date: '' } }))
+    },
+  })
+
+  const deleteHoldingMut = useMutation({
+    mutationFn: (hid) => deleteHolding(selectedId, hid),
+    onSuccess: invalidateHoldings,
+  })
 
   const createMut = useMutation({
     mutationFn: () => createWatchlist(newListName.trim()),
@@ -219,59 +255,57 @@ export default function WatchlistPage() {
   return (
     <div>
       <p className="page-title">Watchlists</p>
-      <div className="watchlist-layout">
 
-        {/* ── Sidebar ── */}
-        <div className="watchlist-sidebar">
-          <h3>My Lists</h3>
-          {lists.length === 0 && <p className="empty" style={{ fontSize: 12 }}>No lists yet.</p>}
-          {lists.map(l => (
-            <div
-              key={l.id}
-              className={`list-item ${l.id === selectedId ? 'selected' : ''}`}
-              onClick={() => setSelectedId(l.id)}
-            >
-              <span>{l.name}</span>
-              <button
-                className="del-btn"
-                onClick={e => { e.stopPropagation(); deleteMut.mutate(l.id) }}
-                title="Delete list"
-              >✕</button>
-            </div>
-          ))}
-          <div className="new-list-row">
-            <input
-              placeholder="New list name…"
-              value={newListName}
-              onChange={e => setNewListName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && newListName.trim() && createMut.mutate()}
-            />
-            <button
-              className="primary"
-              onClick={() => createMut.mutate()}
-              disabled={!newListName.trim() || createMut.isPending}
-            >+</button>
-          </div>
-          {createMut.isError && (
-            <p className="error" style={{ fontSize: 12, marginTop: 6 }}>{createMut.error.message}</p>
-          )}
-        </div>
+      {/* ── List selector row ── */}
+      <div className="controls" style={{ marginBottom: 20 }}>
+        <select
+          value={selectedId ?? ''}
+          onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : null)}
+          style={{ minWidth: 180, fontSize: 15, fontWeight: 600 }}
+        >
+          <option value="">— select a list —</option>
+          {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+        {marketOpen && tickerSymbols.length > 0 && (
+          <span style={{ color: 'var(--green)', fontSize: 12 }}>● live</span>
+        )}
+        {selectedId && (
+          <button
+            className="danger"
+            style={{ padding: '4px 10px', fontSize: 12 }}
+            onClick={() => {
+              if (window.confirm(`Delete "${selectedList?.name}"? This cannot be undone.`)) {
+                deleteMut.mutate(selectedId)
+              }
+            }}
+          >Delete list</button>
+        )}
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            placeholder="New list name…"
+            value={newListName}
+            onChange={e => setNewListName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && newListName.trim() && createMut.mutate()}
+            style={{ width: 180 }}
+          />
+          <button
+            className="primary"
+            onClick={() => createMut.mutate()}
+            disabled={!newListName.trim() || createMut.isPending}
+          >+ Create</button>
+        </span>
+        {createMut.isError && (
+          <span className="error" style={{ fontSize: 12 }}>{createMut.error.message}</span>
+        )}
+      </div>
 
-        {/* ── Main panel ── */}
-        <div>
-          {!selectedList ? (
-            <p className="empty">Select or create a watchlist.</p>
-          ) : (
-            <>
-              <p className="section-title">
-                {selectedList.name}
-                {marketOpen && tickerSymbols.length > 0 && (
-                  <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>● live</span>
-                )}
-              </p>
+      {!selectedList ? (
+        <p className="empty">Select a list or create a new one above.</p>
+      ) : (
+        <>
 
-              {/* Add ticker row */}
-              <div className="controls" style={{ marginBottom: 20 }}>
+          {/* Add ticker row */}
+          <div className="controls" style={{ marginBottom: 20 }}>
                 <div style={{ position: 'relative' }}>
                   <input
                     ref={tickerInputRef}
@@ -345,59 +379,225 @@ export default function WatchlistPage() {
                 <p className="loading">Loading…</p>
               ) : tickers.length === 0 ? (
                 <p className="empty">No tickers yet. Add one above.</p>
-              ) : (
-                <div className="data-table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th></th>
-                        {th('Ticker',         'ticker')}
-                        {th('Company',        'company')}
-                        {th('Signal',         'signal')}
-                        {th('Market Cap (B)', 'market_cap')}
-                        {th('Price',          'close')}
-                        {th('RSI',            'rsi')}
-                        <th>Health Score</th>
-                        <th>Prediction</th>
-                        <th>Live Price</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sorted.map(t => (
-                        <tr key={t.ticker} className="clickable-row" onClick={() => setSelected(t)}>
-                          <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                          <td><strong>{displayTicker(t.ticker)}</strong></td>
-                          <td>{t.company ?? '—'}</td>
-                          <td>{t.signal ? <span className={`badge badge-${t.signal}`}>{t.signal}</span> : '—'}</td>
-                          <td>{fmtMktCap(t.market_cap, t.ticker)}</td>
-                          <td>{fmtPrice(t.close, t.ticker)}</td>
-                          <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
-                          <HealthCell score={t.health_score} />
-                          <UpsideCell targetMean={t.target_mean_price} close={t.close} prices={prices} ticker={t.ticker} />
-                          <LivePriceCell
-                            ticker={t.ticker}
-                            closePrice={t.close}
-                            prices={prices}
-                            marketOpen={marketOpen}
-                          />
-                          <td onClick={e => e.stopPropagation()}>
-                            <button
-                              className="danger"
-                              style={{ padding: '4px 10px', fontSize: 12 }}
-                              onClick={() => removeMut.mutate(t.ticker)}
-                            >Remove</button>
-                          </td>
+              ) : (() => {
+                // ── Portfolio summary ──────────────────────────────────────
+                let totalInvested = 0, totalValue = 0
+                for (const t of sorted) {
+                  const lots = holdingsByTicker[t.ticker] || []
+                  const isIL = t.ticker?.endsWith('.TA')
+                  const currentPrice = (() => {
+                    const live = prices[t.ticker]
+                    const raw = live ?? t.close
+                    return raw != null ? (isIL ? raw / 100 : raw) : null
+                  })()
+                  for (const lot of lots) {
+                    const cost = lot.quantity * lot.buy_price
+                    totalInvested += cost
+                    if (currentPrice != null) totalValue += lot.quantity * currentPrice
+                  }
+                }
+                const totalPnlAbs = totalValue - totalInvested
+                const totalPnlPct = totalInvested > 0 ? (totalPnlAbs / totalInvested) * 100 : null
+                const hasHoldings = totalInvested > 0
+
+                return (<>
+                  {hasHoldings && (
+                    <div className="metrics" style={{ marginBottom: 16 }}>
+                      <div className="metric-card">
+                        <div className="label">Total Invested</div>
+                        <div className="value">${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      </div>
+                      <div className="metric-card">
+                        <div className="label">Current Value</div>
+                        <div className="value">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      </div>
+                      <div className="metric-card">
+                        <div className="label">Total P&L ($)</div>
+                        <div className={`value ${totalPnlAbs >= 0 ? 'up' : 'down'}`}>
+                          {totalPnlAbs >= 0 ? '+' : ''}${Math.abs(totalPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                      <div className="metric-card">
+                        <div className="label">Total P&L (%)</div>
+                        <div className={`value ${totalPnlPct >= 0 ? 'up' : 'down'}`}>
+                          {totalPnlPct != null ? `${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%` : '—'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="data-table-wrap">
+                    <table style={{ tableLayout: 'fixed', width: '100%' }}>
+                      <colgroup>
+                        <col style={{ width: '3%' }} />   {/* logo */}
+                        <col style={{ width: '5%' }} />   {/* ticker */}
+                        <col style={{ width: '12%' }} />  {/* company */}
+                        <col style={{ width: '6%' }} />   {/* signal */}
+                        <col style={{ width: '7%' }} />   {/* market cap */}
+                        <col style={{ width: '6%' }} />   {/* price */}
+                        <col style={{ width: '5%' }} />   {/* rsi */}
+                        <col style={{ width: '9%' }} />   {/* health */}
+                        <col style={{ width: '7%' }} />   {/* prediction */}
+                        <col style={{ width: '9%' }} />   {/* live price */}
+                        <col style={{ width: '5%' }} />   {/* qty */}
+                        <col style={{ width: '6%' }} />   {/* avg price */}
+                        <col style={{ width: '8%' }} />   {/* invested */}
+                        <col style={{ width: '6%' }} />   {/* yield */}
+                        <col style={{ width: '11%' }} />  {/* actions */}
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th></th>
+                          {th('Ticker',         'ticker')}
+                          {th('Company',        'company')}
+                          {th('Signal',         'signal')}
+                          {th('Mkt Cap (B)',    'market_cap')}
+                          {th('Price',          'close')}
+                          {th('RSI',            'rsi')}
+                          <th>Health</th>
+                          <th>Upside</th>
+                          <th>Live Price</th>
+                          <th>Qty</th>
+                          <th>Avg Price</th>
+                          <th>Invested</th>
+                          <th>Yield</th>
+                          <th></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+                      </thead>
+                      <tbody>
+                        {sorted.map(t => {
+                          const lots = holdingsByTicker[t.ticker] || []
+                          const isIL = t.ticker?.endsWith('.TA')
+                          const currentPrice = (() => {
+                            const live = prices[t.ticker]
+                            const raw = live ?? t.close
+                            return raw != null ? (isIL ? raw / 100 : raw) : null
+                          })()
+                          const totalQty = lots.reduce((s, l) => s + l.quantity, 0)
+                          const totalCost = lots.reduce((s, l) => s + l.quantity * l.buy_price, 0)
+                          const avgPrice = totalQty > 0 ? totalCost / totalQty : null
+                          const currentVal = currentPrice != null && totalQty > 0 ? currentPrice * totalQty : null
+                          const yieldPct = currentVal != null && totalCost > 0 ? ((currentVal - totalCost) / totalCost) * 100 : null
+                          const isExpanded = !!expandedTickers[t.ticker]
+                          const lot = newLot[t.ticker] || { quantity: '', buy_price: '', buy_date: '' }
+
+                          const clip = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+
+                          return [
+                            <tr key={t.ticker} className="clickable-row" onClick={() => setSelected(t)}>
+                              <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
+                              <td style={clip}><strong>{displayTicker(t.ticker)}</strong></td>
+                              <td style={clip}>{t.company ?? '—'}</td>
+                              <td>{t.signal ? <span className={`badge badge-${t.signal}`}>{t.signal}</span> : '—'}</td>
+                              <td>{fmtMktCap(t.market_cap, t.ticker)}</td>
+                              <td>{fmtPrice(t.close, t.ticker)}</td>
+                              <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
+                              <HealthCell score={t.health_score} />
+                              <UpsideCell targetMean={t.target_mean_price} close={t.close} prices={prices} ticker={t.ticker} />
+                              <LivePriceCell ticker={t.ticker} closePrice={t.close} prices={prices} marketOpen={marketOpen} />
+                              <td>{totalQty > 0 ? totalQty : '—'}</td>
+                              <td>{avgPrice != null ? avgPrice.toFixed(2) : '—'}</td>
+                              <td>{totalCost > 0 ? `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</td>
+                              <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
+                                {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(2)}%` : '—'}
+                              </td>
+                              <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
+                                <button
+                                  style={{ padding: '4px 8px', fontSize: 12, marginRight: 4 }}
+                                  onClick={() => setExpandedTickers(prev => ({ ...prev, [t.ticker]: !prev[t.ticker] }))}
+                                >{isExpanded ? '▲' : '▼'}{lots.length > 0 ? ` (${lots.length})` : ''}</button>
+                                <button
+                                  className="danger"
+                                  style={{ padding: '4px 8px', fontSize: 14 }}
+                                  onClick={() => removeMut.mutate(t.ticker)}
+                                  title="Remove from watchlist"
+                                >🗑</button>
+                              </td>
+                            </tr>,
+
+                            isExpanded && (
+                              <tr key={`${t.ticker}-lots`}>
+                                <td colSpan={15} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
+                                  <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--accent)' }}>
+                                    {/* Existing lots */}
+                                    {lots.length === 0
+                                      ? <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 10px' }}>No lots yet.</p>
+                                      : <table style={{ fontSize: 12, borderCollapse: 'collapse', marginBottom: 10, width: 'auto' }}>
+                                          <thead>
+                                            <tr style={{ color: 'var(--muted)' }}>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Date</th>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Qty</th>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Buy Price</th>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Cost</th>
+                                              <th style={{ padding: '2px 0', fontWeight: 500 }}>Yield</th>
+                                              <th></th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {lots.map(l => {
+                                              const lotYield = currentPrice != null
+                                                ? ((currentPrice - l.buy_price) / l.buy_price) * 100 : null
+                                              return (
+                                                <tr key={l.id}>
+                                                  <td style={{ padding: '3px 16px 3px 0' }}>{l.buy_date}</td>
+                                                  <td style={{ padding: '3px 16px 3px 0' }}>{l.quantity}</td>
+                                                  <td style={{ padding: '3px 16px 3px 0' }}>${l.buy_price.toFixed(2)}</td>
+                                                  <td style={{ padding: '3px 16px 3px 0' }}>${(l.quantity * l.buy_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                                  <td className={lotYield != null ? (lotYield >= 0 ? 'up' : 'down') : ''} style={{ padding: '3px 16px 3px 0' }}>
+                                                    {lotYield != null ? `${lotYield >= 0 ? '+' : ''}${lotYield.toFixed(2)}%` : '—'}
+                                                  </td>
+                                                  <td>
+                                                    <button className="danger" style={{ padding: '2px 8px', fontSize: 11 }}
+                                                      onClick={() => deleteHoldingMut.mutate(l.id)}>✕</button>
+                                                  </td>
+                                                </tr>
+                                              )
+                                            })}
+                                          </tbody>
+                                        </table>
+                                    }
+                                    {/* Add lot form */}
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <input
+                                        type="number" min="0" step="any"
+                                        placeholder="Qty"
+                                        value={lot.quantity}
+                                        onChange={e => setNewLot(prev => ({ ...prev, [t.ticker]: { ...lot, quantity: e.target.value } }))}
+                                        style={{ width: 80 }}
+                                      />
+                                      <input
+                                        type="number" min="0" step="any"
+                                        placeholder="Buy price"
+                                        value={lot.buy_price}
+                                        onChange={e => setNewLot(prev => ({ ...prev, [t.ticker]: { ...lot, buy_price: e.target.value } }))}
+                                        style={{ width: 100 }}
+                                      />
+                                      <input
+                                        type="date"
+                                        value={lot.buy_date}
+                                        onChange={e => setNewLot(prev => ({ ...prev, [t.ticker]: { ...lot, buy_date: e.target.value } }))}
+                                        style={{ width: 140 }}
+                                      />
+                                      <button
+                                        className="primary"
+                                        style={{ padding: '4px 12px', fontSize: 12 }}
+                                        disabled={!lot.quantity || !lot.buy_price || !lot.buy_date || addHoldingMut.isPending}
+                                        onClick={() => addHoldingMut.mutate({ ticker: t.ticker, quantity: parseFloat(lot.quantity), buy_price: parseFloat(lot.buy_price), buy_date: lot.buy_date })}
+                                      >+ Add lot</button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ),
+                          ]
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>)
+              })()}
+        </>
+      )}
       {selected && <SignalModal row={selected} onClose={() => setSelected(null)} />}
     </div>
   )

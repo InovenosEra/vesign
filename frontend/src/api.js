@@ -118,6 +118,9 @@ export const updateTickerNote = (id, ticker, note) =>
   patch(`/watchlists/${id}/tickers/${ticker}`, { note })
 export const removeTicker = (id, ticker) =>
   del(`/watchlists/${id}/tickers/${ticker}`)
+export const getHoldings = (id) => get(`/watchlists/${id}/holdings`)
+export const addHolding = (id, body) => post(`/watchlists/${id}/holdings`, body)
+export const deleteHolding = (id, holdingId) => del(`/watchlists/${id}/holdings/${holdingId}`)
 
 // --- Search ----------------------------------------------------------------
 export const searchTickers = (q, limit = 10) =>

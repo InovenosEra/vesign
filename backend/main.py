@@ -747,6 +747,41 @@ def remove_ticker(list_id: int, ticker: str):
         )
 
 
+# --- Watchlist holdings ------------------------------------------------------
+
+class HoldingCreate(BaseModel):
+    ticker: str
+    quantity: float
+    buy_price: float
+    buy_date: str
+
+@protected.get("/api/watchlists/{list_id}/holdings")
+def get_holdings(list_id: int):
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id, ticker, quantity, buy_price, buy_date FROM watchlist_holdings WHERE watchlist_id = :lid ORDER BY ticker, buy_date"),
+            {"lid": list_id},
+        ).fetchall()
+    return [{"id": r[0], "ticker": r[1], "quantity": r[2], "buy_price": r[3], "buy_date": r[4]} for r in rows]
+
+@protected.post("/api/watchlists/{list_id}/holdings", status_code=201)
+def add_holding(list_id: int, body: HoldingCreate):
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("INSERT INTO watchlist_holdings (watchlist_id, ticker, quantity, buy_price, buy_date) VALUES (:lid, :ticker, :qty, :price, :date)"),
+            {"lid": list_id, "ticker": body.ticker.upper(), "qty": body.quantity, "price": body.buy_price, "date": body.buy_date},
+        )
+    return {"id": result.lastrowid}
+
+@protected.delete("/api/watchlists/{list_id}/holdings/{holding_id}", status_code=204)
+def delete_holding(list_id: int, holding_id: int):
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM watchlist_holdings WHERE id = :hid AND watchlist_id = :lid"),
+            {"hid": holding_id, "lid": list_id},
+        )
+
+
 # --- Historical trades ------------------------------------------------------
 
 @protected.get("/api/trades")
