@@ -78,7 +78,7 @@ export default function SignalModal({ row, onClose }) {
   let pendingBuy = null
   for (const m of markers) {
     if (m.signal === 'BUY') {
-      pendingBuy = m
+      if (!pendingBuy) pendingBuy = m   // keep first BUY of streak
     } else if (m.signal === 'SELL' && pendingBuy) {
       pairs.push({ buy: pendingBuy, sell: m })
       pendingBuy = null
