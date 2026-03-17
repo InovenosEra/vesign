@@ -393,7 +393,7 @@ def update_company_info():
         except Exception:
             pass
 
-        with ThreadPoolExecutor(max_workers=2) as ex:
+        with ThreadPoolExecutor(max_workers=3) as ex:
             futures = {ex.submit(_fetch_tase, t): t for t in tase_tickers}
             done = 0
             for f in as_completed(futures):
@@ -605,7 +605,7 @@ def update_company_health():
             return None
 
     if us_pending:
-        with ThreadPoolExecutor(max_workers=3) as ex:
+        with ThreadPoolExecutor(max_workers=5) as ex:
             futures = {ex.submit(_score_us, t): t for t in us_pending}
             for f in as_completed(futures):
                 done += 1
@@ -665,7 +665,7 @@ def update_company_health():
         except Exception:
             pass
 
-        with ThreadPoolExecutor(max_workers=2) as ex:
+        with ThreadPoolExecutor(max_workers=3) as ex:
             futures = {ex.submit(_score_tase, t): t for t in tase_pending}
             for f in as_completed(futures):
                 done += 1
