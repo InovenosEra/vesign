@@ -436,15 +436,15 @@ export default function WatchlistPage() {
                         <col style={{ width: '7%' }} />   {/* market cap */}
                         <col style={{ width: '6%' }} />   {/* price */}
                         <col style={{ width: '5%' }} />   {/* rsi */}
-                        <col style={{ width: '9%' }} />   {/* health */}
+                        <col style={{ width: '6%' }} />   {/* health */}
                         <col style={{ width: '6%' }} />   {/* upside */}
                         <col style={{ width: '6%' }} />   {/* ml score */}
-                        <col style={{ width: '9%' }} />   {/* live price */}
+                        <col style={{ width: '8%' }} />   {/* live price */}
                         <col style={{ width: '5%' }} />   {/* qty */}
                         <col style={{ width: '6%' }} />   {/* avg price */}
-                        <col style={{ width: '8%' }} />   {/* invested */}
-                        <col style={{ width: '6%' }} />   {/* yield */}
-                        <col style={{ width: '11%' }} />  {/* actions */}
+                        <col style={{ width: '7%' }} />   {/* invested */}
+                        <col style={{ width: '5%' }} />   {/* yield */}
+                        <col style={{ width: '6%' }} />   {/* actions */}
                       </colgroup>
                       <thead>
                         <tr>
@@ -504,14 +504,14 @@ export default function WatchlistPage() {
                               <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
                                 {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(2)}%` : '—'}
                               </td>
-                              <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
+                              <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                                 <button
-                                  style={{ padding: '4px 8px', fontSize: 12, marginRight: 4 }}
+                                  style={{ padding: '2px 6px', fontSize: 10, marginRight: 4 }}
                                   onClick={() => setExpandedTickers(prev => ({ ...prev, [t.ticker]: !prev[t.ticker] }))}
-                                >{isExpanded ? '▲' : '▼'}{lots.length > 0 ? ` (${lots.length})` : ''}</button>
+                                >{isExpanded ? '▲' : '▼'}</button>
                                 <button
                                   className="danger"
-                                  style={{ padding: '4px 8px', fontSize: 14 }}
+                                  style={{ padding: '4px 8px', fontSize: 14, border: 'none', background: 'transparent', color: '#e74c3c' }}
                                   onClick={() => removeMut.mutate(t.ticker)}
                                   title="Remove from watchlist"
                                 >🗑</button>
