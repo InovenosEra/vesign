@@ -99,7 +99,11 @@ def run_scoring():
         df["target_mean_price"] - df["close"]
     ) / df["close"]
 
-    df["analyst_condition"] = df["fair_value_upside"] >= config.get("analyst_upside_min", 0.30)
+    # IL stocks with no analyst target pass through (rule waived — no free source covers them)
+    il_no_target = df["ticker"].str.endswith(".TA") & df["target_mean_price"].isna()
+    df["analyst_condition"] = (
+        (df["fair_value_upside"] >= config.get("analyst_upside_min", 0.30)) | il_no_target
+    )
 
     # ---------- Bollinger condition ----------
     df["bb_pct_b"] = (df["close"] - df["bb_low"]) / (df["bb_high"] - df["bb_low"])

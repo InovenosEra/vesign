@@ -57,12 +57,13 @@ def _fetch_ta_index(url: str) -> pd.DataFrame:
     html = StringIO(response.text)
     tables = pd.read_html(html)
 
-    # Find the table that has a Symbol column
-    table = None
-    for t in tables:
-        if "Symbol" in t.columns:
-            table = t
-            break
+    # Find the table that has a Symbol/Ticker column (flat or MultiIndex)
+    def _has_symbol_col(t):
+        if isinstance(t.columns, pd.MultiIndex):
+            return any("Symbol" in str(c) or "Ticker" in str(c) for c in t.columns)
+        return any(k in t.columns for k in ("Symbol", "Ticker"))
+
+    table = next((t for t in tables if _has_symbol_col(t)), None)
     if table is None:
         raise ValueError(f"No table with 'Symbol' column found at {url}")
 
@@ -70,11 +71,11 @@ def _fetch_ta_index(url: str) -> pd.DataFrame:
     if isinstance(table.columns, pd.MultiIndex):
         table.columns = [" ".join(str(c) for c in col).strip() for col in table.columns]
         # Re-find columns after flattening
-        sym_col = next((c for c in table.columns if "Symbol" in c), None)
-        name_col = next((c for c in table.columns if "Name" in c), None)
-        sec_col  = next((c for c in table.columns if "Sector" in c), None)
+        sym_col = next((c for c in table.columns if "Symbol" in c or "Ticker" in c), None)
+        name_col = next((c for c in table.columns if "Name" in c or "Corporation" in c), None)
+        sec_col  = next((c for c in table.columns if "Sector" in c or "Industry" in c), None)
     else:
-        sym_col  = "Symbol"
+        sym_col  = next((c for c in ("Symbol", "Ticker") if c in table.columns), None) or "Symbol"
         name_col = next((c for c in ("Name", "Company", "Security") if c in table.columns), table.columns[0])
         sec_col  = next((c for c in ("Sector", "GICS Sector", "Industry") if c in table.columns), None)
 
