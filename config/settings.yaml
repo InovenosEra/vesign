@@ -12,6 +12,8 @@ trailing_stop_pct: 0.10
 volume_ratio_threshold: 1.5
 pct_from_52w_high_min: 0.10
 analyst_upside_min: 0.30
+health_score_min: 3
+ml_score_min: 0.05
 
 vix:
   low_threshold: 15

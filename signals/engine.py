@@ -13,6 +13,10 @@ def _ensure_signals_columns():
         "pct_from_52w_high":"REAL",
         "volume_flag":      "INTEGER",
         "week52_condition": "INTEGER",
+        "health_score":     "REAL",
+        "health_condition": "INTEGER",
+        "prediction_score": "REAL",
+        "ml_condition":     "INTEGER",
     }
     inspector = inspect(engine)
     if "signals" in inspector.get_table_names():
@@ -90,9 +94,20 @@ def run_scoring():
         engine
     )
 
-    analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+    analyst  = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+    health   = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
 
     df = features.merge(analyst, on="ticker", how="left")
+    df = df.merge(health, on="ticker", how="left")
+
+    # ---------- ML prediction scores (loaded early — used as BUY gate) ----------
+    if "predictions" in inspect(engine).get_table_names():
+        predictions = pd.read_sql(
+            "SELECT date, ticker, prediction_score FROM predictions", engine
+        )
+        df = df.merge(predictions, on=["date", "ticker"], how="left")
+    else:
+        df["prediction_score"] = float("nan")
 
     # ---------- Analyst upside ----------
     df["fair_value_upside"] = (
@@ -136,6 +151,22 @@ def run_scoring():
         df["pct_from_52w_high"] <= -config.get("pct_from_52w_high_min", 0.10)
     )
 
+    # ---------- Health score gate ----------
+    # Pass through if no score (new/unscored ticker), waived for IL (already have scores but safety net)
+    health_min = config.get("health_score_min", 3)
+    df["health_condition"] = (
+        (df["health_score"] >= health_min) | df["health_score"].isna()
+    )
+
+    # ---------- ML score gate ----------
+    # Waived for IL tickers (no ML model for TASE) and NULL scores (new tickers)
+    ml_min = config.get("ml_score_min", 0.05)
+    df["ml_condition"] = (
+        (df["prediction_score"] >= ml_min)
+        | df["ticker"].str.endswith(".TA")
+        | df["prediction_score"].isna()
+    )
+
     # ---------- Filter to today before signal assignment ----------
     # Rolling windows already computed above using full history.
     # Signal assignment only touches today's rows — much faster.
@@ -163,6 +194,8 @@ def run_scoring():
         & today_df["analyst_condition"]
         & today_df["volume_flag"]
         & today_df["week52_condition"]
+        & today_df["health_condition"]
+        & today_df["ml_condition"]
     )
     sell_cond = stop_hit | (today_df["rsi"] >= 70)
 
@@ -174,16 +207,6 @@ def run_scoring():
 
     # RSI-based fallback score (always defined, always positive for BUY signals)
     today_df["score"] = 50 - today_df["rsi"]
-
-    # ---------- Merge ML prediction scores ----------
-    if "predictions" in inspect(engine).get_table_names():
-        predictions = pd.read_sql(
-            "SELECT date, ticker, prediction_score FROM predictions",
-            engine
-        )
-        today_df = today_df.merge(predictions, on=["date", "ticker"], how="left")
-    else:
-        today_df["prediction_score"] = float("nan")
 
     if "signals" in inspect(engine).get_table_names():
         with engine.begin() as conn:

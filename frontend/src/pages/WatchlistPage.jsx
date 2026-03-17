@@ -437,7 +437,8 @@ export default function WatchlistPage() {
                         <col style={{ width: '6%' }} />   {/* price */}
                         <col style={{ width: '5%' }} />   {/* rsi */}
                         <col style={{ width: '9%' }} />   {/* health */}
-                        <col style={{ width: '7%' }} />   {/* prediction */}
+                        <col style={{ width: '6%' }} />   {/* upside */}
+                        <col style={{ width: '6%' }} />   {/* ml score */}
                         <col style={{ width: '9%' }} />   {/* live price */}
                         <col style={{ width: '5%' }} />   {/* qty */}
                         <col style={{ width: '6%' }} />   {/* avg price */}
@@ -456,6 +457,7 @@ export default function WatchlistPage() {
                           {th('RSI',            'rsi')}
                           <th>Health</th>
                           <th>Upside</th>
+                          <th>ML Score</th>
                           <th>Live Price</th>
                           <th>Qty</th>
                           <th>Avg Price</th>
@@ -494,6 +496,7 @@ export default function WatchlistPage() {
                               <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
                               <HealthCell score={t.health_score} />
                               <UpsideCell targetMean={t.target_mean_price} close={t.close} prices={prices} ticker={t.ticker} />
+                              <td>{t.prediction_score != null ? <span className={t.prediction_score >= 0 ? 'up' : 'down'}>{t.prediction_score >= 0 ? '▲' : '▼'} {Math.abs(t.prediction_score * 100).toFixed(1)}%</span> : '—'}</td>
                               <LivePriceCell ticker={t.ticker} closePrice={t.close} prices={prices} marketOpen={marketOpen} />
                               <td>{totalQty > 0 ? totalQty : '—'}</td>
                               <td>{avgPrice != null ? avgPrice.toFixed(2) : '—'}</td>
@@ -517,7 +520,7 @@ export default function WatchlistPage() {
 
                             isExpanded && (
                               <tr key={`${t.ticker}-lots`}>
-                                <td colSpan={15} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
+                                <td colSpan={16} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
                                   <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--accent)' }}>
                                     {/* Existing lots */}
                                     {lots.length === 0

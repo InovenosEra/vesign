@@ -72,6 +72,12 @@ function UpsideCell({ targetMean, close, prices, ticker }) {
   return <td className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
 }
 
+function MLScoreCell({ score }) {
+  if (score == null) return <td style={{ color: 'var(--muted)' }}>—</td>
+  const pct = score * 100
+  return <td className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
+}
+
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const style = { whiteSpace: 'nowrap' }
   if (marketOpen === null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
@@ -127,8 +133,8 @@ function Pagination({ page, pages, onChange }) {
 // ---------------------------------------------------------------------------
 
 // Shared fixed widths so BUY and SELL tables align column-by-column
-// Columns: logo, ticker, company, mktcap, price, rsi, low, base, high, health, prediction, live
-const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '120px', '85px', '100px']
+// Columns: logo, ticker, company, mktcap, price, rsi, low, base, high, health, analyst target, ml score, live
+const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '120px', '85px', '75px', '100px']
 
 function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
   return (
@@ -146,7 +152,8 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
           <th>Base Price</th>
           <th>High Price</th>
           <th>Health Score</th>
-          <th>Prediction</th>
+          <th>Analyst Target</th>
+          <th>ML Score</th>
           <th>Live Price</th>
         </tr>
       </thead>
@@ -164,6 +171,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
             <td>{fmtPrice(r.target_high_price, r.ticker)}</td>
             <HealthCell score={r.health_score} />
             <UpsideCell targetMean={r.target_mean_price} close={r.close} prices={prices} ticker={r.ticker} />
+            <MLScoreCell score={r.prediction_score} />
             <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
           </tr>
         ))}
@@ -250,7 +258,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
     <>
       <div className="data-table-wrap">
         <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1174 }}>
-          <colgroup>{['80px','44px','70px','150px','90px','70px','70px','55px','80px','80px','80px','120px','85px','100px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+          <colgroup>{['80px','44px','70px','150px','90px','70px','70px','55px','80px','80px','80px','120px','85px','75px','100px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
           <thead>
             <tr>
               {th('Date',           'date')}
@@ -265,7 +273,8 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               {th('Base Price',     'target_mean_price')}
               {th('High Price',     'target_high_price')}
               <th>Health Score</th>
-              <th>Prediction</th>
+              <th>Analyst Target</th>
+              <th>ML Score</th>
               <th>Live Price</th>
             </tr>
           </thead>
@@ -285,6 +294,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{fmtPrice(r.target_high_price, market)}</td>
                 <HealthCell score={r.health_score} />
                 <UpsideCell targetMean={r.target_mean_price} close={r.close} prices={prices} ticker={r.ticker} />
+                <MLScoreCell score={r.prediction_score} />
                 <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               </tr>
             ))}
