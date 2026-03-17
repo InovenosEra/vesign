@@ -236,6 +236,11 @@ def update_vix():
             progress=False
         )
 
+        # Fallback: period-based download when date range returns empty
+        if data is None or data.empty:
+            print("VIX date-range download empty, trying period fallback...")
+            data = yf.download("^VIX", period="5d", auto_adjust=False, progress=False)
+
         if data is None or data.empty:
             print("VIX download returned empty data")
             return
@@ -388,7 +393,7 @@ def update_company_info():
         except Exception:
             pass
 
-        with ThreadPoolExecutor(max_workers=5) as ex:
+        with ThreadPoolExecutor(max_workers=2) as ex:
             futures = {ex.submit(_fetch_tase, t): t for t in tase_tickers}
             done = 0
             for f in as_completed(futures):
@@ -600,7 +605,7 @@ def update_company_health():
             return None
 
     if us_pending:
-        with ThreadPoolExecutor(max_workers=5) as ex:
+        with ThreadPoolExecutor(max_workers=3) as ex:
             futures = {ex.submit(_score_us, t): t for t in us_pending}
             for f in as_completed(futures):
                 done += 1
@@ -660,7 +665,7 @@ def update_company_health():
         except Exception:
             pass
 
-        with ThreadPoolExecutor(max_workers=5) as ex:
+        with ThreadPoolExecutor(max_workers=2) as ex:
             futures = {ex.submit(_score_tase, t): t for t in tase_pending}
             for f in as_completed(futures):
                 done += 1

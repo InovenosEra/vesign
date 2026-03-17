@@ -132,11 +132,22 @@ def _repair_analyst_targets():
 # ────────────────────────────────────────────────────────────────────────────
 
 def run_daily():
+    import gc
+
     update_prices()
+    gc.collect()
+
     update_vix()
+    gc.collect()
+
     update_company_info()
+    gc.collect()
+
     summarize_descriptions()
+    gc.collect()
+
     update_company_health()
+    gc.collect()
 
     # ── Price gap repair before signal engine so no dates are skipped ────────
     _repair_price_gaps()
@@ -144,11 +155,14 @@ def run_daily():
     prices = load_prices()
     features_df = compute_features(prices)
     save_features(features_df)
+    del prices, features_df
+    gc.collect()
 
     run_prediction_engine()
     run_scoring()
 
     build_trade_log()
+    gc.collect()
 
     run_ranking()
     run_allocator()
