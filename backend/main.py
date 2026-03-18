@@ -94,7 +94,9 @@ def _init_tables():
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS watchlist_lists (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE
+                user_id TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL,
+                UNIQUE(user_id, name)
             )
         """))
         conn.execute(text("""
@@ -115,6 +117,28 @@ def _init_tables():
             conn.execute(text("ALTER TABLE companies ADD COLUMN market TEXT DEFAULT 'US'"))
     except Exception:
         pass  # column already exists or table doesn't exist yet
+
+    # Migrate watchlist_lists: add user_id + change UNIQUE(name) → UNIQUE(user_id, name)
+    try:
+        with engine.begin() as conn:
+            cols = [r[1] for r in conn.execute(text("PRAGMA table_info(watchlist_lists)")).fetchall()]
+            if "user_id" not in cols:
+                conn.execute(text("""
+                    CREATE TABLE watchlist_lists_new (
+                        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL DEFAULT '',
+                        name    TEXT NOT NULL,
+                        UNIQUE(user_id, name)
+                    )
+                """))
+                conn.execute(text("""
+                    INSERT INTO watchlist_lists_new (id, user_id, name)
+                    SELECT id, '', name FROM watchlist_lists
+                """))
+                conn.execute(text("DROP TABLE watchlist_lists"))
+                conn.execute(text("ALTER TABLE watchlist_lists_new RENAME TO watchlist_lists"))
+    except Exception:
+        pass
 
 
 _init_tables()
@@ -659,30 +683,77 @@ def live_prices(tickers: str = Query(..., description="Comma-separated ticker sy
 
 # --- Watchlists -------------------------------------------------------------
 
+def _assert_owns_list(conn, list_id: int, user_id: str):
+    """Raise 403 if the list doesn't belong to this user."""
+    r = conn.execute(
+        text("SELECT id FROM watchlist_lists WHERE id = :lid AND user_id = :uid"),
+        {"lid": list_id, "uid": user_id},
+    ).fetchone()
+    if not r:
+        raise HTTPException(status_code=403, detail="List not found")
+
+
+_EHUD_LIST_NAME = "Ehud"
+
+
 @protected.get("/api/watchlists")
-def get_watchlists():
+def get_watchlists(user=Depends(get_current_user)):
+    uid = user["id"]
+
+    with engine.begin() as conn:
+        has_lists = conn.execute(
+            text("SELECT COUNT(*) FROM watchlist_lists WHERE user_id = :uid"), {"uid": uid}
+        ).fetchone()[0] > 0
+
+        if not has_lists:
+            # Try to claim all unclaimed legacy lists (first user to arrive gets them all)
+            claimed = conn.execute(
+                text("UPDATE watchlist_lists SET user_id = :uid WHERE user_id = ''"),
+                {"uid": uid},
+            ).rowcount
+
+            if claimed == 0:
+                # Legacy lists already claimed — new user gets a copy of their named list
+                src = conn.execute(
+                    text("SELECT id FROM watchlist_lists WHERE name = :name AND user_id != :uid LIMIT 1"),
+                    {"name": _EHUD_LIST_NAME, "uid": uid},
+                ).fetchone()
+                if src:
+                    res = conn.execute(
+                        text("INSERT INTO watchlist_lists (user_id, name) VALUES (:uid, :name)"),
+                        {"uid": uid, "name": _EHUD_LIST_NAME},
+                    )
+                    conn.execute(
+                        text("""INSERT INTO watchlist (list_id, ticker, note)
+                                SELECT :new_lid, ticker, note FROM watchlist WHERE list_id = :src_lid"""),
+                        {"new_lid": res.lastrowid, "src_lid": src[0]},
+                    )
+
     with engine.connect() as conn:
-        df = pd.read_sql(text("SELECT id, name FROM watchlist_lists ORDER BY id"), conn)
+        df = pd.read_sql(
+            text("SELECT id, name FROM watchlist_lists WHERE user_id = :uid ORDER BY id"),
+            conn, params={"uid": uid}
+        )
     return _records(df)
 
 
 @protected.post("/api/watchlists", status_code=201)
-def create_watchlist(body: WatchlistCreate):
+def create_watchlist(body: WatchlistCreate, user=Depends(get_current_user)):
     name = body.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Name cannot be empty")
     try:
         with engine.begin() as conn:
             result = conn.execute(
-                text("INSERT OR IGNORE INTO watchlist_lists (name) VALUES (:name)"),
-                {"name": name},
+                text("INSERT OR IGNORE INTO watchlist_lists (user_id, name) VALUES (:uid, :name)"),
+                {"uid": user["id"], "name": name},
             )
         if result.rowcount == 0:
             raise HTTPException(status_code=409, detail=f"List '{name}' already exists")
         with engine.connect() as conn:
             row = pd.read_sql(
-                text("SELECT id, name FROM watchlist_lists WHERE name = :name"),
-                conn, params={"name": name}
+                text("SELECT id, name FROM watchlist_lists WHERE user_id = :uid AND name = :name"),
+                conn, params={"uid": user["id"], "name": name}
             )
         return row.iloc[0].to_dict()
     except HTTPException:
@@ -692,15 +763,17 @@ def create_watchlist(body: WatchlistCreate):
 
 
 @protected.delete("/api/watchlists/{list_id}", status_code=204)
-def delete_watchlist(list_id: int):
+def delete_watchlist(list_id: int, user=Depends(get_current_user)):
     with engine.begin() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
         conn.execute(text("DELETE FROM watchlist WHERE list_id = :lid"), {"lid": list_id})
-        conn.execute(text("DELETE FROM watchlist_lists WHERE id = :lid"), {"lid": list_id})
+        conn.execute(text("DELETE FROM watchlist_lists WHERE id = :lid AND user_id = :uid"), {"lid": list_id, "uid": user["id"]})
 
 
 @protected.get("/api/watchlists/{list_id}/tickers")
-def get_watchlist_tickers(list_id: int):
+def get_watchlist_tickers(list_id: int, user=Depends(get_current_user)):
     with engine.connect() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
         df = pd.read_sql(
             text("SELECT id, ticker, note FROM watchlist WHERE list_id = :lid ORDER BY id"),
             conn, params={"lid": list_id}
@@ -709,12 +782,13 @@ def get_watchlist_tickers(list_id: int):
 
 
 @protected.post("/api/watchlists/{list_id}/tickers", status_code=201)
-def add_ticker(list_id: int, body: TickerAdd):
+def add_ticker(list_id: int, body: TickerAdd, user=Depends(get_current_user)):
     ticker = body.ticker.strip().upper()
     if not ticker:
         raise HTTPException(status_code=400, detail="Ticker cannot be empty")
     try:
         with engine.begin() as conn:
+            _assert_owns_list(conn, list_id, user["id"])
             result = conn.execute(
                 text("INSERT OR IGNORE INTO watchlist (list_id, ticker, note) VALUES (:lid, :ticker, :note)"),
                 {"lid": list_id, "ticker": ticker, "note": body.note},
@@ -729,8 +803,9 @@ def add_ticker(list_id: int, body: TickerAdd):
 
 
 @protected.patch("/api/watchlists/{list_id}/tickers/{ticker}")
-def update_ticker_note(list_id: int, ticker: str, body: NoteUpdate):
+def update_ticker_note(list_id: int, ticker: str, body: NoteUpdate, user=Depends(get_current_user)):
     with engine.begin() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
         conn.execute(
             text("UPDATE watchlist SET note = :note WHERE list_id = :lid AND ticker = :ticker"),
             {"note": body.note, "lid": list_id, "ticker": ticker.upper()},
@@ -739,8 +814,9 @@ def update_ticker_note(list_id: int, ticker: str, body: NoteUpdate):
 
 
 @protected.delete("/api/watchlists/{list_id}/tickers/{ticker}", status_code=204)
-def remove_ticker(list_id: int, ticker: str):
+def remove_ticker(list_id: int, ticker: str, user=Depends(get_current_user)):
     with engine.begin() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
         conn.execute(
             text("DELETE FROM watchlist WHERE list_id = :lid AND ticker = :ticker"),
             {"lid": list_id, "ticker": ticker.upper()},
@@ -756,8 +832,9 @@ class HoldingCreate(BaseModel):
     buy_date: str
 
 @protected.get("/api/watchlists/{list_id}/holdings")
-def get_holdings(list_id: int):
+def get_holdings(list_id: int, user=Depends(get_current_user)):
     with engine.connect() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
         rows = conn.execute(
             text("SELECT id, ticker, quantity, buy_price, buy_date FROM watchlist_holdings WHERE watchlist_id = :lid ORDER BY ticker, buy_date"),
             {"lid": list_id},
@@ -765,8 +842,9 @@ def get_holdings(list_id: int):
     return [{"id": r[0], "ticker": r[1], "quantity": r[2], "buy_price": r[3], "buy_date": r[4]} for r in rows]
 
 @protected.post("/api/watchlists/{list_id}/holdings", status_code=201)
-def add_holding(list_id: int, body: HoldingCreate):
+def add_holding(list_id: int, body: HoldingCreate, user=Depends(get_current_user)):
     with engine.begin() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
         result = conn.execute(
             text("INSERT INTO watchlist_holdings (watchlist_id, ticker, quantity, buy_price, buy_date) VALUES (:lid, :ticker, :qty, :price, :date)"),
             {"lid": list_id, "ticker": body.ticker.upper(), "qty": body.quantity, "price": body.buy_price, "date": body.buy_date},
@@ -774,8 +852,9 @@ def add_holding(list_id: int, body: HoldingCreate):
     return {"id": result.lastrowid}
 
 @protected.delete("/api/watchlists/{list_id}/holdings/{holding_id}", status_code=204)
-def delete_holding(list_id: int, holding_id: int):
+def delete_holding(list_id: int, holding_id: int, user=Depends(get_current_user)):
     with engine.begin() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
         conn.execute(
             text("DELETE FROM watchlist_holdings WHERE id = :hid AND watchlist_id = :lid"),
             {"hid": holding_id, "lid": list_id},
