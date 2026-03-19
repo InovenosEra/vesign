@@ -57,7 +57,7 @@ def backfill_signals():
     df["analyst_condition"] = df["fair_value_upside"] >= 0.05
 
     df["bb_pct_b"] = (df["close"] - df["bb_low"]) / (df["bb_high"] - df["bb_low"])
-    df["bb_condition"] = df["bb_pct_b"] < 0.2
+    df["bb_condition"] = df["bb_pct_b"] < config.get("bb_pct_b_max", 0.1)
 
     df = df.sort_values(["ticker", "date"]).reset_index(drop=True)
 
