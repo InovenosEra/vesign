@@ -439,7 +439,7 @@ export default function TradesPage() {
     queryFn: () => getOpenTrades(market),
   })
 
-  const { sorted, sort, toggle } = useSort(trades, 'avg_return', 'desc')
+  const { sorted, sort, toggle } = useSort(trades, 'last_sell_date', 'desc')
 
   const total     = trades ? trades.length : 0
   const totalPairs = trades ? trades.reduce((s, t) => s + t.trade_count, 0) : 0
@@ -543,15 +543,17 @@ export default function TradesPage() {
                 {th('Company',     'company')}
                 {th('Ticker',      'ticker')}
                 {th('Market Cap (B)', 'market_cap')}
-                {th('Trades',      'trade_count')}
-                {th('Win Rate',    'win_count')}
-                {th('Avg Return',  'avg_return')}
+                {th('# Trades',     'trade_count')}
+                {th('Buy Date',    'first_buy_date')}
+                {th('Sell Date',   'last_sell_date')}
                 {th('Avg Days',    'avg_days')}
+                {th('Win Rate',    'win_count')}
+                {th('Avg Yield',   'avg_return')}
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0
-                ? <tr><td colSpan={8} className="empty" style={{ textAlign: 'center' }}>No matches found.</td></tr>
+                ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>No matches found.</td></tr>
                 : paginated.map((t, i) => {
                 const winRate = t.trade_count > 0 ? (t.win_count / t.trade_count) * 100 : 0
                 return (
@@ -561,11 +563,13 @@ export default function TradesPage() {
                     <td><strong>{t.ticker}</strong></td>
                     <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{t.trade_count}</td>
+                    <td>{fmtDate(t.first_buy_date)}</td>
+                    <td>{fmtDate(t.last_sell_date)}</td>
+                    <td>{Math.round(t.avg_days)}</td>
                     <td className={winRate >= 50 ? 'up' : 'down'}>{winRate.toFixed(0)}%</td>
                     <td className={t.avg_return >= 0 ? 'up' : 'down'}>
                       {t.avg_return >= 0 ? '+' : ''}{fmt(t.avg_return)}%
                     </td>
-                    <td>{Math.round(t.avg_days)}</td>
                   </tr>
                 )
               })}

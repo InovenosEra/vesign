@@ -938,6 +938,9 @@ def historical_trades(
         days_list = [p["days_held"] for p in closed_pairs if p["days_held"] is not None]
         avg_days = sum(days_list) / len(days_list) if days_list else 0
 
+        buy_dates  = sorted(p["buy_date"]  for p in closed_pairs if p["buy_date"])
+        sell_dates = sorted(p["sell_date"] for p in closed_pairs if p["sell_date"])
+
         ticker_trades[ticker] = {
             "ticker":            ticker,
             "company":           _v(grp.iloc[0]["company"]),
@@ -952,6 +955,8 @@ def historical_trades(
             "win_count":         wins,
             "avg_return":        round(avg_ret, 2),
             "avg_days":          round(avg_days, 1),
+            "first_buy_date":    buy_dates[0]  if buy_dates  else None,
+            "last_sell_date":    sell_dates[-1] if sell_dates else None,
             "trades":            pairs,
         }
 
