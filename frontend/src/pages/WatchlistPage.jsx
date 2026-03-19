@@ -256,51 +256,51 @@ export default function WatchlistPage() {
     <div>
       <p className="page-title">Watchlists</p>
 
-      {/* ── List selector row ── */}
-      <div className="controls" style={{ marginBottom: 20 }}>
-        <select
-          value={selectedId ?? ''}
-          onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : null)}
-          style={{ minWidth: 180, fontSize: 15, fontWeight: 600 }}
-        >
-          <option value="">— select a list —</option>
-          {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-        {marketOpen && tickerSymbols.length > 0 && (
-          <span style={{ color: 'var(--green)', fontSize: 12 }}>● live</span>
-        )}
-        {selectedId && (
-          <button
-            className="danger"
-            style={{ padding: '4px 10px', fontSize: 12 }}
-            onClick={() => {
-              if (window.confirm(`Delete "${selectedList?.name}"? This cannot be undone.`)) {
-                deleteMut.mutate(selectedId)
-              }
-            }}
-          >Delete list</button>
-        )}
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            placeholder="New list name…"
-            value={newListName}
-            onChange={e => setNewListName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && newListName.trim() && createMut.mutate()}
-            style={{ width: 180 }}
-          />
-          <button
-            className="primary"
-            onClick={() => createMut.mutate()}
-            disabled={!newListName.trim() || createMut.isPending}
-          >+ Create</button>
-        </span>
+      {/* ── List management row ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input
+          placeholder="New list name…"
+          value={newListName}
+          onChange={e => setNewListName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && newListName.trim() && createMut.mutate()}
+          style={{ width: 180, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 12px', borderRadius: 6, fontSize: 14, outline: 'none' }}
+        />
+        <button
+          className="primary"
+          onClick={() => createMut.mutate()}
+          disabled={!newListName.trim() || createMut.isPending}
+        >Create</button>
         {createMut.isError && (
           <span className="error" style={{ fontSize: 12 }}>{createMut.error.message}</span>
+        )}
+
+        {lists.map(l => (
+          <div
+            key={l.id}
+            className={`list-card${selectedId === l.id ? ' active' : ''}`}
+            onClick={() => setSelectedId(l.id)}
+          >
+            <span>{l.name}</span>
+            <button
+              className="card-delete"
+              onClick={e => {
+                e.stopPropagation()
+                if (window.confirm(`Delete "${l.name}"? This cannot be undone.`)) {
+                  deleteMut.mutate(l.id)
+                }
+              }}
+              title="Delete list"
+            >✕</button>
+          </div>
+        ))}
+
+        {marketOpen && tickerSymbols.length > 0 && (
+          <span style={{ color: 'var(--green)', fontSize: 12 }}>● live</span>
         )}
       </div>
 
       {!selectedList ? (
-        <p className="empty">Select a list or create a new one above.</p>
+        <p className="empty">Create a new list or select one above.</p>
       ) : (
         <>
 

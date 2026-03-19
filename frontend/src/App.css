@@ -288,6 +288,48 @@ td img.logo {
 }
 .list-item:hover .del-btn { opacity: 1; }
 
+/* ── Watchlist list cards ── */
+.list-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+.list-card:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--accent)22;
+}
+.list-card.active {
+  border-color: var(--accent);
+  background: rgba(79,142,247,0.15);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--accent)33;
+}
+.list-card .card-delete {
+  background: transparent;
+  border: none;
+  color: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.list-card:hover .card-delete,
+.list-card.active .card-delete { color: var(--muted); }
+.list-card .card-delete:hover { color: var(--red) !important; }
+
 .new-list-row {
   display: flex;
   gap: 6px;
