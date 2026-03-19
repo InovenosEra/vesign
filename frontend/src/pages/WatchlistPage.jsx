@@ -106,6 +106,7 @@ export default function WatchlistPage() {
   const tickerDropdownRef = useRef(null)
   const tickerDebounceRef = useRef(null)
   const [selected, setSelected]       = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null) // { id, name }
 
   const { data: lists = [] } = useQuery({
     queryKey: ['watchlists'],
@@ -285,9 +286,7 @@ export default function WatchlistPage() {
               className="card-delete"
               onClick={e => {
                 e.stopPropagation()
-                if (window.confirm(`Delete "${l.name}"? This cannot be undone.`)) {
-                  deleteMut.mutate(l.id)
-                }
+                setConfirmDelete({ id: l.id, name: l.name })
               }}
               title="Delete list"
             >✕</button>
@@ -512,7 +511,7 @@ export default function WatchlistPage() {
                                 <button
                                   className="danger"
                                   style={{ padding: '4px 8px', fontSize: 14, border: 'none', background: 'transparent', color: '#e74c3c' }}
-                                  onClick={() => removeMut.mutate(t.ticker)}
+                                  onClick={() => setConfirmDelete({ ticker: t.ticker })}
                                   title="Remove from watchlist"
                                 >🗑</button>
                               </td>
@@ -602,6 +601,39 @@ export default function WatchlistPage() {
         </>
       )}
       {selected && <SignalModal row={selected} onClose={() => setSelected(null)} />}
+
+      {confirmDelete && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000,
+        }} onClick={() => setConfirmDelete(null)}>
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 14, padding: '28px 32px', minWidth: 320, maxWidth: 400,
+            boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+          }} onClick={e => e.stopPropagation()}>
+            <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>
+              {confirmDelete.ticker ? 'Remove ticker' : 'Delete list'}
+            </p>
+            <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 24 }}>
+              {confirmDelete.ticker
+                ? <>Remove <strong style={{ color: 'var(--text)' }}>{confirmDelete.ticker}</strong> from this watchlist?</>
+                : <>Delete <strong style={{ color: 'var(--text)' }}>"{confirmDelete.name}"</strong>? This cannot be undone.</>
+              }
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDelete(null)}>Cancel</button>
+              <button className="danger" onClick={() => {
+                if (confirmDelete.ticker) removeMut.mutate(confirmDelete.ticker)
+                else deleteMut.mutate(confirmDelete.id)
+                setConfirmDelete(null)
+              }}>
+                {confirmDelete.ticker ? 'Remove' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
