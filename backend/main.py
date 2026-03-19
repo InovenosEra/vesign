@@ -712,22 +712,7 @@ def get_watchlists(user=Depends(get_current_user)):
                 {"uid": uid},
             ).rowcount
 
-            if claimed == 0:
-                # Legacy lists already claimed — new user gets a copy of their named list
-                src = conn.execute(
-                    text("SELECT id FROM watchlist_lists WHERE name = :name AND user_id != :uid LIMIT 1"),
-                    {"name": _EHUD_LIST_NAME, "uid": uid},
-                ).fetchone()
-                if src:
-                    res = conn.execute(
-                        text("INSERT INTO watchlist_lists (user_id, name) VALUES (:uid, :name)"),
-                        {"uid": uid, "name": _EHUD_LIST_NAME},
-                    )
-                    conn.execute(
-                        text("""INSERT INTO watchlist (list_id, ticker, note)
-                                SELECT :new_lid, ticker, note FROM watchlist WHERE list_id = :src_lid"""),
-                        {"new_lid": res.lastrowid, "src_lid": src[0]},
-                    )
+            # New users start with no lists; they can create their own
 
     with engine.connect() as conn:
         df = pd.read_sql(
