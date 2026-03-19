@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 import { getTrades, getOpenTrades, getPriceHistory } from '../api'
 import { useSort } from '../hooks/useSort'
+import { useLivePrices } from '../hooks/useLivePrices'
 import { MarketContext } from '../context/MarketContext'
 
 function fmt(n, decimals = 2) {
@@ -363,6 +364,9 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
   const pages     = Math.max(1, Math.ceil(filtered.length / pageSize))
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
 
+  const tickers = data.map(t => t.ticker)
+  const { prices, marketOpen } = useLivePrices(tickers)
+
   return (
     <>
       <div className="data-table-wrap">
@@ -375,29 +379,61 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
               {th('Market Cap (B)', 'market_cap')}
               {th('Buy Date',       'buy_date')}
               {th('Buy Price',      'buy_price')}
-              {th('Current Price',  'current_price')}
+              {th('Last Day Price',  'current_price')}
               {th('Days Held',      'days_held')}
-              {th('Unrealized',     'unrealized_pct')}
+              <th>Live Price</th>
+              <th>Yield</th>
             </tr>
           </thead>
           <tbody>
             {paginated.length === 0
-              ? <tr><td colSpan={9} className="empty" style={{ textAlign: 'center' }}>No open positions.</td></tr>
-              : paginated.map((t, i) => (
-                <tr key={i} className="clickable-row" onClick={() => onSelect(t)}>
-                  <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                  <td>{t.company ?? '—'}</td>
-                  <td><strong>{t.ticker}</strong></td>
-                  <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
-                  <td>{fmtDate(t.buy_date)}</td>
-                  <td>{fmt(t.buy_price)}</td>
-                  <td>{fmt(t.current_price)}</td>
-                  <td>{t.days_held ?? '—'}</td>
-                  <td className={t.unrealized_pct >= 0 ? 'up' : 'down'}>
-                    {t.unrealized_pct != null ? `${t.unrealized_pct >= 0 ? '+' : ''}${fmt(t.unrealized_pct)}%` : '—'}
-                  </td>
-                </tr>
-              ))
+              ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>No open positions.</td></tr>
+              : paginated.map((t, i) => {
+                const isIL = t.ticker?.endsWith('.TA')
+                const isOpen = isIL ? (marketOpen !== false) : marketOpen
+                const live = prices[t.ticker]
+                const closePrice = t.current_price
+                const displayLive  = live != null ? (isIL ? live / 100 : live) : null
+                const displayClose = closePrice != null ? (isIL ? closePrice / 100 : closePrice) : null
+                const diff = displayLive != null && displayClose != null ? displayLive - displayClose : null
+                const pct  = diff != null && displayClose ? (diff / displayClose) * 100 : null
+                const cls  = diff != null && diff >= 0 ? 'up' : 'down'
+                const arrow = diff != null && diff >= 0 ? '▲' : '▼'
+
+                return (
+                  <tr key={i} className="clickable-row" onClick={() => onSelect(t)}>
+                    <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
+                    <td>{t.company ?? '—'}</td>
+                    <td><strong>{t.ticker}</strong></td>
+                    <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+                    <td>{fmtDate(t.buy_date)}</td>
+                    <td>{fmt(t.buy_price)}</td>
+                    <td>{fmt(t.current_price)}</td>
+                    <td>{t.days_held ?? '—'}</td>
+                    <td>
+                      {!isOpen
+                        ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>Market Closed</span>
+                        : displayLive == null
+                          ? <span style={{ color: 'var(--muted)' }}>—</span>
+                          : <div>
+                              <div>{displayLive.toFixed(2)}</div>
+                              {diff != null && <div className={cls} style={{ fontSize: 11 }}>{arrow} {Math.abs(diff).toFixed(2)} ({Math.abs(pct).toFixed(2)}%)</div>}
+                            </div>
+                      }
+                    </td>
+                    {(() => {
+                      const priceForYield = (isOpen && displayLive != null) ? displayLive : displayClose
+                      const buyPrice = t.buy_price != null ? (isIL ? t.buy_price / 100 : t.buy_price) : null
+                      const yieldPct = priceForYield != null && buyPrice ? ((priceForYield - buyPrice) / buyPrice) * 100 : null
+                      return (
+                        <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
+                          {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${fmt(yieldPct)}%` : '—'}
+                        </td>
+                      )
+                    })()}
+                  </tr>
+                )
+              })
             }
           </tbody>
         </table>
