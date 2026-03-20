@@ -34,21 +34,22 @@ def _get_open_positions():
         return {}
 
     sql = """
-        WITH last_buy AS (
-            SELECT ticker, MAX(date) AS buy_date
-            FROM signals WHERE signal = 'BUY'
-            GROUP BY ticker
-        ),
-        last_sell AS (
+        WITH last_sell AS (
             SELECT ticker, MAX(date) AS sell_date
             FROM signals WHERE signal = 'SELL'
             GROUP BY ticker
+        ),
+        first_open_buy AS (
+            SELECT b.ticker, MIN(b.date) AS buy_date
+            FROM signals b
+            LEFT JOIN last_sell ls ON b.ticker = ls.ticker
+            WHERE b.signal = 'BUY'
+            AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
+            GROUP BY b.ticker
         )
         SELECT s.ticker, s.close AS entry_price
         FROM signals s
-        JOIN last_buy lb ON s.ticker = lb.ticker AND s.date = lb.buy_date
-        LEFT JOIN last_sell ls ON s.ticker = ls.ticker
-        WHERE ls.sell_date IS NULL OR ls.sell_date < lb.buy_date
+        JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
     """
     try:
         df = pd.read_sql(sql, engine)
@@ -197,6 +198,12 @@ def run_scoring():
         & today_df["health_condition"]
         & today_df["ml_condition"]
     )
+
+    # Suppress BUY if already in an open position (first BUY wins until SELL appears)
+    if open_positions:
+        already_open = today_df["ticker"].isin(open_positions.keys())
+        buy_cond = buy_cond & ~already_open
+
     sell_cond = stop_hit | (today_df["rsi"] >= 70)
 
     today_df["signal"] = np.select(

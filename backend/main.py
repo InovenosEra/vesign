@@ -1007,14 +1007,21 @@ def open_trades(market: Optional[str] = None):
     with engine.connect() as conn:
         # Step 1: fast open-position lookup via covering index (signal, ticker, date)
         open_rows = conn.execute(text("""
-            WITH buys  AS (SELECT ticker, MAX(date) AS d FROM signals WHERE signal='BUY'  GROUP BY ticker),
-                 sells AS (SELECT ticker, MAX(date) AS d FROM signals WHERE signal='SELL' GROUP BY ticker),
-                 lasts AS (SELECT ticker, MAX(date) AS d FROM signals                     GROUP BY ticker)
+            WITH last_sells AS (
+                SELECT ticker, MAX(date) AS d FROM signals WHERE signal='SELL' GROUP BY ticker
+            ),
+            buys AS (
+                SELECT b.ticker, MIN(b.date) AS d
+                FROM signals b
+                LEFT JOIN last_sells ls ON b.ticker = ls.ticker
+                WHERE b.signal = 'BUY'
+                AND (ls.d IS NULL OR b.date > ls.d)
+                GROUP BY b.ticker
+            ),
+            lasts AS (SELECT ticker, MAX(date) AS d FROM signals GROUP BY ticker)
             SELECT b.ticker, b.d AS buy_date, l.d AS last_date
             FROM buys b
-            LEFT JOIN sells s ON b.ticker = s.ticker
             JOIN lasts l ON b.ticker = l.ticker
-            WHERE s.d IS NULL OR b.d > s.d
         """)).fetchall()
 
         if not open_rows:
