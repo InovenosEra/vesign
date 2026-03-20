@@ -33,162 +33,19 @@ function fmtCountdown(ms) {
 }
 
 // ---------------------------------------------------------------------------
-// NYSE helpers (America/New_York)
+// Countdown hook — counts down to next_event_utc from backend
 // ---------------------------------------------------------------------------
-function getMarketCloseUTC() {
-  const now = new Date()
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour12: false,
-  }).formatToParts(now)
-  const et = {}
-  parts.forEach(p => { if (p.type !== 'literal') et[p.type] = parseInt(p.value) })
-
-  const y = et.year
-  const m = String(et.month).padStart(2, '0')
-  const d = String(et.day).padStart(2, '0')
-
-  const guess = new Date(`${y}-${m}-${d}T21:00:00Z`)
-  const gParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    hour: 'numeric', minute: 'numeric', hour12: false,
-  }).formatToParts(guess)
-  const gp = {}
-  gParts.forEach(p => { if (p.type !== 'literal') gp[p.type] = parseInt(p.value) })
-  gp.hour = (gp.hour || 0) % 24
-
-  const diffMs = ((16 * 60) - (gp.hour * 60 + (gp.minute || 0))) * 60_000
-  return guess.getTime() + diffMs
-}
-
-function getNextMarketOpenUTC() {
-  const now = new Date()
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour: 'numeric', minute: 'numeric',
-    hour12: false,
-  }).formatToParts(now)
-  const et = {}
-  parts.forEach(p => { if (p.type !== 'literal') et[p.type] = parseInt(p.value) })
-  et.hour = (et.hour || 0) % 24
-
-  const dow = new Date(et.year, et.month - 1, et.day).getDay()
-  const isWeekday  = dow >= 1 && dow <= 5
-  const beforeOpen = et.hour < 9 || (et.hour === 9 && et.minute < 30)
-
-  const target = new Date(et.year, et.month - 1, et.day)
-  if (!isWeekday || !beforeOpen) {
-    target.setDate(target.getDate() + 1)
-    while (target.getDay() === 0 || target.getDay() === 6)
-      target.setDate(target.getDate() + 1)
-  }
-
-  const y = target.getFullYear()
-  const m = String(target.getMonth() + 1).padStart(2, '0')
-  const d = String(target.getDate()).padStart(2, '0')
-
-  const guess = new Date(`${y}-${m}-${d}T14:30:00Z`)
-  const gParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    hour: 'numeric', minute: 'numeric', hour12: false,
-  }).formatToParts(guess)
-  const gp = {}
-  gParts.forEach(p => { if (p.type !== 'literal') gp[p.type] = parseInt(p.value) })
-  gp.hour = (gp.hour || 0) % 24
-
-  const diffMs = ((9 * 60 + 30) - (gp.hour * 60 + (gp.minute || 0))) * 60_000
-  return guess.getTime() + diffMs
-}
-
-// ---------------------------------------------------------------------------
-// TASE helpers (Asia/Jerusalem, open Sun–Thu 09:59–17:29)
-// ---------------------------------------------------------------------------
-function getTaseCloseUTC() {
-  const now = new Date()
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Jerusalem',
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour12: false,
-  }).formatToParts(now)
-  const il = {}
-  parts.forEach(p => { if (p.type !== 'literal') il[p.type] = parseInt(p.value) })
-
-  const y = il.year
-  const m = String(il.month).padStart(2, '0')
-  const d = String(il.day).padStart(2, '0')
-
-  const guess = new Date(`${y}-${m}-${d}T15:29:00Z`)
-  const gParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Jerusalem',
-    hour: 'numeric', minute: 'numeric', hour12: false,
-  }).formatToParts(guess)
-  const gp = {}
-  gParts.forEach(p => { if (p.type !== 'literal') gp[p.type] = parseInt(p.value) })
-  gp.hour = (gp.hour || 0) % 24
-
-  const diffMs = ((17 * 60 + 29) - (gp.hour * 60 + (gp.minute || 0))) * 60_000
-  return guess.getTime() + diffMs
-}
-
-function getNextTaseOpenUTC() {
-  const now = new Date()
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Jerusalem',
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour: 'numeric', minute: 'numeric',
-    hour12: false,
-  }).formatToParts(now)
-  const il = {}
-  parts.forEach(p => { if (p.type !== 'literal') il[p.type] = parseInt(p.value) })
-  il.hour = (il.hour || 0) % 24
-
-  const dow = new Date(il.year, il.month - 1, il.day).getDay()
-  const isTaseDay  = dow >= 0 && dow <= 4
-  const beforeOpen = il.hour < 9 || (il.hour === 9 && il.minute < 59)
-
-  const target = new Date(il.year, il.month - 1, il.day)
-  if (!isTaseDay || !beforeOpen) {
-    target.setDate(target.getDate() + 1)
-    while (target.getDay() === 5 || target.getDay() === 6)
-      target.setDate(target.getDate() + 1)
-  }
-
-  const y = target.getFullYear()
-  const m = String(target.getMonth() + 1).padStart(2, '0')
-  const d = String(target.getDate()).padStart(2, '0')
-
-  const guess = new Date(`${y}-${m}-${d}T07:59:00Z`)
-  const gParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Jerusalem',
-    hour: 'numeric', minute: 'numeric', hour12: false,
-  }).formatToParts(guess)
-  const gp = {}
-  gParts.forEach(p => { if (p.type !== 'literal') gp[p.type] = parseInt(p.value) })
-  gp.hour = (gp.hour || 0) % 24
-
-  const diffMs = ((9 * 60 + 59) - (gp.hour * 60 + (gp.minute || 0))) * 60_000
-  return guess.getTime() + diffMs
-}
-
-// ---------------------------------------------------------------------------
-// Countdown hook — market-aware
-// ---------------------------------------------------------------------------
-function useCountdown(isOpen, market = 'US') {
+function useCountdown(nextEventUtc) {
   const [countdown, setCountdown] = useState('')
 
   useEffect(() => {
-    function tick() {
-      const remaining = market === 'IL'
-        ? (isOpen ? getTaseCloseUTC() - Date.now() : getNextTaseOpenUTC() - Date.now())
-        : (isOpen ? getMarketCloseUTC() - Date.now() : getNextMarketOpenUTC() - Date.now())
-      setCountdown(fmtCountdown(remaining))
-    }
+    if (!nextEventUtc) { setCountdown(''); return }
+    const targetMs = new Date(nextEventUtc).getTime()
+    function tick() { setCountdown(fmtCountdown(targetMs - Date.now())) }
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [isOpen, market])
+  }, [nextEventUtc])
 
   return countdown
 }
@@ -285,7 +142,7 @@ function MarketStatus() {
     queryFn: () => getMarketStatus(market),
     refetchInterval: 60_000,
   })
-  const countdown = useCountdown(data?.is_open ?? false, market)
+  const countdown = useCountdown(data?.next_event_utc)
 
   if (!data) return null
   return data.is_open

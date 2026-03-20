@@ -6,10 +6,11 @@ import requests
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, time as dt_time, UTC, date
+from datetime import datetime, UTC, date
 from typing import Optional
 
 import pandas as pd
+import pandas_market_calendars as mcal
 import pytz
 import yfinance as yf
 from dotenv import load_dotenv
@@ -147,19 +148,51 @@ _init_tables()
 # Market helpers
 # ---------------------------------------------------------------------------
 
+_nyse_cal = mcal.get_calendar("NYSE")
+_tase_cal = mcal.get_calendar("TASE")
+_sched_cache: dict = {}  # (cal_name, date) → schedule DataFrame
+
+
+def _get_schedule(cal, d):
+    key = (cal.name, d)
+    if key not in _sched_cache:
+        _sched_cache[key] = cal.schedule(start_date=d, end_date=d)
+    return _sched_cache[key]
+
+
+def _market_info(cal) -> dict:
+    """Return {is_open, next_event_utc} for a calendar, holiday-aware."""
+    from datetime import timedelta
+    today = datetime.now(UTC).date()
+    now = datetime.now(UTC)
+
+    sched_today = _get_schedule(cal, today)
+    if not sched_today.empty:
+        row = sched_today.iloc[0]
+        open_ts = row["market_open"].to_pydatetime()
+        close_ts = row["market_close"].to_pydatetime()
+        if open_ts <= now <= close_ts:
+            return {"is_open": True, "next_event_utc": close_ts.isoformat()}
+        if now < open_ts:
+            return {"is_open": False, "next_event_utc": open_ts.isoformat()}
+
+    # Session over or today is holiday — find next trading session (up to 10 days)
+    from datetime import timedelta
+    for delta in range(1, 11):
+        sched = _get_schedule(cal, today + timedelta(days=delta))
+        if not sched.empty:
+            open_ts = sched.iloc[0]["market_open"].to_pydatetime()
+            return {"is_open": False, "next_event_utc": open_ts.isoformat()}
+
+    return {"is_open": False, "next_event_utc": None}
+
+
 def market_is_open() -> bool:
-    et = pytz.timezone("US/Eastern")
-    now = datetime.now(UTC).astimezone(et)
-    return now.weekday() < 5 and dt_time(9, 30) <= now.time() <= dt_time(16, 0)
+    return _market_info(_nyse_cal)["is_open"]
 
 
 def tase_is_open() -> bool:
-    """TASE is open Sunday–Thursday, 09:59–17:29 IST (Asia/Jerusalem)."""
-    il = pytz.timezone("Asia/Jerusalem")
-    now = datetime.now(UTC).astimezone(il)
-    dow = now.weekday()  # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 6=Sun
-    is_tase_day = dow <= 3 or dow == 6
-    return is_tase_day and dt_time(9, 59) <= now.time() <= dt_time(17, 29)
+    return _market_info(_tase_cal)["is_open"]
 
 
 def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Series:
@@ -327,8 +360,8 @@ def health():
 @protected.get("/api/market/status")
 def market_status(market: Optional[str] = None):
     if market and market.upper() == "IL":
-        return {"is_open": tase_is_open()}
-    return {"is_open": market_is_open()}
+        return _market_info(_tase_cal)
+    return _market_info(_nyse_cal)
 
 
 # --- Signals ----------------------------------------------------------------
