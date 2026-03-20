@@ -265,6 +265,36 @@ def update_vix():
         print(f"VIX update failed: {e}")
 
 
+def snapshot_analyst_targets(date_str: str) -> None:
+    """Copy current analyst_expectations into analyst_targets_history for date_str.
+
+    Idempotent (INSERT OR IGNORE). Only rows with a non-NULL target_mean_price
+    are snapshotted.
+    """
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS analyst_targets_history (
+                date               TEXT NOT NULL,
+                ticker             TEXT NOT NULL,
+                target_mean_price  REAL,
+                target_high_price  REAL,
+                target_low_price   REAL,
+                number_of_analysts REAL,
+                PRIMARY KEY (date, ticker)
+            )
+        """))
+        result = conn.execute(text("""
+            INSERT OR IGNORE INTO analyst_targets_history
+                (date, ticker, target_mean_price, target_high_price,
+                 target_low_price, number_of_analysts)
+            SELECT :date, ticker, target_mean_price, target_high_price,
+                   target_low_price, number_of_analysts
+            FROM analyst_expectations
+            WHERE target_mean_price IS NOT NULL
+        """), {"date": date_str})
+    print(f"  Snapshotted analyst targets for {date_str}: {result.rowcount} rows inserted")
+
+
 def update_company_info():
     """Fetch fundamentals + analyst targets in a single parallel pass.
     US tickers: FMP (company_profile + price_target_summary).
@@ -455,6 +485,8 @@ def update_company_info():
                        "high": row["target_high_price"], "low": row["target_low_price"],
                        "n": row["number_of_analysts"], "upd": str(row["last_update"])})
         mark_run("analyst_update")
+        today_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        snapshot_analyst_targets(today_str)
 
     print(f"Company info updated ({len(rows)} tickers)")
 
