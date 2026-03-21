@@ -7,8 +7,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.market_data import update_prices, update_vix, update_company_info
 
 # ---------- Feature engineering ----------
-from data.loaders import load_prices, save_features, engine
-from features.technical import compute_features
+from data.loaders import engine
+from features.technical import compute_and_save_features_chunked
 
 # ---------- Modeling ----------
 from models.predict import run_prediction_engine
@@ -42,10 +42,8 @@ def run_daily_fast():
     # ── Price gap repair before signal engine so no dates are skipped ────────
     _repair_price_gaps()
 
-    prices = load_prices(days=280)  # 252 for 52w-high rolling window + buffer
-    features_df = compute_features(prices)
-    save_features(features_df)
-    del prices, features_df
+    # Chunked: avoids peak memory of loading+concatenating all 1,600 tickers at once
+    compute_and_save_features_chunked(engine, days=280, chunk_size=50)
     gc.collect()
 
     run_prediction_engine()
