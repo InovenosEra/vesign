@@ -42,7 +42,7 @@ def run_daily_fast():
     # ── Price gap repair before signal engine so no dates are skipped ────────
     _repair_price_gaps()
 
-    prices = load_prices()
+    prices = load_prices(days=280)  # 252 for 52w-high rolling window + buffer
     features_df = compute_features(prices)
     save_features(features_df)
     del prices, features_df

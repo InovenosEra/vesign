@@ -21,8 +21,21 @@ engine = create_engine(f"sqlite:///{DB_NAME}", echo=False)
 # Data functions
 # -------------------------
 
-def load_prices():
-    return pd.read_sql("SELECT * FROM daily_prices", engine)
+def load_prices(days=None):
+    if days is None:
+        return pd.read_sql("SELECT * FROM daily_prices", engine)
+    # Load only last N trading days per ticker (enough for rolling windows)
+    sql = f"""
+        SELECT * FROM daily_prices
+        WHERE date >= (
+            SELECT date FROM (
+                SELECT DISTINCT date FROM daily_prices
+                ORDER BY date DESC LIMIT {int(days)}
+            ) ORDER BY date ASC LIMIT 1
+        )
+        ORDER BY ticker, date
+    """
+    return pd.read_sql(sql, engine)
 
 
 def save_features(df: pd.DataFrame):
