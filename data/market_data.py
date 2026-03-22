@@ -574,6 +574,16 @@ def update_company_health():
                 INSERT OR REPLACE INTO company_health (ticker, score, reason, last_update)
                 VALUES (:ticker, :score, :reason, :last_update)
             """), r)
+            # Archive to history — one entry per ticker per calendar day (idempotent)
+            conn.execute(text("""
+                INSERT INTO company_health_history (ticker, score, reason, recorded_at)
+                SELECT :ticker, :score, :reason, :last_update
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM company_health_history
+                    WHERE ticker = :ticker
+                    AND date(recorded_at) = date(:last_update)
+                )
+            """), r)
 
     # ── US path: FMP data + Claude ────────────────────────────────────────────
     def _score_us(ticker):
@@ -793,6 +803,16 @@ def update_company_health_batch():
             conn.execute(text("""
                 INSERT OR REPLACE INTO company_health (ticker, score, reason, last_update)
                 VALUES (:ticker, :score, :reason, :last_update)
+            """), r)
+            # Archive to history — one entry per ticker per calendar day (idempotent)
+            conn.execute(text("""
+                INSERT INTO company_health_history (ticker, score, reason, recorded_at)
+                SELECT :ticker, :score, :reason, :last_update
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM company_health_history
+                    WHERE ticker = :ticker
+                    AND date(recorded_at) = date(:last_update)
+                )
             """), r)
 
     # ── Build prompts in parallel ─────────────────────────────────────────────
