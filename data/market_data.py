@@ -920,7 +920,7 @@ def update_company_health_batch():
                 done += 1
                 ticker, prompt = f.result()
                 if prompt:
-                    custom_id = f"health-{ticker}"
+                    custom_id = f"health-{ticker}".replace(".", "_")
                     prompt_map[custom_id] = ticker
                     batch_requests.append({
                         "custom_id": custom_id,
@@ -949,7 +949,7 @@ def update_company_health_batch():
                 done += 1
                 ticker, prompt = f.result()
                 if prompt:
-                    custom_id = f"health-{ticker}"
+                    custom_id = f"health-{ticker}".replace(".", "_")
                     prompt_map[custom_id] = ticker
                     batch_requests.append({
                         "custom_id": custom_id,
