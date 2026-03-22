@@ -395,7 +395,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
-                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
+                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, COALESCE(s.health_score, h.score) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -470,7 +470,13 @@ def signals(
                    s.fair_value_upside,
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
-                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, h.score AS health_score, h.reason AS health_reason,
+                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short,
+                   COALESCE(
+                       (SELECT score FROM company_health_history
+                        WHERE ticker = s.ticker AND DATE(recorded_at) <= DATE(s.date)
+                        ORDER BY recorded_at DESC LIMIT 1),
+                       s.health_score, h.score
+                   ) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -907,12 +913,19 @@ def historical_trades(
         df = pd.read_sql(text(f"""
             SELECT tl.ticker, tl.buy_date, tl.buy_price, tl.sell_date, tl.sell_price, tl.return_pct,
                    c.company, c.logo_url, c.industry, c.description, c.description_short,
-                   f.market_cap, h.score AS health_score, h.reason AS health_reason
+                   f.market_cap,
+                   COALESCE(
+                       (SELECT score FROM company_health_history
+                        WHERE ticker = tl.ticker AND DATE(recorded_at) <= DATE(tl.buy_date)
+                        ORDER BY recorded_at DESC LIMIT 1),
+                       sb.health_score, h.score
+                   ) AS health_score, h.reason AS health_reason
             FROM trade_log tl
             LEFT JOIN companies c ON tl.ticker = c.ticker
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
                 ON tl.ticker = f.ticker
             LEFT JOIN company_health h ON tl.ticker = h.ticker
+            LEFT JOIN signals sb ON sb.ticker = tl.ticker AND DATE(sb.date) = DATE(tl.buy_date)
             {where}
             ORDER BY tl.ticker, tl.buy_date
         """), conn, params=params)
