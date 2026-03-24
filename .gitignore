@@ -8,4 +8,6 @@ __pycache__/
 *.sqlite
 .idea/
 .env
-.claude/settings.local.json.vscode/
+.claude/settings.local.json
+.vscode/
+.claude/
