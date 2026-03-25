@@ -107,6 +107,13 @@ export const getPriceHistory = (ticker, { start, end } = {}) => {
   return get(`/prices/history?${params}`)
 }
 
+export const getAnalystHistory = (ticker, { start, end } = {}) => {
+  const params = new URLSearchParams({ ticker })
+  if (start) params.set('start', start)
+  if (end)   params.set('end', end)
+  return get(`/analyst-history?${params}`)
+}
+
 // --- Watchlists ------------------------------------------------------------
 export const getWatchlists = () => get('/watchlists')
 export const createWatchlist = (name) => post('/watchlists', { name })

@@ -468,7 +468,7 @@ def signals(
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi,
                    s.fair_value_upside,
-                   COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
+                   COALESCE(s.target_mean_price, ae.target_mean_price) AS target_mean_price, COALESCE(s.target_low_price, ae.target_low_price) AS target_low_price, COALESCE(s.target_high_price, ae.target_high_price) AS target_high_price,
                    s.prediction_score,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short,
                    COALESCE(
@@ -675,6 +675,31 @@ def price_history(
                   AND close IS NOT NULL
                 ORDER BY date ASC
             """), conn, params={"ticker": ticker, "offset": f"-{months} months"})
+    return _records(df)
+
+
+@protected.get("/api/analyst-history")
+def analyst_history_endpoint(
+    ticker: str = Query(..., description="Ticker symbol"),
+    start: Optional[str] = Query(default=None),
+    end:   Optional[str] = Query(default=None),
+):
+    """Historical analyst targets (Low/Base/High) for a ticker from the signals table."""
+    ticker = ticker.strip().upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+    start_date = start or "2026-01-01"
+    end_date   = end   or date.today().isoformat()
+    with engine.connect() as conn:
+        df = pd.read_sql(text("""
+            SELECT DATE(date) AS date,
+                   target_mean_price, target_low_price, target_high_price
+            FROM signals
+            WHERE ticker = :ticker
+              AND target_mean_price IS NOT NULL
+              AND DATE(date) BETWEEN :start AND :end
+            ORDER BY date ASC
+        """), conn, params={"ticker": ticker, "start": start_date, "end": end_date})
     return _records(df)
 
 

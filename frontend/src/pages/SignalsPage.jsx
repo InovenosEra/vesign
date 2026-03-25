@@ -65,10 +65,9 @@ function HealthCell({ score }) {
   )
 }
 
-function UpsideCell({ targetMean, close, prices, ticker }) {
-  const currentPrice = (prices && prices[ticker]) || close
-  if (targetMean == null || !currentPrice) return <td>—</td>
-  const pct = ((targetMean - currentPrice) / currentPrice) * 100
+function UpsideCell({ targetMean, close }) {
+  if (targetMean == null || !close) return <td>—</td>
+  const pct = ((targetMean - close) / close) * 100
   return <td className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
 }
 
@@ -170,7 +169,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
             <td>{fmtPrice(r.target_mean_price, r.ticker)}</td>
             <td>{fmtPrice(r.target_high_price, r.ticker)}</td>
             <HealthCell score={r.health_score} />
-            <UpsideCell targetMean={r.target_mean_price} close={r.close} prices={prices} ticker={r.ticker} />
+            <UpsideCell targetMean={r.target_mean_price} close={r.close} />
             <MLScoreCell score={r.prediction_score} />
             <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
           </tr>
@@ -293,7 +292,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{fmtPrice(r.target_mean_price, market)}</td>
                 <td>{fmtPrice(r.target_high_price, market)}</td>
                 <HealthCell score={r.health_score} />
-                <UpsideCell targetMean={r.target_mean_price} close={r.close} prices={prices} ticker={r.ticker} />
+                <UpsideCell targetMean={r.target_mean_price} close={r.close} />
                 <MLScoreCell score={r.prediction_score} />
                 <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               </tr>

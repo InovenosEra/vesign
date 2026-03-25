@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getPriceHistory, getSignalMarkers } from '../api'
+import { getPriceHistory, getSignalMarkers, getAnalystHistory } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -34,16 +34,42 @@ export default function SignalModal({ row, onClose }) {
     staleTime: 300_000,
   })
 
+  const { data: analystHistory = [] } = useQuery({
+    queryKey: ['analyst-history', row.ticker],
+    queryFn: () => getAnalystHistory(row.ticker, { start: start12m, end: today }),
+    staleTime: 300_000,
+  })
+
   // Scale chart data for IL (agorot → ₪)
   const chartHistory = history.map(d => ({ ...d, close: d.close / priceScale }))
+
+  // Merge analyst targets into chart data (forward-fill)
+  const analystMap = Object.fromEntries(analystHistory.map(a => [a.date, a]))
+  let lastAnalyst = null
+  const chartData = chartHistory.map(d => {
+    if (analystMap[d.date]) lastAnalyst = analystMap[d.date]
+    if (!lastAnalyst) return d
+    return {
+      ...d,
+      target_low:  lastAnalyst.target_low_price  != null ? lastAnalyst.target_low_price  / priceScale : undefined,
+      target_mean: lastAnalyst.target_mean_price != null ? lastAnalyst.target_mean_price / priceScale : undefined,
+      target_high: lastAnalyst.target_high_price != null ? lastAnalyst.target_high_price / priceScale : undefined,
+    }
+  })
 
   const base12m  = chartHistory.filter(d => d.date <= target12m).at(-1)
   const yield12m = base12m && chartHistory.length > 0
     ? ((chartHistory.at(-1).close - base12m.close) / base12m.close) * 100
     : null
 
-  const minPrice = chartHistory.length ? Math.min(...chartHistory.map(d => d.close)) * 0.97 : 0
-  const maxPrice = chartHistory.length ? Math.max(...chartHistory.map(d => d.close)) * 1.03 : 0
+  const hasTargets = chartData.some(d => d.target_high != null)
+  const allPrices  = [
+    ...chartHistory.map(d => d.close),
+    ...(hasTargets ? chartData.filter(d => d.target_low  != null).map(d => d.target_low)  : []),
+    ...(hasTargets ? chartData.filter(d => d.target_high != null).map(d => d.target_high) : []),
+  ]
+  const minPrice = allPrices.length ? Math.min(...allPrices) * 0.97 : 0
+  const maxPrice = allPrices.length ? Math.max(...allPrices) * 1.03 : 0
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -67,11 +93,11 @@ export default function SignalModal({ row, onClose }) {
   }, [isLoading])
 
   function dateToX(dateStr) {
-    const idx = chartHistory.findIndex(d => d.date === dateStr)
-    if (idx < 0 || chartHistory.length <= 1) return null
+    const idx = chartData.findIndex(d => d.date === dateStr)
+    if (idx < 0 || chartData.length <= 1) return null
     const plotLeft  = 8 + 48
     const plotWidth = wrapperWidth - plotLeft - 70
-    return plotLeft + (idx / (chartHistory.length - 1)) * plotWidth
+    return plotLeft + (idx / (chartData.length - 1)) * plotWidth
   }
 
   const pairs = []
@@ -185,7 +211,7 @@ export default function SignalModal({ row, onClose }) {
         ) : (
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={chartHistory} margin={{ top: 70, right: 70, bottom: 8, left: 8 }}>
+              <LineChart data={chartData} margin={{ top: 70, right: 70, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
@@ -206,13 +232,21 @@ export default function SignalModal({ row, onClose }) {
                   itemStyle={{ color: 'var(--text)' }}
                   wrapperStyle={{ zIndex: 50 }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={v => [v.toFixed(2), 'Close']}
+                  formatter={(v, name) => {
+                    const labels = { close: 'Close', target_low: 'Target Low', target_mean: 'Target Base', target_high: 'Target High' }
+                    return [v != null ? v.toFixed(2) : '—', labels[name] || name]
+                  }}
                 />
-                <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} name="close" />
+                {hasTargets && <>
+                  <Line type="stepAfter" dataKey="target_low"  stroke="#e74c3c" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_low"  connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_high" connectNulls={false} />
+                </>}
               </LineChart>
             </ResponsiveContainer>
 
-            {wrapperWidth > 0 && chartHistory.length > 1 && (
+            {wrapperWidth > 0 && chartData.length > 1 && (
               <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible', zIndex: 10 }}>
 
                 {pairs.map((p, i) => {
@@ -256,9 +290,9 @@ export default function SignalModal({ row, onClose }) {
 
                 {openBuy && (() => {
                   const buyX  = dateToX(openBuy.date)
-                  const lastX = dateToX(chartHistory.at(-1).date)
+                  const lastX = dateToX(chartData.at(-1).date)
                   if (!buyX) return null
-                  const currentPrice = chartHistory.at(-1).close
+                  const currentPrice = chartData.at(-1).close
                   const pct       = openBuy.close ? ((currentPrice - openBuy.close / priceScale) / (openBuy.close / priceScale)) * 100 : null
                   const gainColor = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
                   const priceText = openBuy.close != null ? fmt(openBuy.close / priceScale, 1) : ''
