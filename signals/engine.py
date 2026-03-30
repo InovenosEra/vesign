@@ -27,23 +27,27 @@ def _ensure_signals_columns():
                     conn.execute(text(f"ALTER TABLE signals ADD COLUMN {col} {dtype}"))
 
 
-def _get_open_positions():
-    """Return {ticker: entry_price} for tickers with an open BUY (no subsequent SELL)."""
+def _get_open_positions(as_of_date=None):
+    """Return {ticker: entry_price} for tickers with an open BUY (no subsequent SELL).
+
+    If as_of_date is provided, only considers signals strictly before that date.
+    """
     inspector = inspect(engine)
     if "signals" not in inspector.get_table_names():
         return {}
 
-    sql = """
+    date_filter = f"AND date < '{as_of_date}'" if as_of_date else ""
+    sql = f"""
         WITH last_sell AS (
             SELECT ticker, MAX(date) AS sell_date
-            FROM signals WHERE signal = 'SELL'
+            FROM signals WHERE signal = 'SELL' {date_filter}
             GROUP BY ticker
         ),
         first_open_buy AS (
             SELECT b.ticker, MIN(b.date) AS buy_date
             FROM signals b
             LEFT JOIN last_sell ls ON b.ticker = ls.ticker
-            WHERE b.signal = 'BUY'
+            WHERE b.signal = 'BUY' {date_filter}
             AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
             GROUP BY b.ticker
         )
@@ -58,9 +62,16 @@ def _get_open_positions():
         return {}
 
 
-def run_scoring():
+def run_scoring(target_date=None):
+    """Run signal scoring.
 
-    print("Running hybrid scoring engine...")
+    target_date: if provided (str 'YYYY-MM-DD'), score that specific date instead of
+                 the latest date in the features table. Used for backfilling missing dates.
+    """
+    if target_date:
+        print(f"Running hybrid scoring engine for {target_date}...")
+    else:
+        print("Running hybrid scoring engine...")
 
     # ---------- Load config ----------
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -75,21 +86,32 @@ def run_scoring():
     _ensure_signals_columns()
 
     # ---------- Load open positions for trailing stop ----------
-    open_positions = _get_open_positions()
+    # For backfill: only consider positions opened before target_date
+    open_positions = _get_open_positions(as_of_date=target_date)
 
     # ---------- Load data ----------
     # Only the last 5 trading days are needed: the rolling conditions
     # (rsi_3day_flag, volume_flag) look back at most 3 rows. All other
     # indicator values (rsi, bb_*, volume_ratio, pct_from_52w_high) are
     # already stored in the features table so no additional history is needed.
+    if target_date:
+        # Dates are stored as 'YYYY-MM-DD HH:MM:SS.ffffff' strings in SQLite,
+        # so 'YYYY-MM-DD' < 'YYYY-MM-DD 00:00:00'. Use next-day boundary to include the target.
+        next_day = (pd.Timestamp(target_date) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        inner_filter = f"WHERE date < '{next_day}'"
+        outer_filter = f"AND date < '{next_day}'"
+    else:
+        inner_filter = ""
+        outer_filter = ""
+
     features = pd.read_sql(
-        """
+        f"""
         SELECT * FROM features
         WHERE date >= (
             SELECT date FROM (
-                SELECT DISTINCT date FROM features ORDER BY date DESC LIMIT 5
+                SELECT DISTINCT date FROM features {inner_filter} ORDER BY date DESC LIMIT 5
             ) ORDER BY date ASC LIMIT 1
-        )
+        ) {outer_filter}
         ORDER BY ticker, date
         """,
         engine
@@ -171,7 +193,7 @@ def run_scoring():
     # ---------- Filter to today before signal assignment ----------
     # Rolling windows already computed above using full history.
     # Signal assignment only touches today's rows — much faster.
-    today = df["date"].max()
+    today = df["date"].max()  # always use the actual max date in the loaded slice
     today_df = df[df["date"] == today].copy()
 
     # ---------- Trailing stop (vectorized) ----------
@@ -219,7 +241,7 @@ def run_scoring():
         with engine.begin() as conn:
             conn.execute(
                 text("DELETE FROM signals WHERE date = :date"),
-                {"date": today}
+                {"date": str(today)}
             )
 
     today_df.to_sql("signals", engine, if_exists="append", index=False)
