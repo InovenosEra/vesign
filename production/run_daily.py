@@ -24,12 +24,16 @@ from portfolio.allocator import run_allocator
 # ── Self-healing repair passes ──────────────────────────────────────────────
 
 def _repair_price_gaps():
-    """Re-download any US tickers missing recent price data (FMP rate-limit gaps)."""
-    from datetime import date, timedelta
+    """Re-download any US tickers missing recent price data (FMP rate-limit gaps).
+
+    Catches two kinds of gaps:
+    1. Tickers whose max date is behind the expected latest date (tail gaps).
+    2. Tickers missing data for an interior date — e.g. have Mar 24 and Mar 27
+       but not Mar 25 or Mar 26 (the bug that caused this fix to be written).
+    """
     import pandas as pd
 
-    today = date.today()
-    # Find the most common latest date among US tickers (= the expected date)
+    # ── 1. Tail gaps: tickers whose max date is behind the mode ─────────────
     df = pd.read_sql(
         "SELECT ticker, DATE(MAX(date)) AS max_date FROM daily_prices "
         "WHERE ticker NOT LIKE '%.TA' GROUP BY ticker",
@@ -39,11 +43,51 @@ def _repair_price_gaps():
         return
     expected = df["max_date"].mode()[0]
     lagging = df[df["max_date"] < expected]["ticker"].tolist()
-    if not lagging:
-        print("Price gaps: none found.")
+    if lagging:
+        print(f"Price gaps (tail): {len(lagging)} tickers behind {expected} — re-downloading…")
+        _download_and_save(lagging, expected, expected)
+    else:
+        print("Price gaps (tail): none found.")
+
+    # ── 2. Interior gaps: tickers present on latest date but missing on ──────
+    #       intermediate dates within the last 10 calendar days
+    recent_dates = pd.read_sql(
+        f"SELECT DISTINCT DATE(date) AS d FROM daily_prices "
+        f"WHERE ticker NOT LIKE '%.TA' AND date >= DATE('{expected}', '-10 days') "
+        f"ORDER BY d",
+        engine,
+    )["d"].tolist()
+
+    if len(recent_dates) < 2:
+        print("Price gaps (interior): not enough dates to check.")
         return
-    print(f"Price gaps: {len(lagging)} tickers behind {expected} — re-downloading…")
-    _download_and_save(lagging, expected, expected)
+
+    # Tickers present on the latest date are the "full universe"
+    universe = set(pd.read_sql(
+        f"SELECT DISTINCT ticker FROM daily_prices "
+        f"WHERE DATE(date) = '{expected}' AND ticker NOT LIKE '%.TA'",
+        engine,
+    )["ticker"].tolist())
+
+    gaps_by_date = {}
+    for d in recent_dates[:-1]:  # all dates except the latest
+        present = set(pd.read_sql(
+            f"SELECT DISTINCT ticker FROM daily_prices "
+            f"WHERE DATE(date) = '{d}' AND ticker NOT LIKE '%.TA'",
+            engine,
+        )["ticker"].tolist())
+        missing = sorted(universe - present)
+        if missing:
+            gaps_by_date[d] = missing
+
+    if not gaps_by_date:
+        print("Price gaps (interior): none found.")
+        return
+
+    for gap_date, tickers in gaps_by_date.items():
+        print(f"Price gaps (interior): {len(tickers)} tickers missing on {gap_date} — re-downloading…")
+        _download_and_save(tickers, gap_date, gap_date)
+
     print("Price gap repair done.")
 
 
@@ -131,6 +175,31 @@ def _repair_analyst_targets():
 
 # ────────────────────────────────────────────────────────────────────────────
 
+def _backfill_missing_signal_dates():
+    """Score any dates within the last 10 days that have features but no signals.
+
+    Runs after run_scoring() to catch interior gaps left by the price repair.
+    """
+    import pandas as pd
+    missing = pd.read_sql(
+        """
+        SELECT DISTINCT DATE(f.date) AS d FROM features f
+        WHERE f.date >= DATE('now', '-10 days')
+          AND NOT EXISTS (
+              SELECT 1 FROM signals s WHERE DATE(s.date) = DATE(f.date)
+          )
+        ORDER BY d
+        """,
+        engine,
+    )
+    dates = missing["d"].tolist()
+    if not dates:
+        return
+    print(f"Backfilling signals for {len(dates)} missing date(s): {dates}")
+    for d in dates:
+        run_scoring(target_date=d)
+
+
 def run_daily():
     import gc
 
@@ -160,6 +229,9 @@ def run_daily():
 
     run_prediction_engine()
     run_scoring()
+
+    # ── Backfill any interior dates still missing signals after repair ────────
+    _backfill_missing_signal_dates()
 
     build_trade_log()
     gc.collect()

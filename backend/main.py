@@ -58,6 +58,19 @@ def _set_sqlite_pragmas(dbapi_conn, _):
     cur.close()
 
 
+def _ensure_indexes():
+    """Create performance indexes if they don't already exist."""
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_companies_ticker ON companies(ticker)",
+        "CREATE INDEX IF NOT EXISTS idx_company_health_history_ticker_date ON company_health_history(ticker, recorded_at)",
+    ]
+    with engine.begin() as conn:
+        for sql in indexes:
+            conn.execute(text(sql))
+
+_ensure_indexes()
+
+
 def _send_access_request_email(requester_email: str, message: str):
     api_key     = os.getenv("RESEND_API_KEY")
     admin_email = os.getenv("ADMIN_EMAIL")
