@@ -14,8 +14,9 @@ with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
 DB_NAME = config["database"]["name"]
+DB_PATH = os.path.join(BASE_DIR, DB_NAME)
 
-engine = create_engine(f"sqlite:///{DB_NAME}", echo=False)
+engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 
 # -------------------------
 # Data functions
