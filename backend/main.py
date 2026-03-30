@@ -1196,7 +1196,7 @@ def run_pipeline():
     _pipeline_proc = subprocess.Popen(
         [sys.executable, "-c",
          "import sys, os; sys.path.insert(0, os.getcwd()); "
-         "from production.run_daily import run_daily; run_daily()"],
+         "from production.run_daily_fast import run_daily_fast; run_daily_fast()"],
         stdout=log_f,
         stderr=subprocess.STDOUT,
         cwd=_APP_ROOT,
