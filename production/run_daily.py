@@ -62,21 +62,21 @@ def _repair_price_gaps():
         print("Price gaps (interior): not enough dates to check.")
         return
 
-    # Tickers present on the latest date are the "full universe"
-    universe = set(pd.read_sql(
-        f"SELECT DISTINCT ticker FROM daily_prices "
-        f"WHERE DATE(date) = '{expected}' AND ticker NOT LIKE '%.TA'",
+    # Single query: load all (ticker, date) pairs in the recent window at once,
+    # then compute missing combos in Python — avoids N separate DB round-trips.
+    present_df = pd.read_sql(
+        f"SELECT ticker, DATE(date) AS d FROM daily_prices "
+        f"WHERE ticker NOT LIKE '%.TA' "
+        f"AND date >= DATE('{expected}', '-10 days') "
+        f"AND date <= '{expected}'",
         engine,
-    )["ticker"].tolist())
+    )
+    universe = set(present_df[present_df["d"] == expected]["ticker"].tolist())
 
     gaps_by_date = {}
     for d in recent_dates[:-1]:  # all dates except the latest
-        present = set(pd.read_sql(
-            f"SELECT DISTINCT ticker FROM daily_prices "
-            f"WHERE DATE(date) = '{d}' AND ticker NOT LIKE '%.TA'",
-            engine,
-        )["ticker"].tolist())
-        missing = sorted(universe - present)
+        present_on_date = set(present_df[present_df["d"] == d]["ticker"].tolist())
+        missing = sorted(universe - present_on_date)
         if missing:
             gaps_by_date[d] = missing
 
@@ -198,6 +198,73 @@ def _backfill_missing_signal_dates():
     print(f"Backfilling signals for {len(dates)} missing date(s): {dates}")
     for d in dates:
         run_scoring(target_date=d)
+
+
+def _validate_pipeline():
+    """Check that all key data is current after the pipeline run.
+
+    Determines the last closed trading session for US (NYSE) and TASE, then
+    verifies prices, VIX, features, and signals all reach that date.
+    Logs a PASS/FAIL line for each check and returns True if everything passed.
+    """
+    import pandas as pd
+    import pandas_market_calendars as mcal
+    from datetime import datetime, UTC, timedelta
+
+    print("\n── Pipeline validation ──────────────────────────────────────────────────")
+    passed = True
+    today = datetime.now(UTC).date()
+
+    def _last_closed(cal_name):
+        cal = mcal.get_calendar(cal_name)
+        sched = cal.schedule(start_date=today - timedelta(days=14), end_date=today)
+        dates = [d.date() for d in sched.index if d.date() < today]
+        return dates[-1] if dates else today - timedelta(days=1)
+
+    expected_us = _last_closed("NYSE")
+    try:
+        expected_tase = _last_closed("TASE")
+    except Exception:
+        expected_tase = expected_us
+
+    def check(label, actual, expected):
+        nonlocal passed
+        ok = str(actual) == str(expected)
+        if not ok:
+            passed = False
+        print(f"  [{'PASS' if ok else 'FAIL'}] {label}: {actual} (expected {expected})")
+
+    row = pd.read_sql(
+        "SELECT COUNT(DISTINCT ticker) AS cnt, DATE(MAX(date)) AS latest "
+        "FROM daily_prices WHERE ticker NOT LIKE '%.TA'",
+        engine,
+    ).iloc[0]
+    check(f"US prices ({row['cnt']} tickers)", row["latest"], expected_us)
+
+    row = pd.read_sql(
+        "SELECT COUNT(DISTINCT ticker) AS cnt, DATE(MAX(date)) AS latest "
+        "FROM daily_prices WHERE ticker LIKE '%.TA'",
+        engine,
+    ).iloc[0]
+    check(f"TASE prices ({row['cnt']} tickers)", row["latest"], expected_tase)
+
+    row = pd.read_sql("SELECT DATE(MAX(date)) AS latest FROM vix", engine).iloc[0]
+    check("VIX", row["latest"], expected_us)
+
+    row = pd.read_sql(
+        "SELECT DATE(MAX(date)) AS latest, COUNT(*) AS cnt FROM signals", engine
+    ).iloc[0]
+    check(f"Signals ({row['cnt']} total)", row["latest"], expected_us)
+
+    row = pd.read_sql("SELECT DATE(MAX(date)) AS latest FROM features", engine).iloc[0]
+    check("Features", row["latest"], expected_us)
+
+    if passed:
+        print("  ✓ All checks passed — pipeline complete.")
+    else:
+        print("  ✗ One or more checks FAILED — see above.")
+    print("────────────────────────────────────────────────────────────────────────\n")
+    return passed
 
 
 def run_daily():

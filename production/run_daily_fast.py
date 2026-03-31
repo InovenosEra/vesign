@@ -20,8 +20,11 @@ from backtesting.engine import build_trade_log
 from portfolio.ranking import run_ranking
 from portfolio.allocator import run_allocator
 
-# Import repair functions from run_daily (single source of truth)
-from production.run_daily import _repair_price_gaps, _repair_market_caps, _repair_analyst_targets
+# Import repair + validation functions from run_daily (single source of truth)
+from production.run_daily import (
+    _repair_price_gaps, _repair_market_caps, _repair_analyst_targets,
+    _validate_pipeline,
+)
 
 
 def run_daily_fast():
@@ -43,7 +46,7 @@ def run_daily_fast():
     _repair_price_gaps()
 
     # Chunked: avoids peak memory of loading+concatenating all 1,600 tickers at once
-    compute_and_save_features_chunked(engine, days=280, chunk_size=50)
+    compute_and_save_features_chunked(engine, days=280, chunk_size=100)
     gc.collect()
 
     run_prediction_engine()
@@ -58,6 +61,9 @@ def run_daily_fast():
     # ── Remaining self-healing repairs ───────────────────────────────────────
     _repair_market_caps()
     _repair_analyst_targets()
+
+    # ── Final validation: log PASS/FAIL for every data layer ─────────────────
+    _validate_pipeline()
 
 
 if __name__ == "__main__":

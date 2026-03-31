@@ -203,7 +203,7 @@ def update_prices():
         return
 
     print(f"Incremental update: {start_date} → {end_date} ({len(tickers):,} tickers)")
-    _download_and_save(tickers, start_date, end_date)
+    _download_and_save(tickers, start_date, end_date, batch_size=20)
 
     print("Prices updated successfully.")
 
