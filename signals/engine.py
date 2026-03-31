@@ -117,7 +117,28 @@ def run_scoring(target_date=None):
         engine
     )
 
-    analyst  = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+    # For historical re-runs (target_date set), use the most recent analyst snapshot
+    # on or before that date so signals reflect what was current then, not today.
+    # For today's live run (target_date=None), always use current analyst_expectations.
+    if target_date:
+        analyst = pd.read_sql(
+            """
+            SELECT ticker, target_mean_price, target_high_price, target_low_price,
+                   number_of_analysts
+            FROM analyst_targets_history h1
+            WHERE date = (
+                SELECT MAX(date) FROM analyst_targets_history h2
+                WHERE h2.ticker = h1.ticker AND h2.date <= :td
+            )
+            """,
+            engine,
+            params={"td": target_date},
+        )
+        if analyst.empty:
+            analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+    else:
+        analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+
     health   = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
 
     df = features.merge(analyst, on="ticker", how="left")
