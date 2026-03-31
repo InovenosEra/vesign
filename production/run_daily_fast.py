@@ -45,6 +45,11 @@ def run_daily_fast():
     # ── Price gap repair before signal engine so no dates are skipped ────────
     _repair_price_gaps()
 
+    # ── Analyst target refresh (yfinance) BEFORE scoring so signals are correct
+    # Overwrites stale FMP values with yfinance's more current consensus data.
+    _repair_analyst_targets()
+    gc.collect()
+
     # Chunked: avoids peak memory of loading+concatenating all 1,600 tickers at once
     compute_and_save_features_chunked(engine, days=280, chunk_size=100)
     gc.collect()
@@ -60,7 +65,6 @@ def run_daily_fast():
 
     # ── Remaining self-healing repairs ───────────────────────────────────────
     _repair_market_caps()
-    _repair_analyst_targets()
 
     # ── Final validation: log PASS/FAIL for every data layer ─────────────────
     _validate_pipeline()

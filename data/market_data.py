@@ -284,7 +284,7 @@ def snapshot_analyst_targets(date_str: str) -> None:
             )
         """))
         result = conn.execute(text("""
-            INSERT OR IGNORE INTO analyst_targets_history
+            INSERT OR REPLACE INTO analyst_targets_history
                 (date, ticker, target_mean_price, target_high_price,
                  target_low_price, number_of_analysts)
             SELECT :date, ticker, target_mean_price, target_high_price,

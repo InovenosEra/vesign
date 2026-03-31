@@ -132,45 +132,82 @@ def _repair_market_caps():
 
 
 def _repair_analyst_targets():
-    """Fallback to yfinance for US tickers with NULL analyst targets."""
+    """Refresh US analyst targets from yfinance in parallel.
+
+    Runs for ALL US tickers (not just NULL) so that stale values from FMP's
+    consensus endpoint are overwritten with yfinance's more current data.
+    yfinance aggregates more analysts and updates more frequently than FMP.
+    After updating analyst_expectations, re-snapshots today's history row.
+    """
     import pandas as pd
     import sqlalchemy as sa
     from datetime import datetime, timezone
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import yfinance as yf
+    from data.market_data import snapshot_analyst_targets
 
     df = pd.read_sql(
-        "SELECT ticker FROM analyst_expectations WHERE target_mean_price IS NULL",
+        "SELECT ticker FROM analyst_expectations WHERE ticker NOT LIKE '%.TA'",
         engine,
     )
-    tickers = [t for t in df["ticker"].tolist() if not t.endswith(".TA")]
+    tickers = df["ticker"].tolist()
     if not tickers:
-        print("Analyst target repair: none needed.")
+        print("Analyst target refresh: no US tickers found.")
         return
-    print(f"Analyst target repair: {len(tickers)} tickers with NULL targets…")
-    import yfinance as yf
-    fixed = 0
+
+    print(f"Analyst target refresh: {len(tickers)} US tickers via yfinance…")
+
+    def _fetch(t):
+        try:
+            info = yf.Ticker(t).info or {}
+            mean = info.get("targetMeanPrice") or None
+            if mean:
+                return {
+                    "ticker": t,
+                    "mean": mean,
+                    "low":  info.get("targetLowPrice") or None,
+                    "high": info.get("targetHighPrice") or None,
+                    "n":    info.get("numberOfAnalystOpinions") or None,
+                }
+        except Exception:
+            pass
+        return None
+
+    results = []
+    with ThreadPoolExecutor(max_workers=15) as ex:
+        futures = {ex.submit(_fetch, t): t for t in tickers}
+        done = 0
+        for f in as_completed(futures):
+            done += 1
+            r = f.result()
+            if r:
+                results.append(r)
+            if done % 200 == 0:
+                print(f"  yfinance: {done}/{len(tickers)} done, {len(results)} with data")
+
+    if not results:
+        print("Analyst target refresh: no data returned from yfinance.")
+        return
+
     now = datetime.now(timezone.utc)
     with engine.begin() as conn:
-        for t in tickers:
-            try:
-                info = yf.Ticker(t).info or {}
-                mean = info.get("targetMeanPrice") or None
-                low  = info.get("targetLowPrice") or None
-                high = info.get("targetHighPrice") or None
-                n    = info.get("numberOfAnalystOpinions") or None
-                if mean:
-                    conn.execute(
-                        sa.text(
-                            "UPDATE analyst_expectations SET "
-                            "target_mean_price=:mean, target_low_price=:low, "
-                            "target_high_price=:high, number_of_analysts=:n, last_update=:ts "
-                            "WHERE ticker=:t"
-                        ),
-                        {"mean": mean, "low": low, "high": high, "n": n, "ts": now, "t": t},
-                    )
-                    fixed += 1
-            except Exception:
-                pass
-    print(f"Analyst target repair done: {fixed}/{len(tickers)} fixed.")
+        for r in results:
+            conn.execute(
+                sa.text(
+                    "UPDATE analyst_expectations SET "
+                    "target_mean_price=:mean, target_low_price=:low, "
+                    "target_high_price=:high, number_of_analysts=:n, last_update=:ts "
+                    "WHERE ticker=:t"
+                ),
+                {"mean": r["mean"], "low": r["low"], "high": r["high"],
+                 "n": r["n"], "ts": now, "t": r["ticker"]},
+            )
+
+    print(f"Analyst target refresh done: {len(results)}/{len(tickers)} updated.")
+
+    # Re-snapshot so analyst_targets_history reflects the corrected yfinance values
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    snapshot_analyst_targets(today_str)
 
 
 # ────────────────────────────────────────────────────────────────────────────
