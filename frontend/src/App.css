@@ -502,11 +502,14 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   .header-currency-wrap { display: none !important; }
   .app-header { gap: 8px; padding: 0 12px; }
 
+  /* Push right-side items to the far right */
+  .header-right { margin-left: auto; gap: 10px; }
+
   /* Shrink logo so hamburger fits */
   .app-header h1 { font-size: 1.6rem !important; margin-top: -2px !important; }
   .app-header h1 img { height: 2.0rem !important; }
 
-  /* Hide greeting text in user menu — avatar only */
+  /* Hide greeting text in user menu — show avatar + ▾ only */
   .user-greeting { display: none; }
 }
 
@@ -518,6 +521,10 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
 
   /* Hide non-essential columns */
   .col-hide-sm { display: none; }
+
+  /* Switch to auto layout so hidden cols don't leave empty space */
+  table { table-layout: auto !important; min-width: 0 !important; }
+  col   { width: auto !important; }
 
   .section-title { font-size: 1.1rem; }
   .page-title    { font-size: 1.1rem; }

@@ -203,7 +203,8 @@ function UserMenu() {
                 {user?.firstName?.[0]}
               </div>
           }
-          <span className="user-greeting">Hello, {user?.firstName} ▾</span>
+          <span className="user-greeting">Hello, {user?.firstName}</span>
+          <span>▾</span>
         </button>
         {open && (
           <div style={{
@@ -264,7 +265,7 @@ function Header() {
         <div className="header-search-wrap" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
           <GlobalSearch />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="header-market-status-wrap"><MarketStatus /></span>
           <FlagSelector />
           <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
