@@ -547,26 +547,21 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
     z-index: 2;
     background: var(--bg);
   }
+  /* col1: force a known width so col2 can position right against it */
   .data-table-wrap th:nth-child(1),
-  .data-table-wrap td:nth-child(1) { left: 0; }
+  .data-table-wrap td:nth-child(1) { left: 0; min-width: 44px !important; max-width: 44px !important; }
   .data-table-wrap th:nth-child(2),
-  .data-table-wrap td:nth-child(2) { left: 40px; }
+  .data-table-wrap td:nth-child(2) { left: 44px; }
 
-  /* Inset left shadow on col2 paints over any gap; outward shadow marks boundary */
-  .data-table-wrap thead th:nth-child(2) {
-    box-shadow: inset 8px 0 0 var(--surface), 3px 0 6px rgba(0,0,0,0.45);
-  }
-  .data-table-wrap tbody td:nth-child(2) {
-    box-shadow: inset 8px 0 0 var(--bg), 3px 0 6px rgba(0,0,0,0.45);
-  }
+  /* Drop shadow on col2 right edge marks the freeze boundary */
+  .data-table-wrap thead th:nth-child(2) { box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
+  .data-table-wrap tbody td:nth-child(2) { box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
 
   /* Opaque hover on sticky cells — transparent bg leaks scrolled text through */
-  tr.clickable-row:hover td:nth-child(1) {
-    background: #141c2e;
-  }
+  tr.clickable-row:hover td:nth-child(1) { background: #141c2e; }
   tr.clickable-row:hover td:nth-child(2) {
     background: #141c2e;
-    box-shadow: inset 8px 0 0 #141c2e, 3px 0 6px rgba(0,0,0,0.45);
+    box-shadow: 3px 0 6px rgba(0,0,0,0.45);
   }
 
   .section-title { font-size: 1.1rem; }
