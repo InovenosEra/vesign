@@ -256,7 +256,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
 
   return (
     <>
-      <div className="data-table-wrap">
+      <div className="data-table-wrap all-signals-wrap">
         <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1174 }}>
           <colgroup>{['80px','44px','70px','150px','90px','70px','70px','55px','80px','80px','80px','120px','85px','75px','100px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
           <thead>

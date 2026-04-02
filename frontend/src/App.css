@@ -532,37 +532,31 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   table { table-layout: auto !important; min-width: 0 !important; }
   col   { width: auto !important; }
 
-  /* Freeze first 2 columns (logo + ticker) while scrolling */
-  /* Header cells keep var(--surface) — same as rest of header */
+  /* ── Freeze first columns while scrolling ── */
+  /* Default (Today / Watchlist / Trades tables): col1=logo, col2=ticker/company */
   .data-table-wrap thead th:nth-child(1),
-  .data-table-wrap thead th:nth-child(2) {
-    position: sticky;
-    z-index: 3;
-    background: var(--surface);
-  }
-  /* Body cells use var(--bg) — same as page/row background */
+  .data-table-wrap thead th:nth-child(2) { position: sticky; z-index: 3; background: var(--surface); }
   .data-table-wrap tbody td:nth-child(1),
-  .data-table-wrap tbody td:nth-child(2) {
-    position: sticky;
-    z-index: 2;
-    background: var(--bg);
-  }
-  /* col1: force a known width so col2 can position right against it */
-  .data-table-wrap th:nth-child(1),
-  .data-table-wrap td:nth-child(1) { left: 0; min-width: 44px !important; max-width: 44px !important; }
-  .data-table-wrap th:nth-child(2),
-  .data-table-wrap td:nth-child(2) { left: 44px; }
-
-  /* Drop shadow on col2 right edge marks the freeze boundary */
+  .data-table-wrap tbody td:nth-child(2) { position: sticky; z-index: 2; background: var(--bg); }
+  .data-table-wrap th:nth-child(1), .data-table-wrap td:nth-child(1) { left: 0; min-width: 44px !important; max-width: 44px !important; }
+  .data-table-wrap th:nth-child(2), .data-table-wrap td:nth-child(2) { left: 44px; }
   .data-table-wrap thead th:nth-child(2) { box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
   .data-table-wrap tbody td:nth-child(2) { box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
-
-  /* Opaque hover on sticky cells — transparent bg leaks scrolled text through */
   tr.clickable-row:hover td:nth-child(1) { background: #141c2e; }
-  tr.clickable-row:hover td:nth-child(2) {
-    background: #141c2e;
-    box-shadow: 3px 0 6px rgba(0,0,0,0.45);
-  }
+  tr.clickable-row:hover td:nth-child(2) { background: #141c2e; box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
+
+  /* All Signals table: col1=date(80px), col2=logo(44px), col3=ticker */
+  .all-signals-wrap thead th:nth-child(3) { position: sticky; z-index: 3; background: var(--surface); }
+  .all-signals-wrap tbody td:nth-child(3) { position: sticky; z-index: 2; background: var(--bg); }
+  .all-signals-wrap th:nth-child(1), .all-signals-wrap td:nth-child(1) { left: 0; min-width: 80px !important; max-width: 80px !important; }
+  .all-signals-wrap th:nth-child(2), .all-signals-wrap td:nth-child(2) { left: 80px; min-width: 44px !important; max-width: 44px !important; }
+  .all-signals-wrap th:nth-child(3), .all-signals-wrap td:nth-child(3) { left: 124px; }
+  .all-signals-wrap thead th:nth-child(2) { box-shadow: none; }
+  .all-signals-wrap tbody td:nth-child(2) { box-shadow: none; }
+  .all-signals-wrap thead th:nth-child(3) { box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
+  .all-signals-wrap tbody td:nth-child(3) { box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
+  .all-signals-wrap tr.clickable-row:hover td:nth-child(2) { background: #141c2e; box-shadow: none; }
+  .all-signals-wrap tr.clickable-row:hover td:nth-child(3) { background: #141c2e; box-shadow: 3px 0 6px rgba(0,0,0,0.45); }
 
   .section-title { font-size: 1.1rem; }
   .page-title    { font-size: 1.1rem; }
