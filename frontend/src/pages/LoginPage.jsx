@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useClerk } from '@clerk/react'
+import { useTranslation } from 'react-i18next'
 import { requestAccess } from '../api'
 
 const inputStyle = {
@@ -52,6 +53,7 @@ function ErrorBox({ msg }) {
 // Sign-in form
 // ---------------------------------------------------------------------------
 function SignInForm({ onRequestAccess }) {
+  const { t } = useTranslation()
   const clerk = useClerk()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -82,11 +84,11 @@ function SignInForm({ onRequestAccess }) {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>Email</label>
+        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>{t('login.email')}</label>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus style={inputStyle} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>Password</label>
+        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>{t('login.password')}</label>
         <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={inputStyle} />
       </div>
       <ErrorBox msg={error} />
@@ -95,13 +97,13 @@ function SignInForm({ onRequestAccess }) {
         color: '#000', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 14,
         cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
       }}>
-        {loading ? 'Signing in…' : 'Sign In'}
+        {loading ? t('login.signingIn') : t('login.signIn')}
       </button>
       <button type="button" onClick={onRequestAccess} style={{
         background: 'transparent', border: 'none', color: 'var(--text-muted, #999)',
         fontSize: 13, cursor: 'pointer', textDecoration: 'underline', padding: 0,
       }}>
-        Request Access
+        {t('login.requestAccess')}
       </button>
     </form>
   )
@@ -111,6 +113,7 @@ function SignInForm({ onRequestAccess }) {
 // Request access form
 // ---------------------------------------------------------------------------
 function RequestAccessForm({ onBack }) {
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -135,16 +138,16 @@ function RequestAccessForm({ onBack }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
         <div style={{ fontSize: 32 }}>✓</div>
-        <p style={{ margin: 0, color: 'var(--text)', fontSize: 15 }}>Request sent!</p>
+        <p style={{ margin: 0, color: 'var(--text)', fontSize: 15 }}>{t('login.requestSent')}</p>
         <p style={{ margin: 0, color: 'var(--text-muted, #999)', fontSize: 13 }}>
-          You'll receive access credentials once your request is approved.
+          {t('login.requestSentDesc')}
         </p>
         <button type="button" onClick={onBack} style={{
           marginTop: 8, padding: '11px', background: 'transparent',
           border: '1px solid var(--border)', borderRadius: 6,
           color: 'var(--text)', fontSize: 14, cursor: 'pointer',
         }}>
-          Back to Sign In
+          {t('login.backToSignIn')}
         </button>
       </div>
     )
@@ -153,14 +156,14 @@ function RequestAccessForm({ onBack }) {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <p style={{ margin: 0, color: 'var(--text-muted, #999)', fontSize: 13, textAlign: 'center' }}>
-        Enter your email and we'll get back to you.
+        {t('login.requestDesc')}
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>Email</label>
+        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>{t('login.email')}</label>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus style={inputStyle} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>Message <span style={{ opacity: 0.5 }}>(optional)</span></label>
+        <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>{t('login.message')} <span style={{ opacity: 0.5 }}>{t('login.optional')}</span></label>
         <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
       </div>
       <ErrorBox msg={error} />
@@ -169,13 +172,13 @@ function RequestAccessForm({ onBack }) {
         color: '#000', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 14,
         cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
       }}>
-        {loading ? 'Sending…' : 'Send Request'}
+        {loading ? t('login.sending') : t('login.sendRequest')}
       </button>
       <button type="button" onClick={onBack} style={{
         background: 'transparent', border: 'none', color: 'var(--text-muted, #999)',
         fontSize: 13, cursor: 'pointer', textDecoration: 'underline', padding: 0,
       }}>
-        Back to Sign In
+        {t('login.backToSignIn')}
       </button>
     </form>
   )

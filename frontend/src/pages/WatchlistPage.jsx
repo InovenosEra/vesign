@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker,
@@ -27,12 +28,14 @@ function fmtMktCap(n, ticker) {
 function displayTicker(ticker) { return ticker ? ticker.replace(/\.TA$/, '') : '—' }
 
 const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
-const _HEALTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+const _HEALTH_KEYS = ['', 'health.weak', 'health.fair', 'health.good', 'health.great', 'health.excellent']
 
 function HealthCell({ score }) {
+  const { t } = useTranslation()
+  const label = score ? t(_HEALTH_KEYS[score]) : ''
   if (!score) return <td style={{ color: 'var(--muted)' }}>—</td>
   return (
-    <td title={_HEALTH_LABELS[score]}>
+    <td title={label}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
         <div style={{ display: 'flex', gap: 3 }}>
           {[1,2,3,4,5].map(i => (
@@ -43,7 +46,7 @@ function HealthCell({ score }) {
           ))}
         </div>
         <span style={{ fontSize: 11, color: _HEALTH_COLORS[score] }}>
-          {_HEALTH_LABELS[score]}
+          {label}
         </span>
       </div>
     </td>
@@ -70,12 +73,13 @@ function UpsideCell({ targetMean, close, prices, ticker }) {
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
+  const { t } = useTranslation()
   const isIL = tickerMarket(ticker) === 'IL'
   const isOpen = isIL
     ? (marketOpen !== false)   // TASE: open unless explicitly false
     : marketOpen
   if (isOpen === null) return <td style={{ color: 'var(--muted)' }}>—</td>
-  if (!isOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>Market Closed</td>
+  if (!isOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closed')}</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
   const displayLive  = isIL ? live / 100 : live
@@ -95,6 +99,7 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
 }
 
 export default function WatchlistPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [selectedId, setSelectedId]   = useState(null)
   const [newListName, setNewListName] = useState('')
@@ -251,16 +256,16 @@ export default function WatchlistPage() {
 
   const selectedList = lists.find(l => l.id === selectedId)
 
-  const th = (label, col, className) => <Th label={label} col={col} sort={sort} onSort={toggle} className={className} />
+  const th = (label, col, className) => <Th label={t(label)} col={col} sort={sort} onSort={toggle} className={className} />
 
   return (
     <div>
-      <p className="page-title">Watchlists</p>
+      <p className="page-title">{t('watchlist.title')}</p>
 
       {/* ── List management row ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
         <input
-          placeholder="New list name…"
+          placeholder={t('watchlist.newListPlaceholder')}
           value={newListName}
           onChange={e => setNewListName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && newListName.trim() && createMut.mutate()}
@@ -270,7 +275,7 @@ export default function WatchlistPage() {
           className="primary"
           onClick={() => createMut.mutate()}
           disabled={!newListName.trim() || createMut.isPending}
-        >Create</button>
+        >{t('watchlist.create')}</button>
         {createMut.isError && (
           <span className="error" style={{ fontSize: 12 }}>{createMut.error.message}</span>
         )}
@@ -288,7 +293,7 @@ export default function WatchlistPage() {
                 e.stopPropagation()
                 setConfirmDelete({ id: l.id, name: l.name })
               }}
-              title="Delete list"
+              title={t('watchlist.deleteList')}
             >✕</button>
           </div>
         ))}
@@ -299,7 +304,7 @@ export default function WatchlistPage() {
       </div>
 
       {!selectedList ? (
-        <p className="empty">Create a new list or select one above.</p>
+        <p className="empty">{t('watchlist.empty')}</p>
       ) : (
         <>
 
@@ -308,7 +313,7 @@ export default function WatchlistPage() {
                 <div style={{ position: 'relative' }}>
                   <input
                     ref={tickerInputRef}
-                    placeholder="Ticker or company…"
+                    placeholder={t('watchlist.addTickerPlaceholder')}
                     value={newTicker}
                     onChange={handleTickerChange}
                     onKeyDown={handleTickerKeyDown}
@@ -370,14 +375,14 @@ export default function WatchlistPage() {
                   className="primary"
                   onClick={() => addMut.mutate()}
                   disabled={!newTicker || addMut.isPending}
-                >Add</button>
+                >{t('watchlist.add')}</button>
                 {addMut.isError && <span className="error">{addMut.error.message}</span>}
               </div>
 
               {loadingTickers ? (
-                <p className="loading">Loading…</p>
+                <p className="loading">{t('table.loading')}</p>
               ) : tickers.length === 0 ? (
-                <p className="empty">No tickers yet. Add one above.</p>
+                <p className="empty">{t('watchlist.noTickers')}</p>
               ) : (() => {
                 // ── Portfolio summary ──────────────────────────────────────
                 let totalInvested = 0, totalValue = 0
@@ -403,21 +408,21 @@ export default function WatchlistPage() {
                   {hasHoldings && (
                     <div className="metrics" style={{ marginBottom: 16 }}>
                       <div className="metric-card">
-                        <div className="label">Total Invested</div>
+                        <div className="label">{t('watchlist.totalInvested')}</div>
                         <div className="value">${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       </div>
                       <div className="metric-card">
-                        <div className="label">Current Value</div>
+                        <div className="label">{t('watchlist.currentValue')}</div>
                         <div className="value">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       </div>
                       <div className="metric-card">
-                        <div className="label">Total P&L ($)</div>
+                        <div className="label">{t('watchlist.totalPnlAbs')}</div>
                         <div className={`value ${totalPnlAbs >= 0 ? 'up' : 'down'}`}>
                           {totalPnlAbs >= 0 ? '+' : ''}${Math.abs(totalPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                       </div>
                       <div className="metric-card">
-                        <div className="label">Total P&L (%)</div>
+                        <div className="label">{t('watchlist.totalPnlPct')}</div>
                         <div className={`value ${totalPnlPct >= 0 ? 'up' : 'down'}`}>
                           {totalPnlPct != null ? `${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%` : '—'}
                         </div>
@@ -448,20 +453,20 @@ export default function WatchlistPage() {
                       <thead>
                         <tr>
                           <th></th>
-                          {th('Ticker',         'ticker')}
-                          {th('Company',        'company')}
-                          {th('Signal',         'signal')}
-                          {th('Mkt Cap (B)',    'market_cap', 'col-hide-sm')}
-                          {th('Price',          'close')}
-                          {th('RSI',            'rsi')}
-                          <th>Health</th>
-                          <th>Upside</th>
-                          <th className="col-hide-sm">ML Score</th>
-                          <th>Live Price</th>
-                          <th>Qty</th>
-                          <th>Avg Price</th>
-                          <th>Invested</th>
-                          <th>Yield</th>
+                          {th('col.ticker',         'ticker')}
+                          {th('col.company',        'company')}
+                          {th('col.signal',         'signal')}
+                          {th('col.mktCap',         'market_cap', 'col-hide-sm')}
+                          {th('col.price',          'close')}
+                          {th('col.rsi',            'rsi')}
+                          <th>{t('col.health')}</th>
+                          <th>{t('col.upside')}</th>
+                          <th className="col-hide-sm">{t('col.mlScore')}</th>
+                          <th>{t('col.livePrice')}</th>
+                          <th>{t('col.qty')}</th>
+                          <th>{t('col.avgPrice')}</th>
+                          <th>{t('col.invested')}</th>
+                          <th>{t('col.yield')}</th>
                           <th></th>
                         </tr>
                       </thead>
@@ -512,7 +517,7 @@ export default function WatchlistPage() {
                                   className="danger"
                                   style={{ padding: '4px 8px', fontSize: 14, border: 'none', background: 'transparent', color: '#e74c3c' }}
                                   onClick={() => setConfirmDelete({ ticker: t.ticker })}
-                                  title="Remove from watchlist"
+                                  title={t('watchlist.removeFromWatchlist')}
                                 >🗑</button>
                               </td>
                             </tr>,
@@ -523,15 +528,15 @@ export default function WatchlistPage() {
                                   <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--accent)' }}>
                                     {/* Existing lots */}
                                     {lots.length === 0
-                                      ? <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 10px' }}>No lots yet.</p>
+                                      ? <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 10px' }}>{t('watchlist.noLots')}</p>
                                       : <table style={{ fontSize: 12, borderCollapse: 'collapse', marginBottom: 10, width: 'auto' }}>
                                           <thead>
                                             <tr style={{ color: 'var(--muted)' }}>
-                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Date</th>
-                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Qty</th>
-                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Buy Price</th>
-                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>Cost</th>
-                                              <th style={{ padding: '2px 0', fontWeight: 500 }}>Yield</th>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>{t('col.date')}</th>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>{t('col.qty')}</th>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>{t('col.buyPrice')}</th>
+                                              <th style={{ padding: '2px 16px 2px 0', fontWeight: 500 }}>{t('col.cost')}</th>
+                                              <th style={{ padding: '2px 0', fontWeight: 500 }}>{t('col.yield')}</th>
                                               <th></th>
                                             </tr>
                                           </thead>
@@ -585,7 +590,7 @@ export default function WatchlistPage() {
                                         style={{ padding: '4px 12px', fontSize: 12 }}
                                         disabled={!lot.quantity || !lot.buy_price || !lot.buy_date || addHoldingMut.isPending}
                                         onClick={() => addHoldingMut.mutate({ ticker: t.ticker, quantity: parseFloat(lot.quantity), buy_price: parseFloat(lot.buy_price), buy_date: lot.buy_date })}
-                                      >+ Add lot</button>
+                                      >{t('watchlist.addLot')}</button>
                                     </div>
                                   </div>
                                 </td>
@@ -613,22 +618,22 @@ export default function WatchlistPage() {
             boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
           }} onClick={e => e.stopPropagation()}>
             <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>
-              {confirmDelete.ticker ? 'Remove ticker' : 'Delete list'}
+              {confirmDelete.ticker ? t('watchlist.removeTicker') : t('watchlist.deleteList')}
             </p>
             <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 24 }}>
               {confirmDelete.ticker
-                ? <>Remove <strong style={{ color: 'var(--text)' }}>{confirmDelete.ticker}</strong> from this watchlist?</>
-                : <>Delete <strong style={{ color: 'var(--text)' }}>"{confirmDelete.name}"</strong>? This cannot be undone.</>
+                ? <>{t('watchlist.remove')} <strong style={{ color: 'var(--text)' }}>{confirmDelete.ticker}</strong> {t('watchlist.removeTickerSuffix')}?</>
+                : <>{t('watchlist.delete')} <strong style={{ color: 'var(--text)' }}>"{confirmDelete.name}"</strong>? {t('watchlist.deleteListSuffix')}</>
               }
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirmDelete(null)}>Cancel</button>
+              <button onClick={() => setConfirmDelete(null)}>{t('watchlist.cancel')}</button>
               <button className="danger" onClick={() => {
                 if (confirmDelete.ticker) removeMut.mutate(confirmDelete.ticker)
                 else deleteMut.mutate(confirmDelete.id)
                 setConfirmDelete(null)
               }}>
-                {confirmDelete.ticker ? 'Remove' : 'Delete'}
+                {confirmDelete.ticker ? t('watchlist.remove') : t('watchlist.delete')}
               </button>
             </div>
           </div>

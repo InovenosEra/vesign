@@ -594,3 +594,25 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   thead th { font-size: 12px; padding: 6px; }
   .app-header { padding: 0 10px; }
 }
+
+/* ── RTL (Hebrew) layout ── */
+[dir="rtl"] .app-header { flex-direction: row-reverse; }
+[dir="rtl"] .header-right { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .mobile-menu { text-align: right; }
+[dir="rtl"] .data-table-wrap { direction: rtl; }
+[dir="rtl"] td,
+[dir="rtl"] th { text-align: right; }
+[dir="rtl"] .desktop-nav { direction: rtl; }
+[dir="rtl"] .pagination { direction: rtl; }
+[dir="rtl"] .controls { flex-direction: row-reverse; }
+/* Sticky cols flip side in RTL */
+[dir="rtl"] .data-table-wrap th:nth-child(1),
+[dir="rtl"] .data-table-wrap td:nth-child(1) {
+  left: auto !important;
+  right: 0;
+}
+[dir="rtl"] .data-table-wrap th:nth-child(2),
+[dir="rtl"] .data-table-wrap td:nth-child(2) {
+  left: auto !important;
+  right: 44px;
+}

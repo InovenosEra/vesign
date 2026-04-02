@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useUser } from '@clerk/react'
+import { useTranslation } from 'react-i18next'
 
 export default function CompleteProfilePage() {
+  const { t } = useTranslation()
   const { user } = useUser()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -16,7 +18,7 @@ export default function CompleteProfilePage() {
       await user.update({ firstName: firstName.trim(), lastName: lastName.trim() })
       // AppLayout will re-render automatically after the user object updates
     } catch (err) {
-      setError('Failed to save. Please try again.')
+      setError(t('profile.saveFailed'))
     } finally {
       setLoading(false)
     }
@@ -54,13 +56,13 @@ export default function CompleteProfilePage() {
             <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
           </h1>
           <p style={{ margin: 0, color: 'var(--text-muted, #999)', fontSize: 14 }}>
-            Please complete your profile to continue.
+            {t('profile.completePrompt')}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>First Name</label>
+            <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>{t('profile.firstName')}</label>
             <input
               type="text"
               value={firstName}
@@ -71,7 +73,7 @@ export default function CompleteProfilePage() {
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>Last Name</label>
+            <label style={{ fontSize: 13, color: 'var(--text-muted, #999)' }}>{t('profile.lastName')}</label>
             <input
               type="text"
               value={lastName}
@@ -97,7 +99,7 @@ export default function CompleteProfilePage() {
               cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? 'Saving…' : 'Continue'}
+            {loading ? t('profile.saving') : t('profile.continue')}
           </button>
         </form>
       </div>

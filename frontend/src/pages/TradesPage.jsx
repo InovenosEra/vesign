@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -111,6 +112,7 @@ function PriceBoxLabel({ viewBox, value, color }) {
 // ---------------------------------------------------------------------------
 
 function TradeModal({ row, start, end, onClose }) {
+  const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const isIL     = row.ticker?.endsWith('.TA') ?? market === 'IL'
   const currency = isIL ? '₪' : '$'
@@ -185,7 +187,7 @@ function TradeModal({ row, start, end, onClose }) {
     )
   }
 
-  const healthLabels = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+  const healthLabels = ['', t('health.weak'), t('health.fair'), t('health.good'), t('health.great'), t('health.excellent')]
   const healthColors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
 
   return (
@@ -203,20 +205,20 @@ function TradeModal({ row, start, end, onClose }) {
 
           {/* General column */}
           <div ref={generalColRef} className="modal-general-col" style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
-            <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
+            <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.general')}</div>
             <div style={{ padding: '8px 0px', border: '1px solid var(--border)', borderRadius: 8 }}>
               <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
                 <tbody>
                   {[
-                    ['Ticker',              <strong>{row.ticker?.replace(/\.TA$/, '') ?? '—'}</strong>],
-                    ['Company',             row.company ?? '—'],
-                    ['Industry',            row.industry ?? '—'],
-                    ['Market Cap (B)',       row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
-                    ['Current Signal',      row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
-                    ['Current Price',       history12m.length > 0 ? fmt(history12m.at(-1).close / (isIL ? 100 : 1)) : '—'],
-                    ['12M Yield (organic)', yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
-                    ...(row.unrealized_pct == null ? [['12M Yield (Vesign)', row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
-                    ...(row.unrealized_pct != null ? [['Yield Since Buy', <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
+                    [t('modal.ticker'),        <strong>{row.ticker?.replace(/\.TA$/, '') ?? '—'}</strong>],
+                    [t('modal.company'),       row.company ?? '—'],
+                    [t('modal.industry'),      row.industry ?? '—'],
+                    [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
+                    [t('modal.currentSignal'), row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
+                    [t('modal.currentPrice'),  history12m.length > 0 ? fmt(history12m.at(-1).close / (isIL ? 100 : 1)) : '—'],
+                    [t('modal.yield12mOrganic'), yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
+                    ...(row.unrealized_pct == null ? [[t('modal.yield12mVesign'), row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
+                    ...(row.unrealized_pct != null ? [[t('modal.yieldSinceBuy'), <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
                       <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 120 }}>{label}</td>
@@ -232,14 +234,14 @@ function TradeModal({ row, start, end, onClose }) {
           {(row.description_short || row.description || row.health_score) && (
             <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
               {(row.description_short || row.description) && (<>
-                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
+                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.description')}</div>
                 <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
                   {row.description_short || row.description}
                 </div>
               </>)}
               {row.health_score && (
                 <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>Company Health</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>{t('modal.companyHealth')}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                     {[1,2,3,4,5].map(i => (
                       <div key={i} style={{ width: 28, height: 12, borderRadius: 4, background: i <= row.health_score ? healthColors[row.health_score] : 'var(--border)' }} />
@@ -257,7 +259,7 @@ function TradeModal({ row, start, end, onClose }) {
 
         {/* Chart */}
         {isLoading ? (
-          <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
+          <p className="loading" style={{ padding: 40 }}>{t('modal.loadingChart')}</p>
         ) : (
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
             <ResponsiveContainer width="100%" height={340}>
@@ -281,7 +283,7 @@ function TradeModal({ row, start, end, onClose }) {
                   labelStyle={{ color: 'var(--muted)' }}
                   itemStyle={{ color: 'var(--text)' }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={v => [`${currency}${v.toFixed(2)}`, 'Close']}
+                  formatter={v => [`${currency}${v.toFixed(2)}`, t('modal.chartClose')]}
                 />
                 <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
               </LineChart>
@@ -325,7 +327,7 @@ function TradeModal({ row, start, end, onClose }) {
                         return <>
                           <text x={buyX + 6} y={PLOT_TOP + 30} fontSize={10}
                             style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                            OPEN
+                            {t('modal.open').toUpperCase()}
                           </text>
                           {lastX != null && pct != null && <>
                             <line x1={buyX} y1={lineY} x2={lastX} y2={lineY} style={{ stroke: color, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
@@ -353,6 +355,7 @@ function TradeModal({ row, start, end, onClose }) {
 // ---------------------------------------------------------------------------
 
 function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
+  const { t } = useTranslation()
   const { sorted, sort, toggle } = useSort(data, 'buy_date', 'desc')
 
   const th = (label, col, className) => <Th label={label} col={col} sort={sort} onSort={toggle} className={className} />
@@ -374,20 +377,20 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
           <thead>
             <tr>
               <th></th>
-              {th('Ticker',         'ticker')}
-              {th('Company',        'company')}
-              {th('Market Cap (B)', 'market_cap',    'col-hide-sm')}
-              {th('Buy Date',       'buy_date')}
-              {th('Buy Price',      'buy_price')}
-              {th('Last Day Price',  'current_price', 'col-hide-sm')}
-              {th('Days Held',      'days_held')}
-              <th>Live Price</th>
-              <th>Yield</th>
+              {th(t('col.ticker'),       'ticker')}
+              {th(t('col.company'),      'company')}
+              {th(t('col.marketCap'),    'market_cap',    'col-hide-sm')}
+              {th(t('col.buyDate'),      'buy_date')}
+              {th(t('col.buyPrice'),     'buy_price')}
+              {th(t('col.lastDayPrice'), 'current_price', 'col-hide-sm')}
+              {th(t('col.daysHeld'),     'days_held')}
+              <th>{t('col.livePrice')}</th>
+              <th>{t('col.yield')}</th>
             </tr>
           </thead>
           <tbody>
             {paginated.length === 0
-              ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>No open positions.</td></tr>
+              ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>{t('trades.noOpen')}</td></tr>
               : paginated.map((t, i) => {
                 const isIL = t.ticker?.endsWith('.TA')
                 const isOpen = isIL ? (marketOpen !== false) : marketOpen
@@ -412,7 +415,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     <td>{t.days_held ?? '—'}</td>
                     <td>
                       {!isOpen
-                        ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>Market Closed</span>
+                        ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closed')}</span>
                         : displayLive == null
                           ? <span style={{ color: 'var(--muted)' }}>—</span>
                           : <div>
@@ -448,6 +451,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
 // ---------------------------------------------------------------------------
 
 export default function TradesPage() {
+  const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
@@ -498,12 +502,12 @@ export default function TradesPage() {
 
   return (
     <div>
-      <p className="page-title">Historical Trades</p>
+      <p className="page-title">{t('trades.title')}</p>
 
       <div className="controls">
-        <label style={{ color: 'var(--muted)', fontSize: 13 }}>From</label>
+        <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.from')}</label>
         <input type="date" value={start} onChange={e => setStart(e.target.value)} />
-        <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
+        <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.to')}</label>
         <input type="date" value={end} onChange={e => setEnd(e.target.value)} />
         <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[3, 6, 12, 24].map(m => (
@@ -516,34 +520,34 @@ export default function TradesPage() {
         </span>
       </div>
 
-      {isLoading && <p className="loading">Loading…</p>}
-      {isError   && <p className="error">Failed to load trades.</p>}
+      {isLoading && <p className="loading">{t('table.loading')}</p>}
+      {isError   && <p className="error">{t('trades.failedLoad')}</p>}
 
       {trades && total > 0 && (
         <div className="metrics">
           <div className="metric-card">
-            <div className="label">Total Trades</div>
+            <div className="label">{t('trades.totalTrades')}</div>
             <div className="value">{totalPairs}</div>
           </div>
           <div className="metric-card">
-            <div className="label">Win Rate</div>
+            <div className="label">{t('trades.winRate')}</div>
             <div className="value">{totalPairs > 0 ? ((wins / totalPairs) * 100).toFixed(1) : '—'}%</div>
           </div>
           <div className="metric-card">
-            <div className="label">Avg Yield/Trade</div>
+            <div className="label">{t('trades.avgYield')}</div>
             <div className={`value ${avgReturn >= 0 ? 'up' : 'down'}`}>
               {avgReturn >= 0 ? '+' : ''}{fmt(avgReturn)}%
             </div>
           </div>
           <div className="metric-card">
-            <div className="label">Avg Days Held</div>
+            <div className="label">{t('trades.avgDays')}</div>
             <div className="value">{avgDays != null ? Math.round(avgDays) : '—'}</div>
           </div>
         </div>
       )}
 
       {trades && total === 0 && (
-        <p className="empty">No completed BUY→SELL trades in the selected period.</p>
+        <p className="empty">{t('trades.noCompleted')}</p>
       )}
 
       {trades && total > 0 && (() => {
@@ -559,14 +563,14 @@ export default function TradesPage() {
         <>
         <div className="controls" style={{ marginTop: 0 }}>
           <input
-            placeholder="🔍 Search ticker or company"
+            placeholder={`🔍 ${t('table.search')}`}
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
             style={{ width: 240 }}
           />
-          {search && <button onClick={() => { setSearch(''); setPage(1) }}>Clear</button>}
+          {search && <button onClick={() => { setSearch(''); setPage(1) }}>{t('table.clear')}</button>}
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+            <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
             <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -580,20 +584,20 @@ export default function TradesPage() {
             <thead>
               <tr>
                 <th></th>
-                {th('Ticker',      'ticker')}
-                {th('Company',     'company')}
-                {th('Market Cap (B)', 'market_cap', 'col-hide-sm')}
-                {th('# Trades',     'trade_count')}
-                {th('Buy Date',    'first_buy_date')}
-                {th('Sell Date',   'last_sell_date')}
-                {th('Avg Days',    'avg_days', 'col-hide-sm')}
-                {th('Win Rate',    'win_count')}
-                {th('Avg Yield',   'avg_return')}
+                {th(t('col.ticker'),    'ticker')}
+                {th(t('col.company'),   'company')}
+                {th(t('col.marketCap'), 'market_cap', 'col-hide-sm')}
+                {th(t('col.trades'),    'trade_count')}
+                {th(t('col.buyDate'),   'first_buy_date')}
+                {th(t('col.sellDate'),  'last_sell_date')}
+                {th(t('col.avgDays'),   'avg_days', 'col-hide-sm')}
+                {th(t('col.winRate'),   'win_count')}
+                {th(t('col.avgYield'),  'avg_return')}
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0
-                ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>No matches found.</td></tr>
+                ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>{t('trades.noMatches')}</td></tr>
                 : paginated.map((t, i) => {
                 const winRate = t.trade_count > 0 ? (t.win_count / t.trade_count) * 100 : 0
                 return (
@@ -632,12 +636,12 @@ export default function TradesPage() {
       )}
 
       {/* Open Trades */}
-      <p className="page-title" style={{ marginTop: 40 }}>Open Trades</p>
+      <p className="page-title" style={{ marginTop: 40 }}>{t('trades.openTitle')}</p>
 
       <div className="controls">
-        <label style={{ color: 'var(--muted)', fontSize: 13 }}>From</label>
+        <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.from')}</label>
         <input type="date" value={openStart} onChange={e => setOpenStart(e.target.value)} />
-        <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
+        <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.to')}</label>
         <input type="date" value={openEnd} onChange={e => setOpenEnd(e.target.value)} />
         <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[3, 6, 12].map(m => (
@@ -650,7 +654,7 @@ export default function TradesPage() {
         </span>
       </div>
 
-      {loadingOpen && <p className="loading">Loading…</p>}
+      {loadingOpen && <p className="loading">{t('table.loading')}</p>}
       {errorOpen && <p className="error">Error: {openError?.message}</p>}
       {!loadingOpen && !errorOpen && (() => {
         const filtered = openTrades.filter(t => {
@@ -667,35 +671,35 @@ export default function TradesPage() {
             {openCount > 0 && (
               <div className="metrics">
                 <div className="metric-card">
-                  <div className="label">Open Trades</div>
+                  <div className="label">{t('trades.openTrades')}</div>
                   <div className="value">{openCount}</div>
                 </div>
                 <div className="metric-card">
-                  <div className="label">Win Rate</div>
+                  <div className="label">{t('trades.winRate')}</div>
                   <div className="value">{winRate != null ? `${winRate.toFixed(1)}%` : '—'}</div>
                 </div>
                 <div className="metric-card">
-                  <div className="label">Avg Yield/Trade</div>
+                  <div className="label">{t('trades.avgYield')}</div>
                   <div className={`value ${avgYield >= 0 ? 'up' : 'down'}`}>
                     {avgYield != null ? `${avgYield >= 0 ? '+' : ''}${fmt(avgYield)}%` : '—'}
                   </div>
                 </div>
                 <div className="metric-card">
-                  <div className="label">Avg Days Open</div>
+                  <div className="label">{t('trades.avgDaysOpen')}</div>
                   <div className="value">{avgDaysOpen != null ? Math.round(avgDaysOpen) : '—'}</div>
                 </div>
               </div>
             )}
             <div className="controls" style={{ marginTop: 0 }}>
               <input
-                placeholder="🔍 Search ticker or company"
+                placeholder={`🔍 ${t('table.search')}`}
                 value={openSearch}
                 onChange={e => { setOpenSearch(e.target.value); setOpenPage(1) }}
                 style={{ width: 240 }}
               />
-              {openSearch && <button onClick={() => { setOpenSearch(''); setOpenPage(1) }}>Clear</button>}
+              {openSearch && <button onClick={() => { setOpenSearch(''); setOpenPage(1) }}>{t('table.clear')}</button>}
               <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+                <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
                 <select value={openPageSize} onChange={e => { setOpenPageSize(Number(e.target.value)); setOpenPage(1) }}>
                   <option value={10}>10</option>
                   <option value={25}>25</option>

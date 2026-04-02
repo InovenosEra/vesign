@@ -2,6 +2,8 @@ import { useState, useEffect, useContext, useRef } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { ClerkProvider, RedirectToSignIn, useAuth, useClerk, useUser } from '@clerk/react'
+import { useTranslation } from 'react-i18next'
+import i18n from './i18n'
 import { setTokenGetter } from './api'
 import { getMarketStatus } from './api'
 import { MarketContext, MarketProvider } from './context/MarketContext'
@@ -48,6 +50,96 @@ function useCountdown(nextEventUtc) {
   }, [nextEventUtc])
 
   return countdown
+}
+
+// ---------------------------------------------------------------------------
+// Language switcher
+// ---------------------------------------------------------------------------
+const LANGUAGES = [
+  { code: 'en', label: 'EN' },
+  { code: 'he', label: 'HE' },
+  { code: 'es', label: 'ES' },
+  { code: 'fr', label: 'FR' },
+]
+
+function LanguageSwitcher() {
+  const [open, setOpen] = useState(false)
+  const [currentLang, setCurrentLang] = useState(localStorage.getItem('lang') || 'en')
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onMouseDown(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [])
+
+  function switchLang(code) {
+    i18n.changeLanguage(code)
+    localStorage.setItem('lang', code)
+    setCurrentLang(code)
+    document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
+    document.documentElement.lang = code
+    setOpen(false)
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: '4px 10px',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 700,
+          color: 'var(--text)',
+          letterSpacing: '0.05em',
+        }}
+      >
+        {currentLang.toUpperCase()}
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          top: 'calc(100% + 6px)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          zIndex: 100,
+          minWidth: 60,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          overflow: 'hidden',
+        }}>
+          {LANGUAGES.map(lang => (
+            <button
+              key={lang.code}
+              onClick={() => switchLang(lang.code)}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '8px 12px',
+                background: currentLang === lang.code ? 'rgba(0,210,255,0.12)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text)',
+                fontSize: 12,
+                fontWeight: 700,
+                textAlign: 'center',
+                letterSpacing: '0.05em',
+              }}
+            >
+              {lang.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +228,7 @@ function FlagSelector() {
 // Market status badge
 // ---------------------------------------------------------------------------
 function MarketStatus() {
+  const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const { data } = useQuery({
     queryKey: ['market-status', market],
@@ -148,14 +241,14 @@ function MarketStatus() {
   return data.is_open
     ? (
       <span className="market-open" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-        <span><span className="dot-blink">●</span> Market Open</span>
-        <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>Closes in {countdown}</span>
+        <span><span className="dot-blink">●</span> {t('market.open')}</span>
+        <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>{t('market.closesIn', { countdown })}</span>
       </span>
     )
     : (
       <span className="market-closed" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-        <span>● Market Close</span>
-        <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>Opens in {countdown}</span>
+        <span>● {t('market.closed')}</span>
+        <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>{t('market.opensIn', { countdown })}</span>
       </span>
     )
 }
@@ -164,6 +257,7 @@ function MarketStatus() {
 // User menu (Hello [First name] + dropdown)
 // ---------------------------------------------------------------------------
 function UserMenu() {
+  const { t } = useTranslation()
   const { signOut, openUserProfile } = useClerk()
   const { user } = useUser()
   const [open, setOpen] = useState(false)
@@ -204,7 +298,7 @@ function UserMenu() {
                 {user?.firstName?.[0]}
               </div>
           }
-          <span className="user-hello">Hello, </span><span className="user-name">{user?.firstName}</span> ▾
+          <span className="user-hello">{t('header.hello')} </span><span className="user-name">{user?.firstName}</span> ▾
         </button>
         {open && (
           <div style={{
@@ -214,12 +308,12 @@ function UserMenu() {
             boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
           }}>
             {[
-              { label: 'Edit Profile Picture', action: () => { setShowPicModal(true); setOpen(false) } },
-              { label: 'Change Password', action: () => { openUserProfile(); setOpen(false) } },
-              { label: 'Sign Out', action: () => signOut({ redirectUrl: '/sign-in' }) },
+              { labelKey: 'header.editPicture', action: () => { setShowPicModal(true); setOpen(false) } },
+              { labelKey: 'header.changePassword', action: () => { openUserProfile(); setOpen(false) } },
+              { labelKey: 'header.signOut', action: () => signOut({ redirectUrl: '/sign-in' }) },
             ].map(item => (
               <button
-                key={item.label}
+                key={item.labelKey}
                 onClick={item.action}
                 style={{
                   display: 'block', width: '100%', padding: '10px 16px',
@@ -227,7 +321,7 @@ function UserMenu() {
                   color: 'var(--text)', fontSize: 13, textAlign: 'left',
                 }}
               >
-                {item.label}
+                {t(item.labelKey)}
               </button>
             ))}
           </div>
@@ -242,6 +336,7 @@ function UserMenu() {
 // Header
 // ---------------------------------------------------------------------------
 function Header() {
+  const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const closeNav = () => setMobileNavOpen(false)
@@ -257,9 +352,9 @@ function Header() {
             </h1>
           </NavLink>
           <nav className="desktop-nav">
-            <NavLink to="/">Signals</NavLink>
-            <NavLink to="/watchlist">Watchlist</NavLink>
-            <NavLink to="/trades">Trades</NavLink>
+            <NavLink to="/">{t('nav.signals')}</NavLink>
+            <NavLink to="/watchlist">{t('nav.watchlist')}</NavLink>
+            <NavLink to="/trades">{t('nav.trades')}</NavLink>
           </nav>
         </div>
         <div className="header-search-wrap" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -268,6 +363,7 @@ function Header() {
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="header-market-status-wrap"><MarketStatus /></span>
           <FlagSelector />
+          <LanguageSwitcher />
           <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
             {market === 'IL' ? '₪' : '$'}
           </span>
@@ -275,7 +371,7 @@ function Header() {
           <button
             className="hamburger"
             onClick={() => setMobileNavOpen(o => !o)}
-            aria-label="Menu"
+            aria-label={t('header.menu')}
           >
             {mobileNavOpen ? '✕' : '☰'}
           </button>
@@ -283,9 +379,9 @@ function Header() {
       </header>
       {mobileNavOpen && (
         <div className="mobile-menu">
-          <NavLink to="/" onClick={closeNav}>Signals</NavLink>
-          <NavLink to="/watchlist" onClick={closeNav}>Watchlist</NavLink>
-          <NavLink to="/trades" onClick={closeNav}>Trades</NavLink>
+          <NavLink to="/" onClick={closeNav}>{t('nav.signals')}</NavLink>
+          <NavLink to="/watchlist" onClick={closeNav}>{t('nav.watchlist')}</NavLink>
+          <NavLink to="/trades" onClick={closeNav}>{t('nav.trades')}</NavLink>
           <div className="mobile-menu-divider" />
           <div className="mobile-menu-market"><MarketStatus /></div>
         </div>

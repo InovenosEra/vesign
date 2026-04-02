@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { getPriceHistory, getSignalMarkers, getAnalystHistory } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import {
@@ -14,6 +15,7 @@ function fmt(n, decimals = 2) {
 }
 
 export default function SignalModal({ row, onClose }) {
+  const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const isIL      = row?.ticker?.endsWith('.TA') ?? market === 'IL'
   const currency  = isIL ? '₪' : '$'
@@ -150,21 +152,21 @@ export default function SignalModal({ row, onClose }) {
             {row.ticker?.replace(/\.TA$/, '')}
           </div>
           <div ref={generalColRef} className="modal-general-col" style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
-            <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
+            <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.general')}</div>
             <div style={{ padding: '8px 0px', border: '1px solid var(--border)', borderRadius: 8 }}>
               <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
                 <tbody>
                   {[
-                    ['Ticker',     <strong>{row.ticker?.replace(/\.TA$/, '') ?? '—'}</strong>],
-                    ['Company',    row.company ?? '—'],
-                    ['Industry',   row.industry ?? '—'],
-                    ['Market Cap (B)', row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
-                    ['Signal',     row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
-                    ['Price',      row.close != null ? fmt(row.close / priceScale) : '—'],
-                    ['RSI',        row.rsi != null ? row.rsi.toFixed(1) : '—'],
-                    ['Analyst Target', (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
-                    ['ML Score', (() => { const s = row.prediction_score; if (s == null) return '—'; const pct = s * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span> })()],
-                    ['12M Yield',  yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
+                    [t('modal.ticker'),        <strong>{row.ticker?.replace(/\.TA$/, '') ?? '—'}</strong>],
+                    [t('modal.company'),       row.company ?? '—'],
+                    [t('modal.industry'),      row.industry ?? '—'],
+                    [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
+                    [t('col.signal'),          row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
+                    [t('modal.price'),         row.close != null ? fmt(row.close / priceScale) : '—'],
+                    [t('modal.rsi'),           row.rsi != null ? row.rsi.toFixed(1) : '—'],
+                    [t('modal.analystTarget'), (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
+                    [t('modal.mlScore'),       (() => { const s = row.prediction_score; if (s == null) return '—'; const pct = s * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span> })()],
+                    [t('modal.yield12m'),      yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
                       <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 90 }}>{label}</td>
@@ -178,18 +180,18 @@ export default function SignalModal({ row, onClose }) {
           {(row.description_short || row.description || row.health_score) && (
             <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
               {(row.description_short || row.description) && (<>
-                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
+                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.description')}</div>
                 <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
                   {row.description_short || row.description}
                 </div>
               </>)}
               {row.health_score && (() => {
-                const labels = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+                const labels = ['', t('health.weak'), t('health.fair'), t('health.good'), t('health.great'), t('health.excellent')]
                 const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
                 const score  = row.health_score
                 return (
                   <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>Company Health</div>
+                    <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>{t('modal.companyHealth')}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       {[1,2,3,4,5].map(i => (
                         <div key={i} style={{ width: 28, height: 12, borderRadius: 4, background: i <= score ? colors[score] : 'var(--border)' }} />
@@ -207,7 +209,7 @@ export default function SignalModal({ row, onClose }) {
 
         {/* Chart */}
         {isLoading ? (
-          <p className="loading" style={{ padding: 40 }}>Loading chart…</p>
+          <p className="loading" style={{ padding: 40 }}>{t('modal.loadingChart')}</p>
         ) : (
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
             <ResponsiveContainer width="100%" height={340}>
@@ -233,7 +235,12 @@ export default function SignalModal({ row, onClose }) {
                   wrapperStyle={{ zIndex: 50 }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
                   formatter={(v, name) => {
-                    const labels = { close: 'Close', target_low: 'Target Low', target_mean: 'Target Base', target_high: 'Target High' }
+                    const labels = {
+                      close: t('modal.chartClose'),
+                      target_low: t('modal.chartTargetLow'),
+                      target_mean: t('modal.chartTargetBase'),
+                      target_high: t('modal.chartTargetHigh'),
+                    }
                     return [v != null ? v.toFixed(2) : '—', labels[name] || name]
                   }}
                 />
@@ -339,7 +346,7 @@ export default function SignalModal({ row, onClose }) {
                               fill="var(--surface)" opacity={0.85} />
                             <text x={buyX} y={midY} textAnchor="middle" dominantBaseline="central"
                               fontSize={10} style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                              Open
+                              {t('modal.open')}
                             </text>
                           </g>
                         )

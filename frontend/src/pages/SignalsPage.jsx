@@ -1,5 +1,6 @@
 import { useState, useMemo, useContext, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { getSignalsToday, getSignals } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import { useLivePrices } from '../hooks/useLivePrices'
@@ -44,12 +45,14 @@ function fmtDate(str) {
 }
 
 const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
-const _HEALTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Great', 'Excellent']
+const _HEALTH_KEYS = ['', 'health.weak', 'health.fair', 'health.good', 'health.great', 'health.excellent']
 
 function HealthCell({ score }) {
+  const { t } = useTranslation()
+  const label = score ? t(_HEALTH_KEYS[score]) : ''
   if (!score) return <td style={{ color: 'var(--muted)' }}>—</td>
   return (
-    <td title={_HEALTH_LABELS[score]} style={{ whiteSpace: 'nowrap' }}>
+    <td title={label} style={{ whiteSpace: 'nowrap' }}>
       <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
         {[1,2,3,4,5].map(i => (
           <div key={i} style={{
@@ -58,7 +61,7 @@ function HealthCell({ score }) {
           }} />
         ))}
         <span style={{ fontSize: 11, color: _HEALTH_COLORS[score], marginLeft: 3 }}>
-          {_HEALTH_LABELS[score]}
+          {label}
         </span>
       </div>
     </td>
@@ -79,9 +82,10 @@ function MLScoreCell({ score, className }) {
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
+  const { t } = useTranslation()
   const style = { whiteSpace: 'nowrap' }
   if (marketOpen === null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
-  if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>Closed</td>
+  if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>{t('market.closed')}</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
   const scale = isILTicker(ticker) ? 100 : 1
@@ -137,24 +141,25 @@ function Pagination({ page, pages, onChange }) {
 const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '120px', '85px', '75px', '100px']
 
 function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
+  const { t } = useTranslation()
   return (
     <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1024 }}>
       <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
       <thead>
         <tr>
           <th></th>
-          <th>Ticker</th>
-          <th>Company</th>
-          <th>Market Cap (B)</th>
-          <th>Price</th>
-          <th>RSI</th>
-          <th className="col-hide-sm">Low Price</th>
-          <th>Base Price</th>
-          <th className="col-hide-sm">High Price</th>
-          <th>Health Score</th>
-          <th>Analyst Target</th>
-          <th className="col-hide-sm">ML Score</th>
-          <th>Live Price</th>
+          <th>{t('col.ticker')}</th>
+          <th>{t('col.company')}</th>
+          <th>{t('col.marketCap')}</th>
+          <th>{t('col.price')}</th>
+          <th>{t('col.rsi')}</th>
+          <th className="col-hide-sm">{t('col.lowPrice')}</th>
+          <th>{t('col.basePrice')}</th>
+          <th className="col-hide-sm">{t('col.highPrice')}</th>
+          <th>{t('col.healthScore')}</th>
+          <th>{t('col.analystTarget')}</th>
+          <th className="col-hide-sm">{t('col.mlScore')}</th>
+          <th>{t('col.livePrice')}</th>
         </tr>
       </thead>
       <tbody>
@@ -181,9 +186,10 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
 }
 
 function TodayTable({ rows, prices, marketOpen, onRowClick, market }) {
+  const { t } = useTranslation()
   const { sorted } = useSort(rows, 'market_cap', 'desc')
 
-  if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
+  if (!rows || rows.length === 0) return <p className="empty">{t('signals.noSignals')}</p>
 
   return (
     <div className="data-table-wrap">
@@ -193,12 +199,13 @@ function TodayTable({ rows, prices, marketOpen, onRowClick, market }) {
 }
 
 function TodaySellTable({ rows, prices, marketOpen, onRowClick, market }) {
+  const { t } = useTranslation()
   const { sorted } = useSort(rows, 'market_cap', 'desc')
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [search, setSearch]     = useState('')
 
-  if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
+  if (!rows || rows.length === 0) return <p className="empty">{t('signals.noSignals')}</p>
 
   const filtered = search
     ? sorted.filter(r =>
@@ -217,14 +224,14 @@ function TodaySellTable({ rows, prices, marketOpen, onRowClick, market }) {
     <>
       <div className="controls">
         <input
-          placeholder="🔍 Search ticker or company"
+          placeholder={`🔍 ${t('table.search')}`}
           value={search}
           onChange={e => handleSearch(e.target.value)}
           style={{ width: 240 }}
         />
-        {search && <button onClick={() => handleSearch('')}>Clear</button>}
+        {search && <button onClick={() => handleSearch('')}>{t('table.clear')}</button>}
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+          <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
           <select value={pageSize} onChange={e => handlePageSize(e.target.value)}>
             <option value={10}>10</option>
             <option value={25}>25</option>
@@ -246,10 +253,11 @@ function TodaySellTable({ rows, prices, marketOpen, onRowClick, market }) {
 // ---------------------------------------------------------------------------
 
 function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowClick, prices, marketOpen, market }) {
+  const { t } = useTranslation()
   if (!result) return null
   const { data: rows, pages } = result
 
-  if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
+  if (!rows || rows.length === 0) return <p className="empty">{t('signals.noSignals')}</p>
 
   const th = (label, col, className) =>
     <ServerTh label={label} col={col} sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={className} />
@@ -261,21 +269,21 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
           <colgroup>{['80px','44px','70px','150px','90px','70px','70px','55px','80px','80px','80px','120px','85px','75px','100px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
           <thead>
             <tr>
-              {th('Date',           'date')}
+              {th(t('col.date'),           'date')}
               <th></th>
-              {th('Ticker',         'ticker')}
-              {th('Company',        'company')}
-              {th('Market Cap (B)', 'market_cap')}
-              {th('Signal',         'signal')}
-              {th('Price',          'close')}
-              {th('RSI',            'rsi')}
-              {th('Low Price',      'target_low_price',  'col-hide-sm')}
-              {th('Base Price',     'target_mean_price')}
-              {th('High Price',     'target_high_price', 'col-hide-sm')}
-              <th>Health Score</th>
-              <th>Analyst Target</th>
-              <th className="col-hide-sm">ML Score</th>
-              <th>Live Price</th>
+              {th(t('col.ticker'),         'ticker')}
+              {th(t('col.company'),        'company')}
+              {th(t('col.marketCap'),      'market_cap')}
+              {th(t('col.signal'),         'signal')}
+              {th(t('col.price'),          'close')}
+              {th(t('col.rsi'),            'rsi')}
+              {th(t('col.lowPrice'),       'target_low_price',  'col-hide-sm')}
+              {th(t('col.basePrice'),      'target_mean_price')}
+              {th(t('col.highPrice'),      'target_high_price', 'col-hide-sm')}
+              <th>{t('col.healthScore')}</th>
+              <th>{t('col.analystTarget')}</th>
+              <th className="col-hide-sm">{t('col.mlScore')}</th>
+              <th>{t('col.livePrice')}</th>
             </tr>
           </thead>
           <tbody>
@@ -311,6 +319,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
 // ---------------------------------------------------------------------------
 
 export default function SignalsPage() {
+  const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const [signalFilter, setSignalFilter] = useState('ALL')
   const [search, setSearch]             = useState('')
@@ -389,34 +398,34 @@ export default function SignalsPage() {
     <div>
       <div className="section">
         <p className="section-title">
-          Today's BUY Signals ({loadingBuy ? '…' : (todayBuy?.length ?? 0)})
-          {marketOpen && <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>● live</span>}
+          {t('signals.todayBuy', { count: loadingBuy ? '…' : (todayBuy?.length ?? 0) })}
+          {marketOpen && <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>{t('market.live')}</span>}
         </p>
         {loadingBuy
-          ? <p className="loading">Loading…</p>
+          ? <p className="loading">{t('table.loading')}</p>
           : <TodayTable rows={todayBuy} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} market={market} />}
       </div>
 
       <div className="section">
         <p className="section-title">
-          Today's SELL Signals ({loadingSell ? '…' : (todaySell?.length ?? 0)})
-          {marketOpen && <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>● live</span>}
+          {t('signals.todaySell', { count: loadingSell ? '…' : (todaySell?.length ?? 0) })}
+          {marketOpen && <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>{t('market.live')}</span>}
         </p>
         {loadingSell
-          ? <p className="loading">Loading…</p>
+          ? <p className="loading">{t('table.loading')}</p>
           : <TodaySellTable rows={todaySell} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} market={market} />}
       </div>
 
       <div className="section">
         <p className="section-title">
-          All Signals
+          {t('signals.allSignals')}
           {allResult && <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 10 }}>
-            {allResult.total.toLocaleString()} rows
+            {t('signals.rows', { total: allResult.total.toLocaleString() })}
           </span>}
         </p>
         <div className="controls">
           <input
-            placeholder="🔍 Search ticker or company"
+            placeholder={`🔍 ${t('table.search')}`}
             value={search}
             onChange={e => handleSearch(e.target.value)}
             style={{ width: 240 }}
@@ -426,9 +435,9 @@ export default function SignalsPage() {
               {s}
             </button>
           ))}
-          {search && <button onClick={() => handleSearch('')}>Clear</button>}
+          {search && <button onClick={() => handleSearch('')}>{t('table.clear')}</button>}
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+            <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
             <select value={pageSize} onChange={e => handlePageSize(e.target.value)}>
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -438,7 +447,7 @@ export default function SignalsPage() {
           </span>
         </div>
         {loadingAll && !allResult
-          ? <p className="loading">Loading…</p>
+          ? <p className="loading">{t('table.loading')}</p>
           : <AllSignalsTable
               result={allResult}
               sortBy={sortBy}

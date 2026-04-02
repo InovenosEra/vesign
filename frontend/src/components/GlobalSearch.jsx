@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { searchTickers } from '../api'
 import SignalModal from './SignalModal'
 
 export default function GlobalSearch() {
+  const { t } = useTranslation()
   const [query, setQuery]       = useState('')
   const [results, setResults]   = useState([])
   const [open, setOpen]         = useState(false)
@@ -73,7 +75,7 @@ export default function GlobalSearch() {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder="Search ticker or company…"
+          placeholder={t('table.searchGlobal')}
           style={{
             width: 240,
             padding: '6px 14px',
