@@ -505,12 +505,18 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   /* Push right-side items to the far right */
   .header-right { margin-left: auto; gap: 10px; }
 
-  /* Shrink logo so hamburger fits */
-  .app-header h1 { font-size: 1.6rem !important; margin-top: -2px !important; }
-  .app-header h1 img { height: 2.0rem !important; }
+  /* Logo: slightly smaller than desktop but still prominent */
+  .app-header h1 { font-size: 2.0rem !important; margin-top: -3px !important; }
+  .app-header h1 img { height: 2.5rem !important; }
 
-  /* Hide greeting text in user menu — show avatar + ▾ only */
-  .user-greeting { display: none; }
+  /* Profile button: show first name only (hide "Hello, " prefix) */
+  .user-hello { display: none; }
+
+  /* Wider profile button with more visible border */
+  .user-menu-btn {
+    padding: 4px 14px 4px 4px !important;
+    border-color: var(--muted) !important;
+  }
 }
 
 /* ≤ 640px: tighter layout + hide non-essential table columns */
@@ -525,6 +531,32 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   /* Switch to auto layout so hidden cols don't leave empty space */
   table { table-layout: auto !important; min-width: 0 !important; }
   col   { width: auto !important; }
+
+  /* Freeze first 2 columns (logo + ticker/date) while scrolling */
+  .data-table-wrap th:nth-child(1),
+  .data-table-wrap td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--surface);
+  }
+  .data-table-wrap th:nth-child(2),
+  .data-table-wrap td:nth-child(2) {
+    position: sticky;
+    left: 40px; /* logo column is ~40px wide */
+    z-index: 3;
+    background: var(--surface);
+  }
+  /* Sticky column separator shadow */
+  .data-table-wrap td:nth-child(2),
+  .data-table-wrap th:nth-child(2) {
+    box-shadow: 3px 0 6px rgba(0,0,0,0.35);
+  }
+  /* Keep row hover on sticky cells */
+  tr.clickable-row:hover td:nth-child(1),
+  tr.clickable-row:hover td:nth-child(2) {
+    background: rgba(79, 142, 247, 0.07);
+  }
 
   .section-title { font-size: 1.1rem; }
   .page-title    { font-size: 1.1rem; }

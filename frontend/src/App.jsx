@@ -182,6 +182,7 @@ function UserMenu() {
     <>
       <div ref={ref} style={{ position: 'relative' }}>
         <button
+          className="user-menu-btn"
           onClick={() => setOpen(o => !o)}
           style={{
             background: 'transparent',
@@ -203,8 +204,7 @@ function UserMenu() {
                 {user?.firstName?.[0]}
               </div>
           }
-          <span className="user-greeting">Hello, {user?.firstName}</span>
-          <span>▾</span>
+          <span className="user-hello">Hello, </span><span className="user-name">{user?.firstName}</span> ▾
         </button>
         {open && (
           <div style={{
