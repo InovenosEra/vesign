@@ -562,7 +562,9 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   .page-title    { font-size: 1.1rem; }
 
   /* Metric cards: 2 per row */
-  .metric-card { flex: 1 1 calc(50% - 8px); }
+  .metric-card { flex: 1 1 calc(50% - 8px); padding: 10px 14px; }
+  .metric-card .value { font-size: 1.1rem; }
+  .metrics { gap: 10px; margin-bottom: 16px; }
 
   /* Modal: stack header vertically */
   .modal-header {

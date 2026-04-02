@@ -505,28 +505,14 @@ export default function TradesPage() {
         <input type="date" value={start} onChange={e => setStart(e.target.value)} />
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
         <input type="date" value={end} onChange={e => setEnd(e.target.value)} />
-        {[3, 6, 12, 24].map(m => (
-          <button
-            key={m}
-            className="period-chip"
-            onClick={() => { setStart(isoMonthsAgo(m)); setEnd(new Date().toISOString().slice(0, 10)) }}
-          >{m}M</button>
-        ))}
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            placeholder="🔍 Search ticker or company"
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
-            style={{ width: 220 }}
-          />
-          {search && <button onClick={() => { setSearch(''); setPage(1) }}>Clear</button>}
-          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
-          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
+        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {[3, 6, 12, 24].map(m => (
+            <button
+              key={m}
+              className="period-chip"
+              onClick={() => { setStart(isoMonthsAgo(m)); setEnd(new Date().toISOString().slice(0, 10)) }}
+            >{m}M</button>
+          ))}
         </span>
       </div>
 
@@ -571,6 +557,24 @@ export default function TradesPage() {
         const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
         return (
         <>
+        <div className="controls" style={{ marginTop: 0 }}>
+          <input
+            placeholder="🔍 Search ticker or company"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            style={{ width: 240 }}
+          />
+          {search && <button onClick={() => { setSearch(''); setPage(1) }}>Clear</button>}
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </span>
+        </div>
         <div className="data-table-wrap">
           <table>
             <thead>
@@ -635,28 +639,14 @@ export default function TradesPage() {
         <input type="date" value={openStart} onChange={e => setOpenStart(e.target.value)} />
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>To</label>
         <input type="date" value={openEnd} onChange={e => setOpenEnd(e.target.value)} />
-        {[3, 6, 12].map(m => (
-          <button
-            key={m}
-            className="period-chip"
-            onClick={() => { setOpenStart(isoMonthsAgo(m)); setOpenEnd(new Date().toISOString().slice(0, 10)) }}
-          >{m}M</button>
-        ))}
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            placeholder="🔍 Search ticker or company"
-            value={openSearch}
-            onChange={e => { setOpenSearch(e.target.value); setOpenPage(1) }}
-            style={{ width: 220 }}
-          />
-          {openSearch && <button onClick={() => { setOpenSearch(''); setOpenPage(1) }}>Clear</button>}
-          <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
-          <select value={openPageSize} onChange={e => { setOpenPageSize(Number(e.target.value)); setOpenPage(1) }}>
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
+        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {[3, 6, 12].map(m => (
+            <button
+              key={m}
+              className="period-chip"
+              onClick={() => { setOpenStart(isoMonthsAgo(m)); setOpenEnd(new Date().toISOString().slice(0, 10)) }}
+            >{m}M</button>
+          ))}
         </span>
       </div>
 
@@ -696,6 +686,24 @@ export default function TradesPage() {
                 </div>
               </div>
             )}
+            <div className="controls" style={{ marginTop: 0 }}>
+              <input
+                placeholder="🔍 Search ticker or company"
+                value={openSearch}
+                onChange={e => { setOpenSearch(e.target.value); setOpenPage(1) }}
+                style={{ width: 240 }}
+              />
+              {openSearch && <button onClick={() => { setOpenSearch(''); setOpenPage(1) }}>Clear</button>}
+              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <label style={{ color: 'var(--muted)', fontSize: 13 }}>Rows</label>
+                <select value={openPageSize} onChange={e => { setOpenPageSize(Number(e.target.value)); setOpenPage(1) }}>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </span>
+            </div>
             <OpenTradesTable data={filtered} search={openSearch} page={openPage} pageSize={openPageSize} setPage={setOpenPage} onSelect={setSelectedOpen} />
           </>
         )
