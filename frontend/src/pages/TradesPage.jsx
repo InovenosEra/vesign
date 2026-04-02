@@ -374,8 +374,8 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
           <thead>
             <tr>
               <th></th>
-              {th('Company',        'company')}
               {th('Ticker',         'ticker')}
+              {th('Company',        'company')}
               {th('Market Cap (B)', 'market_cap',    'col-hide-sm')}
               {th('Buy Date',       'buy_date')}
               {th('Buy Price',      'buy_price')}
@@ -403,8 +403,8 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                 return (
                   <tr key={i} className="clickable-row" onClick={() => onSelect(t)}>
                     <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                    <td>{t.company ?? '—'}</td>
                     <td><strong>{t.ticker}</strong></td>
+                    <td>{t.company ?? '—'}</td>
                     <td className="col-hide-sm">{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{fmtDate(t.buy_date)}</td>
                     <td>{fmt(t.buy_price)}</td>
@@ -576,8 +576,8 @@ export default function TradesPage() {
             <thead>
               <tr>
                 <th></th>
-                {th('Company',     'company')}
                 {th('Ticker',      'ticker')}
+                {th('Company',     'company')}
                 {th('Market Cap (B)', 'market_cap', 'col-hide-sm')}
                 {th('# Trades',     'trade_count')}
                 {th('Buy Date',    'first_buy_date')}
@@ -595,8 +595,8 @@ export default function TradesPage() {
                 return (
                   <tr key={i} className="clickable-row" onClick={() => setSelected(t)}>
                     <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                    <td>{t.company ?? '—'}</td>
                     <td><strong>{t.ticker}</strong></td>
+                    <td>{t.company ?? '—'}</td>
                     <td className="col-hide-sm">{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{t.trade_count}</td>
                     <td>{fmtDate(t.first_buy_date)}</td>
