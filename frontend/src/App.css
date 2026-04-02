@@ -439,3 +439,110 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   padding: 6px 12px;
   font-size: 12px;
 }
+
+/* ── Responsive layout ── */
+
+/* Hamburger button (hidden on desktop) */
+.hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Mobile dropdown nav */
+.mobile-menu {
+  position: fixed;
+  top: 70px;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  z-index: 99;
+  padding: 12px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.mobile-menu a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+}
+.mobile-menu a:hover  { background: var(--surface); color: var(--text); }
+.mobile-menu a.active { background: var(--surface); color: var(--accent); }
+.mobile-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+.mobile-menu-market {
+  padding: 4px 14px;
+}
+
+/* ≤ 900px: collapse header nav into hamburger */
+@media (max-width: 900px) {
+  .hamburger { display: flex; }
+  .desktop-nav { display: none !important; }
+  .header-search-wrap { display: none !important; }
+  .header-market-status-wrap { display: none !important; }
+  .header-currency-wrap { display: none !important; }
+  .app-header { gap: 12px; padding: 0 16px; }
+}
+
+/* ≤ 640px: tighter layout + hide non-essential table columns */
+@media (max-width: 640px) {
+  .app-main { padding: 12px 10px; }
+  td { padding: 7px 8px; }
+  thead th { padding: 8px 8px; }
+
+  /* Hide non-essential columns */
+  .col-hide-sm { display: none; }
+
+  .section-title { font-size: 1.1rem; }
+  .page-title    { font-size: 1.1rem; }
+
+  /* Metric cards: 2 per row */
+  .metric-card { flex: 1 1 calc(50% - 8px); }
+
+  /* Modal: stack header vertically */
+  .modal-header {
+    flex-wrap: wrap;
+    position: relative;
+    padding-right: 40px; /* make room for absolute close btn */
+  }
+  .modal-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  .modal-logo             { width: 56px !important; height: 56px !important; }
+  .modal-logo-placeholder { width: 56px !important; height: 56px !important; font-size: 11px !important; }
+  .modal-general-col      { width: 100% !important; }
+  .modal-desc-col         { width: 100% !important; height: auto !important; }
+
+  /* Pagination: wrap on very small screens */
+  .pagination { gap: 4px; flex-wrap: wrap; }
+  .pagination button { min-width: 44px; padding: 5px 8px; font-size: 12px; }
+}
+
+/* ≤ 400px: tightest layout */
+@media (max-width: 400px) {
+  .app-main { padding: 8px 6px; }
+  td { padding: 5px 6px; font-size: 12px; }
+  thead th { font-size: 12px; padding: 6px; }
+  .app-header { padding: 0 10px; }
+}

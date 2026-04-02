@@ -55,10 +55,10 @@ function Pagination({ page, pages, onChange }) {
   )
 }
 
-function Th({ label, col, sort, onSort }) {
+function Th({ label, col, sort, onSort, className }) {
   const active = sort.key === col
   return (
-    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }}>
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
       {label}
       <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
         {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
@@ -195,14 +195,14 @@ function TradeModal({ row, start, end, onClose }) {
         {/* Header */}
         <div className="modal-header" style={{ alignItems: 'flex-start' }}>
           {row.logo_url
-            ? <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
             : null}
-          <div style={{ width: 96, height: 96, flexShrink: 0, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', display: row.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', color: 'var(--text)' }}>
+          <div className="modal-logo-placeholder" style={{ width: 96, height: 96, flexShrink: 0, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', display: row.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', color: 'var(--text)' }}>
             {row.ticker?.replace(/\.TA$/, '')}
           </div>
 
           {/* General column */}
-          <div ref={generalColRef} style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
+          <div ref={generalColRef} className="modal-general-col" style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
             <div style={{ padding: '8px 0px', border: '1px solid var(--border)', borderRadius: 8 }}>
               <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
@@ -230,7 +230,7 @@ function TradeModal({ row, start, end, onClose }) {
 
           {/* Description + Health column */}
           {(row.description_short || row.description || row.health_score) && (
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
+            <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
               {(row.description_short || row.description) && (<>
                 <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
                 <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
@@ -355,7 +355,7 @@ function TradeModal({ row, start, end, onClose }) {
 function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
   const { sorted, sort, toggle } = useSort(data, 'buy_date', 'desc')
 
-  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
+  const th = (label, col, className) => <Th label={label} col={col} sort={sort} onSort={toggle} className={className} />
 
   const filtered  = search ? sorted.filter(t =>
     t.ticker?.toLowerCase().includes(search.toLowerCase()) ||
@@ -376,10 +376,10 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
               <th></th>
               {th('Company',        'company')}
               {th('Ticker',         'ticker')}
-              {th('Market Cap (B)', 'market_cap')}
+              {th('Market Cap (B)', 'market_cap',    'col-hide-sm')}
               {th('Buy Date',       'buy_date')}
               {th('Buy Price',      'buy_price')}
-              {th('Last Day Price',  'current_price')}
+              {th('Last Day Price',  'current_price', 'col-hide-sm')}
               {th('Days Held',      'days_held')}
               <th>Live Price</th>
               <th>Yield</th>
@@ -405,10 +405,10 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                     <td>{t.company ?? '—'}</td>
                     <td><strong>{t.ticker}</strong></td>
-                    <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+                    <td className="col-hide-sm">{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{fmtDate(t.buy_date)}</td>
                     <td>{fmt(t.buy_price)}</td>
-                    <td>{fmt(t.current_price)}</td>
+                    <td className="col-hide-sm">{fmt(t.current_price)}</td>
                     <td>{t.days_held ?? '—'}</td>
                     <td>
                       {!isOpen
@@ -494,7 +494,7 @@ export default function TradesPage() {
           : 0), 0)
     : null
 
-  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
+  const th = (label, col, className) => <Th label={label} col={col} sort={sort} onSort={toggle} className={className} />
 
   return (
     <div>
@@ -578,11 +578,11 @@ export default function TradesPage() {
                 <th></th>
                 {th('Company',     'company')}
                 {th('Ticker',      'ticker')}
-                {th('Market Cap (B)', 'market_cap')}
+                {th('Market Cap (B)', 'market_cap', 'col-hide-sm')}
                 {th('# Trades',     'trade_count')}
                 {th('Buy Date',    'first_buy_date')}
                 {th('Sell Date',   'last_sell_date')}
-                {th('Avg Days',    'avg_days')}
+                {th('Avg Days',    'avg_days', 'col-hide-sm')}
                 {th('Win Rate',    'win_count')}
                 {th('Avg Yield',   'avg_return')}
               </tr>
@@ -597,11 +597,11 @@ export default function TradesPage() {
                     <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
                     <td>{t.company ?? '—'}</td>
                     <td><strong>{t.ticker}</strong></td>
-                    <td>{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+                    <td className="col-hide-sm">{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{t.trade_count}</td>
                     <td>{fmtDate(t.first_buy_date)}</td>
                     <td>{fmtDate(t.last_sell_date)}</td>
-                    <td>{Math.round(t.avg_days)}</td>
+                    <td className="col-hide-sm">{Math.round(t.avg_days)}</td>
                     <td className={winRate >= 50 ? 'up' : 'down'}>{winRate.toFixed(0)}%</td>
                     <td className={t.avg_return >= 0 ? 'up' : 'down'}>
                       {t.avg_return >= 0 ? '+' : ''}{fmt(t.avg_return)}%

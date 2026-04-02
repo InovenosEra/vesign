@@ -242,33 +242,54 @@ function UserMenu() {
 // ---------------------------------------------------------------------------
 function Header() {
   const { market } = useContext(MarketContext)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const closeNav = () => setMobileNavOpen(false)
+
   return (
-    <header className="app-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
-        <NavLink to="/" style={{ textDecoration: 'none' }}>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 900, fontSize: '2.7rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, marginTop: '-6px', cursor: 'pointer' }}>
-            <img src="/favicon.png" alt="V" style={{ height: '3.2rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0, 210, 255, 0.6))' }} />
-            <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
-          </h1>
-        </NavLink>
-        <nav>
-          <NavLink to="/">Signals</NavLink>
-          <NavLink to="/watchlist">Watchlist</NavLink>
-          <NavLink to="/trades">Trades</NavLink>
-        </nav>
-      </div>
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-        <GlobalSearch />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <MarketStatus />
-        <FlagSelector />
-        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
-          {market === 'IL' ? '₪' : '$'}
-        </span>
-        <UserMenu />
-      </div>
-    </header>
+    <>
+      <header className="app-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
+          <NavLink to="/" onClick={closeNav} style={{ textDecoration: 'none' }}>
+            <h1 style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 900, fontSize: '2.7rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, marginTop: '-6px', cursor: 'pointer' }}>
+              <img src="/favicon.png" alt="V" style={{ height: '3.2rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0, 210, 255, 0.6))' }} />
+              <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
+            </h1>
+          </NavLink>
+          <nav className="desktop-nav">
+            <NavLink to="/">Signals</NavLink>
+            <NavLink to="/watchlist">Watchlist</NavLink>
+            <NavLink to="/trades">Trades</NavLink>
+          </nav>
+        </div>
+        <div className="header-search-wrap" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+          <GlobalSearch />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="header-market-status-wrap"><MarketStatus /></span>
+          <FlagSelector />
+          <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
+            {market === 'IL' ? '₪' : '$'}
+          </span>
+          <UserMenu />
+          <button
+            className="hamburger"
+            onClick={() => setMobileNavOpen(o => !o)}
+            aria-label="Menu"
+          >
+            {mobileNavOpen ? '✕' : '☰'}
+          </button>
+        </div>
+      </header>
+      {mobileNavOpen && (
+        <div className="mobile-menu">
+          <NavLink to="/" onClick={closeNav}>Signals</NavLink>
+          <NavLink to="/watchlist" onClick={closeNav}>Watchlist</NavLink>
+          <NavLink to="/trades" onClick={closeNav}>Trades</NavLink>
+          <div className="mobile-menu-divider" />
+          <div className="mobile-menu-market"><MarketStatus /></div>
+        </div>
+      )}
+    </>
   )
 }
 

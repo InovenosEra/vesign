@@ -138,9 +138,9 @@ export default function SignalModal({ row, onClose }) {
         {/* Header */}
         <div className="modal-header" style={{ alignItems: 'flex-start' }}>
           {row.logo_url
-            ? <img src={row.logo_url} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             : null}
-          <div style={{
+          <div className="modal-logo-placeholder" style={{
             width: 96, height: 96, flexShrink: 0, borderRadius: 10,
             background: 'var(--surface)', border: '1px solid var(--border)',
             display: row.logo_url ? 'none' : 'flex',
@@ -149,7 +149,7 @@ export default function SignalModal({ row, onClose }) {
           }}>
             {row.ticker?.replace(/\.TA$/, '')}
           </div>
-          <div ref={generalColRef} style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
+          <div ref={generalColRef} className="modal-general-col" style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>General</div>
             <div style={{ padding: '8px 0px', border: '1px solid var(--border)', borderRadius: 8 }}>
               <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
@@ -176,7 +176,7 @@ export default function SignalModal({ row, onClose }) {
             </div>
           </div>
           {(row.description_short || row.description || row.health_score) && (
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
+            <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
               {(row.description_short || row.description) && (<>
                 <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>Description</div>
                 <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>

@@ -71,10 +71,11 @@ function UpsideCell({ targetMean, close }) {
   return <td className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
 }
 
-function MLScoreCell({ score }) {
-  if (score == null) return <td style={{ color: 'var(--muted)' }}>—</td>
+function MLScoreCell({ score, className }) {
+  const cls = className || ''
+  if (score == null) return <td className={cls} style={{ color: 'var(--muted)' }}>—</td>
   const pct = score * 100
-  return <td className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
+  return <td className={`${cls} ${pct >= 0 ? 'up' : 'down'}`}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
 }
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
@@ -102,10 +103,10 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
 
 // Sortable <th> — used by client-side tables
 // Server-side sortable <th> — used by the paginated all-signals table
-function ServerTh({ label, col, sortBy, sortDir, onSort }) {
+function ServerTh({ label, col, sortBy, sortDir, onSort, className }) {
   const active = sortBy === col
   return (
-    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }}>
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
       {label}
       <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
         {active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
@@ -147,12 +148,12 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
           <th>Market Cap (B)</th>
           <th>Price</th>
           <th>RSI</th>
-          <th>Low Price</th>
+          <th className="col-hide-sm">Low Price</th>
           <th>Base Price</th>
-          <th>High Price</th>
+          <th className="col-hide-sm">High Price</th>
           <th>Health Score</th>
           <th>Analyst Target</th>
-          <th>ML Score</th>
+          <th className="col-hide-sm">ML Score</th>
           <th>Live Price</th>
         </tr>
       </thead>
@@ -165,12 +166,12 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
             <td>{fmtMktCap(r.market_cap)}</td>
             <td>{fmtPrice(r.close, r.ticker)}</td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-            <td>{fmtPrice(r.target_low_price, r.ticker)}</td>
+            <td className="col-hide-sm">{fmtPrice(r.target_low_price, r.ticker)}</td>
             <td>{fmtPrice(r.target_mean_price, r.ticker)}</td>
-            <td>{fmtPrice(r.target_high_price, r.ticker)}</td>
+            <td className="col-hide-sm">{fmtPrice(r.target_high_price, r.ticker)}</td>
             <HealthCell score={r.health_score} />
             <UpsideCell targetMean={r.target_mean_price} close={r.close} />
-            <MLScoreCell score={r.prediction_score} />
+            <MLScoreCell score={r.prediction_score} className="col-hide-sm" />
             <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
           </tr>
         ))}
@@ -250,8 +251,8 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
 
   if (!rows || rows.length === 0) return <p className="empty">No signals found.</p>
 
-  const th = (label, col) =>
-    <ServerTh label={label} col={col} sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+  const th = (label, col, className) =>
+    <ServerTh label={label} col={col} sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={className} />
 
   return (
     <>
@@ -268,12 +269,12 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               {th('Signal',         'signal')}
               {th('Price',          'close')}
               {th('RSI',            'rsi')}
-              {th('Low Price',      'target_low_price')}
+              {th('Low Price',      'target_low_price',  'col-hide-sm')}
               {th('Base Price',     'target_mean_price')}
-              {th('High Price',     'target_high_price')}
+              {th('High Price',     'target_high_price', 'col-hide-sm')}
               <th>Health Score</th>
               <th>Analyst Target</th>
-              <th>ML Score</th>
+              <th className="col-hide-sm">ML Score</th>
               <th>Live Price</th>
             </tr>
           </thead>
@@ -288,12 +289,12 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}</span> : '—'}</td>
                 <td>{fmtPrice(r.close, market)}</td>
                 <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-                <td>{fmtPrice(r.target_low_price, market)}</td>
+                <td className="col-hide-sm">{fmtPrice(r.target_low_price, market)}</td>
                 <td>{fmtPrice(r.target_mean_price, market)}</td>
-                <td>{fmtPrice(r.target_high_price, market)}</td>
+                <td className="col-hide-sm">{fmtPrice(r.target_high_price, market)}</td>
                 <HealthCell score={r.health_score} />
                 <UpsideCell targetMean={r.target_mean_price} close={r.close} />
-                <MLScoreCell score={r.prediction_score} />
+                <MLScoreCell score={r.prediction_score} className="col-hide-sm" />
                 <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
               </tr>
             ))}

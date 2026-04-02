@@ -50,10 +50,10 @@ function HealthCell({ score }) {
   )
 }
 
-function Th({ label, col, sort, onSort }) {
+function Th({ label, col, sort, onSort, className }) {
   const active = sort.key === col
   return (
-    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }}>
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
       {label}
       <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
         {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
@@ -251,7 +251,7 @@ export default function WatchlistPage() {
 
   const selectedList = lists.find(l => l.id === selectedId)
 
-  const th = (label, col) => <Th label={label} col={col} sort={sort} onSort={toggle} />
+  const th = (label, col, className) => <Th label={label} col={col} sort={sort} onSort={toggle} className={className} />
 
   return (
     <div>
@@ -451,12 +451,12 @@ export default function WatchlistPage() {
                           {th('Ticker',         'ticker')}
                           {th('Company',        'company')}
                           {th('Signal',         'signal')}
-                          {th('Mkt Cap (B)',    'market_cap')}
+                          {th('Mkt Cap (B)',    'market_cap', 'col-hide-sm')}
                           {th('Price',          'close')}
                           {th('RSI',            'rsi')}
                           <th>Health</th>
                           <th>Upside</th>
-                          <th>ML Score</th>
+                          <th className="col-hide-sm">ML Score</th>
                           <th>Live Price</th>
                           <th>Qty</th>
                           <th>Avg Price</th>
@@ -490,12 +490,12 @@ export default function WatchlistPage() {
                               <td style={clip}><strong>{displayTicker(t.ticker)}</strong></td>
                               <td style={clip}>{t.company ?? '—'}</td>
                               <td>{t.signal ? <span className={`badge badge-${t.signal}`}>{t.signal}</span> : '—'}</td>
-                              <td>{fmtMktCap(t.market_cap, t.ticker)}</td>
+                              <td className="col-hide-sm">{fmtMktCap(t.market_cap, t.ticker)}</td>
                               <td>{fmtPrice(t.close, t.ticker)}</td>
                               <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
                               <HealthCell score={t.health_score} />
                               <UpsideCell targetMean={t.target_mean_price} close={t.close} prices={prices} ticker={t.ticker} />
-                              <td>{t.prediction_score != null ? <span className={t.prediction_score >= 0 ? 'up' : 'down'}>{t.prediction_score >= 0 ? '▲' : '▼'} {Math.abs(t.prediction_score * 100).toFixed(1)}%</span> : '—'}</td>
+                              <td className="col-hide-sm">{t.prediction_score != null ? <span className={t.prediction_score >= 0 ? 'up' : 'down'}>{t.prediction_score >= 0 ? '▲' : '▼'} {Math.abs(t.prediction_score * 100).toFixed(1)}%</span> : '—'}</td>
                               <LivePriceCell ticker={t.ticker} closePrice={t.close} prices={prices} marketOpen={marketOpen} />
                               <td>{totalQty > 0 ? totalQty : '—'}</td>
                               <td>{avgPrice != null ? avgPrice.toFixed(2) : '—'}</td>
