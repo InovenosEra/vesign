@@ -471,12 +471,12 @@ export default function WatchlistPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sorted.map(t => {
-                          const lots = holdingsByTicker[t.ticker] || []
-                          const isIL = t.ticker?.endsWith('.TA')
+                        {sorted.map(row => {
+                          const lots = holdingsByTicker[row.ticker] || []
+                          const isIL = row.ticker?.endsWith('.TA')
                           const currentPrice = (() => {
-                            const live = prices[t.ticker]
-                            const raw = live ?? t.close
+                            const live = prices[row.ticker]
+                            const raw = live ?? row.close
                             return raw != null ? (isIL ? raw / 100 : raw) : null
                           })()
                           const totalQty = lots.reduce((s, l) => s + l.quantity, 0)
@@ -484,24 +484,24 @@ export default function WatchlistPage() {
                           const avgPrice = totalQty > 0 ? totalCost / totalQty : null
                           const currentVal = currentPrice != null && totalQty > 0 ? currentPrice * totalQty : null
                           const yieldPct = currentVal != null && totalCost > 0 ? ((currentVal - totalCost) / totalCost) * 100 : null
-                          const isExpanded = !!expandedTickers[t.ticker]
-                          const lot = newLot[t.ticker] || { quantity: '', buy_price: '', buy_date: '' }
+                          const isExpanded = !!expandedTickers[row.ticker]
+                          const lot = newLot[row.ticker] || { quantity: '', buy_price: '', buy_date: '' }
 
                           const clip = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 
                           return [
-                            <tr key={t.ticker} className="clickable-row" onClick={() => setSelected(t)}>
-                              <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                              <td style={clip}><strong>{displayTicker(t.ticker)}</strong></td>
-                              <td style={clip}>{t.company ?? '—'}</td>
-                              <td>{t.signal ? <span className={`badge badge-${t.signal}`}>{t.signal}</span> : '—'}</td>
-                              <td className="col-hide-sm">{fmtMktCap(t.market_cap, t.ticker)}</td>
-                              <td>{fmtPrice(t.close, t.ticker)}</td>
-                              <td>{t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
-                              <HealthCell score={t.health_score} />
-                              <UpsideCell targetMean={t.target_mean_price} close={t.close} prices={prices} ticker={t.ticker} />
-                              <td className="col-hide-sm">{t.prediction_score != null ? <span className={t.prediction_score >= 0 ? 'up' : 'down'}>{t.prediction_score >= 0 ? '▲' : '▼'} {Math.abs(t.prediction_score * 100).toFixed(1)}%</span> : '—'}</td>
-                              <LivePriceCell ticker={t.ticker} closePrice={t.close} prices={prices} marketOpen={marketOpen} />
+                            <tr key={row.ticker} className="clickable-row" onClick={() => setSelected(row)}>
+                              <td>{row.logo_url ? <img className="logo" src={row.logo_url} alt="" /> : null}</td>
+                              <td style={clip}><strong>{displayTicker(row.ticker)}</strong></td>
+                              <td style={clip}>{row.company ?? '—'}</td>
+                              <td>{row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'}</td>
+                              <td className="col-hide-sm">{fmtMktCap(row.market_cap, row.ticker)}</td>
+                              <td>{fmtPrice(row.close, row.ticker)}</td>
+                              <td>{row.rsi != null ? row.rsi.toFixed(1) : '—'}</td>
+                              <HealthCell score={row.health_score} />
+                              <UpsideCell targetMean={row.target_mean_price} close={row.close} prices={prices} ticker={row.ticker} />
+                              <td className="col-hide-sm">{row.prediction_score != null ? <span className={row.prediction_score >= 0 ? 'up' : 'down'}>{row.prediction_score >= 0 ? '▲' : '▼'} {Math.abs(row.prediction_score * 100).toFixed(1)}%</span> : '—'}</td>
+                              <LivePriceCell ticker={row.ticker} closePrice={row.close} prices={prices} marketOpen={marketOpen} />
                               <td>{totalQty > 0 ? totalQty : '—'}</td>
                               <td>{avgPrice != null ? avgPrice.toFixed(2) : '—'}</td>
                               <td>{totalCost > 0 ? `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</td>
@@ -511,19 +511,19 @@ export default function WatchlistPage() {
                               <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                                 <button
                                   style={{ padding: '2px 6px', fontSize: 10, marginRight: 4 }}
-                                  onClick={() => setExpandedTickers(prev => ({ ...prev, [t.ticker]: !prev[t.ticker] }))}
+                                  onClick={() => setExpandedTickers(prev => ({ ...prev, [row.ticker]: !prev[row.ticker] }))}
                                 >{isExpanded ? '▲' : '▼'}</button>
                                 <button
                                   className="danger"
                                   style={{ padding: '4px 8px', fontSize: 14, border: 'none', background: 'transparent', color: '#e74c3c' }}
-                                  onClick={() => setConfirmDelete({ ticker: t.ticker })}
+                                  onClick={() => setConfirmDelete({ ticker: row.ticker })}
                                   title={t('watchlist.removeFromWatchlist')}
                                 >🗑</button>
                               </td>
                             </tr>,
 
                             isExpanded && (
-                              <tr key={`${t.ticker}-lots`}>
+                              <tr key={`${row.ticker}-lots`}>
                                 <td colSpan={16} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
                                   <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--accent)' }}>
                                     {/* Existing lots */}
@@ -569,27 +569,27 @@ export default function WatchlistPage() {
                                         type="number" min="0" step="any"
                                         placeholder="Qty"
                                         value={lot.quantity}
-                                        onChange={e => setNewLot(prev => ({ ...prev, [t.ticker]: { ...lot, quantity: e.target.value } }))}
+                                        onChange={e => setNewLot(prev => ({ ...prev, [row.ticker]: { ...lot, quantity: e.target.value } }))}
                                         style={{ width: 80 }}
                                       />
                                       <input
                                         type="number" min="0" step="any"
                                         placeholder="Buy price"
                                         value={lot.buy_price}
-                                        onChange={e => setNewLot(prev => ({ ...prev, [t.ticker]: { ...lot, buy_price: e.target.value } }))}
+                                        onChange={e => setNewLot(prev => ({ ...prev, [row.ticker]: { ...lot, buy_price: e.target.value } }))}
                                         style={{ width: 100 }}
                                       />
                                       <input
                                         type="date"
                                         value={lot.buy_date}
-                                        onChange={e => setNewLot(prev => ({ ...prev, [t.ticker]: { ...lot, buy_date: e.target.value } }))}
+                                        onChange={e => setNewLot(prev => ({ ...prev, [row.ticker]: { ...lot, buy_date: e.target.value } }))}
                                         style={{ width: 140 }}
                                       />
                                       <button
                                         className="primary"
                                         style={{ padding: '4px 12px', fontSize: 12 }}
                                         disabled={!lot.quantity || !lot.buy_price || !lot.buy_date || addHoldingMut.isPending}
-                                        onClick={() => addHoldingMut.mutate({ ticker: t.ticker, quantity: parseFloat(lot.quantity), buy_price: parseFloat(lot.buy_price), buy_date: lot.buy_date })}
+                                        onClick={() => addHoldingMut.mutate({ ticker: row.ticker, quantity: parseFloat(lot.quantity), buy_price: parseFloat(lot.buy_price), buy_date: lot.buy_date })}
                                       >{t('watchlist.addLot')}</button>
                                     </div>
                                   </div>

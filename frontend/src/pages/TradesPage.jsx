@@ -391,11 +391,11 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
           <tbody>
             {paginated.length === 0
               ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>{t('trades.noOpen')}</td></tr>
-              : paginated.map((t, i) => {
-                const isIL = t.ticker?.endsWith('.TA')
+              : paginated.map((trade, i) => {
+                const isIL = trade.ticker?.endsWith('.TA')
                 const isOpen = isIL ? (marketOpen !== false) : marketOpen
-                const live = prices[t.ticker]
-                const closePrice = t.current_price
+                const live = prices[trade.ticker]
+                const closePrice = trade.current_price
                 const displayLive  = live != null ? (isIL ? live / 100 : live) : null
                 const displayClose = closePrice != null ? (isIL ? closePrice / 100 : closePrice) : null
                 const diff = displayLive != null && displayClose != null ? displayLive - displayClose : null
@@ -404,15 +404,15 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                 const arrow = diff != null && diff >= 0 ? '▲' : '▼'
 
                 return (
-                  <tr key={i} className="clickable-row" onClick={() => onSelect(t)}>
-                    <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                    <td><strong>{t.ticker}</strong></td>
-                    <td>{t.company ?? '—'}</td>
-                    <td className="col-hide-sm">{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
-                    <td>{fmtDate(t.buy_date)}</td>
-                    <td>{fmt(t.buy_price)}</td>
-                    <td className="col-hide-sm">{fmt(t.current_price)}</td>
-                    <td>{t.days_held ?? '—'}</td>
+                  <tr key={i} className="clickable-row" onClick={() => onSelect(trade)}>
+                    <td>{trade.logo_url ? <img className="logo" src={trade.logo_url} alt="" /> : null}</td>
+                    <td><strong>{trade.ticker}</strong></td>
+                    <td>{trade.company ?? '—'}</td>
+                    <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+                    <td>{fmtDate(trade.buy_date)}</td>
+                    <td>{fmt(trade.buy_price)}</td>
+                    <td className="col-hide-sm">{fmt(trade.current_price)}</td>
+                    <td>{trade.days_held ?? '—'}</td>
                     <td>
                       {!isOpen
                         ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closed')}</span>
@@ -426,7 +426,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     </td>
                     {(() => {
                       const priceForYield = (isOpen && displayLive != null) ? displayLive : displayClose
-                      const buyPrice = t.buy_price != null ? (isIL ? t.buy_price / 100 : t.buy_price) : null
+                      const buyPrice = trade.buy_price != null ? (isIL ? trade.buy_price / 100 : trade.buy_price) : null
                       const yieldPct = priceForYield != null && buyPrice ? ((priceForYield - buyPrice) / buyPrice) * 100 : null
                       return (
                         <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
@@ -598,21 +598,21 @@ export default function TradesPage() {
             <tbody>
               {paginated.length === 0
                 ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>{t('trades.noMatches')}</td></tr>
-                : paginated.map((t, i) => {
-                const winRate = t.trade_count > 0 ? (t.win_count / t.trade_count) * 100 : 0
+                : paginated.map((trade, i) => {
+                const winRate = trade.trade_count > 0 ? (trade.win_count / trade.trade_count) * 100 : 0
                 return (
-                  <tr key={i} className="clickable-row" onClick={() => setSelected(t)}>
-                    <td>{t.logo_url ? <img className="logo" src={t.logo_url} alt="" /> : null}</td>
-                    <td><strong>{t.ticker}</strong></td>
-                    <td>{t.company ?? '—'}</td>
-                    <td className="col-hide-sm">{t.market_cap != null ? (t.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
-                    <td>{t.trade_count}</td>
-                    <td>{fmtDate(t.first_buy_date)}</td>
-                    <td>{fmtDate(t.last_sell_date)}</td>
-                    <td className="col-hide-sm">{Math.round(t.avg_days)}</td>
+                  <tr key={i} className="clickable-row" onClick={() => setSelected(trade)}>
+                    <td>{trade.logo_url ? <img className="logo" src={trade.logo_url} alt="" /> : null}</td>
+                    <td><strong>{trade.ticker}</strong></td>
+                    <td>{trade.company ?? '—'}</td>
+                    <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
+                    <td>{trade.trade_count}</td>
+                    <td>{fmtDate(trade.first_buy_date)}</td>
+                    <td>{fmtDate(trade.last_sell_date)}</td>
+                    <td className="col-hide-sm">{Math.round(trade.avg_days)}</td>
                     <td className={winRate >= 50 ? 'up' : 'down'}>{winRate.toFixed(0)}%</td>
-                    <td className={t.avg_return >= 0 ? 'up' : 'down'}>
-                      {t.avg_return >= 0 ? '+' : ''}{fmt(t.avg_return)}%
+                    <td className={trade.avg_return >= 0 ? 'up' : 'down'}>
+                      {trade.avg_return >= 0 ? '+' : ''}{fmt(trade.avg_return)}%
                     </td>
                   </tr>
                 )
