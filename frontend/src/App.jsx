@@ -203,7 +203,7 @@ function UserMenu() {
                 {user?.firstName?.[0]}
               </div>
           }
-          Hello, {user?.firstName} ▾
+          <span className="user-greeting">Hello, {user?.firstName} ▾</span>
         </button>
         {open && (
           <div style={{

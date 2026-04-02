@@ -500,7 +500,14 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   .header-search-wrap { display: none !important; }
   .header-market-status-wrap { display: none !important; }
   .header-currency-wrap { display: none !important; }
-  .app-header { gap: 12px; padding: 0 16px; }
+  .app-header { gap: 8px; padding: 0 12px; }
+
+  /* Shrink logo so hamburger fits */
+  .app-header h1 { font-size: 1.6rem !important; margin-top: -2px !important; }
+  .app-header h1 img { height: 2.0rem !important; }
+
+  /* Hide greeting text in user menu — avatar only */
+  .user-greeting { display: none; }
 }
 
 /* ≤ 640px: tighter layout + hide non-essential table columns */
