@@ -534,25 +534,29 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
 
   /* Freeze first 2 columns (logo + ticker/date) while scrolling */
   .data-table-wrap th:nth-child(1),
-  .data-table-wrap td:nth-child(1) {
+  .data-table-wrap th:nth-child(2) {
     position: sticky;
-    left: 0;
     z-index: 3;
-    background: var(--surface);
+    background: var(--surface); /* header row color */
   }
-  .data-table-wrap th:nth-child(2),
+  .data-table-wrap td:nth-child(1),
   .data-table-wrap td:nth-child(2) {
     position: sticky;
-    left: 40px; /* logo column is ~40px wide */
-    z-index: 3;
-    background: var(--surface);
+    z-index: 2;
+    background: var(--bg); /* body row color — same as page bg */
   }
-  /* Sticky column separator shadow */
-  .data-table-wrap td:nth-child(2),
-  .data-table-wrap th:nth-child(2) {
-    box-shadow: 3px 0 6px rgba(0,0,0,0.35);
+  .data-table-wrap th:nth-child(1),
+  .data-table-wrap td:nth-child(1) { left: 0; }
+  .data-table-wrap th:nth-child(2),
+  .data-table-wrap td:nth-child(2) { left: 40px; }
+
+  /* Hard border on col 2 — hides any gap from col 1 and marks scroll boundary */
+  .data-table-wrap th:nth-child(2),
+  .data-table-wrap td:nth-child(2) {
+    border-right: 1px solid var(--border);
+    box-shadow: 3px 0 8px rgba(0,0,0,0.4);
   }
-  /* Keep row hover on sticky cells */
+  /* Keep hover state on sticky cells */
   tr.clickable-row:hover td:nth-child(1),
   tr.clickable-row:hover td:nth-child(2) {
     background: rgba(79, 142, 247, 0.07);
