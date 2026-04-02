@@ -532,30 +532,24 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   table { table-layout: auto !important; min-width: 0 !important; }
   col   { width: auto !important; }
 
-  /* Freeze first 2 columns (logo + ticker/date) while scrolling */
+  /* Freeze first 2 columns (logo + ticker) while scrolling */
   .data-table-wrap th:nth-child(1),
-  .data-table-wrap th:nth-child(2) {
-    position: sticky;
-    z-index: 3;
-    background: var(--surface); /* header row color */
-  }
+  .data-table-wrap th:nth-child(2),
   .data-table-wrap td:nth-child(1),
   .data-table-wrap td:nth-child(2) {
     position: sticky;
     z-index: 2;
-    background: var(--bg); /* body row color — same as page bg */
+    background: var(--bg); /* exactly the page background — no visible difference */
   }
   .data-table-wrap th:nth-child(1),
   .data-table-wrap td:nth-child(1) { left: 0; }
   .data-table-wrap th:nth-child(2),
-  .data-table-wrap td:nth-child(2) { left: 40px; }
+  .data-table-wrap td:nth-child(2) { left: 39px; } /* 39 not 40 — closes sub-pixel gap */
 
-  /* Hard border on col 2 — hides any gap from col 1 and marks scroll boundary */
+  /* Subtle right shadow on col 2 marks the scroll boundary */
   .data-table-wrap th:nth-child(2),
-  .data-table-wrap td:nth-child(2) {
-    border-right: 1px solid var(--border);
-    box-shadow: 3px 0 8px rgba(0,0,0,0.4);
-  }
+  .data-table-wrap td:nth-child(2) { box-shadow: 3px 0 6px rgba(0,0,0,0.4); }
+
   /* Keep hover state on sticky cells */
   tr.clickable-row:hover td:nth-child(1),
   tr.clickable-row:hover td:nth-child(2) {
