@@ -363,7 +363,7 @@ function Header() {
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="header-market-status-wrap"><MarketStatus /></span>
           <FlagSelector />
-          <LanguageSwitcher />
+          <span className="lang-switcher-header"><LanguageSwitcher /></span>
           <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
             {market === 'IL' ? '₪' : '$'}
           </span>
@@ -384,6 +384,22 @@ function Header() {
           <NavLink to="/trades" onClick={closeNav}>{t('nav.trades')}</NavLink>
           <div className="mobile-menu-divider" />
           <div className="mobile-menu-market"><MarketStatus /></div>
+          <div className="mobile-menu-divider" />
+          <div className="mobile-menu-langs">
+            {LANGUAGES.map(lang => (
+              <button
+                key={lang.code}
+                className={`mobile-lang-btn${(localStorage.getItem('lang') || 'en') === lang.code ? ' active' : ''}`}
+                onClick={() => {
+                  i18n.changeLanguage(lang.code)
+                  localStorage.setItem('lang', lang.code)
+                  document.documentElement.dir = lang.code === 'he' ? 'rtl' : 'ltr'
+                  document.documentElement.lang = lang.code
+                  closeNav()
+                }}
+              >{lang.label}</button>
+            ))}
+          </div>
         </div>
       )}
     </>
