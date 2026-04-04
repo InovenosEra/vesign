@@ -140,7 +140,7 @@ export default function SignalModal({ row, onClose }) {
         {/* Header */}
         <div className="modal-header" style={{ alignItems: 'flex-start' }}>
           {row.logo_url
-            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, background: '#fff', padding: 6 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.4))' }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             : null}
           <div className="modal-logo-placeholder" style={{
             width: 96, height: 96, flexShrink: 0, borderRadius: 10,
