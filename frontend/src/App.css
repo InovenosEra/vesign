@@ -182,12 +182,13 @@ table {
 thead th {
   background: var(--surface);
   color: var(--muted);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   text-align: left;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  overflow: hidden;
 }
 
 tbody tr { border-bottom: 1px solid var(--border); }
