@@ -99,7 +99,7 @@
   "trades.noOpen": "No hay posiciones abiertas.",
   "modal.general": "General",
   "modal.description": "Descripción",
-  "modal.companyHealth": "Salud de la empresa",
+  "modal.companyHealth": "Puntuación de salud",
   "modal.loadingChart": "Cargando gráfico…",
   "modal.ticker": "Ticker",
   "modal.company": "Empresa",

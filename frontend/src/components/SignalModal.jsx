@@ -211,7 +211,7 @@ export default function SignalModal({ row, onClose }) {
                     <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>{t('modal.companyHealth')}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       {[1,2,3,4,5].map(i => (
-                        <div key={i} style={{ width: 28, height: 12, borderRadius: 4, background: i <= score ? colors[score] : 'var(--border)' }} />
+                        <div key={i} style={{ width: 20, height: 8, borderRadius: 3, background: i <= score ? colors[score] : 'var(--border)' }} />
                       ))}
                       <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>{labels[score]}</span>
                     </div>

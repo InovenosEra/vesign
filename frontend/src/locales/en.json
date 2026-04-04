@@ -108,7 +108,7 @@
 
   "modal.general": "General",
   "modal.description": "Description",
-  "modal.companyHealth": "Company Health",
+  "modal.companyHealth": "Health Score",
   "modal.loadingChart": "Loading chart\u2026",
   "modal.ticker": "Ticker",
   "modal.company": "Company",
