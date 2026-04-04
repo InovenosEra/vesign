@@ -206,6 +206,8 @@ td {
   white-space: nowrap;
 }
 
+.recharts-wrapper, .recharts-wrapper * { outline: none; }
+
 td img.logo {
   width: 24px; height: 24px;
   border-radius: 4px;
