@@ -1315,10 +1315,6 @@ def portfolio_performance(user=Depends(get_current_user)):
         if not user_rows:
             return []
 
-        user_cost = sum(r[2] for r in user_rows if r[2] is not None)
-        if user_cost <= 0:
-            return []
-
         # Vesign: first BUY signal per ticker in the 52-week window
         signal_rows = conn.execute(text("""
             WITH first_buy AS (
@@ -1386,18 +1382,31 @@ def portfolio_performance(user=Depends(get_current_user)):
         except Exception:
             pass
 
+    # Compute portfolio BASE VALUE at week 0 (price 52 weeks ago) for true 12M yield
+    base_value = 0.0
+    for ticker, qty, _ in user_rows:
+        if qty is None:
+            continue
+        p = get_price_at(ticker, weeks[0])
+        if p is not None:
+            base_value += float(qty) * p
+    if base_value <= 0:
+        # Fallback: use actual cost basis if no prices available at week 0
+        base_value = sum(float(r[2]) for r in user_rows if r[2] is not None)
+
     result = []
     for week_date in weeks:
-        # User portfolio yield
-        total_val, total_cost = 0.0, 0.0
-        for ticker, qty, cost in user_rows:
-            if qty is None or cost is None:
+        # User portfolio yield vs its value 52 weeks ago (true last-12M performance)
+        total_val = 0.0
+        any_price = False
+        for ticker, qty, _ in user_rows:
+            if qty is None:
                 continue
             p = get_price_at(ticker, week_date)
             if p is not None:
                 total_val += float(qty) * p
-                total_cost += float(cost)
-        port_yield = round((total_val / total_cost - 1) * 100, 2) if total_cost > 0 else None
+                any_price = True
+        port_yield = round((total_val / base_value - 1) * 100, 2) if any_price and base_value > 0 else None
 
         # Vesign equal-weight: avg return of all active positions
         active_returns = []
