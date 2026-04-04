@@ -1,16 +1,23 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker,
   getSignalsByTickers, searchTickers,
   getHoldings, addHolding, deleteHolding,
+  getPortfolioHoldings, getSuccessRate,
   WHITE_BG_LOGOS,
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
 import SignalModal from '../components/SignalModal'
+
+const _PIE_COLORS = [
+  '#00d2ff', '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6',
+  '#1abc9c', '#e67e22', '#34495e', '#16a085', '#8e44ad', '#d35400',
+]
 
 function tickerMarket(ticker) { return ticker?.endsWith('.TA') ? 'IL' : 'US' }
 
@@ -159,6 +166,49 @@ export default function WatchlistPage() {
     return map
   }, [holdings])
 
+  // ── Portfolio-wide data (all lists) ─────────────────────────────────────
+  const { data: portfolioHoldings = [] } = useQuery({
+    queryKey: ['portfolio-holdings'],
+    queryFn: getPortfolioHoldings,
+    staleTime: 60_000,
+  })
+  const { data: successRateData = [] } = useQuery({
+    queryKey: ['success-rate', 12],
+    queryFn: () => getSuccessRate(12),
+    staleTime: 300_000,
+  })
+  const portfolioTickers = useMemo(() => portfolioHoldings.map(h => h.ticker), [portfolioHoldings])
+  const { prices: portPrices } = useLivePrices(portfolioTickers)
+
+  const portEnriched = useMemo(() => portfolioHoldings.map(h => {
+    const live = portPrices[h.ticker]
+    const currentVal = live != null ? live * h.total_qty : null
+    const pnlPct = currentVal != null && h.total_cost ? ((currentVal - h.total_cost) / h.total_cost) * 100 : null
+    return { ...h, currentVal, pnlPct }
+  }), [portfolioHoldings, portPrices])
+
+  const portTotalInvested = portEnriched.reduce((s, h) => s + (h.total_cost || 0), 0)
+  const portTotalValue    = portEnriched.reduce((s, h) => s + (h.currentVal ?? h.total_cost ?? 0), 0)
+  const portPnlAbs        = portTotalValue - portTotalInvested
+  const portPnlPct        = portTotalInvested > 0 ? (portPnlAbs / portTotalInvested) * 100 : null
+
+  const portPieData = useMemo(() => portEnriched
+    .map(h => ({ name: h.ticker, value: h.currentVal ?? h.total_cost ?? 0 }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value),
+  [portEnriched])
+  const portPieTotal = portPieData.reduce((s, d) => s + d.value, 0)
+
+  const { vesignWinRate, vesignAvgReturn, vesignTotal } = useMemo(() => {
+    let t = 0, w = 0, r = 0
+    successRateData.forEach(row => {
+      t += row.total_trades || 0
+      w += row.wins || 0
+      r += (row.avg_return_pct || 0) * (row.total_trades || 0)
+    })
+    return { vesignWinRate: t > 0 ? (w / t) * 100 : null, vesignAvgReturn: t > 0 ? r / t : 0, vesignTotal: t }
+  }, [successRateData])
+
   const invalidateLists    = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
   const invalidateTickers  = () => qc.invalidateQueries({ queryKey: ['watchlist-tickers', selectedId] })
   const invalidateHoldings = () => qc.invalidateQueries({ queryKey: ['watchlist-holdings', selectedId] })
@@ -259,6 +309,106 @@ export default function WatchlistPage() {
   return (
     <div>
       <p className="page-title">{t('watchlist.title')}</p>
+
+      {/* ── Portfolio summary (all lists) ── */}
+      {portEnriched.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          {/* Summary cards */}
+          <div className="metrics" style={{ marginBottom: 16 }}>
+            <div className="metric-card">
+              <div className="label">{t('watchlist.totalInvested')}</div>
+              <div className="value">${portTotalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div className="metric-card">
+              <div className="label">{t('watchlist.currentValue')}</div>
+              <div className="value">${portTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div className="metric-card">
+              <div className="label">{t('watchlist.totalPnlAbs')}</div>
+              <div className={`value ${portPnlAbs >= 0 ? 'up' : 'down'}`}>
+                {portPnlAbs >= 0 ? '+' : ''}${Math.abs(portPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="metric-card">
+              <div className="label">{t('watchlist.totalPnlPct')}</div>
+              <div className={`value ${portPnlPct != null && portPnlPct >= 0 ? 'up' : 'down'}`}>
+                {portPnlPct != null ? `${portPnlPct >= 0 ? '+' : ''}${portPnlPct.toFixed(2)}%` : '—'}
+              </div>
+            </div>
+          </div>
+
+          {/* Donut chart + What-If */}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {/* Allocation donut */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '0 0 auto', display: 'flex', gap: 20, alignItems: 'center' }}>
+              <div style={{ width: 160, height: 160, flexShrink: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={portPieData} dataKey="value" cx="50%" cy="50%" innerRadius={44} outerRadius={74} strokeWidth={1}>
+                      {portPieData.map((_, i) => <Cell key={i} fill={_PIE_COLORS[i % _PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
+                      formatter={v => [`$${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, '']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ fontSize: 12 }}>
+                {portPieData.slice(0, 8).map((d, i) => {
+                  const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
+                  const h = portEnriched.find(x => x.ticker === d.name)
+                  return (
+                    <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], flexShrink: 0 }} />
+                      <span style={{ minWidth: 50, fontWeight: 600 }}>{d.name}</span>
+                      <span style={{ color: 'var(--muted)', minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
+                      {h?.pnlPct != null && <span className={h.pnlPct >= 0 ? 'up' : 'down'} style={{ fontSize: 11 }}>{h.pnlPct >= 0 ? '+' : ''}{h.pnlPct.toFixed(1)}%</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* What-If */}
+            {vesignTotal > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: 1, minWidth: 240 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t('portfolio.whatIf')}</div>
+                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.winRate')}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{vesignWinRate != null ? `${vesignWinRate.toFixed(1)}%` : '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.avgReturn')}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>+{vesignAvgReturn.toFixed(2)}%</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.totalTrades')}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{vesignTotal}</div>
+                  </div>
+                  {portPnlPct != null && (
+                    <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
+                      <div style={{ display: 'flex', gap: 20 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.yourPortfolio')}</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: portPnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                            {portPnlPct >= 0 ? '+' : ''}{portPnlPct.toFixed(2)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.vesignSignals')}</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--green)' }}>+{vesignAvgReturn.toFixed(2)}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── List management row ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
