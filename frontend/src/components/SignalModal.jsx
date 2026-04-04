@@ -264,7 +264,7 @@ export default function SignalModal({ row, onClose }) {
 
                   {/* Earnings section */}
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--muted)', marginBottom: 4 }}>{t('modal.earnings')}</div>
+                    <div style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--muted)', paddingLeft: 13, marginBottom: 4 }}>{t('modal.earnings')}</div>
                     {earningsLoading
                       ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
                       : earningsData.length === 0
@@ -281,7 +281,7 @@ export default function SignalModal({ row, onClose }) {
 
                   {/* Analyst changes section */}
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--muted)', marginBottom: 4 }}>{t('modal.analystChanges')}</div>
+                    <div style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--muted)', paddingLeft: 13, marginBottom: 4 }}>{t('modal.analystChanges')}</div>
                     {analystChangesLoading
                       ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
                       : analystChangesData.length === 0
@@ -305,7 +305,7 @@ export default function SignalModal({ row, onClose }) {
 
                   {/* News section */}
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--muted)', marginBottom: 4 }}>{t('modal.tabNews')}</div>
+                    <div style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--muted)', paddingLeft: 13, marginBottom: 4 }}>{t('modal.tabNews')}</div>
                     {newsLoading
                       ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
                       : newsData.length === 0
