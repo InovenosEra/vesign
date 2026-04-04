@@ -272,29 +272,27 @@ function TradeModal({ row, start, end, onClose }) {
 
           {/* Description + Health column (tabbed) */}
           <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
-            {/* Info tab — single unified scroll */}
-            {descTab === 'info' && (
-              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {(row.description_short || row.description) && (<>
-                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.description')}</div>
-                  <div style={{ fontSize: 12, lineHeight: 1.6, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
-                    {row.description_short || row.description}
+            {/* Info tab */}
+            {descTab === 'info' && (<>
+              {(row.description_short || row.description) && (<>
+                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.description')}</div>
+                <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                  {row.description_short || row.description}
+                </div>
+              </>)}
+              {row.health_score && (<>
+                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.companyHealth')}</div>
+                <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    {[1,2,3,4,5].map(i => (
+                      <div key={i} style={{ width: 20, height: 8, borderRadius: 3, background: i <= row.health_score ? healthColors[row.health_score] : 'var(--border)' }} />
+                    ))}
+                    <span style={{ fontSize: 12, fontWeight: 'bold', color: healthColors[row.health_score], marginLeft: 4 }}>{healthLabels[row.health_score]}</span>
                   </div>
-                </>)}
-                {row.health_score && (<>
-                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.companyHealth')}</div>
-                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      {[1,2,3,4,5].map(i => (
-                        <div key={i} style={{ width: 20, height: 8, borderRadius: 3, background: i <= row.health_score ? healthColors[row.health_score] : 'var(--border)' }} />
-                      ))}
-                      <span style={{ fontSize: 12, fontWeight: 'bold', color: healthColors[row.health_score], marginLeft: 4 }}>{healthLabels[row.health_score]}</span>
-                    </div>
-                    {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6 }}>{row.health_reason}</div>}
-                  </div>
-                </>)}
-              </div>
-            )}
+                  {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6 }}>{row.health_reason}</div>}
+                </div>
+              </>)}
+            </>)}
             {/* News tab */}
             {descTab === 'news' && (<>
               <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.tabNews')}</div>
