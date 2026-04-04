@@ -603,43 +603,32 @@ def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=60)):
 
 @protected.get("/api/signals/success-rate")
 def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
-    """BUY→SELL success rate aggregated per company over the last N months."""
+    """BUY→SELL success rate from trade_log (US only) over the last N months."""
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.ticker, s.date, s.signal, s.close,
+            SELECT tl.ticker, tl.buy_date, tl.sell_date,
+                   tl.buy_price, tl.sell_price, tl.return_pct,
                    c.company, c.logo_url, f.market_cap
-            FROM signals s
-            LEFT JOIN companies c ON s.ticker = c.ticker
+            FROM trade_log tl
+            LEFT JOIN companies c ON tl.ticker = c.ticker
             {_MARKET_CAP_JOIN}
-            WHERE s.signal IN ('BUY', 'SELL')
-            AND DATE(s.date) >= DATE('now', '-{months} months')
-            ORDER BY s.ticker, s.date
+            WHERE DATE(tl.sell_date) >= DATE('now', '-{months} months')
+              AND tl.ticker NOT LIKE '%.TA'
+            ORDER BY tl.ticker, tl.sell_date
         """), conn)
 
-    df["date"] = pd.to_datetime(df["date"])
+    if df.empty:
+        return []
 
     rows = []
     for ticker, grp in df.groupby("ticker", sort=False):
         meta = grp.iloc[0]
-        trades = []
-        open_trade = None
-        for _, row in grp.iterrows():
-            if row["signal"] == "BUY" and open_trade is None:
-                open_trade = row
-            elif row["signal"] == "SELL" and open_trade is not None:
-                ret = (row["close"] - open_trade["close"]) / open_trade["close"]
-                trades.append({
-                    "return_pct": ret * 100,
-                    "days_held":  (row["date"] - open_trade["date"]).days,
-                    "win":        ret > 0,
-                })
-                open_trade = None
-
-        if not trades:
-            continue
-
-        total = len(trades)
-        wins  = sum(t["win"] for t in trades)
+        total = len(grp)
+        wins = int((grp["return_pct"] > 0).sum())
+        avg_return = float(grp["return_pct"].mean()) * 100
+        buy_dates = pd.to_datetime(grp["buy_date"])
+        sell_dates = pd.to_datetime(grp["sell_date"])
+        avg_days = float((sell_dates - buy_dates).dt.days.mean())
         rows.append({
             "ticker":         ticker,
             "company":        meta["company"],
@@ -648,8 +637,8 @@ def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
             "total_trades":   total,
             "wins":           wins,
             "success_rate":   round(wins / total * 100, 1),
-            "avg_return_pct": round(sum(t["return_pct"] for t in trades) / total, 2),
-            "avg_days_held":  round(sum(t["days_held"]  for t in trades) / total, 1),
+            "avg_return_pct": round(avg_return, 2),
+            "avg_days_held":  round(avg_days, 1),
         })
 
     return sorted(rows, key=lambda x: x["success_rate"], reverse=True)
