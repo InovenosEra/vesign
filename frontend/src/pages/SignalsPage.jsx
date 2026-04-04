@@ -110,7 +110,7 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
 function ServerTh({ label, col, sortBy, sortDir, onSort, className }) {
   const active = sortBy === col
   return (
-    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className={className}>
       {label}
       <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
         {active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}

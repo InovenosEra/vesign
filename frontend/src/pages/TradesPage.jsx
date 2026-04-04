@@ -59,7 +59,7 @@ function Pagination({ page, pages, onChange }) {
 function Th({ label, col, sort, onSort, className }) {
   const active = sort.key === col
   return (
-    <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
+    <th onClick={() => onSort(col)} style={{ cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className={className}>
       {label}
       <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
         {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
