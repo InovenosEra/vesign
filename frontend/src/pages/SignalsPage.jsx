@@ -167,7 +167,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
           <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
             <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
             <td><strong>{displayTicker(r.ticker)}</strong></td>
-            <td>{r.company ?? '—'}</td>
+            <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
             <td>{fmtMktCap(r.market_cap)}</td>
             <td>{fmtPrice(r.close, r.ticker)}</td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
@@ -292,7 +292,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
                 <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
                 <td><strong>{displayTicker(r.ticker)}</strong></td>
-                <td>{r.company ?? '—'}</td>
+                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
                 <td>{fmtMktCap(r.market_cap, market)}</td>
                 <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}</span> : '—'}</td>
                 <td>{fmtPrice(r.close, market)}</td>
