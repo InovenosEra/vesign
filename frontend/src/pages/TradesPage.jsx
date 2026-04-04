@@ -190,7 +190,7 @@ function TradeModal({ row, start, end, onClose }) {
     return plotLeft + (idx / (chartData.length - 1)) * plotWidth
   }
 
-  const PLOT_TOP    = 70
+  const PLOT_TOP    = 100
   const PLOT_BOTTOM = 332
 
   function priceBox(cx, value, color) {
@@ -341,7 +341,7 @@ function TradeModal({ row, start, end, onClose }) {
               </span>
             </div>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={chartData} margin={{ top: 70, right: 24, bottom: 8, left: 8 }}>
+              <LineChart data={chartData} margin={{ top: 100, right: 24, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
