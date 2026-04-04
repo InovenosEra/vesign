@@ -117,9 +117,21 @@ function TradeModal({ row, start, end, onClose }) {
 
   const [descTab, setDescTab] = useState('info')
 
+  const today = new Date().toISOString().slice(0, 10)
+  const [activePeriod, setActivePeriod] = useState(null)
+  const [chartStart, setChartStart]     = useState(start)
+  const [chartEnd,   setChartEnd]       = useState(end)
+
+  function selectPeriod(months) {
+    setActivePeriod(months)
+    const d = new Date(); d.setMonth(d.getMonth() - months)
+    setChartStart(d.toISOString().slice(0, 10))
+    setChartEnd(today)
+  }
+
   const { data: history = [], isLoading } = useQuery({
-    queryKey: ['price-history', row.ticker, start, end],
-    queryFn: () => getPriceHistory(row.ticker, { start, end }),
+    queryKey: ['price-history', row.ticker, chartStart, chartEnd],
+    queryFn: () => getPriceHistory(row.ticker, { start: chartStart, end: chartEnd }),
     staleTime: 300_000,
   })
 
@@ -178,7 +190,7 @@ function TradeModal({ row, start, end, onClose }) {
     return plotLeft + (idx / (chartData.length - 1)) * plotWidth
   }
 
-  const PLOT_TOP    = 36
+  const PLOT_TOP    = 70
   const PLOT_BOTTOM = 332
 
   function priceBox(cx, value, color) {
@@ -310,8 +322,26 @@ function TradeModal({ row, start, end, onClose }) {
           <p className="loading" style={{ padding: 40 }}>{t('modal.loadingChart')}</p>
         ) : (
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
+
+            {/* Period selector — overlaid at top of chart */}
+            <div style={{ position: 'absolute', top: 36, left: 56, right: 24, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
+              {[1, 3, 6, 12, 24].map(m => (
+                <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
+                  onClick={() => selectPeriod(m)}
+                >{m}M</button>
+              ))}
+              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="date" value={chartStart} max={chartEnd}
+                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                  onChange={e => { setChartStart(e.target.value); setActivePeriod(null) }} />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>→</span>
+                <input type="date" value={chartEnd} min={chartStart} max={today}
+                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                  onChange={e => { setChartEnd(e.target.value); setActivePeriod(null) }} />
+              </span>
+            </div>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={chartData} margin={{ top: 36, right: 24, bottom: 8, left: 8 }}>
+              <LineChart data={chartData} margin={{ top: 70, right: 24, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
