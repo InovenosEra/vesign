@@ -349,12 +349,20 @@ export default function WatchlistPage() {
                     </Pie>
                     <Tooltip
                       contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
-                      formatter={v => [`$${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, '']}
+                      labelStyle={{ color: 'var(--text)', fontWeight: 700 }}
+                      itemStyle={{ color: 'var(--text)' }}
+                      formatter={(v, name) => [`$${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, name]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
               <div style={{ fontSize: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, color: 'var(--muted)', fontSize: 10 }}>
+                  <span style={{ width: 8, flexShrink: 0 }} />
+                  <span style={{ minWidth: 50 }}>{t('col.ticker')}</span>
+                  <span style={{ minWidth: 36, textAlign: 'right' }}>{t('portfolio.allocation').slice(0,5)}%</span>
+                  <span style={{ minWidth: 42, textAlign: 'right' }}>{t('col.yield')}</span>
+                </div>
                 {portPieData.slice(0, 8).map((d, i) => {
                   const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
                   const h = portEnriched.find(x => x.ticker === d.name)
@@ -363,7 +371,9 @@ export default function WatchlistPage() {
                       <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], flexShrink: 0 }} />
                       <span style={{ minWidth: 50, fontWeight: 600 }}>{d.name}</span>
                       <span style={{ color: 'var(--muted)', minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
-                      {h?.pnlPct != null && <span className={h.pnlPct >= 0 ? 'up' : 'down'} style={{ fontSize: 11 }}>{h.pnlPct >= 0 ? '+' : ''}{h.pnlPct.toFixed(1)}%</span>}
+                      <span className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ minWidth: 42, textAlign: 'right', fontSize: 11 }}>
+                        {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
+                      </span>
                     </div>
                   )
                 })}
