@@ -137,7 +137,7 @@ function Pagination({ page, pages, onChange }) {
 
 // Shared fixed widths so BUY and SELL tables align column-by-column
 // Columns: logo, ticker, company, mktcap, price, rsi, low, base, high, health, analyst target, ml score, live
-const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '75px', '85px', '75px', '100px']
+const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '75px', '85px', '75px', '70px']
 
 function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
   const { t } = useTranslation()
@@ -265,7 +265,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
     <>
       <div className="data-table-wrap all-signals-wrap">
         <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1174 }}>
-          <colgroup>{['80px','44px','70px','150px','90px','70px','70px','55px','80px','80px','80px','75px','85px','75px','100px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+          <colgroup>{['80px','44px','70px','150px','90px','70px','70px','55px','80px','80px','80px','75px','85px','75px','70px'].map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
           <thead>
             <tr>
               {th(t('col.date'),           'date')}
