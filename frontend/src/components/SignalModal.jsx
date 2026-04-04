@@ -155,7 +155,7 @@ export default function SignalModal({ row, onClose }) {
       <div className="modal-box" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="modal-header" style={{ alignItems: 'flex-start' }}>
+        <div className="modal-header" style={{ alignItems: 'flex-start', marginBottom: 0 }}>
           {row.logo_url
             ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             : null}
@@ -225,7 +225,7 @@ export default function SignalModal({ row, onClose }) {
         </div>
 
         {/* Chart period selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '12px 0 4px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '10px 0 4px', flexWrap: 'wrap' }}>
           {CHART_PERIODS.map(m => (
             <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
               onClick={() => selectPeriod(m)}
