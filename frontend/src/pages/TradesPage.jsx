@@ -324,7 +324,7 @@ function TradeModal({ row, start, end, onClose }) {
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
 
             {/* Period selector — overlaid at top of chart */}
-            <div style={{ position: 'absolute', top: 36, left: 56, right: 24, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
+            <div style={{ position: 'absolute', top: 8, left: 56, right: 24, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
               {[1, 3, 6, 12, 24].map(m => (
                 <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
                   onClick={() => selectPeriod(m)}
