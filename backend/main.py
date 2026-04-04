@@ -611,7 +611,10 @@ def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
                    c.company, c.logo_url, f.market_cap
             FROM trade_log tl
             LEFT JOIN companies c ON tl.ticker = c.ticker
-            {_MARKET_CAP_JOIN}
+            LEFT JOIN (
+                SELECT ticker, MAX(market_cap) AS market_cap
+                FROM fundamentals GROUP BY ticker
+            ) f ON tl.ticker = f.ticker
             WHERE DATE(tl.sell_date) >= DATE('now', '-{months} months')
               AND tl.ticker NOT LIKE '%.TA'
             ORDER BY tl.ticker, tl.sell_date
