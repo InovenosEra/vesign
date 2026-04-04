@@ -108,6 +108,7 @@
   "modal.currentSignal": "איתות נוכחי",
   "modal.currentPrice": "מחיר נוכחי",
   "modal.yieldPeriod": "תשואה {{months}} חודשים",
+  "modal.yieldCustom": "תשואת תקופה",
   "modal.yield12m": "תשואה 12 חודשים",
   "modal.yield12mOrganic": "תשואה 12 חודשים (אורגנית)",
   "modal.yield12mVesign": "תשואה 12 חודשים (Vesign)",

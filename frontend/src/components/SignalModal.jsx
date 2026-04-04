@@ -16,6 +16,10 @@ function fmt(n, decimals = 2) {
 
 const CHART_PERIODS = [1, 3, 6, 12, 24]
 
+function monthsAgo(n) {
+  const d = new Date(); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 10)
+}
+
 export default function SignalModal({ row, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
@@ -24,14 +28,22 @@ export default function SignalModal({ row, onClose }) {
   const priceScale = isIL ? 100 : 1  // IL prices stored in agorot, display in ₪
   const today     = new Date().toISOString().slice(0, 10)
 
-  const [chartMonths, setChartMonths] = useState(12)
+  const [activePeriod, setActivePeriod] = useState(12)
+  const [chartStart, setChartStart]     = useState(() => monthsAgo(12))
+  const [chartEnd,   setChartEnd]       = useState(today)
 
-  const startDate  = (() => { const d = new Date(); d.setMonth(d.getMonth() - chartMonths); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
-  const targetDate = (() => { const d = new Date(); d.setMonth(d.getMonth() - chartMonths); return d.toISOString().slice(0, 10) })()
+  function selectPeriod(months) {
+    setActivePeriod(months)
+    setChartStart(monthsAgo(months))
+    setChartEnd(today)
+  }
+
+  // Fetch a 7-day-earlier start so we have a base price for yield even if market was closed
+  const fetchStart = (() => { const d = new Date(chartStart); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
   const { data: history = [], isLoading } = useQuery({
-    queryKey: ['price-history-signal', row.ticker, chartMonths],
-    queryFn: () => getPriceHistory(row.ticker, { start: startDate, end: today }),
+    queryKey: ['price-history-signal', row.ticker, fetchStart, chartEnd],
+    queryFn: () => getPriceHistory(row.ticker, { start: fetchStart, end: chartEnd }),
     staleTime: 300_000,
   })
 
@@ -42,8 +54,8 @@ export default function SignalModal({ row, onClose }) {
   })
 
   const { data: analystHistory = [] } = useQuery({
-    queryKey: ['analyst-history', row.ticker, chartMonths],
-    queryFn: () => getAnalystHistory(row.ticker, { start: startDate, end: today }),
+    queryKey: ['analyst-history', row.ticker, fetchStart, chartEnd],
+    queryFn: () => getAnalystHistory(row.ticker, { start: fetchStart, end: chartEnd }),
     staleTime: 300_000,
   })
 
@@ -64,7 +76,7 @@ export default function SignalModal({ row, onClose }) {
     }
   })
 
-  const basePeriod  = chartHistory.filter(d => d.date <= targetDate).at(-1)
+  const basePeriod  = chartHistory.filter(d => d.date <= chartStart).at(-1) ?? chartHistory[0]
   const yieldPeriod = basePeriod && chartHistory.length > 0
     ? ((chartHistory.at(-1).close - basePeriod.close) / basePeriod.close) * 100
     : null
@@ -171,7 +183,7 @@ export default function SignalModal({ row, onClose }) {
                     [t('modal.rsi'),           row.rsi != null ? row.rsi.toFixed(1) : '—'],
                     [t('modal.analystTarget'), (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
                     [t('modal.mlScore'),       (() => { const s = row.prediction_score; if (s == null) return '—'; const pct = s * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span> })()],
-                    [t('modal.yieldPeriod', { months: chartMonths }), yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
+                    [activePeriod ? t('modal.yieldPeriod', { months: activePeriod }) : t('modal.yieldCustom'), yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
                       <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 90 }}>{label}</td>
@@ -213,12 +225,21 @@ export default function SignalModal({ row, onClose }) {
         </div>
 
         {/* Chart period selector */}
-        <div style={{ display: 'flex', gap: 6, margin: '12px 0 4px', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '12px 0 4px', flexWrap: 'wrap' }}>
           {CHART_PERIODS.map(m => (
-            <button key={m} className={`period-chip${chartMonths === m ? ' active' : ''}`}
-              onClick={() => setChartMonths(m)}
+            <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
+              onClick={() => selectPeriod(m)}
             >{m}M</button>
           ))}
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="date" value={chartStart} max={chartEnd}
+              style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+              onChange={e => { setChartStart(e.target.value); setActivePeriod(null) }} />
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>→</span>
+            <input type="date" value={chartEnd} min={chartStart} max={today}
+              style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+              onChange={e => { setChartEnd(e.target.value); setActivePeriod(null) }} />
+          </span>
         </div>
 
         {/* Chart */}

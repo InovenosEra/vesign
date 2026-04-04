@@ -108,6 +108,7 @@
   "modal.currentSignal": "Señal actual",
   "modal.currentPrice": "Precio actual",
   "modal.yieldPeriod": "Rendimiento {{months}}M",
+  "modal.yieldCustom": "Rendimiento del período",
   "modal.yield12m": "Rendimiento 12M",
   "modal.yield12mOrganic": "Rendimiento 12M (orgánico)",
   "modal.yield12mVesign": "Rendimiento 12M (Vesign)",
