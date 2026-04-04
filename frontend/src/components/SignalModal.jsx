@@ -178,17 +178,30 @@ export default function SignalModal({ row, onClose }) {
 
         {/* Header */}
         <div className="modal-header" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
-          {row.logo_url
-            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-            : null}
-          <div className="modal-logo-placeholder" style={{
-            width: 96, height: 96, flexShrink: 0, borderRadius: 10,
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            display: row.logo_url ? 'none' : 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 'bold', color: 'var(--text)',
-          }}>
-            {row.ticker?.replace(/\.TA$/, '')}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {row.logo_url
+              ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+              : null}
+            <div className="modal-logo-placeholder" style={{
+              width: 96, height: 96, flexShrink: 0, borderRadius: 10,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              display: row.logo_url ? 'none' : 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 'bold', color: 'var(--text)',
+            }}>
+              {row.ticker?.replace(/\.TA$/, '')}
+            </div>
+            {/* Tab bar below logo */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['info', 'news'].map(tab => (
+                <button key={tab}
+                  className={`period-chip${descTab === tab ? ' active' : ''}`}
+                  onClick={() => setDescTab(tab)}
+                  style={{ fontSize: 11, padding: '2px 10px' }}>
+                  {tab === 'info' ? t('modal.tabInfo') : t('modal.tabNews')}
+                </button>
+              ))}
+            </div>
           </div>
           <div ref={generalColRef} className="modal-general-col" style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.general')}</div>
@@ -218,18 +231,6 @@ export default function SignalModal({ row, onClose }) {
           </div>
           {(row.description_short || row.description || row.health_score || true) && (
             <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
-              {/* Tab bar */}
-              <div style={{ display: 'flex', gap: 2, paddingLeft: 2 }}>
-                {['info', 'news'].map(tab => (
-                  <button key={tab}
-                    className={`period-chip${descTab === tab ? ' active' : ''}`}
-                    onClick={() => setDescTab(tab)}
-                    style={{ fontSize: 11, padding: '2px 10px' }}>
-                    {tab === 'info' ? t('modal.tabInfo') : t('modal.tabNews')}
-                  </button>
-                ))}
-              </div>
-
               {/* Info tab */}
               {descTab === 'info' && (<>
                 {(row.description_short || row.description) && (<>
