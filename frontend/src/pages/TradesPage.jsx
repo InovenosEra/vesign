@@ -412,7 +412,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     <td>{trade.days_held ?? '—'}</td>
                     <td>
                       {!isOpen
-                        ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closed')}</span>
+                        ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</span>
                         : displayLive == null
                           ? <span style={{ color: 'var(--muted)' }}>—</span>
                           : <div>

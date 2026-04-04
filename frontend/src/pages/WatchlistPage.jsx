@@ -76,7 +76,7 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
     ? (marketOpen !== false)   // TASE: open unless explicitly false
     : marketOpen
   if (isOpen === null) return <td style={{ color: 'var(--muted)' }}>—</td>
-  if (!isOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closed')}</td>
+  if (!isOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
   const displayLive  = isIL ? live / 100 : live

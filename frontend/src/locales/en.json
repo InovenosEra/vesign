@@ -5,6 +5,7 @@
 
   "market.open": "Market Open",
   "market.closed": "Market Closed",
+  "market.closedShort": "Closed",
   "market.closesIn": "Closes in {{countdown}}",
   "market.opensIn": "Opens in {{countdown}}",
   "market.live": "● live",
@@ -32,8 +33,8 @@
 
   "col.ticker": "Ticker",
   "col.company": "Company",
-  "col.marketCap": "M. Cap (B)",
-  "col.mktCap": "M. Cap (B)",
+  "col.marketCap": "Market Cap (B)",
+  "col.mktCap": "Market Cap (B)",
   "col.price": "Price",
   "col.rsi": "RSI",
   "col.lowPrice": "Low Price",

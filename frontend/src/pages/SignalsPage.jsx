@@ -87,7 +87,7 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const { t } = useTranslation()
   const style = { whiteSpace: 'nowrap' }
   if (marketOpen === null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
-  if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>{t('market.closed')}</td>
+  if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</td>
   const live = prices[ticker]
   if (live == null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
   const scale = isILTicker(ticker) ? 100 : 1

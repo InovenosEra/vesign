@@ -4,6 +4,7 @@
   "nav.trades": "עסקאות",
   "market.open": "השוק פתוח",
   "market.closed": "השוק סגור",
+  "market.closedShort": "סגור",
   "market.closesIn": "נסגר בעוד {{countdown}}",
   "market.opensIn": "נפתח בעוד {{countdown}}",
   "market.live": "● חי",
