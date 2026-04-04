@@ -187,8 +187,8 @@ thead th {
   text-align: left;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  overflow: hidden;
+  white-space: normal;
+  vertical-align: bottom;
 }
 
 tbody tr { border-bottom: 1px solid var(--border); }
