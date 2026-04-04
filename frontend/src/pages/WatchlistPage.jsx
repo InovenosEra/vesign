@@ -308,7 +308,7 @@ export default function WatchlistPage() {
 
   return (
     <div>
-      <p className="page-title">{t('watchlist.title')}</p>
+      <p className="page-title">{t('portfolio.title')}</p>
 
       {/* ── Portfolio summary (all lists) ── */}
       {portEnriched.length > 0 && (

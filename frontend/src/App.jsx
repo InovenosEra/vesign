@@ -353,8 +353,8 @@ function Header() {
           </NavLink>
           <nav className="desktop-nav">
             <NavLink to="/">{t('nav.signals')}</NavLink>
-            <NavLink to="/watchlist">{t('nav.watchlist')}</NavLink>
             <NavLink to="/trades">{t('nav.trades')}</NavLink>
+            <NavLink to="/portfolio">{t('nav.portfolio')}</NavLink>
           </nav>
         </div>
         <div className="header-search-wrap" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -380,8 +380,8 @@ function Header() {
       {mobileNavOpen && (
         <div className="mobile-menu">
           <NavLink to="/" onClick={closeNav}>{t('nav.signals')}</NavLink>
-          <NavLink to="/watchlist" onClick={closeNav}>{t('nav.watchlist')}</NavLink>
           <NavLink to="/trades" onClick={closeNav}>{t('nav.trades')}</NavLink>
+          <NavLink to="/portfolio" onClick={closeNav}>{t('nav.portfolio')}</NavLink>
           <div className="mobile-menu-divider" />
           <div className="mobile-menu-market"><MarketStatus /></div>
           <div className="mobile-menu-divider" />
@@ -444,7 +444,7 @@ function AppLayout() {
           <main className="app-main">
             <Routes>
               <Route path="/" element={<SignalsPage />} />
-              <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/portfolio" element={<WatchlistPage />} />
               <Route path="/trades" element={<TradesPage />} />
             </Routes>
           </main>
