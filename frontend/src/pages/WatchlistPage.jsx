@@ -426,7 +426,6 @@ export default function WatchlistPage() {
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: 1, minWidth: 240 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
                   {t('portfolio.comparisonTitle')}
-                  <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)', marginLeft: 8 }}>last 12 months</span>
                 </div>
                 <div style={{ width: '100%', height: 160 }}>
                   <ResponsiveContainer width="100%" height="100%">
