@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getPriceHistory, getSignalMarkers, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
+import { getPriceHistory, getSignalMarkers, getAnalystHistory, getNews, getSignalsByTickers, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -20,9 +20,21 @@ function monthsAgo(n) {
   const d = new Date(); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 10)
 }
 
-export default function SignalModal({ row, onClose }) {
+export default function SignalModal({ row: rowProp, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
+
+  // Fetch full signal data if the caller passed a partial row (e.g. WatchlistPage, GlobalSearch)
+  const needsSupplement = !rowProp.description_short && !rowProp.description && !rowProp.health_reason
+  const { data: tickerInfo } = useQuery({
+    queryKey: ['ticker-info', rowProp.ticker],
+    queryFn: () => getSignalsByTickers([rowProp.ticker]).then(rows => rows?.[0] ?? null),
+    enabled: needsSupplement && !!rowProp.ticker,
+    staleTime: 600_000,
+  })
+  // Supplemental data fills missing fields; rowProp's own fields take priority
+  const row = needsSupplement && tickerInfo ? { ...tickerInfo, ...rowProp } : rowProp
+
   const isIL      = row?.ticker?.endsWith('.TA') ?? market === 'IL'
   const currency  = isIL ? '₪' : '$'
   const priceScale = isIL ? 100 : 1  // IL prices stored in agorot, display in ₪
