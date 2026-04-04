@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getPriceHistory, getSignalMarkers, getAnalystHistory, getNews, getEarnings, getAnalystChanges, WHITE_BG_LOGOS } from '../api'
+import { getPriceHistory, getSignalMarkers, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -67,19 +67,6 @@ export default function SignalModal({ row, onClose }) {
     staleTime: 300_000,
   })
 
-  const { data: earningsData = [], isLoading: earningsLoading } = useQuery({
-    queryKey: ['earnings', row.ticker],
-    queryFn: () => getEarnings(row.ticker),
-    enabled: descTab === 'news',
-    staleTime: 300_000,
-  })
-
-  const { data: analystChangesData = [], isLoading: analystChangesLoading } = useQuery({
-    queryKey: ['analyst-changes', row.ticker],
-    queryFn: () => getAnalystChanges(row.ticker, 8),
-    enabled: descTab === 'news',
-    staleTime: 300_000,
-  })
 
   // Scale chart data for IL (agorot → ₪)
   const chartHistory = history.map(d => ({ ...d, close: d.close / priceScale }))
@@ -261,51 +248,7 @@ export default function SignalModal({ row, onClose }) {
               {/* News tab */}
               {descTab === 'news' && (
                 <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-                  {/* Earnings section */}
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--muted)', paddingLeft: 13, marginBottom: 4 }}>{t('modal.earnings')}</div>
-                    {earningsLoading
-                      ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
-                      : earningsData.length === 0
-                        ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.noEarnings')}</div>
-                        : earningsData.map((e, i) => (
-                          <div key={i} style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
-                            <span style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{e.date}</span>
-                            {e.eps_est != null && <span style={{ marginLeft: 10, color: 'var(--muted)' }}>EPS est: {Number(e.eps_est).toFixed(2)}</span>}
-                            {e.revenue_est != null && <span style={{ marginLeft: 10, color: 'var(--muted)' }}>Rev est: {(e.revenue_est / 1e6).toFixed(0)}M</span>}
-                          </div>
-                        ))
-                    }
-                  </div>
-
-                  {/* Analyst changes section */}
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--muted)', paddingLeft: 13, marginBottom: 4 }}>{t('modal.analystChanges')}</div>
-                    {analystChangesLoading
-                      ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
-                      : analystChangesData.length === 0
-                        ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.noAnalystChanges')}</div>
-                        : analystChangesData.map((a, i) => {
-                          const act = (a.action || '').toLowerCase()
-                          const badgeColor = act.includes('upgrade') ? 'var(--green)' : act.includes('downgrade') ? 'var(--red)' : 'var(--muted)'
-                          const actLabel = act.includes('upgrade') ? t('modal.upgrade') : act.includes('downgrade') ? t('modal.downgrade') : act.includes('init') ? t('modal.initiate') : t('modal.reiterate')
-                          return (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11 }}>
-                              <span style={{ background: badgeColor, color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{actLabel}</span>
-                              <span style={{ fontWeight: 600, flexShrink: 0 }}>{a.firm}</span>
-                              {a.from_grade && a.to_grade && <span style={{ color: 'var(--muted)' }}>{a.from_grade} → {a.to_grade}</span>}
-                              {a.price_target != null && <span style={{ color: 'var(--accent)', marginLeft: 'auto', flexShrink: 0 }}>${Number(a.price_target).toFixed(0)}</span>}
-                              <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{(a.date || '').slice(0, 10)}</span>
-                            </div>
-                          )
-                        })
-                    }
-                  </div>
-
-                  {/* News section */}
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--muted)', paddingLeft: 13, marginBottom: 4 }}>{t('modal.tabNews')}</div>
                     {newsLoading
                       ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
                       : newsData.length === 0
