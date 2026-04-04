@@ -118,6 +118,8 @@
   "modal.price": "Prix",
   "modal.rsi": "RSI",
   "modal.chartClose": "Clôture",
+  "modal.legendBuy": "Signal d'achat",
+  "modal.legendSell": "Signal de vente",
   "modal.chartTargetLow": "Objectif bas",
   "modal.chartTargetBase": "Objectif de base",
   "modal.chartTargetHigh": "Objectif haut",

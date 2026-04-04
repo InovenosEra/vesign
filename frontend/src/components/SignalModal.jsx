@@ -396,6 +396,34 @@ export default function SignalModal({ row, onClose }) {
 
               </svg>
             )}
+
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', padding: '6px 0 2px', fontSize: 11, color: 'var(--muted)' }}>
+              {[
+                { color: 'var(--accent)', dash: false, label: t('modal.chartClose') },
+                ...(pairs.length > 0 || openBuy ? [
+                  { color: 'var(--green)', dash: false, vertical: true, label: t('modal.legendBuy') },
+                  { color: 'var(--red)',   dash: false, vertical: true, label: t('modal.legendSell') },
+                ] : []),
+                ...(hasTargets ? [
+                  { color: '#2ecc71', dash: true, label: t('modal.chartTargetHigh') },
+                  { color: '#f39c12', dash: true, label: t('modal.chartTargetBase') },
+                  { color: '#e74c3c', dash: true, label: t('modal.chartTargetLow') },
+                ] : []),
+              ].map(({ color, dash, vertical, label }) => (
+                <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {vertical
+                    ? <span style={{ width: 2, height: 12, background: color, borderRadius: 1, display: 'inline-block' }} />
+                    : <svg width="24" height="10" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                        <line x1="0" y1="5" x2="24" y2="5"
+                          stroke={color} strokeWidth="2"
+                          strokeDasharray={dash ? '5 3' : undefined} />
+                      </svg>
+                  }
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </div>

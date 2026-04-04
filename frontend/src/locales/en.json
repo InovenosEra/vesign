@@ -127,6 +127,8 @@
   "modal.price": "Price",
   "modal.rsi": "RSI",
   "modal.chartClose": "Close",
+  "modal.legendBuy": "BUY signal",
+  "modal.legendSell": "SELL signal",
   "modal.chartTargetLow": "Target Low",
   "modal.chartTargetBase": "Target Base",
   "modal.chartTargetHigh": "Target High",

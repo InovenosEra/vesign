@@ -118,6 +118,8 @@
   "modal.price": "מחיר",
   "modal.rsi": "RSI",
   "modal.chartClose": "סגירה",
+  "modal.legendBuy": "סיגנל קנייה",
+  "modal.legendSell": "סיגנל מכירה",
   "modal.chartTargetLow": "יעד נמוך",
   "modal.chartTargetBase": "יעד בסיס",
   "modal.chartTargetHigh": "יעד גבוה",
