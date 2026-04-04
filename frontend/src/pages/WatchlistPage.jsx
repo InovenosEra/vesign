@@ -383,7 +383,10 @@ export default function WatchlistPage() {
             {/* What-If */}
             {vesignTotal > 0 && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: 1, minWidth: 240 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t('portfolio.whatIf')}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+                  {t('portfolio.whatIf')}
+                  <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)', marginLeft: 8 }}>last 12 months</span>
+                </div>
                 <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.winRate')}</div>
