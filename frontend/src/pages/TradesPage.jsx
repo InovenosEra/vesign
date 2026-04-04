@@ -61,9 +61,6 @@ function Th({ label, col, sort, onSort, className }) {
   return (
     <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
       {label}
-      <span className={`sort-icon ${active ? 'sort-active' : ''}`}>
-        {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
-      </span>
     </th>
   )
 }
