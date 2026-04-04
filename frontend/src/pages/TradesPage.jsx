@@ -288,21 +288,21 @@ function TradeModal({ row, start, end, onClose }) {
 
             {wrapperWidth > 0 && history.length > 1 && (
               <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
-                {row.trades.map((t, i) => {
-                  const buyX  = t.buy_date  ? dateToX(t.buy_date.slice(0, 10))  : null
-                  const sellX = t.sell_date ? dateToX(t.sell_date.slice(0, 10)) : null
+                {row.trades.map((trade, i) => {
+                  const buyX  = trade.buy_date  ? dateToX(trade.buy_date.slice(0, 10))  : null
+                  const sellX = trade.sell_date ? dateToX(trade.sell_date.slice(0, 10)) : null
                   return (
                     <g key={i}>
                       {buyX != null && <>
                         <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
-                        {t.buy_price != null && priceBox(buyX, currency + fmt(t.buy_price, 1), 'var(--green)')}
+                        {trade.buy_price != null && priceBox(buyX, currency + fmt(trade.buy_price, 1), 'var(--green)')}
                       </>}
                       {sellX != null && <>
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
-                        {t.sell_price != null && priceBox(sellX, currency + fmt(t.sell_price, 1), 'var(--red)')}
+                        {trade.sell_price != null && priceBox(sellX, currency + fmt(trade.sell_price, 1), 'var(--red)')}
                       </>}
-                      {buyX != null && sellX != null && t.buy_price != null && t.sell_price != null && (() => {
-                        const pct   = ((t.sell_price - t.buy_price) / t.buy_price) * 100
+                      {buyX != null && sellX != null && trade.buy_price != null && trade.sell_price != null && (() => {
+                        const pct   = ((trade.sell_price - trade.buy_price) / trade.buy_price) * 100
                         const color = pct >= 0 ? 'var(--green)' : 'var(--red)'
                         const lineY = PLOT_TOP + 18
                         return <>
@@ -313,11 +313,11 @@ function TradeModal({ row, start, end, onClose }) {
                           </text>
                         </>
                       })()}
-                      {buyX != null && t.result === 'Open' && (() => {
+                      {buyX != null && trade.result === 'Open' && (() => {
                         const lastX = dateToX(history.at(-1).date)
                         const currentPrice = history.at(-1).close
-                        const pct = t.buy_price != null && currentPrice != null
-                          ? ((currentPrice - t.buy_price) / t.buy_price) * 100
+                        const pct = trade.buy_price != null && currentPrice != null
+                          ? ((currentPrice - trade.buy_price) / trade.buy_price) * 100
                           : null
                         const color = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
                         const lineY = PLOT_TOP + 18
