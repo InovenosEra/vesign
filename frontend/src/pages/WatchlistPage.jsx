@@ -397,22 +397,27 @@ export default function WatchlistPage() {
                     <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.totalTrades')}</div>
                     <div style={{ fontSize: 18, fontWeight: 700 }}>{vesignTotal}</div>
                   </div>
-                  {portPnlPct != null && (
-                    <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
-                      <div style={{ display: 'flex', gap: 20 }}>
-                        <div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.yourPortfolio')}</div>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: portPnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                            {portPnlPct >= 0 ? '+' : ''}{portPnlPct.toFixed(2)}%
+                  {portPnlPct != null && (() => {
+                    const delta = portPnlPct - vesignAvgReturn
+                    return (
+                      <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
+                        <div style={{ display: 'flex', gap: 20 }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.yourPortfolio')}</div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: portPnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                              {portPnlPct >= 0 ? '+' : ''}{portPnlPct.toFixed(2)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.vsPortfolio')}</div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: delta >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                              {delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(2)}%
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.vesignSignals')}</div>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--green)' }}>+{vesignAvgReturn.toFixed(2)}%</div>
-                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
               </div>
             )}
