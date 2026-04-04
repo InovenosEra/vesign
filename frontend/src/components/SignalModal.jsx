@@ -170,7 +170,7 @@ export default function SignalModal({ row, onClose }) {
           </div>
           <div ref={generalColRef} className="modal-general-col" style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, width: 300 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.general')}</div>
-            <div style={{ padding: '8px 0px', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div style={{ padding: '0', border: '1px solid var(--border)', borderRadius: 8 }}>
               <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', margin: 0, tableLayout: 'fixed' }}>
                 <tbody>
                   {[
@@ -185,9 +185,9 @@ export default function SignalModal({ row, onClose }) {
                     [t('modal.mlScore'),       (() => { const s = row.prediction_score; if (s == null) return '—'; const pct = s * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span> })()],
                     [activePeriod ? t('modal.yieldPeriod', { months: activePeriod }) : t('modal.yieldCustom'), yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
                   ].map(([label, value]) => (
-                    <tr key={label} style={{ height: 22 }}>
-                      <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 90 }}>{label}</td>
-                      <td style={{ verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</td>
+                    <tr key={label}>
+                      <td style={{ color: 'var(--muted)', padding: '5px 8px 5px 12px', verticalAlign: 'middle', whiteSpace: 'nowrap', width: 108 }}>{label}</td>
+                      <td style={{ padding: '5px 12px 5px 0', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</td>
                     </tr>
                   ))}
                 </tbody>
