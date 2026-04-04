@@ -1292,7 +1292,7 @@ def portfolio_holdings(user=Depends(get_current_user)):
 
 @protected.get("/api/portfolio/performance")
 def portfolio_performance(user=Depends(get_current_user)):
-    """Weekly portfolio yield % (last 52 weeks, US holdings only)."""
+    """Weekly yield %: user portfolio + Vesign equal-weight model (last 52 weeks)."""
     from datetime import date as _date, timedelta
     from collections import defaultdict
 
@@ -1302,14 +1302,13 @@ def portfolio_performance(user=Depends(get_current_user)):
     weeks = [start_date + timedelta(weeks=i) for i in range(53)]
 
     with engine.connect() as conn:
+        # User US holdings
         user_rows = conn.execute(text("""
-            SELECT wh.ticker,
-                   SUM(wh.quantity)                   AS total_qty,
-                   SUM(wh.quantity * wh.buy_price)    AS total_cost
+            SELECT wh.ticker, SUM(wh.quantity) AS total_qty,
+                   SUM(wh.quantity * wh.buy_price) AS total_cost
             FROM watchlist_holdings wh
             JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid
-              AND wh.ticker NOT LIKE '%.TA'
+            WHERE wl.user_id = :uid AND wh.ticker NOT LIKE '%.TA'
             GROUP BY wh.ticker
         """), {"uid": uid}).fetchall()
 
@@ -1320,9 +1319,36 @@ def portfolio_performance(user=Depends(get_current_user)):
         if user_cost <= 0:
             return []
 
-        tickers = [r[0] for r in user_rows]
-        ph = ", ".join([f":t{i}" for i in range(len(tickers))])
-        tp = {f"t{i}": t for i, t in enumerate(tickers)}
+        # Vesign: first BUY signal per ticker in the 52-week window
+        signal_rows = conn.execute(text("""
+            WITH first_buy AS (
+                SELECT ticker, MIN(date) AS signal_date
+                FROM signals
+                WHERE signal = 'BUY' AND date >= :start AND ticker NOT LIKE '%.TA'
+                GROUP BY ticker
+            )
+            SELECT fb.ticker, DATE(fb.signal_date) AS signal_date, s.close AS entry_price
+            FROM first_buy fb
+            JOIN signals s ON s.ticker = fb.ticker AND s.date = fb.signal_date AND s.signal = 'BUY'
+            WHERE s.close IS NOT NULL AND s.close > 0
+        """), {"start": start_date.isoformat()}).fetchall()
+
+        # Matching closed trades
+        sig_tickers = [r[0] for r in signal_rows]
+        if sig_tickers:
+            sph = ", ".join([f":st{i}" for i in range(len(sig_tickers))])
+            stp = {f"st{i}": t for i, t in enumerate(sig_tickers)}
+            trade_rows = conn.execute(text(f"""
+                SELECT ticker, DATE(sell_date) AS sell_date, return_pct
+                FROM trade_log
+                WHERE buy_date >= :start AND ticker IN ({sph})
+            """), {"start": (start_date - timedelta(days=7)).isoformat(), **stp}).fetchall()
+        else:
+            trade_rows = []
+
+        all_tickers = list({r[0] for r in user_rows} | {r[0] for r in signal_rows})
+        ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
+        tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
         cutoff_buf = (start_date - timedelta(days=30)).isoformat()
 
         price_rows = conn.execute(text(f"""
@@ -1346,10 +1372,24 @@ def portfolio_performance(user=Depends(get_current_user)):
                 return close
         return None
 
+    trade_map = {}
+    for ticker, sell_d_str, return_pct in trade_rows:
+        try:
+            trade_map[ticker] = (_date.fromisoformat(str(sell_d_str)[:10]), float(return_pct))
+        except Exception:
+            pass
+
+    vesign_positions = []
+    for ticker, sig_d_str, entry_price in signal_rows:
+        try:
+            vesign_positions.append((_date.fromisoformat(str(sig_d_str)[:10]), ticker, float(entry_price)))
+        except Exception:
+            pass
+
     result = []
     for week_date in weeks:
-        total_val = 0.0
-        total_cost = 0.0
+        # User portfolio yield
+        total_val, total_cost = 0.0, 0.0
         for ticker, qty, cost in user_rows:
             if qty is None or cost is None:
                 continue
@@ -1358,7 +1398,23 @@ def portfolio_performance(user=Depends(get_current_user)):
                 total_val += float(qty) * p
                 total_cost += float(cost)
         port_yield = round((total_val / total_cost - 1) * 100, 2) if total_cost > 0 else None
-        result.append({"week": week_date.isoformat(), "portfolio": port_yield})
+
+        # Vesign equal-weight: avg return of all active positions
+        active_returns = []
+        for sig_date, ticker, entry_price in vesign_positions:
+            if sig_date > week_date:
+                continue
+            if ticker in trade_map:
+                sell_d, rp = trade_map[ticker]
+                if sell_d <= week_date:
+                    active_returns.append(rp * 100)
+                    continue
+            p = get_price_at(ticker, week_date)
+            if p is not None:
+                active_returns.append((p / entry_price - 1) * 100)
+        vesign_yield = round(sum(active_returns) / len(active_returns), 2) if active_returns else None
+
+        result.append({"week": week_date.isoformat(), "portfolio": port_yield, "vesign": vesign_yield})
 
     return result
 
