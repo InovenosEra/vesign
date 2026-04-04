@@ -52,15 +52,17 @@ function HealthCell({ score }) {
   const label = score ? t(_HEALTH_KEYS[score]) : ''
   if (!score) return <td style={{ color: 'var(--muted)' }}>—</td>
   return (
-    <td title={label} style={{ whiteSpace: 'nowrap' }}>
-      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-        {[1,2,3,4,5].map(i => (
-          <div key={i} style={{
-            width: 10, height: 10, borderRadius: 2,
-            background: i <= score ? _HEALTH_COLORS[score] : 'var(--border)',
-          }} />
-        ))}
-        <span style={{ fontSize: 11, color: _HEALTH_COLORS[score], marginLeft: 3 }}>
+    <td title={label}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {[1,2,3,4,5].map(i => (
+            <div key={i} style={{
+              width: 10, height: 10, borderRadius: 2,
+              background: i <= score ? _HEALTH_COLORS[score] : 'var(--border)',
+            }} />
+          ))}
+        </div>
+        <span style={{ fontSize: 11, color: _HEALTH_COLORS[score] }}>
           {label}
         </span>
       </div>
