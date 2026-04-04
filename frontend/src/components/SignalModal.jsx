@@ -186,8 +186,8 @@ export default function SignalModal({ row, onClose }) {
                     [activePeriod ? t('modal.yieldPeriod', { months: activePeriod }) : t('modal.yieldCustom'), yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
                   ].map(([label, value]) => (
                     <tr key={label}>
-                      <td style={{ color: 'var(--muted)', padding: '5px 8px 5px 12px', verticalAlign: 'middle', whiteSpace: 'nowrap', width: 108 }}>{label}</td>
-                      <td style={{ padding: '5px 12px 5px 0', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</td>
+                      <td style={{ color: 'var(--muted)', padding: '6px 8px 6px 12px', verticalAlign: 'middle', whiteSpace: 'nowrap', width: 108 }}>{label}</td>
+                      <td style={{ padding: '6px 12px 6px 0', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</td>
                     </tr>
                   ))}
                 </tbody>
