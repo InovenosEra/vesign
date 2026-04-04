@@ -14,6 +14,8 @@ function fmt(n, decimals = 2) {
     : '—'
 }
 
+const CHART_PERIODS = [1, 3, 6, 12, 24]
+
 export default function SignalModal({ row, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
@@ -21,12 +23,15 @@ export default function SignalModal({ row, onClose }) {
   const currency  = isIL ? '₪' : '$'
   const priceScale = isIL ? 100 : 1  // IL prices stored in agorot, display in ₪
   const today     = new Date().toISOString().slice(0, 10)
-  const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
-  const start12m  = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+
+  const [chartMonths, setChartMonths] = useState(12)
+
+  const startDate  = (() => { const d = new Date(); d.setMonth(d.getMonth() - chartMonths); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+  const targetDate = (() => { const d = new Date(); d.setMonth(d.getMonth() - chartMonths); return d.toISOString().slice(0, 10) })()
 
   const { data: history = [], isLoading } = useQuery({
-    queryKey: ['price-history-signal', row.ticker],
-    queryFn: () => getPriceHistory(row.ticker, { start: start12m, end: today }),
+    queryKey: ['price-history-signal', row.ticker, chartMonths],
+    queryFn: () => getPriceHistory(row.ticker, { start: startDate, end: today }),
     staleTime: 300_000,
   })
 
@@ -37,8 +42,8 @@ export default function SignalModal({ row, onClose }) {
   })
 
   const { data: analystHistory = [] } = useQuery({
-    queryKey: ['analyst-history', row.ticker],
-    queryFn: () => getAnalystHistory(row.ticker, { start: start12m, end: today }),
+    queryKey: ['analyst-history', row.ticker, chartMonths],
+    queryFn: () => getAnalystHistory(row.ticker, { start: startDate, end: today }),
     staleTime: 300_000,
   })
 
@@ -59,9 +64,9 @@ export default function SignalModal({ row, onClose }) {
     }
   })
 
-  const base12m  = chartHistory.filter(d => d.date <= target12m).at(-1)
-  const yield12m = base12m && chartHistory.length > 0
-    ? ((chartHistory.at(-1).close - base12m.close) / base12m.close) * 100
+  const basePeriod  = chartHistory.filter(d => d.date <= targetDate).at(-1)
+  const yieldPeriod = basePeriod && chartHistory.length > 0
+    ? ((chartHistory.at(-1).close - basePeriod.close) / basePeriod.close) * 100
     : null
 
   const hasTargets = chartData.some(d => d.target_high != null)
@@ -166,7 +171,7 @@ export default function SignalModal({ row, onClose }) {
                     [t('modal.rsi'),           row.rsi != null ? row.rsi.toFixed(1) : '—'],
                     [t('modal.analystTarget'), (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
                     [t('modal.mlScore'),       (() => { const s = row.prediction_score; if (s == null) return '—'; const pct = s * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span> })()],
-                    [t('modal.yield12m'),      yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
+                    [t('modal.yieldPeriod', { months: chartMonths }), yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
                       <td style={{ color: 'var(--muted)', paddingRight: 8, verticalAlign: 'middle', whiteSpace: 'nowrap', width: 90 }}>{label}</td>
@@ -205,6 +210,15 @@ export default function SignalModal({ row, onClose }) {
             </div>
           )}
           <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Chart period selector */}
+        <div style={{ display: 'flex', gap: 6, margin: '12px 0 4px', justifyContent: 'flex-end' }}>
+          {CHART_PERIODS.map(m => (
+            <button key={m} className={`period-chip${chartMonths === m ? ' active' : ''}`}
+              onClick={() => setChartMonths(m)}
+            >{m}M</button>
+          ))}
         </div>
 
         {/* Chart */}

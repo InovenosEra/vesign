@@ -107,6 +107,7 @@
   "modal.marketCap": "Cap. boursière (Md)",
   "modal.currentSignal": "Signal actuel",
   "modal.currentPrice": "Prix actuel",
+  "modal.yieldPeriod": "Rendement {{months}}M",
   "modal.yield12m": "Rendement 12M",
   "modal.yield12mOrganic": "Rendement 12M (organique)",
   "modal.yield12mVesign": "Rendement 12M (Vesign)",

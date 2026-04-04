@@ -134,6 +134,11 @@ html, body, #root {
   border-color: var(--accent);
   color: var(--accent);
 }
+.period-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(79, 142, 247, 0.12);
+}
 
 /* ── Buttons ── */
 button {
