@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
-import { getTrades, getOpenTrades, getPriceHistory, WHITE_BG_LOGOS } from '../api'
+import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
 import { useSort } from '../hooks/useSort'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { MarketContext } from '../context/MarketContext'
@@ -111,8 +111,11 @@ function PriceBoxLabel({ viewBox, value, color }) {
 function TradeModal({ row, start, end, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
-  const isIL     = row.ticker?.endsWith('.TA') ?? market === 'IL'
-  const currency = isIL ? '₪' : '$'
+  const isIL      = row.ticker?.endsWith('.TA') ?? market === 'IL'
+  const currency  = isIL ? '₪' : '$'
+  const priceScale = isIL ? 100 : 1
+
+  const [descTab, setDescTab] = useState('info')
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['price-history', row.ticker, start, end],
@@ -133,8 +136,42 @@ function TradeModal({ row, start, end, onClose }) {
     ? ((history12m.at(-1).close - base12m.close) / base12m.close) * 100
     : null
 
-  const minPrice = history.length ? Math.min(...history.map(d => d.close)) * 0.97 : 0
-  const maxPrice = history.length ? Math.max(...history.map(d => d.close)) * 1.03 : 0
+  const { data: analystHistory = [] } = useQuery({
+    queryKey: ['analyst-history-trade', row.ticker, start, end],
+    queryFn: () => getAnalystHistory(row.ticker, { start, end }),
+    staleTime: 300_000,
+  })
+
+  const { data: newsData = [], isLoading: newsLoading } = useQuery({
+    queryKey: ['news', row.ticker],
+    queryFn: () => getNews(row.ticker, 5),
+    enabled: descTab === 'news',
+    staleTime: 300_000,
+  })
+
+  // Merge analyst targets into chart data (forward-fill) + scale prices
+  const analystMap = Object.fromEntries(analystHistory.map(a => [a.date, a]))
+  let lastAnalyst = null
+  const chartData = history.map(d => {
+    if (analystMap[d.date]) lastAnalyst = analystMap[d.date]
+    const scaled = { ...d, close: d.close / priceScale }
+    if (!lastAnalyst) return scaled
+    return {
+      ...scaled,
+      target_low:  lastAnalyst.target_low_price  != null ? lastAnalyst.target_low_price  / priceScale : undefined,
+      target_mean: lastAnalyst.target_mean_price != null ? lastAnalyst.target_mean_price / priceScale : undefined,
+      target_high: lastAnalyst.target_high_price != null ? lastAnalyst.target_high_price / priceScale : undefined,
+    }
+  })
+
+  const hasTargets = chartData.some(d => d.target_high != null)
+  const allPrices  = [
+    ...chartData.map(d => d.close),
+    ...(hasTargets ? chartData.filter(d => d.target_low  != null).map(d => d.target_low)  : []),
+    ...(hasTargets ? chartData.filter(d => d.target_high != null).map(d => d.target_high) : []),
+  ]
+  const minPrice = allPrices.length ? Math.min(...allPrices) * 0.97 : 0
+  const maxPrice = allPrices.length ? Math.max(...allPrices) * 1.03 : 0
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -158,11 +195,11 @@ function TradeModal({ row, start, end, onClose }) {
   }, [isLoading])
 
   function dateToX(dateStr) {
-    const idx = history.findIndex(d => d.date === dateStr)
-    if (idx < 0 || history.length <= 1) return null
+    const idx = chartData.findIndex(d => d.date === dateStr)
+    if (idx < 0 || chartData.length <= 1) return null
     const plotLeft  = 8 + 48
     const plotWidth = wrapperWidth - plotLeft - 24
-    return plotLeft + (idx / (history.length - 1)) * plotWidth
+    return plotLeft + (idx / (chartData.length - 1)) * plotWidth
   }
 
   const PLOT_TOP    = 36
@@ -193,11 +230,24 @@ function TradeModal({ row, start, end, onClose }) {
 
         {/* Header */}
         <div className="modal-header" style={{ alignItems: 'flex-start' }}>
-          {row.logo_url
-            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
-            : null}
-          <div className="modal-logo-placeholder" style={{ width: 96, height: 96, flexShrink: 0, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', display: row.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', color: 'var(--text)' }}>
-            {row.ticker?.replace(/\.TA$/, '')}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {row.logo_url
+              ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+              : null}
+            <div className="modal-logo-placeholder" style={{ width: 96, height: 96, flexShrink: 0, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', display: row.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', color: 'var(--text)' }}>
+              {row.ticker?.replace(/\.TA$/, '')}
+            </div>
+            {/* Tab bar below logo */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['info', 'news'].map(tab => (
+                <button key={tab}
+                  className={`period-chip${descTab === tab ? ' active' : ''}`}
+                  onClick={() => setDescTab(tab)}
+                  style={{ fontSize: 11, padding: '2px 10px' }}>
+                  {tab === 'info' ? t('modal.tabInfo') : t('modal.tabNews')}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* General column */}
@@ -227,9 +277,10 @@ function TradeModal({ row, start, end, onClose }) {
             </div>
           </div>
 
-          {/* Description + Health column */}
-          {(row.description_short || row.description || row.health_score) && (
-            <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
+          {/* Description + Health column (tabbed) */}
+          <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
+            {/* Info tab */}
+            {descTab === 'info' && (<>
               {(row.description_short || row.description) && (<>
                 <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.description')}</div>
                 <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
@@ -238,7 +289,7 @@ function TradeModal({ row, start, end, onClose }) {
               </>)}
               {row.health_score && (
                 <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>{t('modal.companyHealth')}</div>
+                  <div style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>{t('modal.companyHealth')}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                     {[1,2,3,4,5].map(i => (
                       <div key={i} style={{ width: 20, height: 8, borderRadius: 3, background: i <= row.health_score ? healthColors[row.health_score] : 'var(--border)' }} />
@@ -248,8 +299,32 @@ function TradeModal({ row, start, end, onClose }) {
                   {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6, flex: 1, minHeight: 0, overflowY: 'auto' }}>{row.health_reason}</div>}
                 </div>
               )}
-            </div>
-          )}
+            </>)}
+            {/* News tab */}
+            {descTab === 'news' && (<>
+              <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.tabNews')}</div>
+              <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                {newsLoading
+                  ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
+                  : newsData.length === 0
+                    ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.noNews')}</div>
+                    : newsData.map((n, i) => (
+                      <div key={i} style={{ paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 10, color: 'var(--muted)' }}>{(n.date || '').slice(0, 10)}</span>
+                          {n.source && <span style={{ fontSize: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 5px' }}>{n.source}</span>}
+                        </div>
+                        {n.url
+                          ? <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none', display: 'block', marginBottom: 2 }}>{n.title}</a>
+                          : <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{n.title}</div>
+                        }
+                        {n.summary && <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{n.summary}</div>}
+                      </div>
+                    ))
+                }
+              </div>
+            </>)}
+          </div>
 
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
@@ -260,7 +335,7 @@ function TradeModal({ row, start, end, onClose }) {
         ) : (
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={history} margin={{ top: 36, right: 24, bottom: 8, left: 8 }}>
+              <LineChart data={chartData} margin={{ top: 36, right: 24, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
@@ -280,13 +355,26 @@ function TradeModal({ row, start, end, onClose }) {
                   labelStyle={{ color: 'var(--muted)' }}
                   itemStyle={{ color: 'var(--text)' }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={v => [`${currency}${v.toFixed(2)}`, t('modal.chartClose')]}
+                  formatter={(v, name) => {
+                    const labels = {
+                      close: t('modal.chartClose'),
+                      target_low: t('modal.chartTargetLow'),
+                      target_mean: t('modal.chartTargetBase'),
+                      target_high: t('modal.chartTargetHigh'),
+                    }
+                    return [v != null ? `${currency}${v.toFixed(2)}` : '—', labels[name] || name]
+                  }}
                 />
-                <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} name="close" />
+                {hasTargets && <>
+                  <Line type="stepAfter" dataKey="target_low"  stroke="#e74c3c" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_low"  connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_high" connectNulls={false} />
+                </>}
               </LineChart>
             </ResponsiveContainer>
 
-            {wrapperWidth > 0 && history.length > 1 && (
+            {wrapperWidth > 0 && chartData.length > 1 && (
               <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
                 {row.trades.map((trade, i) => {
                   const buyX  = trade.buy_date  ? dateToX(trade.buy_date.slice(0, 10))  : null
@@ -295,11 +383,11 @@ function TradeModal({ row, start, end, onClose }) {
                     <g key={i}>
                       {buyX != null && <>
                         <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
-                        {trade.buy_price != null && priceBox(buyX, currency + fmt(trade.buy_price, 1), 'var(--green)')}
+                        {trade.buy_price != null && priceBox(buyX, currency + fmt(trade.buy_price / priceScale, 1), 'var(--green)')}
                       </>}
                       {sellX != null && <>
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
-                        {trade.sell_price != null && priceBox(sellX, currency + fmt(trade.sell_price, 1), 'var(--red)')}
+                        {trade.sell_price != null && priceBox(sellX, currency + fmt(trade.sell_price / priceScale, 1), 'var(--red)')}
                       </>}
                       {buyX != null && sellX != null && trade.buy_price != null && trade.sell_price != null && (() => {
                         const pct   = ((trade.sell_price - trade.buy_price) / trade.buy_price) * 100
@@ -314,10 +402,10 @@ function TradeModal({ row, start, end, onClose }) {
                         </>
                       })()}
                       {buyX != null && trade.result === 'Open' && (() => {
-                        const lastX = dateToX(history.at(-1).date)
-                        const currentPrice = history.at(-1).close
+                        const lastX = dateToX(chartData.at(-1).date)
+                        const currentPrice = chartData.at(-1).close
                         const pct = trade.buy_price != null && currentPrice != null
-                          ? ((currentPrice - trade.buy_price) / trade.buy_price) * 100
+                          ? ((currentPrice - trade.buy_price / priceScale) / (trade.buy_price / priceScale)) * 100
                           : null
                         const color = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
                         const lineY = PLOT_TOP + 18
@@ -340,6 +428,32 @@ function TradeModal({ row, start, end, onClose }) {
                 })}
               </svg>
             )}
+
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', padding: '6px 0 2px', fontSize: 11, color: 'var(--muted)' }}>
+              {[
+                { color: 'var(--accent)', dash: false, label: t('modal.chartClose') },
+                { color: 'var(--green)', dash: false, vertical: true, label: t('modal.legendBuy') },
+                { color: 'var(--red)',   dash: false, vertical: true, label: t('modal.legendSell') },
+                ...(hasTargets ? [
+                  { color: '#2ecc71', dash: true, label: t('modal.chartTargetHigh') },
+                  { color: '#f39c12', dash: true, label: t('modal.chartTargetBase') },
+                  { color: '#e74c3c', dash: true, label: t('modal.chartTargetLow') },
+                ] : []),
+              ].map(({ color, dash, vertical, label }) => (
+                <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {vertical
+                    ? <span style={{ width: 2, height: 12, background: color, borderRadius: 1, display: 'inline-block' }} />
+                    : <svg width="24" height="10" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                        <line x1="0" y1="5" x2="24" y2="5"
+                          stroke={color} strokeWidth="2"
+                          strokeDasharray={dash ? '5 3' : undefined} />
+                      </svg>
+                  }
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </div>
