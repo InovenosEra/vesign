@@ -1240,6 +1240,7 @@ def portfolio_holdings(user=Depends(get_current_user)):
             JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
             WHERE wl.user_id = :uid
             GROUP BY wh.ticker
+            ORDER BY total_cost DESC
         """), {"uid": uid}).fetchall()
 
         if not rows:
@@ -1251,10 +1252,17 @@ def portfolio_holdings(user=Depends(get_current_user)):
 
         meta = {r[0]: r for r in conn.execute(text(f"""
             SELECT c.ticker, c.company, c.logo_url, c.industry,
-                   f.market_cap
+                   f.market_cap,
+                   lp.latest_close
             FROM companies c
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
                 ON c.ticker = f.ticker
+            LEFT JOIN (
+                SELECT p1.ticker, p1.close AS latest_close
+                FROM daily_prices p1
+                INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
+                    ON p1.ticker = p2.ticker AND p1.date = p2.max_date
+            ) lp ON c.ticker = lp.ticker
             WHERE c.ticker IN ({ph})
         """), tp).fetchall()}
 
@@ -1263,18 +1271,20 @@ def portfolio_holdings(user=Depends(get_current_user)):
         ticker, total_qty, total_cost, first_buy_date = r
         avg_price = (total_cost / total_qty) if total_qty else None
         m = meta.get(ticker)
+        mc = m[4] if m else None
+        latest_close = m[5] if m else None
         result.append({
             "ticker": ticker,
             "company": m[1] if m else None,
             "logo_url": m[2] if m else None,
             "industry": m[3] if m else None,
-            "market_cap": int(m[4]) if m and m[4] is not None and not (isinstance(m[4], float) and math.isnan(m[4])) else None,
+            "market_cap": int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
             "total_qty": total_qty,
             "total_cost": round(total_cost, 2) if total_cost is not None else None,
             "avg_price": round(avg_price, 4) if avg_price is not None else None,
+            "latest_close": round(float(latest_close), 4) if latest_close is not None else None,
             "first_buy_date": first_buy_date,
         })
-    result.sort(key=lambda x: (x["total_cost"] or 0), reverse=True)
     return result
 
 

@@ -181,8 +181,8 @@ export default function WatchlistPage() {
   const { prices: portPrices } = useLivePrices(portfolioTickers)
 
   const portEnriched = useMemo(() => portfolioHoldings.map(h => {
-    const live = portPrices[h.ticker]
-    const currentVal = live != null ? live * h.total_qty : null
+    const currentPrice = portPrices[h.ticker] ?? h.latest_close
+    const currentVal = currentPrice != null ? currentPrice * h.total_qty : null
     const pnlPct = currentVal != null && h.total_cost ? ((currentVal - h.total_cost) / h.total_cost) * 100 : null
     return { ...h, currentVal, pnlPct }
   }), [portfolioHoldings, portPrices])
@@ -531,53 +531,7 @@ export default function WatchlistPage() {
                 <p className="loading">{t('table.loading')}</p>
               ) : tickers.length === 0 ? (
                 <p className="empty">{t('watchlist.noTickers')}</p>
-              ) : (() => {
-                // ── Portfolio summary ──────────────────────────────────────
-                let totalInvested = 0, totalValue = 0
-                for (const t of sorted) {
-                  const lots = holdingsByTicker[t.ticker] || []
-                  const isIL = t.ticker?.endsWith('.TA')
-                  const currentPrice = (() => {
-                    const live = prices[t.ticker]
-                    const raw = live ?? t.close
-                    return raw != null ? (isIL ? raw / 100 : raw) : null
-                  })()
-                  for (const lot of lots) {
-                    const cost = lot.quantity * lot.buy_price
-                    totalInvested += cost
-                    if (currentPrice != null) totalValue += lot.quantity * currentPrice
-                  }
-                }
-                const totalPnlAbs = totalValue - totalInvested
-                const totalPnlPct = totalInvested > 0 ? (totalPnlAbs / totalInvested) * 100 : null
-                const hasHoldings = totalInvested > 0
-
-                return (<>
-                  {hasHoldings && (
-                    <div className="metrics" style={{ marginBottom: 16 }}>
-                      <div className="metric-card">
-                        <div className="label">{t('watchlist.totalInvested')}</div>
-                        <div className="value">${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      </div>
-                      <div className="metric-card">
-                        <div className="label">{t('watchlist.currentValue')}</div>
-                        <div className="value">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      </div>
-                      <div className="metric-card">
-                        <div className="label">{t('watchlist.totalPnlAbs')}</div>
-                        <div className={`value ${totalPnlAbs >= 0 ? 'up' : 'down'}`}>
-                          {totalPnlAbs >= 0 ? '+' : ''}${Math.abs(totalPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                      <div className="metric-card">
-                        <div className="label">{t('watchlist.totalPnlPct')}</div>
-                        <div className={`value ${totalPnlPct >= 0 ? 'up' : 'down'}`}>
-                          {totalPnlPct != null ? `${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%` : '—'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+              ) : (
                   <div className="data-table-wrap">
                     <table style={{ tableLayout: 'fixed', width: '100%' }}>
                       <colgroup>
@@ -749,8 +703,7 @@ export default function WatchlistPage() {
                       </tbody>
                     </table>
                   </div>
-                </>)
-              })()}
+              )}
         </>
       )}
       {selected && <SignalModal row={selected} onClose={() => setSelected(null)} />}
