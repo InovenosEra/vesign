@@ -207,7 +207,7 @@ export default function SignalModal({ row, onClose }) {
                 const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
                 const score  = row.health_score
                 return (
-                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
                     <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 'bold', marginBottom: 6 }}>{t('modal.companyHealth')}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       {[1,2,3,4,5].map(i => (
@@ -215,7 +215,7 @@ export default function SignalModal({ row, onClose }) {
                       ))}
                       <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>{labels[score]}</span>
                     </div>
-                    {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6, flex: 1, minHeight: 0, overflowY: 'auto' }}>{row.health_reason}</div>}
+                    {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6 }}>{row.health_reason}</div>}
                   </div>
                 )
               })()}
