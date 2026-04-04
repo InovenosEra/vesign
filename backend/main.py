@@ -1307,34 +1307,16 @@ def portfolio_performance(user=Depends(get_current_user)):
         if not user_rows:
             return []
 
-        # Vesign: first BUY signal per ticker in the 52-week window
-        signal_rows = conn.execute(text("""
-            WITH first_buy AS (
-                SELECT ticker, MIN(date) AS signal_date
-                FROM signals
-                WHERE signal = 'BUY' AND date >= :start AND ticker NOT LIKE '%.TA'
-                GROUP BY ticker
-            )
-            SELECT fb.ticker, DATE(fb.signal_date) AS signal_date, s.close AS entry_price
-            FROM first_buy fb
-            JOIN signals s ON s.ticker = fb.ticker AND s.date = fb.signal_date AND s.signal = 'BUY'
-            WHERE s.close IS NOT NULL AND s.close > 0
+        # Vesign: all closed trades from trade_log in the 52-week window
+        trade_log_rows = conn.execute(text("""
+            SELECT DATE(sell_date) AS sell_date, return_pct
+            FROM trade_log
+            WHERE DATE(sell_date) >= :start AND ticker NOT LIKE '%.TA'
+              AND sell_date IS NOT NULL AND return_pct IS NOT NULL
+            ORDER BY sell_date
         """), {"start": start_date.isoformat()}).fetchall()
 
-        # Matching closed trades
-        sig_tickers = [r[0] for r in signal_rows]
-        if sig_tickers:
-            sph = ", ".join([f":st{i}" for i in range(len(sig_tickers))])
-            stp = {f"st{i}": t for i, t in enumerate(sig_tickers)}
-            trade_rows = conn.execute(text(f"""
-                SELECT ticker, DATE(sell_date) AS sell_date, return_pct
-                FROM trade_log
-                WHERE buy_date >= :start AND ticker IN ({sph})
-            """), {"start": (start_date - timedelta(days=7)).isoformat(), **stp}).fetchall()
-        else:
-            trade_rows = []
-
-        all_tickers = list({r[0] for r in user_rows} | {r[0] for r in signal_rows})
+        all_tickers = list({r[0] for r in user_rows})
         ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
         tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
         # Extra buffer before window for lots bought just before start_date
@@ -1361,17 +1343,11 @@ def portfolio_performance(user=Depends(get_current_user)):
                 return close
         return None
 
-    trade_map = {}
-    for ticker, sell_d_str, return_pct in trade_rows:
+    # Pre-parse trade_log rows for Vesign series
+    trade_by_sell = []
+    for sd_str, rp in trade_log_rows:
         try:
-            trade_map[ticker] = (_date.fromisoformat(str(sell_d_str)[:10]), float(return_pct))
-        except Exception:
-            pass
-
-    vesign_positions = []
-    for ticker, sig_d_str, entry_price in signal_rows:
-        try:
-            vesign_positions.append((_date.fromisoformat(str(sig_d_str)[:10]), ticker, float(entry_price)))
+            trade_by_sell.append((_date.fromisoformat(str(sd_str)[:10]), float(rp)))
         except Exception:
             pass
 
@@ -1407,20 +1383,9 @@ def portfolio_performance(user=Depends(get_current_user)):
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        # Vesign equal-weight: avg return of all active positions
-        active_returns = []
-        for sig_date, ticker, entry_price in vesign_positions:
-            if sig_date > week_date:
-                continue
-            if ticker in trade_map:
-                sell_d, rp = trade_map[ticker]
-                if sell_d <= week_date:
-                    active_returns.append(rp * 100)
-                    continue
-            p = get_price_at(ticker, week_date)
-            if p is not None:
-                active_returns.append((p / entry_price - 1) * 100)
-        vesign_yield = round(sum(active_returns) / len(active_returns), 2) if active_returns else None
+        # Vesign: running avg of all closed trades up to this week (matches What-If box)
+        closed_returns = [rp * 100 for sd, rp in trade_by_sell if sd <= week_date]
+        vesign_yield = round(sum(closed_returns) / len(closed_returns), 2) if closed_returns else None
 
         result.append({"week": week_date.isoformat(), "portfolio": port_yield, "vesign": vesign_yield})
 
