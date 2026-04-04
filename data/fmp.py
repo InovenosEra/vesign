@@ -135,12 +135,24 @@ def stock_news(ticker: str, limit: int = 5) -> list:
 
 
 def earnings_calendar(ticker: str) -> list:
-    """Upcoming earnings dates with EPS/revenue estimates."""
+    """Next upcoming earnings date with EPS/revenue estimates (deduplicated, future only)."""
+    from datetime import date as _date
     data = _get("earnings-calendar", {"symbol": ticker})
     if not data or not isinstance(data, list):
         return []
-    return [{"date": item.get("date"), "eps_est": item.get("epsEstimated"),
-             "revenue_est": item.get("revenueEstimated")} for item in data[:3]]
+    today = _date.today().isoformat()
+    seen_dates = set()
+    result = []
+    for item in data:
+        d = item.get("date")
+        if not d or d < today or d in seen_dates:
+            continue
+        seen_dates.add(d)
+        result.append({"date": d, "eps_est": item.get("epsEstimated"),
+                        "revenue_est": item.get("revenueEstimated")})
+        if len(result) == 2:
+            break
+    return result
 
 
 def analyst_upgrades(ticker: str, limit: int = 8) -> list:
