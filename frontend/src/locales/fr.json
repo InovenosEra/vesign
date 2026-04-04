@@ -166,6 +166,7 @@
   "portfolio.allocation": "Répartition",
   "portfolio.byTicker": "Par ticker",
   "portfolio.bySector": "Par secteur",
+  "portfolio.comparisonTitle": "Comparaison des performances sur 12 mois",
   "portfolio.whatIf": "Et si vous aviez suivi tous les signaux BUY ?",
   "portfolio.winRate": "Taux de réussite",
   "portfolio.avgReturn": "Rendement moy./Transaction",

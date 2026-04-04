@@ -1,13 +1,13 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker,
   getSignalsByTickers, searchTickers,
   getHoldings, addHolding, deleteHolding,
-  getPortfolioHoldings, getPortfolioPerformance, getSuccessRate,
+  getPortfolioHoldings, getPortfolioPerformance, getPortfolioComparison,
   WHITE_BG_LOGOS,
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
@@ -172,9 +172,9 @@ export default function WatchlistPage() {
     queryFn: getPortfolioHoldings,
     staleTime: 60_000,
   })
-  const { data: successRateData = [] } = useQuery({
-    queryKey: ['success-rate', 12],
-    queryFn: () => getSuccessRate(12),
+  const { data: compData = [] } = useQuery({
+    queryKey: ['portfolio-comparison'],
+    queryFn: getPortfolioComparison,
     staleTime: 300_000,
   })
   const { data: perfData = [] } = useQuery({
@@ -203,16 +203,6 @@ export default function WatchlistPage() {
     .sort((a, b) => b.value - a.value),
   [portEnriched])
   const portPieTotal = portPieData.reduce((s, d) => s + d.value, 0)
-
-  const { vesignWinRate, vesignAvgReturn, vesignTotal } = useMemo(() => {
-    let t = 0, w = 0, r = 0
-    successRateData.forEach(row => {
-      t += row.total_trades || 0
-      w += row.wins || 0
-      r += (row.avg_return_pct || 0) * (row.total_trades || 0)
-    })
-    return { vesignWinRate: t > 0 ? (w / t) * 100 : null, vesignAvgReturn: t > 0 ? r / t : 0, vesignTotal: t }
-  }, [successRateData])
 
   const invalidateLists    = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
   const invalidateTickers  = () => qc.invalidateQueries({ queryKey: ['watchlist-tickers', selectedId] })
@@ -432,46 +422,32 @@ export default function WatchlistPage() {
             )}
 
             {/* What-If */}
-            {vesignTotal > 0 && (
+            {compData.length > 0 && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: 1, minWidth: 240 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
-                  {t('portfolio.whatIf')}
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  {t('portfolio.comparisonTitle')}
                   <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)', marginLeft: 8 }}>last 12 months</span>
                 </div>
-                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.winRate')}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{vesignWinRate != null ? `${vesignWinRate.toFixed(1)}%` : '—'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.avgReturn')}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>+{vesignAvgReturn.toFixed(2)}%</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.totalTrades')}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700 }}>{vesignTotal}</div>
-                  </div>
-                  {portPnlPct != null && (() => {
-                    const delta = portPnlPct - vesignAvgReturn
-                    return (
-                      <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
-                        <div style={{ display: 'flex', gap: 20 }}>
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.yourPortfolio')}</div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: portPnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                              {portPnlPct >= 0 ? '+' : ''}{portPnlPct.toFixed(2)}%
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.vsPortfolio')}</div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: delta >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                              {delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(2)}%
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })()}
+                <div style={{ width: '100%', height: 160 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={compData} margin={{ top: 18, right: 8, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text)' }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: 'var(--muted)' }} tickLine={false} axisLine={false}
+                        tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`} />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
+                        formatter={v => [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`]}
+                        itemStyle={{ color: 'var(--text)' }}
+                      />
+                      <Bar dataKey="yield" radius={[4, 4, 0, 0]}
+                        label={{ position: 'top', fontSize: 10, fill: 'var(--text)', formatter: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` }}>
+                        {compData.map((entry, i) => (
+                          <Cell key={i} fill={entry.name === 'Vesign' ? 'var(--green)' : '#3498db'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             )}

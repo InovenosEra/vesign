@@ -1416,6 +1416,100 @@ def portfolio_performance(user=Depends(get_current_user)):
     return result
 
 
+# --- Portfolio comparison (bar chart) ----------------------------------------
+
+@protected.get("/api/portfolio/comparison")
+def portfolio_comparison(user=Depends(get_current_user)):
+    """Final 12M yield per watchlist + Vesign — for the bar chart."""
+    from datetime import date as _date, timedelta
+    from collections import defaultdict
+
+    uid = user["id"]
+    today = _date.today()
+    start_date = today - timedelta(weeks=52)
+
+    with engine.connect() as conn:
+        # Holdings grouped by watchlist
+        holdings_rows = conn.execute(text("""
+            SELECT wl.id, wl.name, wh.ticker, wh.quantity, wh.buy_price, DATE(wh.buy_date) AS buy_date
+            FROM watchlist_holdings wh
+            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
+            WHERE wl.user_id = :uid AND wh.ticker NOT LIKE '%.TA' AND wh.quantity > 0
+            ORDER BY wl.name, wh.buy_date
+        """), {"uid": uid}).fetchall()
+
+        if not holdings_rows:
+            return []
+
+        # Vesign: avg return of in-window closed trades (= final point of green line)
+        vesign_row = conn.execute(text("""
+            SELECT AVG(return_pct) * 100
+            FROM trade_log
+            WHERE DATE(buy_date) >= :start AND DATE(sell_date) >= :start
+              AND ticker NOT LIKE '%.TA'
+              AND sell_date IS NOT NULL AND return_pct IS NOT NULL
+        """), {"start": start_date.isoformat()}).fetchone()
+
+        tickers = list({r[2] for r in holdings_rows})
+        ph = ", ".join([f":t{i}" for i in range(len(tickers))])
+        tp = {f"t{i}": t for i, t in enumerate(tickers)}
+        cutoff = (start_date - timedelta(days=60)).isoformat()
+
+        price_rows = conn.execute(text(f"""
+            SELECT ticker, DATE(date) AS d, close
+            FROM daily_prices
+            WHERE ticker IN ({ph}) AND date >= :cutoff
+            ORDER BY ticker, date
+        """), {**tp, "cutoff": cutoff}).fetchall()
+
+    # Build price map
+    price_map = defaultdict(list)
+    for ticker, d_str, close in price_rows:
+        try:
+            price_map[ticker].append((_date.fromisoformat(str(d_str)[:10]), float(close)))
+        except Exception:
+            pass
+
+    def latest_price(ticker):
+        pts = price_map.get(ticker, [])
+        return pts[-1][1] if pts else None
+
+    def price_at_start(ticker):
+        for d_obj, close in reversed(price_map.get(ticker, [])):
+            if d_obj <= start_date:
+                return close
+        return None
+
+    # Compute per-watchlist yield
+    watchlist_lots = defaultdict(list)
+    watchlist_names = {}
+    for wl_id, wl_name, ticker, qty, buy_price, buy_date_str in holdings_rows:
+        watchlist_names[wl_id] = wl_name
+        try:
+            buy_d = _date.fromisoformat(str(buy_date_str)[:10])
+        except Exception:
+            buy_d = today
+        base_p = price_at_start(ticker) if buy_d <= start_date else float(buy_price)
+        if base_p is None:
+            base_p = float(buy_price)
+        cur_p = latest_price(ticker)
+        if cur_p:
+            watchlist_lots[wl_id].append((float(qty), base_p, cur_p))
+
+    result = []
+    vesign_val = float(vesign_row[0]) if vesign_row and vesign_row[0] is not None else None
+    if vesign_val is not None:
+        result.append({"name": "Vesign", "yield": round(vesign_val, 2)})
+
+    for wl_id, lots in watchlist_lots.items():
+        total_val  = sum(qty * cur_p  for qty, base_p, cur_p in lots)
+        total_base = sum(qty * base_p for qty, base_p, cur_p in lots)
+        if total_base > 0:
+            result.append({"name": watchlist_names[wl_id], "yield": round((total_val / total_base - 1) * 100, 2)})
+
+    return result
+
+
 # --- Pipeline ---------------------------------------------------------------
 
 @protected.post("/api/pipeline/run")

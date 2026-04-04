@@ -178,6 +178,7 @@
   "portfolio.allocation": "Allocation",
   "portfolio.byTicker": "By Ticker",
   "portfolio.bySector": "By Sector",
+  "portfolio.comparisonTitle": "12-Month Performance Comparison",
   "portfolio.whatIf": "What If You Had Followed All BUY Signals?",
   "portfolio.winRate": "Win Rate",
   "portfolio.avgReturn": "Avg Return/Trade",

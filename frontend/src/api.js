@@ -162,3 +162,6 @@ export const getPortfolioHoldings = () =>
 
 export const getPortfolioPerformance = () =>
   get('/portfolio/performance')
+
+export const getPortfolioComparison = () =>
+  get('/portfolio/comparison')
