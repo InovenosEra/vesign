@@ -1288,6 +1288,81 @@ def portfolio_holdings(user=Depends(get_current_user)):
     return result
 
 
+# --- Portfolio performance ---------------------------------------------------
+
+@protected.get("/api/portfolio/performance")
+def portfolio_performance(user=Depends(get_current_user)):
+    """Weekly portfolio yield % (last 52 weeks, US holdings only)."""
+    from datetime import date as _date, timedelta
+    from collections import defaultdict
+
+    uid = user["id"]
+    today = _date.today()
+    start_date = today - timedelta(weeks=52)
+    weeks = [start_date + timedelta(weeks=i) for i in range(53)]
+
+    with engine.connect() as conn:
+        user_rows = conn.execute(text("""
+            SELECT wh.ticker,
+                   SUM(wh.quantity)                   AS total_qty,
+                   SUM(wh.quantity * wh.buy_price)    AS total_cost
+            FROM watchlist_holdings wh
+            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
+            WHERE wl.user_id = :uid
+              AND wh.ticker NOT LIKE '%.TA'
+            GROUP BY wh.ticker
+        """), {"uid": uid}).fetchall()
+
+        if not user_rows:
+            return []
+
+        user_cost = sum(r[2] for r in user_rows if r[2] is not None)
+        if user_cost <= 0:
+            return []
+
+        tickers = [r[0] for r in user_rows]
+        ph = ", ".join([f":t{i}" for i in range(len(tickers))])
+        tp = {f"t{i}": t for i, t in enumerate(tickers)}
+        cutoff_buf = (start_date - timedelta(days=30)).isoformat()
+
+        price_rows = conn.execute(text(f"""
+            SELECT ticker, DATE(date) AS d, close
+            FROM daily_prices
+            WHERE ticker IN ({ph}) AND date >= :cutoff
+            ORDER BY ticker, date
+        """), {**tp, "cutoff": cutoff_buf}).fetchall()
+
+    price_map = defaultdict(list)
+    for ticker, d_str, close in price_rows:
+        try:
+            d_obj = _date.fromisoformat(str(d_str)[:10])
+            price_map[ticker].append((d_obj, float(close)))
+        except Exception:
+            pass
+
+    def get_price_at(ticker, target):
+        for d_obj, close in reversed(price_map.get(ticker, [])):
+            if d_obj <= target:
+                return close
+        return None
+
+    result = []
+    for week_date in weeks:
+        total_val = 0.0
+        total_cost = 0.0
+        for ticker, qty, cost in user_rows:
+            if qty is None or cost is None:
+                continue
+            p = get_price_at(ticker, week_date)
+            if p is not None:
+                total_val += float(qty) * p
+                total_cost += float(cost)
+        port_yield = round((total_val / total_cost - 1) * 100, 2) if total_cost > 0 else None
+        result.append({"week": week_date.isoformat(), "portfolio": port_yield})
+
+    return result
+
+
 # --- Pipeline ---------------------------------------------------------------
 
 @protected.post("/api/pipeline/run")

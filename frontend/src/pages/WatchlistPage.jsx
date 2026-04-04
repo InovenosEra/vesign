@@ -1,13 +1,13 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker,
   getSignalsByTickers, searchTickers,
   getHoldings, addHolding, deleteHolding,
-  getPortfolioHoldings, getSuccessRate,
+  getPortfolioHoldings, getPortfolioPerformance, getSuccessRate,
   WHITE_BG_LOGOS,
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
@@ -175,6 +175,11 @@ export default function WatchlistPage() {
   const { data: successRateData = [] } = useQuery({
     queryKey: ['success-rate', 12],
     queryFn: () => getSuccessRate(12),
+    staleTime: 300_000,
+  })
+  const { data: perfData = [] } = useQuery({
+    queryKey: ['portfolio-performance'],
+    queryFn: getPortfolioPerformance,
     staleTime: 300_000,
   })
   const portfolioTickers = useMemo(() => portfolioHoldings.map(h => h.ticker), [portfolioHoldings])
@@ -379,6 +384,61 @@ export default function WatchlistPage() {
                 })}
               </div>
             </div>
+
+            {/* Performance line chart */}
+            {perfData.length > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '1.5 1 280px', minWidth: 280 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Performance (last 12 months)</div>
+                <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 11 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ display: 'inline-block', width: 20, height: 2, background: '#3498db', borderRadius: 1 }} />
+                    Your Portfolio
+                  </span>
+                  {vesignAvgReturn != null && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ display: 'inline-block', width: 20, height: 2, background: 'var(--green)', borderRadius: 1, borderBottom: '1px dashed var(--green)' }} />
+                      Vesign avg/trade
+                    </span>
+                  )}
+                </div>
+                <div style={{ width: '100%', height: 160 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={perfData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis
+                        dataKey="week"
+                        tick={{ fontSize: 9, fill: 'var(--muted)' }}
+                        tickLine={false}
+                        interval={7}
+                        tickFormatter={v => new Date(v).toLocaleDateString('en-US', { month: 'short' })}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 9, fill: 'var(--muted)' }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`}
+                      />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
+                        labelStyle={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}
+                        labelFormatter={v => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        formatter={(v, name) => v != null ? [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, name] : ['—', name]}
+                        itemStyle={{ color: 'var(--text)' }}
+                      />
+                      {vesignAvgReturn != null && (
+                        <ReferenceLine
+                          y={vesignAvgReturn}
+                          stroke="var(--green)"
+                          strokeDasharray="5 3"
+                          label={{ value: `Vesign +${vesignAvgReturn.toFixed(1)}%`, fill: 'var(--green)', fontSize: 9, position: 'insideTopRight' }}
+                        />
+                      )}
+                      <Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="#3498db" strokeWidth={1.5} dot={false} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
 
             {/* What-If */}
             {vesignTotal > 0 && (

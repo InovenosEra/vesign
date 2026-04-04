@@ -159,3 +159,6 @@ export const getAnalystChanges = (ticker, limit = 8) =>
 // --- Portfolio -------------------------------------------------------------
 export const getPortfolioHoldings = () =>
   get('/portfolio/holdings')
+
+export const getPortfolioPerformance = () =>
+  get('/portfolio/performance')
