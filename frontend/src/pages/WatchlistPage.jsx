@@ -207,6 +207,11 @@ export default function WatchlistPage() {
   const invalidateLists    = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
   const invalidateTickers  = () => qc.invalidateQueries({ queryKey: ['watchlist-tickers', selectedId] })
   const invalidateHoldings = () => qc.invalidateQueries({ queryKey: ['watchlist-holdings', selectedId] })
+  const invalidatePortfolio = () => {
+    qc.invalidateQueries({ queryKey: ['portfolio-holdings'] })
+    qc.invalidateQueries({ queryKey: ['portfolio-performance'] })
+    qc.invalidateQueries({ queryKey: ['portfolio-comparison'] })
+  }
 
   const addHoldingMut = useMutation({
     mutationFn: (body) => addHolding(selectedId, body),
@@ -218,7 +223,7 @@ export default function WatchlistPage() {
 
   const deleteHoldingMut = useMutation({
     mutationFn: (hid) => deleteHolding(selectedId, hid),
-    onSuccess: invalidateHoldings,
+    onSuccess: () => { invalidateHoldings(); invalidatePortfolio() },
   })
 
   const createMut = useMutation({
@@ -228,7 +233,7 @@ export default function WatchlistPage() {
 
   const deleteMut = useMutation({
     mutationFn: (id) => deleteWatchlist(id),
-    onSuccess: (_, id) => { invalidateLists(); if (selectedId === id) setSelectedId(null) },
+    onSuccess: (_, id) => { invalidateLists(); invalidatePortfolio(); if (selectedId === id) setSelectedId(null) },
   })
 
   const addMut = useMutation({
@@ -294,7 +299,7 @@ export default function WatchlistPage() {
 
   const removeMut = useMutation({
     mutationFn: (ticker) => removeTicker(selectedId, ticker),
-    onSuccess: invalidateTickers,
+    onSuccess: () => { invalidateTickers(); invalidatePortfolio() },
   })
 
   const selectedList = lists.find(l => l.id === selectedId)
