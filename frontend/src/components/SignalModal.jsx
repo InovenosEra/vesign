@@ -228,7 +228,7 @@ export default function SignalModal({ row, onClose }) {
         {isLoading ? (
           <p className="loading" style={{ padding: 40 }}>{t('modal.loadingChart')}</p>
         ) : (
-          <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
+          <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden', outline: 'none' }}>
 
             {/* Period selector — overlaid at top of chart, aligned with plot area */}
             <div style={{ position: 'absolute', top: 36, left: 56, right: 70, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
