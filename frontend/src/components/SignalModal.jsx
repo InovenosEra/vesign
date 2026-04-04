@@ -231,7 +231,7 @@ export default function SignalModal({ row, onClose }) {
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
 
             {/* Period selector — overlaid at top of chart, aligned with plot area */}
-            <div style={{ position: 'absolute', top: 8, left: 56, right: 8, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
+            <div style={{ position: 'absolute', top: 8, left: 56, right: 70, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
               {CHART_PERIODS.map(m => (
                 <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
                   onClick={() => selectPeriod(m)}
