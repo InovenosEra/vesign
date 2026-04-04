@@ -115,7 +115,7 @@ export default function SignalModal({ row, onClose }) {
     const idx = chartData.findIndex(d => d.date === dateStr)
     if (idx < 0 || chartData.length <= 1) return null
     const plotLeft  = 8 + 48
-    const plotWidth = wrapperWidth - plotLeft - 70
+    const plotWidth = wrapperWidth - plotLeft - 16
     return plotLeft + (idx / (chartData.length - 1)) * plotWidth
   }
 
@@ -231,7 +231,7 @@ export default function SignalModal({ row, onClose }) {
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden', outline: 'none' }}>
 
             {/* Period selector — overlaid at top of chart, aligned with plot area */}
-            <div style={{ position: 'absolute', top: 36, left: 56, right: 70, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
+            <div style={{ position: 'absolute', top: 36, left: 56, right: 16, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
               {CHART_PERIODS.map(m => (
                 <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
                   onClick={() => selectPeriod(m)}
@@ -248,7 +248,7 @@ export default function SignalModal({ row, onClose }) {
               </span>
             </div>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={chartData} margin={{ top: 70, right: 70, bottom: 8, left: 8 }}>
+              <LineChart data={chartData} margin={{ top: 70, right: 16, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
