@@ -118,9 +118,9 @@ function TradeModal({ row, start, end, onClose }) {
   const [descTab, setDescTab] = useState('info')
 
   const today = new Date().toISOString().slice(0, 10)
-  const [activePeriod, setActivePeriod] = useState(null)
-  const [chartStart, setChartStart]     = useState(start)
-  const [chartEnd,   setChartEnd]       = useState(end)
+  const [activePeriod, setActivePeriod] = useState(12)
+  const [chartStart, setChartStart]     = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 12); return d.toISOString().slice(0, 10) })
+  const [chartEnd,   setChartEnd]       = useState(today)
 
   function selectPeriod(months) {
     setActivePeriod(months)
