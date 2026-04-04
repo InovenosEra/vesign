@@ -32,8 +32,8 @@
 
   "col.ticker": "Ticker",
   "col.company": "Company",
-  "col.marketCap": "Market Cap (B)",
-  "col.mktCap": "Mkt Cap (B)",
+  "col.marketCap": "M. Cap (B)",
+  "col.mktCap": "M. Cap (B)",
   "col.price": "Price",
   "col.rsi": "RSI",
   "col.lowPrice": "Low Price",

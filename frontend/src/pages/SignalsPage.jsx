@@ -113,7 +113,7 @@ function ServerTh({ label, col, sortBy, sortDir, onSort, className }) {
   const active = sortBy === col
   return (
     <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
-      {label}
+      {label}{active ? <span style={{ marginLeft: 3 }}>{sortDir === 'asc' ? '▲' : '▼'}</span> : null}
     </th>
   )
 }

@@ -57,7 +57,7 @@ function Th({ label, col, sort, onSort, className }) {
   const active = sort.key === col
   return (
     <th onClick={() => onSort(col)} style={{ cursor: 'pointer' }} className={className}>
-      {label}
+      {label}{active ? <span style={{ marginLeft: 3 }}>{sort.dir === 'asc' ? '▲' : '▼'}</span> : null}
     </th>
   )
 }
