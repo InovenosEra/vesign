@@ -146,5 +146,31 @@
   "lang.en": "EN",
   "lang.he": "HE",
   "lang.es": "ES",
-  "lang.fr": "FR"
+  "lang.fr": "FR",
+
+  "modal.tabInfo": "מידע",
+  "modal.tabNews": "חדשות",
+  "modal.earnings": "דוחות רווח",
+  "modal.noEarnings": "לא נמצאו תאריכי דוחות קרובים.",
+  "modal.analystChanges": "דירוגי אנליסטים",
+  "modal.noAnalystChanges": "אין שינויי דירוג אחרונים.",
+  "modal.noNews": "לא נמצאו חדשות אחרונות.",
+  "modal.upgrade": "שדרוג",
+  "modal.downgrade": "הורדת דירוג",
+  "modal.initiate": "התחלת כיסוי",
+  "modal.reiterate": "אישור מחדש",
+
+  "nav.portfolio": "תיק השקעות",
+  "portfolio.title": "תיק השקעות",
+  "portfolio.noHoldings": "אין אחזקות עדיין. הוסף לוטים ברשימות המעקב.",
+  "portfolio.allocation": "הקצאה",
+  "portfolio.byTicker": "לפי מניה",
+  "portfolio.bySector": "לפי ענף",
+  "portfolio.whatIf": "מה היה קורה אם היית עוקב אחרי כל איתותי הקנייה?",
+  "portfolio.winRate": "אחוז הצלחה",
+  "portfolio.avgReturn": "תשואה ממוצעת לעסקה",
+  "portfolio.totalTrades": "סה״כ עסקאות",
+  "portfolio.yourPortfolio": "התיק שלך",
+  "portfolio.vesignSignals": "ממוצע איתותי Vesign",
+  "portfolio.vsPortfolio": "לעומת התיק שלך"
 }

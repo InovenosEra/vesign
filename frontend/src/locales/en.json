@@ -158,5 +158,31 @@
   "lang.en": "EN",
   "lang.he": "HE",
   "lang.es": "ES",
-  "lang.fr": "FR"
+  "lang.fr": "FR",
+
+  "modal.tabInfo": "Info",
+  "modal.tabNews": "News",
+  "modal.earnings": "Earnings",
+  "modal.noEarnings": "No upcoming earnings found.",
+  "modal.analystChanges": "Analyst Ratings",
+  "modal.noAnalystChanges": "No recent rating changes.",
+  "modal.noNews": "No recent news found.",
+  "modal.upgrade": "Upgrade",
+  "modal.downgrade": "Downgrade",
+  "modal.initiate": "Initiated",
+  "modal.reiterate": "Reiterate",
+
+  "nav.portfolio": "Portfolio",
+  "portfolio.title": "Portfolio",
+  "portfolio.noHoldings": "No holdings yet. Add lots in your Watchlists.",
+  "portfolio.allocation": "Allocation",
+  "portfolio.byTicker": "By Ticker",
+  "portfolio.bySector": "By Sector",
+  "portfolio.whatIf": "What If You Had Followed All BUY Signals?",
+  "portfolio.winRate": "Win Rate",
+  "portfolio.avgReturn": "Avg Return/Trade",
+  "portfolio.totalTrades": "Total Trades",
+  "portfolio.yourPortfolio": "Your Portfolio",
+  "portfolio.vesignSignals": "Vesign Signals Avg",
+  "portfolio.vsPortfolio": "vs your portfolio"
 }

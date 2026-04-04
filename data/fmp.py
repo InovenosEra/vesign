@@ -124,8 +124,31 @@ def income_statement(ticker: str, limit: int = 2) -> list:
 
 
 def stock_news(ticker: str, limit: int = 5) -> list:
-    """Recent news headlines. Returns empty list if not available on current plan."""
+    """Recent news articles with metadata. Returns empty list if not available on current plan."""
     data = _get("news/stock", {"symbols": ticker, "limit": limit})
     if not data or not isinstance(data, list):
         return []
-    return [item["title"] for item in data if item.get("title")]
+    return [{"title": item.get("title", ""), "date": item.get("publishedDate", ""),
+             "source": item.get("site", ""), "url": item.get("url", ""),
+             "summary": item.get("text", ""), "image": item.get("image", "")}
+            for item in data if item.get("title")]
+
+
+def earnings_calendar(ticker: str) -> list:
+    """Upcoming earnings dates with EPS/revenue estimates."""
+    data = _get("earnings-calendar", {"symbol": ticker})
+    if not data or not isinstance(data, list):
+        return []
+    return [{"date": item.get("date"), "eps_est": item.get("epsEstimated"),
+             "revenue_est": item.get("revenueEstimated")} for item in data[:3]]
+
+
+def analyst_upgrades(ticker: str, limit: int = 8) -> list:
+    """Recent analyst upgrades/downgrades."""
+    data = _get("upgrades-downgrades", {"symbol": ticker})
+    if not data or not isinstance(data, list):
+        return []
+    return [{"date": item.get("publishedDate", ""), "firm": item.get("gradingCompany", ""),
+             "action": item.get("action", ""), "from_grade": item.get("previousGrade", ""),
+             "to_grade": item.get("newGrade", ""), "price_target": item.get("priceTarget")}
+            for item in data[:limit]]

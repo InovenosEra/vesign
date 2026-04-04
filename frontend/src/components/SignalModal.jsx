@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getPriceHistory, getSignalMarkers, getAnalystHistory, WHITE_BG_LOGOS } from '../api'
+import { getPriceHistory, getSignalMarkers, getAnalystHistory, getNews, getEarnings, getAnalystChanges, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -31,6 +31,7 @@ export default function SignalModal({ row, onClose }) {
   const [activePeriod, setActivePeriod] = useState(12)
   const [chartStart, setChartStart]     = useState(() => monthsAgo(12))
   const [chartEnd,   setChartEnd]       = useState(today)
+  const [descTab, setDescTab]           = useState('info')
 
   function selectPeriod(months) {
     setActivePeriod(months)
@@ -56,6 +57,27 @@ export default function SignalModal({ row, onClose }) {
   const { data: analystHistory = [] } = useQuery({
     queryKey: ['analyst-history', row.ticker, fetchStart, chartEnd],
     queryFn: () => getAnalystHistory(row.ticker, { start: fetchStart, end: chartEnd }),
+    staleTime: 300_000,
+  })
+
+  const { data: newsData = [], isLoading: newsLoading } = useQuery({
+    queryKey: ['news', row.ticker],
+    queryFn: () => getNews(row.ticker, 5),
+    enabled: descTab === 'news',
+    staleTime: 300_000,
+  })
+
+  const { data: earningsData = [], isLoading: earningsLoading } = useQuery({
+    queryKey: ['earnings', row.ticker],
+    queryFn: () => getEarnings(row.ticker),
+    enabled: descTab === 'news',
+    staleTime: 300_000,
+  })
+
+  const { data: analystChangesData = [], isLoading: analystChangesLoading } = useQuery({
+    queryKey: ['analyst-changes', row.ticker],
+    queryFn: () => getAnalystChanges(row.ticker, 8),
+    enabled: descTab === 'news',
     staleTime: 300_000,
   })
 
@@ -194,31 +216,116 @@ export default function SignalModal({ row, onClose }) {
               </table>
             </div>
           </div>
-          {(row.description_short || row.description || row.health_score) && (
+          {(row.description_short || row.description || row.health_score || true) && (
             <div className="modal-desc-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', ...(generalColH ? { height: generalColH } : {}) }}>
-              {(row.description_short || row.description) && (<>
-                <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.description')}</div>
-                <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
-                  {row.description_short || row.description}
-                </div>
-              </>)}
-              {row.health_score && (() => {
-                const labels = ['', t('health.weak'), t('health.fair'), t('health.good'), t('health.great'), t('health.excellent')]
-                const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
-                const score  = row.health_score
-                return (<>
-                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.companyHealth')}</div>
-                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      {[1,2,3,4,5].map(i => (
-                        <div key={i} style={{ width: 20, height: 8, borderRadius: 3, background: i <= score ? colors[score] : 'var(--border)' }} />
-                      ))}
-                      <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>{labels[score]}</span>
-                    </div>
-                    {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6 }}>{row.health_reason}</div>}
+              {/* Tab bar */}
+              <div style={{ display: 'flex', gap: 2, paddingLeft: 2 }}>
+                {['info', 'news'].map(tab => (
+                  <button key={tab}
+                    className={`period-chip${descTab === tab ? ' active' : ''}`}
+                    onClick={() => setDescTab(tab)}
+                    style={{ fontSize: 11, padding: '2px 10px' }}>
+                    {tab === 'info' ? t('modal.tabInfo') : t('modal.tabNews')}
+                  </button>
+                ))}
+              </div>
+
+              {/* Info tab */}
+              {descTab === 'info' && (<>
+                {(row.description_short || row.description) && (<>
+                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.description')}</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.6, overflowY: 'auto', flex: 1, minHeight: 0, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    {row.description_short || row.description}
                   </div>
-                </>)
-              })()}
+                </>)}
+                {row.health_score && (() => {
+                  const labels = ['', t('health.weak'), t('health.fair'), t('health.good'), t('health.great'), t('health.excellent')]
+                  const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
+                  const score  = row.health_score
+                  return (<>
+                    <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.companyHealth')}</div>
+                    <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        {[1,2,3,4,5].map(i => (
+                          <div key={i} style={{ width: 20, height: 8, borderRadius: 3, background: i <= score ? colors[score] : 'var(--border)' }} />
+                        ))}
+                        <span style={{ fontSize: 12, fontWeight: 'bold', color: colors[score], marginLeft: 4 }}>{labels[score]}</span>
+                      </div>
+                      {row.health_reason && <div style={{ fontSize: 12, lineHeight: 1.6 }}>{row.health_reason}</div>}
+                    </div>
+                  </>)
+                })()}
+              </>)}
+
+              {/* News tab */}
+              {descTab === 'news' && (
+                <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                  {/* Earnings section */}
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--muted)', marginBottom: 4 }}>{t('modal.earnings')}</div>
+                    {earningsLoading
+                      ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
+                      : earningsData.length === 0
+                        ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.noEarnings')}</div>
+                        : earningsData.map((e, i) => (
+                          <div key={i} style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
+                            <span style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{e.date}</span>
+                            {e.eps_est != null && <span style={{ marginLeft: 10, color: 'var(--muted)' }}>EPS est: {Number(e.eps_est).toFixed(2)}</span>}
+                            {e.revenue_est != null && <span style={{ marginLeft: 10, color: 'var(--muted)' }}>Rev est: {(e.revenue_est / 1e6).toFixed(0)}M</span>}
+                          </div>
+                        ))
+                    }
+                  </div>
+
+                  {/* Analyst changes section */}
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--muted)', marginBottom: 4 }}>{t('modal.analystChanges')}</div>
+                    {analystChangesLoading
+                      ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
+                      : analystChangesData.length === 0
+                        ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.noAnalystChanges')}</div>
+                        : analystChangesData.map((a, i) => {
+                          const act = (a.action || '').toLowerCase()
+                          const badgeColor = act.includes('upgrade') ? 'var(--green)' : act.includes('downgrade') ? 'var(--red)' : 'var(--muted)'
+                          const actLabel = act.includes('upgrade') ? t('modal.upgrade') : act.includes('downgrade') ? t('modal.downgrade') : act.includes('init') ? t('modal.initiate') : t('modal.reiterate')
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11 }}>
+                              <span style={{ background: badgeColor, color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{actLabel}</span>
+                              <span style={{ fontWeight: 600, flexShrink: 0 }}>{a.firm}</span>
+                              {a.from_grade && a.to_grade && <span style={{ color: 'var(--muted)' }}>{a.from_grade} → {a.to_grade}</span>}
+                              {a.price_target != null && <span style={{ color: 'var(--accent)', marginLeft: 'auto', flexShrink: 0 }}>${Number(a.price_target).toFixed(0)}</span>}
+                              <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{(a.date || '').slice(0, 10)}</span>
+                            </div>
+                          )
+                        })
+                    }
+                  </div>
+
+                  {/* News section */}
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--muted)', marginBottom: 4 }}>{t('modal.tabNews')}</div>
+                    {newsLoading
+                      ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
+                      : newsData.length === 0
+                        ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.noNews')}</div>
+                        : newsData.map((n, i) => (
+                          <div key={i} style={{ paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                              <span style={{ fontSize: 10, color: 'var(--muted)' }}>{(n.date || '').slice(0, 10)}</span>
+                              {n.source && <span style={{ fontSize: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 5px' }}>{n.source}</span>}
+                            </div>
+                            {n.url
+                              ? <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none', display: 'block', marginBottom: 2 }}>{n.title}</a>
+                              : <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{n.title}</div>
+                            }
+                            {n.summary && <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{n.summary}</div>}
+                          </div>
+                        ))
+                    }
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <button className="modal-close" onClick={onClose}>✕</button>

@@ -10,6 +10,7 @@ import { MarketContext, MarketProvider } from './context/MarketContext'
 import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
 import TradesPage from './pages/TradesPage'
+import PortfolioPage from './pages/PortfolioPage'
 import GlobalSearch from './components/GlobalSearch'
 import ProfilePictureModal from './components/ProfilePictureModal'
 import LoginPage from './pages/LoginPage'
@@ -355,6 +356,7 @@ function Header() {
             <NavLink to="/">{t('nav.signals')}</NavLink>
             <NavLink to="/watchlist">{t('nav.watchlist')}</NavLink>
             <NavLink to="/trades">{t('nav.trades')}</NavLink>
+            <NavLink to="/portfolio">{t('nav.portfolio')}</NavLink>
           </nav>
         </div>
         <div className="header-search-wrap" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -382,6 +384,7 @@ function Header() {
           <NavLink to="/" onClick={closeNav}>{t('nav.signals')}</NavLink>
           <NavLink to="/watchlist" onClick={closeNav}>{t('nav.watchlist')}</NavLink>
           <NavLink to="/trades" onClick={closeNav}>{t('nav.trades')}</NavLink>
+          <NavLink to="/portfolio" onClick={closeNav}>{t('nav.portfolio')}</NavLink>
           <div className="mobile-menu-divider" />
           <div className="mobile-menu-market"><MarketStatus /></div>
           <div className="mobile-menu-divider" />
@@ -446,6 +449,7 @@ function AppLayout() {
               <Route path="/" element={<SignalsPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
               <Route path="/trades" element={<TradesPage />} />
+              <Route path="/portfolio" element={<PortfolioPage />} />
             </Routes>
           </main>
         )}

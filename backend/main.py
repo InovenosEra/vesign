@@ -1195,6 +1195,89 @@ def open_trades(market: Optional[str] = None):
     return result
 
 
+# --- News & analyst endpoints -----------------------------------------------
+
+@protected.get("/api/news")
+def stock_news_endpoint(ticker: str = Query(...), limit: int = Query(default=5, ge=1, le=20)):
+    from data import fmp as _fmp
+    ticker = ticker.strip().upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+    return _fmp.stock_news(ticker, limit)
+
+
+@protected.get("/api/earnings")
+def earnings_endpoint(ticker: str = Query(...)):
+    from data import fmp as _fmp
+    ticker = ticker.strip().upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+    return _fmp.earnings_calendar(ticker)
+
+
+@protected.get("/api/analyst-changes")
+def analyst_changes_endpoint(ticker: str = Query(...), limit: int = Query(default=8, ge=1, le=20)):
+    from data import fmp as _fmp
+    ticker = ticker.strip().upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+    return _fmp.analyst_upgrades(ticker, limit)
+
+
+# --- Portfolio holdings ------------------------------------------------------
+
+@protected.get("/api/portfolio/holdings")
+def portfolio_holdings(user=Depends(get_current_user)):
+    """All holdings across all user's watchlists, aggregated per ticker."""
+    uid = user["id"]
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT wh.ticker,
+                   SUM(wh.quantity) AS total_qty,
+                   SUM(wh.quantity * wh.buy_price) AS total_cost,
+                   MIN(wh.buy_date) AS first_buy_date
+            FROM watchlist_holdings wh
+            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
+            WHERE wl.user_id = :uid
+            GROUP BY wh.ticker
+        """), {"uid": uid}).fetchall()
+
+        if not rows:
+            return []
+
+        tickers = [r[0] for r in rows]
+        ph = ", ".join([f":t{i}" for i in range(len(tickers))])
+        tp = {f"t{i}": t for i, t in enumerate(tickers)}
+
+        meta = {r[0]: r for r in conn.execute(text(f"""
+            SELECT c.ticker, c.company, c.logo_url, c.industry,
+                   f.market_cap
+            FROM companies c
+            LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
+                ON c.ticker = f.ticker
+            WHERE c.ticker IN ({ph})
+        """), tp).fetchall()}
+
+    result = []
+    for r in rows:
+        ticker, total_qty, total_cost, first_buy_date = r
+        avg_price = (total_cost / total_qty) if total_qty else None
+        m = meta.get(ticker)
+        result.append({
+            "ticker": ticker,
+            "company": m[1] if m else None,
+            "logo_url": m[2] if m else None,
+            "industry": m[3] if m else None,
+            "market_cap": int(m[4]) if m and m[4] is not None and not (isinstance(m[4], float) and math.isnan(m[4])) else None,
+            "total_qty": total_qty,
+            "total_cost": round(total_cost, 2) if total_cost is not None else None,
+            "avg_price": round(avg_price, 4) if avg_price is not None else None,
+            "first_buy_date": first_buy_date,
+        })
+    result.sort(key=lambda x: (x["total_cost"] or 0), reverse=True)
+    return result
+
+
 # --- Pipeline ---------------------------------------------------------------
 
 @protected.post("/api/pipeline/run")

@@ -145,3 +145,17 @@ export const getTrades = ({ start, end, market = 'US' } = {}) => {
 
 export const getOpenTrades = (market = 'US') =>
   get(`/trades/open?market=${market}`)
+
+// --- News & analyst changes ------------------------------------------------
+export const getNews = (ticker, limit = 5) =>
+  get(`/news?ticker=${encodeURIComponent(ticker)}&limit=${limit}`)
+
+export const getEarnings = (ticker) =>
+  get(`/earnings?ticker=${encodeURIComponent(ticker)}`)
+
+export const getAnalystChanges = (ticker, limit = 8) =>
+  get(`/analyst-changes?ticker=${encodeURIComponent(ticker)}&limit=${limit}`)
+
+// --- Portfolio -------------------------------------------------------------
+export const getPortfolioHoldings = () =>
+  get('/portfolio/holdings')
