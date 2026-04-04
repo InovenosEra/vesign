@@ -155,7 +155,7 @@ export default function SignalModal({ row, onClose }) {
       <div className="modal-box" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="modal-header" style={{ alignItems: 'flex-start', marginBottom: 0 }}>
+        <div className="modal-header" style={{ alignItems: 'flex-start' }}>
           {row.logo_url
             ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             : null}
@@ -224,29 +224,29 @@ export default function SignalModal({ row, onClose }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        {/* Chart period selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '10px 0 4px', flexWrap: 'wrap' }}>
-          {CHART_PERIODS.map(m => (
-            <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
-              onClick={() => selectPeriod(m)}
-            >{m}M</button>
-          ))}
-          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="date" value={chartStart} max={chartEnd}
-              style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
-              onChange={e => { setChartStart(e.target.value); setActivePeriod(null) }} />
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>→</span>
-            <input type="date" value={chartEnd} min={chartStart} max={today}
-              style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
-              onChange={e => { setChartEnd(e.target.value); setActivePeriod(null) }} />
-          </span>
-        </div>
-
         {/* Chart */}
         {isLoading ? (
           <p className="loading" style={{ padding: 40 }}>{t('modal.loadingChart')}</p>
         ) : (
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden' }}>
+
+            {/* Period selector — overlaid at top of chart, aligned with plot area */}
+            <div style={{ position: 'absolute', top: 8, left: 56, right: 8, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
+              {CHART_PERIODS.map(m => (
+                <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
+                  onClick={() => selectPeriod(m)}
+                >{m}M</button>
+              ))}
+              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="date" value={chartStart} max={chartEnd}
+                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                  onChange={e => { setChartStart(e.target.value); setActivePeriod(null) }} />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>→</span>
+                <input type="date" value={chartEnd} min={chartStart} max={today}
+                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                  onChange={e => { setChartEnd(e.target.value); setActivePeriod(null) }} />
+              </span>
+            </div>
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={chartData} margin={{ top: 70, right: 70, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
