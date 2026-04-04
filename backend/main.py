@@ -1302,14 +1302,14 @@ def portfolio_performance(user=Depends(get_current_user)):
     weeks = [start_date + timedelta(weeks=i) for i in range(53)]
 
     with engine.connect() as conn:
-        # User US holdings
+        # User US holdings — individual lots with buy_date
         user_rows = conn.execute(text("""
-            SELECT wh.ticker, SUM(wh.quantity) AS total_qty,
-                   SUM(wh.quantity * wh.buy_price) AS total_cost
+            SELECT wh.ticker, wh.quantity, wh.buy_price, DATE(wh.buy_date) AS buy_date
             FROM watchlist_holdings wh
             JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
             WHERE wl.user_id = :uid AND wh.ticker NOT LIKE '%.TA'
-            GROUP BY wh.ticker
+              AND wh.quantity > 0
+            ORDER BY wh.buy_date
         """), {"uid": uid}).fetchall()
 
         if not user_rows:
@@ -1345,7 +1345,8 @@ def portfolio_performance(user=Depends(get_current_user)):
         all_tickers = list({r[0] for r in user_rows} | {r[0] for r in signal_rows})
         ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
         tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
-        cutoff_buf = (start_date - timedelta(days=30)).isoformat()
+        # Extra buffer before window for lots bought just before start_date
+        cutoff_buf = (start_date - timedelta(days=60)).isoformat()
 
         price_rows = conn.execute(text(f"""
             SELECT ticker, DATE(date) AS d, close
@@ -1382,31 +1383,37 @@ def portfolio_performance(user=Depends(get_current_user)):
         except Exception:
             pass
 
-    # Compute portfolio BASE VALUE at week 0 (price 52 weeks ago) for true 12M yield
-    base_value = 0.0
-    for ticker, qty, _ in user_rows:
-        if qty is None:
+    # Parse lots with buy dates
+    user_lots = []
+    for ticker, qty, buy_price, buy_date_str in user_rows:
+        if qty is None or buy_price is None:
             continue
-        p = get_price_at(ticker, weeks[0])
-        if p is not None:
-            base_value += float(qty) * p
-    if base_value <= 0:
-        # Fallback: use actual cost basis if no prices available at week 0
-        base_value = sum(float(r[2]) for r in user_rows if r[2] is not None)
+        try:
+            buy_d = _date.fromisoformat(str(buy_date_str)[:10])
+        except Exception:
+            continue
+        # Base price: price at week0 for pre-existing lots, actual buy_price for lots entered within window
+        if buy_d <= weeks[0]:
+            base_p = get_price_at(ticker, weeks[0])
+            if base_p is None:
+                base_p = float(buy_price)  # fallback
+        else:
+            base_p = float(buy_price)
+        user_lots.append((ticker, float(qty), buy_d, base_p))
 
     result = []
     for week_date in weeks:
-        # User portfolio yield vs its value 52 weeks ago (true last-12M performance)
+        # Only include lots purchased by this week; use each lot's own base price
         total_val = 0.0
-        any_price = False
-        for ticker, qty, _ in user_rows:
-            if qty is None:
-                continue
+        total_base = 0.0
+        for ticker, qty, buy_d, base_p in user_lots:
+            if buy_d > week_date:
+                continue  # not yet purchased
             p = get_price_at(ticker, week_date)
             if p is not None:
-                total_val += float(qty) * p
-                any_price = True
-        port_yield = round((total_val / base_value - 1) * 100, 2) if any_price and base_value > 0 else None
+                total_val += qty * p
+                total_base += qty * base_p
+        port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
         # Vesign equal-weight: avg return of all active positions
         active_returns = []
