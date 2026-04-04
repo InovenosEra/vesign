@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
-import { getTrades, getOpenTrades, getPriceHistory } from '../api'
+import { getTrades, getOpenTrades, getPriceHistory, WHITE_BG_LOGOS } from '../api'
 import { useSort } from '../hooks/useSort'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { MarketContext } from '../context/MarketContext'
@@ -194,7 +194,7 @@ function TradeModal({ row, start, end, onClose }) {
         {/* Header */}
         <div className="modal-header" style={{ alignItems: 'flex-start' }}>
           {row.logo_url
-            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
             : null}
           <div className="modal-logo-placeholder" style={{ width: 96, height: 96, flexShrink: 0, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', display: row.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', color: 'var(--text)' }}>
             {row.ticker?.replace(/\.TA$/, '')}
@@ -402,7 +402,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
 
                 return (
                   <tr key={i} className="clickable-row" onClick={() => onSelect(trade)}>
-                    <td>{trade.logo_url ? <img className="logo" src={trade.logo_url} alt="" /> : null}</td>
+                    <td>{trade.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(trade.ticker) ? ' logo-white-bg' : ''}`} src={trade.logo_url} alt="" /> : null}</td>
                     <td><strong>{trade.ticker}</strong></td>
                     <td>{trade.company ?? '—'}</td>
                     <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
@@ -599,7 +599,7 @@ export default function TradesPage() {
                 const winRate = trade.trade_count > 0 ? (trade.win_count / trade.trade_count) * 100 : 0
                 return (
                   <tr key={i} className="clickable-row" onClick={() => setSelected(trade)}>
-                    <td>{trade.logo_url ? <img className="logo" src={trade.logo_url} alt="" /> : null}</td>
+                    <td>{trade.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(trade.ticker) ? ' logo-white-bg' : ''}`} src={trade.logo_url} alt="" /> : null}</td>
                     <td><strong>{trade.ticker}</strong></td>
                     <td>{trade.company ?? '—'}</td>
                     <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>

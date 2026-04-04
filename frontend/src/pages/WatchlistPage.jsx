@@ -6,6 +6,7 @@ import {
   getWatchlistTickers, addTicker, removeTicker,
   getSignalsByTickers, searchTickers,
   getHoldings, addHolding, deleteHolding,
+  WHITE_BG_LOGOS,
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
@@ -350,7 +351,7 @@ export default function WatchlistPage() {
                           }}
                         >
                           {r.logo_url
-                            ? <img src={r.logo_url} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'contain', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+                            ? <img src={r.logo_url} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(r.ticker) ? { background: '#fff', padding: 2 } : {}) }} onError={e => e.target.style.display = 'none'} />
                             : <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 'bold', color: 'var(--muted)' }}>{r.ticker.slice(0, 4)}</div>
                           }
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -488,7 +489,7 @@ export default function WatchlistPage() {
 
                           return [
                             <tr key={row.ticker} className="clickable-row" onClick={() => setSelected(row)}>
-                              <td>{row.logo_url ? <img className="logo" src={row.logo_url} alt="" /> : null}</td>
+                              <td>{row.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(row.ticker) ? ' logo-white-bg' : ''}`} src={row.logo_url} alt="" /> : null}</td>
                               <td style={clip}><strong>{displayTicker(row.ticker)}</strong></td>
                               <td style={clip}>{row.company ?? '—'}</td>
                               <td>{row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'}</td>

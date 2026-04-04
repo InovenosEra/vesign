@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getPriceHistory, getSignalMarkers, getAnalystHistory } from '../api'
+import { getPriceHistory, getSignalMarkers, getAnalystHistory, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -140,7 +140,7 @@ export default function SignalModal({ row, onClose }) {
         {/* Header */}
         <div className="modal-header" style={{ alignItems: 'flex-start' }}>
           {row.logo_url
-            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
             : null}
           <div className="modal-logo-placeholder" style={{
             width: 96, height: 96, flexShrink: 0, borderRadius: 10,

@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getSignalsToday, getSignals } from '../api'
+import { getSignalsToday, getSignals, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
@@ -164,7 +164,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
-            <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
+            <td>{r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
             <td><strong>{displayTicker(r.ticker)}</strong></td>
             <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
             <td>{fmtMktCap(r.market_cap)}</td>
@@ -289,7 +289,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
             {rows.map((r, i) => (
               <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
                 <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
-                <td>{r.logo_url ? <img className="logo" src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
+                <td>{r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
                 <td><strong>{displayTicker(r.ticker)}</strong></td>
                 <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
                 <td>{fmtMktCap(r.market_cap, market)}</td>

@@ -207,6 +207,11 @@ td img.logo {
   object-fit: contain;
   display: block;
 }
+img.logo-white-bg, img.modal-logo-white-bg {
+  background: #fff;
+  padding: 2px;
+  border-radius: 4px;
+}
 
 /* ── Signal badge ── */
 .badge {
