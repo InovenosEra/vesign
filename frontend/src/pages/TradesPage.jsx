@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
-import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
+import { getTrades, getOpenTrades, getPriceHistory, getNews, WHITE_BG_LOGOS } from '../api'
 import { useSort } from '../hooks/useSort'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { MarketContext } from '../context/MarketContext'
@@ -136,12 +136,6 @@ function TradeModal({ row, start, end, onClose }) {
     ? ((history12m.at(-1).close - base12m.close) / base12m.close) * 100
     : null
 
-  const { data: analystHistory = [] } = useQuery({
-    queryKey: ['analyst-history-trade', row.ticker, start, end],
-    queryFn: () => getAnalystHistory(row.ticker, { start, end }),
-    staleTime: 300_000,
-  })
-
   const { data: newsData = [], isLoading: newsLoading } = useQuery({
     queryKey: ['news', row.ticker],
     queryFn: () => getNews(row.ticker, 5),
@@ -149,29 +143,11 @@ function TradeModal({ row, start, end, onClose }) {
     staleTime: 300_000,
   })
 
-  // Merge analyst targets into chart data (forward-fill) + scale prices
-  const analystMap = Object.fromEntries(analystHistory.map(a => [a.date, a]))
-  let lastAnalyst = null
-  const chartData = history.map(d => {
-    if (analystMap[d.date]) lastAnalyst = analystMap[d.date]
-    const scaled = { ...d, close: d.close / priceScale }
-    if (!lastAnalyst) return scaled
-    return {
-      ...scaled,
-      target_low:  lastAnalyst.target_low_price  != null ? lastAnalyst.target_low_price  / priceScale : undefined,
-      target_mean: lastAnalyst.target_mean_price != null ? lastAnalyst.target_mean_price / priceScale : undefined,
-      target_high: lastAnalyst.target_high_price != null ? lastAnalyst.target_high_price / priceScale : undefined,
-    }
-  })
+  // Scale prices for IL (agorot → ₪)
+  const chartData = history.map(d => ({ ...d, close: d.close / priceScale }))
 
-  const hasTargets = chartData.some(d => d.target_high != null)
-  const allPrices  = [
-    ...chartData.map(d => d.close),
-    ...(hasTargets ? chartData.filter(d => d.target_low  != null).map(d => d.target_low)  : []),
-    ...(hasTargets ? chartData.filter(d => d.target_high != null).map(d => d.target_high) : []),
-  ]
-  const minPrice = allPrices.length ? Math.min(...allPrices) * 0.97 : 0
-  const maxPrice = allPrices.length ? Math.max(...allPrices) * 1.03 : 0
+  const minPrice = chartData.length ? Math.min(...chartData.map(d => d.close)) * 0.97 : 0
+  const maxPrice = chartData.length ? Math.max(...chartData.map(d => d.close)) * 1.03 : 0
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -355,22 +331,9 @@ function TradeModal({ row, start, end, onClose }) {
                   labelStyle={{ color: 'var(--muted)' }}
                   itemStyle={{ color: 'var(--text)' }}
                   labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={(v, name) => {
-                    const labels = {
-                      close: t('modal.chartClose'),
-                      target_low: t('modal.chartTargetLow'),
-                      target_mean: t('modal.chartTargetBase'),
-                      target_high: t('modal.chartTargetHigh'),
-                    }
-                    return [v != null ? `${currency}${v.toFixed(2)}` : '—', labels[name] || name]
-                  }}
+                  formatter={v => [`${currency}${v.toFixed(2)}`, t('modal.chartClose')]}
                 />
                 <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} name="close" />
-                {hasTargets && <>
-                  <Line type="stepAfter" dataKey="target_low"  stroke="#e74c3c" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_low"  connectNulls={false} />
-                  <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
-                  <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_high" connectNulls={false} />
-                </>}
               </LineChart>
             </ResponsiveContainer>
 
@@ -435,11 +398,6 @@ function TradeModal({ row, start, end, onClose }) {
                 { color: 'var(--accent)', dash: false, label: t('modal.chartClose') },
                 { color: 'var(--green)', dash: false, vertical: true, label: t('modal.legendBuy') },
                 { color: 'var(--red)',   dash: false, vertical: true, label: t('modal.legendSell') },
-                ...(hasTargets ? [
-                  { color: '#2ecc71', dash: true, label: t('modal.chartTargetHigh') },
-                  { color: '#f39c12', dash: true, label: t('modal.chartTargetBase') },
-                  { color: '#e74c3c', dash: true, label: t('modal.chartTargetLow') },
-                ] : []),
               ].map(({ color, dash, vertical, label }) => (
                 <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   {vertical
