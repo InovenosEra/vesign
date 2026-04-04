@@ -1307,16 +1307,19 @@ def portfolio_performance(user=Depends(get_current_user)):
         if not user_rows:
             return []
 
-        # Vesign: all closed trades from trade_log in the 52-week window
+        # Vesign: in-window trades (bought within the 52-week window) for position tracking
         trade_log_rows = conn.execute(text("""
-            SELECT DATE(sell_date) AS sell_date, return_pct
+            SELECT ticker, DATE(buy_date) AS buy_date, DATE(sell_date) AS sell_date,
+                   buy_price, return_pct
             FROM trade_log
-            WHERE DATE(sell_date) >= :start AND ticker NOT LIKE '%.TA'
-              AND sell_date IS NOT NULL AND return_pct IS NOT NULL
-            ORDER BY sell_date
+            WHERE DATE(buy_date) >= :start AND DATE(sell_date) >= :start
+              AND ticker NOT LIKE '%.TA'
+              AND sell_date IS NOT NULL AND return_pct IS NOT NULL AND buy_price IS NOT NULL
+            ORDER BY buy_date
         """), {"start": start_date.isoformat()}).fetchall()
 
-        all_tickers = list({r[0] for r in user_rows})
+        vesign_tickers = list({r[0] for r in trade_log_rows})
+        all_tickers = list({r[0] for r in user_rows} | set(vesign_tickers))
         ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
         tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
         # Extra buffer before window for lots bought just before start_date
@@ -1343,13 +1346,20 @@ def portfolio_performance(user=Depends(get_current_user)):
                 return close
         return None
 
-    # Pre-parse trade_log rows for Vesign series
-    trade_by_sell = []
-    for sd_str, rp in trade_log_rows:
+    # Pre-parse Vesign trades for equal-weight portfolio simulation
+    vesign_trades = []
+    for ticker, buy_d_str, sell_d_str, buy_price, return_pct in trade_log_rows:
         try:
-            trade_by_sell.append((_date.fromisoformat(str(sd_str)[:10]), float(rp)))
+            vesign_trades.append((
+                ticker,
+                _date.fromisoformat(str(buy_d_str)[:10]),
+                _date.fromisoformat(str(sell_d_str)[:10]),
+                float(buy_price),
+                float(return_pct),
+            ))
         except Exception:
             pass
+    N_vesign = len(vesign_trades)
 
     # Parse lots with buy dates
     user_lots = []
@@ -1383,9 +1393,23 @@ def portfolio_performance(user=Depends(get_current_user)):
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        # Vesign: running avg of all closed trades up to this week (matches What-If box)
-        closed_returns = [rp * 100 for sd, rp in trade_by_sell if sd <= week_date]
-        vesign_yield = round(sum(closed_returns) / len(closed_returns), 2) if closed_returns else None
+        # Vesign equal-weight portfolio: each trade contributes 0% until its buy_date,
+        # then tracks return until sell_date (or live price if still open at this week).
+        # Divides by N_vesign (total positions) so un-started positions count as cash (0%).
+        if N_vesign > 0:
+            total_v = 0.0
+            for v_ticker, buy_d, sell_d, buy_price, return_pct in vesign_trades:
+                if buy_d > week_date:
+                    pass  # not yet started → 0% contribution (cash)
+                elif sell_d <= week_date:
+                    total_v += return_pct * 100  # closed → use stored return
+                else:
+                    p = get_price_at(v_ticker, week_date)
+                    if p is not None:
+                        total_v += (p / buy_price - 1) * 100  # open → live price return
+            vesign_yield = round(total_v / N_vesign, 2)
+        else:
+            vesign_yield = None
 
         result.append({"week": week_date.isoformat(), "portfolio": port_yield, "vesign": vesign_yield})
 
