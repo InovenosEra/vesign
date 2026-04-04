@@ -158,6 +158,11 @@ function TradeModal({ row, start, end, onClose }) {
   // Scale prices for IL (agorot → ₪)
   const chartData = history.map(d => ({ ...d, close: d.close / priceScale }))
 
+  const basePeriod  = chartData.filter(d => d.date <= chartStart).at(-1) ?? chartData[0]
+  const yieldPeriod = basePeriod && chartData.length > 0
+    ? ((chartData.at(-1).close - basePeriod.close) / basePeriod.close) * 100
+    : null
+
   const minPrice = chartData.length ? Math.min(...chartData.map(d => d.close)) * 0.97 : 0
   const maxPrice = chartData.length ? Math.max(...chartData.map(d => d.close)) * 1.03 : 0
 
@@ -251,8 +256,8 @@ function TradeModal({ row, start, end, onClose }) {
                     [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
                     [t('modal.currentSignal'), row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
                     [t('modal.currentPrice'),  history12m.length > 0 ? fmt(history12m.at(-1).close / (isIL ? 100 : 1)) : '—'],
-                    [t('modal.yield12mOrganic'), yield12m != null ? <span className={yield12m >= 0 ? 'up' : 'down'}>{yield12m >= 0 ? '+' : ''}{fmt(yield12m)}%</span> : '—'],
-                    ...(row.unrealized_pct == null ? [[t('modal.yield12mVesign'), row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
+                    [activePeriod ? `${t('modal.yieldPeriod', { months: activePeriod })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
+                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { months: activePeriod })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
                     ...(row.unrealized_pct != null ? [[t('modal.yieldSinceBuy'), <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
