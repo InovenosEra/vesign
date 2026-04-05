@@ -636,8 +636,20 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   align-self: stretch; min-height: 320px;
 }
 @media (max-width: 860px) {
-  .login-branding-panel { display: none; }
   .login-divider { display: none; }
+  .login-branding-panel { width: 100%; justify-content: center; }
+  .login-branding-panel > div {
+    padding: 28px 20px 8px !important;
+    max-width: 100% !important;
+    align-items: center;
+    text-align: center;
+  }
+  .login-branding-panel > div p:first-child { margin-bottom: 12px !important; }
+  .login-branding-panel > div p:nth-child(2) {
+    font-size: 14px !important;
+    margin-bottom: 20px !important;
+  }
+  .login-branding-panel > div > div { margin-bottom: 16px !important; gap: 10px !important; }
 }
 
 /* ── RTL (Hebrew) layout ── */

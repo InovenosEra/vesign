@@ -382,7 +382,7 @@ export default function LoginPage() {
 
       <div style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 64, padding: '40px 24px', flexWrap: 'wrap',
+        gap: 32, padding: '40px 24px', flexWrap: 'wrap',
       }}>
 
         {/* Left: branding info — hidden on small screens via inline style trick */}
