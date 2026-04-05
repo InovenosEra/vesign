@@ -31,7 +31,6 @@ body::before {
   top: -15%; left: -10%;
   width: 60%; height: 60%;
   background: radial-gradient(ellipse, rgba(45,147,204,0.15) 0%, transparent 65%);
-  animation: floatOrb1 20s ease-in-out infinite alternate;
   pointer-events: none;
   z-index: 0;
 }
@@ -41,7 +40,6 @@ body::after {
   bottom: -15%; right: -8%;
   width: 50%; height: 50%;
   background: radial-gradient(ellipse, rgba(83,229,239,0.09) 0%, transparent 65%);
-  animation: floatOrb2 25s ease-in-out infinite alternate;
   pointer-events: none;
   z-index: 0;
 }
@@ -677,14 +675,6 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
 
 /* landing-bg: just ensures content sits above body orbs */
 .landing-bg { position: relative; }
-@keyframes floatOrb1 {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(3%, 3%) scale(1.05); }
-}
-@keyframes floatOrb2 {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-3%, -3%) scale(1.05); }
-}
 
 /* CTA buttons */
 .landing-btn-primary {
