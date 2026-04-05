@@ -223,8 +223,12 @@
   "landing.statAvgYield": "Avg. yield per trade",
   "landing.statStocks": "Stocks scanned daily",
   "login.pitch": "An investment research platform that identifies high-conviction buy and sell opportunities in US and Israeli markets every trading day.",
+  "login.featuresLabel": "What you get",
+  "login.feature1Title": "Daily Signals",
   "login.feature1": "Daily buy & sell signals across thousands of stocks",
+  "login.feature2Title": "Trade Analytics",
   "login.feature2": "Full trade history with win rates and yields",
+  "login.feature3Title": "Portfolio Tracking",
   "login.feature3": "Portfolio tracking with real-time P&L",
   "login.learnMore": "Learn more about Vesign",
 

@@ -19,9 +19,9 @@ const inputStyle = {
 }
 
 const FEATURES = [
-  { icon: '📊', key: 'login.feature1' },
-  { icon: '📈', key: 'login.feature2' },
-  { icon: '💼', key: 'login.feature3' },
+  { icon: '📊', titleKey: 'login.feature1Title', key: 'login.feature1', rgb: '83,229,239' },
+  { icon: '📈', titleKey: 'login.feature2Title', key: 'login.feature2', rgb: '45,147,204' },
+  { icon: '💼', titleKey: 'login.feature3Title', key: 'login.feature3', rgb: '79,142,247' },
 ]
 
 const STATS = [
@@ -360,25 +360,47 @@ function LandingContent({ onSignIn, onRequest }) {
 
       {/* Feature cards */}
       <section style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        gap: 20,
-        padding: 'clamp(40px, 6vw, 72px) clamp(20px, 5vw, 72px)',
+        padding: 'clamp(16px, 3vw, 32px) clamp(20px, 5vw, 72px) clamp(40px, 6vw, 72px)',
         maxWidth: 1100, margin: '0 auto', width: '100%',
         boxSizing: 'border-box', position: 'relative', zIndex: 1,
       }}>
-        {FEATURES.map((f, i) => (
-          <div key={f.key} className={`feature-card feature-card-${i}`} style={{
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 14, padding: '32px 28px',
-          }}>
-            <div style={{ fontSize: 36, marginBottom: 16 }}>{f.icon}</div>
-            <p style={{ margin: 0, fontSize: 15, color: 'rgba(220,230,245,0.9)', fontWeight: 500, lineHeight: 1.6 }}>
-              {t(f.key)}
-            </p>
-          </div>
-        ))}
+        <p style={{
+          textAlign: 'center', margin: '0 0 36px',
+          fontSize: 11, fontWeight: 700, letterSpacing: '0.28em',
+          textTransform: 'uppercase', color: 'rgba(83,229,239,0.55)',
+        }}>
+          {t('login.featuresLabel')}
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 24,
+        }}>
+          {FEATURES.map((f, i) => (
+            <div key={f.key} className={`feature-card feature-card-${i}`} style={{
+              background: 'rgba(12,16,30,0.75)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 18, padding: '36px 30px',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 14, fontSize: 26,
+                background: `rgba(${f.rgb},0.1)`,
+                border: `1px solid rgba(${f.rgb},0.28)`,
+                boxShadow: `0 0 20px rgba(${f.rgb},0.18)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {f.icon}
+              </div>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#e8eaf0', lineHeight: 1.2 }}>
+                {t(f.titleKey)}
+              </h3>
+              <p style={{ margin: 0, fontSize: 14, color: 'rgba(180,195,220,0.65)', lineHeight: 1.7 }}>
+                {t(f.key)}
+              </p>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Learn more */}

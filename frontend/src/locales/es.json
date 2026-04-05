@@ -211,8 +211,12 @@
   "landing.statAvgYield": "Rendimiento prom. por operación",
   "landing.statStocks": "Acciones escaneadas diariamente",
   "login.pitch": "Una plataforma de investigación de inversiones que identifica oportunidades de compra y venta de alta convicción en los mercados de EE. UU. e Israel cada día de operaciones.",
+  "login.featuresLabel": "Lo que obtienes",
+  "login.feature1Title": "Señales Diarias",
   "login.feature1": "Señales diarias de compra y venta en miles de acciones",
+  "login.feature2Title": "Análisis de Operaciones",
   "login.feature2": "Historial completo de operaciones con tasas de acierto y rendimientos",
+  "login.feature3Title": "Seguimiento de Cartera",
   "login.feature3": "Seguimiento de cartera con P&L en tiempo real",
   "login.learnMore": "Saber más sobre Vesign",
 

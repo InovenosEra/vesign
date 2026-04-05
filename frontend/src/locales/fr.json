@@ -211,8 +211,12 @@
   "landing.statAvgYield": "Rendement moy. par transaction",
   "landing.statStocks": "Actions analysées par jour",
   "login.pitch": "Une plateforme de recherche en investissement qui identifie chaque jour de bourse les opportunités d'achat et de vente à forte conviction sur les marchés américains et israéliens.",
+  "login.featuresLabel": "Ce que vous obtenez",
+  "login.feature1Title": "Signaux Quotidiens",
   "login.feature1": "Signaux d'achat et de vente quotidiens sur des milliers d'actions",
+  "login.feature2Title": "Analyse des Transactions",
   "login.feature2": "Historique complet des transactions avec taux de réussite et rendements",
+  "login.feature3Title": "Suivi de Portefeuille",
   "login.feature3": "Suivi de portefeuille avec P&L en temps réel",
   "login.learnMore": "En savoir plus sur Vesign",
 
