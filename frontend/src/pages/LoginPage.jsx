@@ -55,7 +55,7 @@ function SlimHeader() {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
       background: 'rgba(11,14,24,0.85)', backdropFilter: 'blur(10px)',
-      position: 'sticky', top: 0, zIndex: 10,
+      position: 'sticky', top: 0, zIndex: 10, direction: 'ltr',
     }}>
       <h1 style={{
         display: 'flex', alignItems: 'center', gap: 2,
