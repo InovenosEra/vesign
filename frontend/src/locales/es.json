@@ -242,5 +242,11 @@
   "agreement.back": "Volver a iniciar sesión",
 
   "about.signIn": "Iniciar sesión",
-  "about.goToDashboard": "Ir al panel"
+  "about.goToDashboard": "Ir al panel",
+  "about.heroTagline": "Acerca de",
+  "about.heroHeadline": "Nosotros traemos la señal. Tú tomas la decisión.",
+  "about.dimension1": "Acción del precio",
+  "about.dimension2": "Sentimiento del mercado",
+  "about.dimension3": "Salud de la empresa",
+  "about.dimension4": "Consenso de analistas"
 }

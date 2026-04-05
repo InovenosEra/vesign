@@ -242,5 +242,11 @@
   "agreement.back": "חזרה להתחברות",
 
   "about.signIn": "התחברות",
-  "about.goToDashboard": "עבור ללוח הבקרה"
+  "about.goToDashboard": "עבור ללוח הבקרה",
+  "about.heroTagline": "אודות",
+  "about.heroHeadline": "אנחנו מביאים את האיתות. אתה מקבל את ההחלטה.",
+  "about.dimension1": "פעולת מחיר",
+  "about.dimension2": "סנטימנט שוק",
+  "about.dimension3": "בריאות החברה",
+  "about.dimension4": "קונצנזוס אנליסטים"
 }

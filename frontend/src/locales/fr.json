@@ -242,5 +242,11 @@
   "agreement.back": "Retour à la connexion",
 
   "about.signIn": "Se connecter",
-  "about.goToDashboard": "Aller au tableau de bord"
+  "about.goToDashboard": "Aller au tableau de bord",
+  "about.heroTagline": "À propos",
+  "about.heroHeadline": "Nous apportons le signal. Vous prenez la décision.",
+  "about.dimension1": "Action des prix",
+  "about.dimension2": "Sentiment du marché",
+  "about.dimension3": "Santé de l'entreprise",
+  "about.dimension4": "Consensus des analystes"
 }

@@ -254,5 +254,11 @@
   "agreement.back": "Back to Sign In",
 
   "about.signIn": "Sign In",
-  "about.goToDashboard": "Go to Dashboard"
+  "about.goToDashboard": "Go to Dashboard",
+  "about.heroTagline": "About Us",
+  "about.heroHeadline": "We bring the signal. You make the move.",
+  "about.dimension1": "Price Action",
+  "about.dimension2": "Market Sentiment",
+  "about.dimension3": "Company Health",
+  "about.dimension4": "Analyst Consensus"
 }
