@@ -67,12 +67,12 @@ const LANGUAGES = [
 ]
 
 export function LanguageSwitcher() {
-  const [currentLang, setCurrentLang] = useState(localStorage.getItem('lang') || 'en')
+  const { i18n: i18nInstance } = useTranslation()
+  const currentLang = i18nInstance.language
 
   function switchLang(code) {
-    i18n.changeLanguage(code)
+    i18nInstance.changeLanguage(code)
     localStorage.setItem('lang', code)
-    setCurrentLang(code)
     document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
     document.documentElement.lang = code
   }
@@ -103,7 +103,8 @@ export function LanguageSwitcher() {
 }
 
 function LanguageSwitcherDropdown() {
-  const [currentLang, setCurrentLang] = useState(localStorage.getItem('lang') || 'en')
+  const { i18n: i18nInstance } = useTranslation()
+  const currentLang = i18nInstance.language
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -116,9 +117,8 @@ function LanguageSwitcherDropdown() {
   }, [])
 
   function switchLang(code) {
-    i18n.changeLanguage(code)
+    i18nInstance.changeLanguage(code)
     localStorage.setItem('lang', code)
-    setCurrentLang(code)
     document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
     document.documentElement.lang = code
     setOpen(false)
@@ -421,7 +421,7 @@ function Header() {
             {LANGUAGES.map(lang => (
               <button
                 key={lang.code}
-                className={`mobile-lang-btn${(localStorage.getItem('lang') || 'en') === lang.code ? ' active' : ''}`}
+                className={`mobile-lang-btn${i18n.language === lang.code ? ' active' : ''}`}
                 onClick={() => {
                   i18n.changeLanguage(lang.code)
                   localStorage.setItem('lang', lang.code)
