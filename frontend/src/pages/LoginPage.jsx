@@ -25,10 +25,10 @@ const FEATURES = [
 ]
 
 const STATS = [
-  { display: '4,200+', labelKey: 'landing.statSignals' },
-  { display: '67%',    labelKey: 'landing.statWinRate'  },
-  { display: '+12.4%', labelKey: 'landing.statAvgYield' },
-  { display: '5,000+', labelKey: 'landing.statStocks'   },
+  { display: '1,500+', labelKey: 'landing.statStocks'   },
+  { display: '500+',   labelKey: 'landing.statSignals'  },
+  { display: '90%+',   labelKey: 'landing.statWinRate'  },
+  { display: '+24%',   labelKey: 'landing.statAvgYield' },
 ]
 
 const AGREEMENT_SECTION_KEYS = [
