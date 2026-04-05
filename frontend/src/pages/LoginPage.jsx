@@ -400,7 +400,7 @@ export default function LoginPage() {
   const [modal, setModal] = useState(null) // null | 'signin' | 'request'
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column', paddingTop: 60 }}>
       <PublicHeader />
       <LandingContent
         onSignIn={() => setModal('signin')}

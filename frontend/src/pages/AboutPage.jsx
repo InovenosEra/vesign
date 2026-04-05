@@ -130,7 +130,7 @@ export default function AboutPage({ standalone = false }) {
 
   if (standalone) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
+      <div style={{ minHeight: '100vh', background: 'transparent', color: 'var(--text)', paddingTop: 60 }}>
         <PublicHeader />
         <AboutContent standalone />
         <Footer />

@@ -170,7 +170,7 @@ export default function ContactPage({ standalone = false }) {
 
   if (standalone) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ minHeight: '100vh', background: 'transparent', color: 'var(--text)', display: 'flex', flexDirection: 'column', paddingTop: 60 }}>
         <PublicHeader />
         <div style={{ flex: 1 }}>
           <ContactContent standalone />
