@@ -204,6 +204,8 @@
   "about.howTitle": "Notre approche d'analyse",
   "about.howDesc": "Vesign évalue les actions simultanément selon plusieurs dimensions : l'action des prix, le sentiment du marché, la santé financière de l'entreprise et le consensus des analystes. Seules les actions qui répondent à tous les critères à la fois sont mises en avant — afin que la liste des signaux reste ciblée et exploitable.",
   "about.disclaimer": "Vesign est un outil de recherche et d'aide à la décision uniquement. Il ne constitue pas un conseil en investissement financier, et rien sur cette plateforme ne doit être interprété comme une recommandation d'achat ou de vente de titres. Vesign n'assume aucune responsabilité quant aux décisions d'investissement prises par les utilisateurs sur la base des informations ou signaux fournis. Les performances passées des signaux ne préjugent pas des résultats futurs. Effectuez toujours vos propres vérifications et consultez un conseiller financier qualifié avant d'investir.",
+  "login.welcome": "Bienvenue sur Vesign",
+  "login.aboutUs": "À propos de nous",
   "login.pitch": "Une plateforme de recherche en investissement qui identifie chaque jour de bourse les opportunités d'achat et de vente à forte conviction sur les marchés américains et israéliens.",
   "login.feature1": "Signaux d'achat et de vente quotidiens sur des milliers d'actions",
   "login.feature2": "Historique complet des transactions avec taux de réussite et rendements",

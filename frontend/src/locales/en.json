@@ -216,6 +216,8 @@
   "about.howTitle": "How We Analyze",
   "about.howDesc": "Vesign evaluates stocks across multiple dimensions simultaneously: price action, market sentiment, company financial health, and analyst consensus. Only stocks that meet all criteria at once are surfaced — keeping the signal list focused and actionable.",
   "about.disclaimer": "Vesign is a research and decision-support tool only. It does not constitute financial advice, and nothing on this platform should be interpreted as a recommendation to buy or sell any security. Vesign bears no responsibility for any investment decisions made by users based on the information or signals provided. Past signal performance is not indicative of future results. Always conduct your own due diligence and consult a qualified financial advisor before investing.",
+  "login.welcome": "Welcome to Vesign",
+  "login.aboutUs": "About us",
   "login.pitch": "An investment research platform that identifies high-conviction buy and sell opportunities in US and Israeli markets every trading day.",
   "login.feature1": "Daily buy & sell signals across thousands of stocks",
   "login.feature2": "Full trade history with win rates and yields",

@@ -317,6 +317,13 @@ function BrandingPanel() {
       flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
       padding: '60px 56px', maxWidth: 520,
     }}>
+      {/* Welcome title */}
+      <h2 style={{
+        fontSize: 28, fontWeight: 700, margin: '0 0 16px', color: 'var(--text)',
+      }}>
+        {t('login.welcome')}
+      </h2>
+
       {/* Sub-brand */}
       <p style={{
         fontSize: 16, fontWeight: 700, letterSpacing: '0.15em',
@@ -324,7 +331,7 @@ function BrandingPanel() {
         background: 'linear-gradient(180deg, #53e5ef 0%, #2d93cc 55%, #2262a8 100%)',
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
       }}>
-        {t('nav.about')}
+        {t('login.aboutUs')}
       </p>
 
       {/* Pitch */}
