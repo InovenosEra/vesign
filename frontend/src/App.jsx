@@ -434,7 +434,9 @@ export function PublicHeader() {
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-      background: 'transparent', direction: 'ltr',
+      background: 'radial-gradient(ellipse 100% 80% at 0% 0%, rgba(45,147,204,0.16) 0%, transparent 100%), radial-gradient(ellipse 80% 80% at 100% 100%, rgba(83,229,239,0.09) 0%, transparent 100%), #0b0e18',
+      backgroundAttachment: 'fixed',
+      direction: 'ltr',
     }}>
       <Link to="/" style={{ textDecoration: 'none' }}>
         <h1 style={{
