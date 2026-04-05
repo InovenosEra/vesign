@@ -321,7 +321,6 @@ function Header() {
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="header-market-status-wrap"><MarketStatus /></span>
-          <Link to="/contact" className="header-contact-link">{t('nav.contact')}</Link>
           <FlagSelector />
           <span className="lang-switcher-header"><LanguageSwitcher /></span>
           <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
