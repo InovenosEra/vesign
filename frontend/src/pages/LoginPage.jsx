@@ -19,9 +19,35 @@ const inputStyle = {
 }
 
 const FEATURES = [
-  { icon: '📊', titleKey: 'login.feature1Title', key: 'login.feature1', rgb: '83,229,239' },
-  { icon: '📈', titleKey: 'login.feature2Title', key: 'login.feature2', rgb: '45,147,204' },
-  { icon: '💼', titleKey: 'login.feature3Title', key: 'login.feature3', rgb: '79,142,247' },
+  {
+    Icon: ({ color }) => (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <rect x="2" y="12" width="5" height="10" rx="1.5" fill={color} fillOpacity="0.5"/>
+        <rect x="9.5" y="7" width="5" height="15" rx="1.5" fill={color}/>
+        <rect x="17" y="3" width="5" height="19" rx="1.5" fill={color} fillOpacity="0.75"/>
+      </svg>
+    ),
+    titleKey: 'login.feature1Title', key: 'login.feature1', rgb: '83,229,239',
+  },
+  {
+    Icon: ({ color }) => (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <path d="M3 17L9 11L13 15L21 7" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M16 7H21V12" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+    titleKey: 'login.feature2Title', key: 'login.feature2', rgb: '45,147,204',
+  },
+  {
+    Icon: ({ color }) => (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" strokeOpacity="0.4"/>
+        <path d="M12 3C16.97 3 21 7.03 21 12H12V3Z" fill={color} fillOpacity="0.8"/>
+        <path d="M12 3C16.97 3 21 7.03 21 12H12V3Z" stroke={color} strokeWidth="1.5"/>
+      </svg>
+    ),
+    titleKey: 'login.feature3Title', key: 'login.feature3', rgb: '79,142,247',
+  },
 ]
 
 const STATS = [
@@ -384,13 +410,13 @@ function LandingContent({ onSignIn, onRequest }) {
               display: 'flex', flexDirection: 'column', gap: 16,
             }}>
               <div style={{
-                width: 56, height: 56, borderRadius: 14, fontSize: 26,
+                width: 56, height: 56, borderRadius: 14,
                 background: `rgba(${f.rgb},0.1)`,
                 border: `1px solid rgba(${f.rgb},0.28)`,
                 boxShadow: `0 0 20px rgba(${f.rgb},0.18)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {f.icon}
+                <f.Icon color={`rgb(${f.rgb})`} />
               </div>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#e8eaf0', lineHeight: 1.2 }}>
                 {t(f.titleKey)}
