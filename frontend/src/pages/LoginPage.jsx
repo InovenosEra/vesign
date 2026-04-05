@@ -54,7 +54,7 @@ function Modal({ onClose, children }) {
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
-        background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+        background: 'rgba(5,8,18,0.55)', backdropFilter: 'blur(8px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
@@ -114,15 +114,14 @@ function SignInForm({ onRequestAccess }) {
         <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={inputStyle} />
       </div>
       <ErrorBox msg={error} />
-      <button type="submit" disabled={loading} style={{
-        marginTop: 4, padding: '13px', background: 'var(--accent, #2d93cc)',
-        color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 16,
-        cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+      <button type="submit" disabled={loading} className="landing-btn-primary" style={{
+        marginTop: 4, width: '100%', opacity: loading ? 0.7 : 1,
+        cursor: loading ? 'not-allowed' : 'pointer',
       }}>
         {loading ? t('login.signingIn') : t('login.signIn')}
       </button>
       <button type="button" onClick={onRequestAccess} style={{
-        background: 'transparent', border: 'none', color: 'var(--text-muted, #999)',
+        background: 'transparent', border: 'none', color: '#53e5ef',
         fontSize: 14, cursor: 'pointer', textDecoration: 'underline', padding: 0,
       }}>
         {t('login.requestAccess')}
