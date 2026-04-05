@@ -392,7 +392,7 @@ function LandingContent({ onSignIn, onRequest }) {
       }}>
         <p style={{
           textAlign: 'center', margin: '0 0 36px',
-          fontSize: 11, fontWeight: 700, letterSpacing: '0.28em',
+          fontSize: 13, fontWeight: 700, letterSpacing: '0.28em',
           textTransform: 'uppercase', color: 'rgba(83,229,239,0.55)',
         }}>
           {t('login.featuresLabel')}
