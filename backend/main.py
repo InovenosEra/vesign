@@ -112,9 +112,9 @@ def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
     pdf.set_draw_color(180, 180, 200)
     pdf.rect(20, pdf.get_y(), 170, 22, style="FD")
     pdf.set_xy(24, pdf.get_y() + 3)
-    pdf.cell(0, 6, f"Name:      {name}", ln=True)
+    pdf.multi_cell(162, 6, f"Name:      {name}")
     pdf.set_x(24)
-    pdf.cell(0, 6, f"Email:       {email}", ln=True)
+    pdf.multi_cell(162, 6, f"Email:       {email}")
     pdf.ln(6)
 
     # Agreement body
@@ -136,10 +136,10 @@ def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
     pdf.line(20, pdf.get_y(), 190, pdf.get_y())
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, f"Digitally signed by: {name}", ln=True)
+    pdf.multi_cell(0, 7, f"Digitally signed by: {name}")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Date & Time: {agreed_at} (UTC)", ln=True)
-    pdf.cell(0, 6, f"Email: {email}", ln=True)
+    pdf.multi_cell(0, 6, f"Date & Time: {agreed_at} (UTC)")
+    pdf.multi_cell(0, 6, f"Email: {email}")
     pdf.ln(4)
     pdf.set_font("Helvetica", "I", 9)
     pdf.set_text_color(120, 120, 120)
@@ -168,11 +168,14 @@ def _send_access_request_email(requester_email: str, message: str,
             "text": body,
         }
         if agreement_name and agreed_at:
-            pdf_bytes = _generate_agreement_pdf(agreement_name, requester_email, agreed_at)
-            payload["attachments"] = [{
-                "filename": "vesign-terms-agreement.pdf",
-                "content": base64.b64encode(pdf_bytes).decode(),
-            }]
+            try:
+                pdf_bytes = _generate_agreement_pdf(agreement_name, requester_email, agreed_at)
+                payload["attachments"] = [{
+                    "filename": "vesign-terms-agreement.pdf",
+                    "content": base64.b64encode(pdf_bytes).decode(),
+                }]
+            except Exception as pdf_exc:
+                print(f"[email] PDF generation failed (sending without attachment): {pdf_exc}")
         resp = requests.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
