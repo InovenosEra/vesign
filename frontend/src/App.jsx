@@ -62,6 +62,8 @@ const LANGUAGES = [
   { code: 'he', label: 'HE', flag: '🇮🇱' },
   { code: 'es', label: 'ES', flag: '🇪🇸' },
   { code: 'fr', label: 'FR', flag: '🇫🇷' },
+  { code: 'de', label: 'DE', flag: '🇩🇪' },
+  { code: 'it', label: 'IT', flag: '🇮🇹' },
 ]
 
 export function LanguageSwitcher() {
