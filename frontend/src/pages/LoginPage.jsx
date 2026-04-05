@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { requestAccess } from '../api'
 import { Footer, LanguageSwitcher } from '../App'
 
+// ── Shared ────────────────────────────────────────────────────────────────────
 const inputStyle = {
   padding: '12px 14px',
   background: 'var(--bg)',
@@ -17,36 +18,26 @@ const inputStyle = {
   boxSizing: 'border-box',
 }
 
-const cardStyle = {
-  background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: 12,
-  padding: '48px 56px',
-  width: 420,
-  flexShrink: 0,
-  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-}
-
 const FEATURES = [
   { icon: '📊', key: 'login.feature1' },
   { icon: '📈', key: 'login.feature2' },
   { icon: '💼', key: 'login.feature3' },
 ]
 
-function Logo() {
-  return (
-    <div style={{ textAlign: 'center', marginBottom: 32 }}>
-      <h1 style={{
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        gap: 2, fontWeight: 900, fontSize: '2.4rem', letterSpacing: '0.08em',
-        fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0,
-      }}>
-        <img src="/favicon.png" alt="V" style={{ height: '2.8rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0,210,255,0.6))' }} />
-        <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
-      </h1>
-    </div>
-  )
-}
+const STATS = [
+  { display: '4,200+', labelKey: 'landing.statSignals' },
+  { display: '67%',    labelKey: 'landing.statWinRate'  },
+  { display: '+12.4%', labelKey: 'landing.statAvgYield' },
+  { display: '5,000+', labelKey: 'landing.statStocks'   },
+]
+
+const AGREEMENT_SECTION_KEYS = [
+  { titleKey: 'agreement.s1title', bodyKey: 'agreement.s1body' },
+  { titleKey: 'agreement.s2title', bodyKey: 'agreement.s2body' },
+  { titleKey: 'agreement.s3title', bodyKey: 'agreement.s3body' },
+  { titleKey: 'agreement.s4title', bodyKey: 'agreement.s4body' },
+  { titleKey: 'agreement.s5title', bodyKey: 'agreement.s5body' },
+]
 
 function ErrorBox({ msg }) {
   if (!msg) return null
@@ -57,9 +48,51 @@ function ErrorBox({ msg }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Sign-in form
-// ---------------------------------------------------------------------------
+// ── Slim header ───────────────────────────────────────────────────────────────
+function SlimHeader() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+      background: 'rgba(11,14,24,0.85)', backdropFilter: 'blur(10px)',
+      position: 'sticky', top: 0, zIndex: 10,
+    }}>
+      <h1 style={{
+        display: 'flex', alignItems: 'center', gap: 2,
+        fontWeight: 900, fontSize: '2rem', letterSpacing: '0.08em',
+        fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, direction: 'ltr',
+      }}>
+        <img src="/favicon.png" alt="V" style={{ height: '2.4rem', objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,210,255,0.7))' }} />
+        <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
+      </h1>
+      <LanguageSwitcher />
+    </div>
+  )
+}
+
+// ── Modal overlay ─────────────────────────────────────────────────────────────
+function Modal({ onClose, children }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 14, padding: '44px 48px', width: '100%', maxWidth: 440,
+        boxShadow: '0 24px 80px rgba(0,0,0,0.7)', maxHeight: '90vh', overflowY: 'auto',
+      }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ── Sign-in form ──────────────────────────────────────────────────────────────
 function SignInForm({ onRequestAccess }) {
   const { t } = useTranslation()
   const clerk = useClerk()
@@ -90,26 +123,29 @@ function SignInForm({ onRequestAccess }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
+        {t('login.signIn')}
+      </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontSize: 15, color: 'var(--text-muted, #999)' }}>{t('login.email')}</label>
+        <label style={{ fontSize: 14, color: 'var(--text-muted, #999)' }}>{t('login.email')}</label>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus style={inputStyle} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontSize: 15, color: 'var(--text-muted, #999)' }}>{t('login.password')}</label>
+        <label style={{ fontSize: 14, color: 'var(--text-muted, #999)' }}>{t('login.password')}</label>
         <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={inputStyle} />
       </div>
       <ErrorBox msg={error} />
       <button type="submit" disabled={loading} style={{
-        marginTop: 8, padding: '13px', background: 'var(--accent, #00d2ff)',
-        color: '#000', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 16,
+        marginTop: 4, padding: '13px', background: 'var(--accent, #2d93cc)',
+        color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 16,
         cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
       }}>
         {loading ? t('login.signingIn') : t('login.signIn')}
       </button>
       <button type="button" onClick={onRequestAccess} style={{
         background: 'transparent', border: 'none', color: 'var(--text-muted, #999)',
-        fontSize: 15, cursor: 'pointer', textDecoration: 'underline', padding: 0,
+        fontSize: 14, cursor: 'pointer', textDecoration: 'underline', padding: 0,
       }}>
         {t('login.requestAccess')}
       </button>
@@ -117,17 +153,7 @@ function SignInForm({ onRequestAccess }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Agreement step
-// ---------------------------------------------------------------------------
-const AGREEMENT_SECTION_KEYS = [
-  { titleKey: 'agreement.s1title', bodyKey: 'agreement.s1body' },
-  { titleKey: 'agreement.s2title', bodyKey: 'agreement.s2body' },
-  { titleKey: 'agreement.s3title', bodyKey: 'agreement.s3body' },
-  { titleKey: 'agreement.s4title', bodyKey: 'agreement.s4body' },
-  { titleKey: 'agreement.s5title', bodyKey: 'agreement.s5body' },
-]
-
+// ── Agreement step ────────────────────────────────────────────────────────────
 function AgreementStep({ onAgree, onBack }) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
@@ -145,8 +171,6 @@ function AgreementStep({ onAgree, onBack }) {
           {t('agreement.subtitle')}
         </p>
       </div>
-
-      {/* Scrollable agreement text */}
       <div style={{
         maxHeight: 260, overflowY: 'auto', padding: '14px 16px',
         background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8,
@@ -159,53 +183,30 @@ function AgreementStep({ onAgree, onBack }) {
           </div>
         ))}
       </div>
-
-      {/* Signature */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <label style={{ fontSize: 14, color: 'var(--muted, #999)' }}>{t('agreement.nameLabel')}</label>
         <input
-          type="text"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder={t('agreement.namePlaceholder')}
-          autoFocus
+          type="text" value={name} onChange={e => setName(e.target.value)}
+          placeholder={t('agreement.namePlaceholder')} autoFocus
           style={{ ...inputStyle, fontSize: 15 }}
         />
       </div>
-
-      {/* Checkbox — terms */}
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={e => setChecked(e.target.checked)}
-          style={{ marginTop: 2, accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }}
-        />
+        <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)}
+          style={{ marginTop: 2, accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }} />
         {t('agreement.checkbox')}
       </label>
-
-      {/* Checkbox — communications */}
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
-        <input
-          type="checkbox"
-          checked={checkedComms}
-          onChange={e => setCheckedComms(e.target.checked)}
-          style={{ marginTop: 2, accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }}
-        />
+        <input type="checkbox" checked={checkedComms} onChange={e => setCheckedComms(e.target.checked)}
+          style={{ marginTop: 2, accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }} />
         {t('agreement.checkboxComms')}
       </label>
-
-      <button
-        type="button"
-        disabled={!canProceed}
-        onClick={() => onAgree(name.trim())}
-        style={{
-          padding: '13px', background: canProceed ? 'var(--accent, #00d2ff)' : 'var(--border)',
-          color: canProceed ? '#000' : 'var(--muted, #666)',
-          border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 16,
-          cursor: canProceed ? 'pointer' : 'not-allowed', transition: 'background 0.2s',
-        }}
-      >
+      <button type="button" disabled={!canProceed} onClick={() => onAgree(name.trim())} style={{
+        padding: '13px', background: canProceed ? 'var(--accent, #2d93cc)' : 'var(--border)',
+        color: canProceed ? '#fff' : 'var(--muted, #666)',
+        border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 16,
+        cursor: canProceed ? 'pointer' : 'not-allowed', transition: 'background 0.2s',
+      }}>
         {t('agreement.cta')}
       </button>
       <button type="button" onClick={onBack} style={{
@@ -218,12 +219,10 @@ function AgreementStep({ onAgree, onBack }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Request access form
-// ---------------------------------------------------------------------------
+// ── Request access form ───────────────────────────────────────────────────────
 function RequestAccessForm({ onBack }) {
   const { t } = useTranslation()
-  const [step, setStep] = useState('agreement') // 'agreement' | 'form'
+  const [step, setStep] = useState('agreement')
   const [agreementName, setAgreementName] = useState('')
   const [agreedAt, setAgreedAt] = useState('')
   const [email, setEmail] = useState('')
@@ -238,9 +237,7 @@ function RequestAccessForm({ onBack }) {
     setStep('form')
   }
 
-  if (step === 'agreement') {
-    return <AgreementStep onAgree={handleAgree} onBack={onBack} />
-  }
+  if (step === 'agreement') return <AgreementStep onAgree={handleAgree} onBack={onBack} />
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -259,14 +256,12 @@ function RequestAccessForm({ onBack }) {
   if (done) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-        <div style={{ fontSize: 32 }}>✓</div>
-        <p style={{ margin: 0, color: 'var(--text)', fontSize: 15 }}>{t('login.requestSent')}</p>
-        <p style={{ margin: 0, color: 'var(--text-muted, #999)', fontSize: 13 }}>
-          {t('login.requestSentDesc')}
-        </p>
+        <div style={{ fontSize: 40 }}>✓</div>
+        <p style={{ margin: 0, color: 'var(--text)', fontSize: 16, fontWeight: 600 }}>{t('login.requestSent')}</p>
+        <p style={{ margin: 0, color: 'var(--text-muted, #999)', fontSize: 13 }}>{t('login.requestSentDesc')}</p>
         <button type="button" onClick={onBack} style={{
           marginTop: 8, padding: '11px', background: 'transparent',
-          border: '1px solid var(--border)', borderRadius: 6,
+          border: '1px solid var(--border)', borderRadius: 8,
           color: 'var(--text)', fontSize: 14, cursor: 'pointer',
         }}>
           {t('login.backToSignIn')}
@@ -290,8 +285,8 @@ function RequestAccessForm({ onBack }) {
       </div>
       <ErrorBox msg={error} />
       <button type="submit" disabled={loading} style={{
-        marginTop: 8, padding: '11px', background: 'var(--accent, #00d2ff)',
-        color: '#000', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 14,
+        marginTop: 4, padding: '11px', background: 'var(--accent, #2d93cc)',
+        color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14,
         cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
       }}>
         {loading ? t('login.sending') : t('login.sendRequest')}
@@ -306,111 +301,153 @@ function RequestAccessForm({ onBack }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Left branding panel
-// ---------------------------------------------------------------------------
-function BrandingPanel() {
+// ── Landing content ───────────────────────────────────────────────────────────
+function LandingContent({ onSignIn, onRequest }) {
   const { t } = useTranslation()
 
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-      padding: '60px 56px', maxWidth: 520,
-    }}>
-      {/* Welcome title */}
-      <h2 className="login-welcome-title" style={{
-        fontSize: 30, fontWeight: 800, margin: '0 0 16px', letterSpacing: '-0.02em',
-        background: 'linear-gradient(135deg, #ffffff 0%, #53e5ef 40%, #2d93cc 100%)',
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-      }}>
-        {t('login.welcome')}
-      </h2>
+    <div className="landing-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-      {/* Sub-brand */}
-      <p style={{
-        fontSize: 16, fontWeight: 700, letterSpacing: '0.15em',
-        textTransform: 'uppercase', margin: '0 0 10px',
-        background: 'linear-gradient(180deg, #53e5ef 0%, #2d93cc 55%, #2262a8 100%)',
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+      {/* Hero */}
+      <section style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', textAlign: 'center',
+        padding: 'clamp(60px, 10vh, 100px) 24px clamp(48px, 8vh, 80px)',
+        position: 'relative', zIndex: 1,
       }}>
-        {t('login.aboutUs')}
-      </p>
+        <p style={{
+          fontSize: 13, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
+          margin: '0 0 20px', color: 'rgba(83,229,239,0.8)',
+        }}>
+          {t('login.aboutUs')}
+        </p>
 
-      {/* Pitch */}
-      <p style={{
-        fontSize: 17, lineHeight: 1.75, color: 'var(--muted, #aaa)',
-        margin: '0 0 36px', maxWidth: 400,
+        <h2 className="login-welcome-title" style={{
+          fontSize: 'clamp(2.4rem, 7vw, 4.5rem)', fontWeight: 900,
+          margin: '0 0 24px', letterSpacing: '-0.03em', lineHeight: 1.05,
+          background: 'linear-gradient(135deg, #ffffff 0%, #53e5ef 45%, #2d93cc 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        }}>
+          {t('login.welcome')}
+        </h2>
+
+        <p style={{
+          fontSize: 'clamp(1rem, 2.2vw, 1.2rem)', color: 'rgba(200,210,230,0.75)',
+          maxWidth: 580, lineHeight: 1.75, margin: '0 0 52px',
+        }}>
+          {t('login.pitch')}
+        </p>
+
+        {/* CTA buttons */}
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={onSignIn}
+            className="landing-btn-primary"
+          >
+            {t('login.signIn')}
+          </button>
+          <button
+            onClick={onRequest}
+            className="landing-btn-secondary"
+          >
+            {t('login.requestAccess')}
+          </button>
+        </div>
+      </section>
+
+      {/* Stats row */}
+      <section style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        borderTop: '1px solid rgba(255,255,255,0.07)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        position: 'relative', zIndex: 1,
+        background: 'rgba(255,255,255,0.02)',
       }}>
-        {t('login.pitch')}
-      </p>
-
-      {/* Feature list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 40 }}>
-        {FEATURES.map(f => (
-          <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 24 }}>{f.icon}</span>
-            <span style={{ fontSize: 16, color: 'var(--text)', fontWeight: 500 }}>{t(f.key)}</span>
+        {STATS.map((s, i) => (
+          <div key={s.labelKey} className={`stat-card stat-card-${i}`} style={{
+            padding: 'clamp(24px, 4vw, 40px) 24px',
+            textAlign: 'center',
+            borderRight: i < STATS.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+          }}>
+            <div style={{
+              fontSize: 'clamp(2rem, 4.5vw, 2.8rem)', fontWeight: 900, lineHeight: 1,
+              background: 'linear-gradient(135deg, #53e5ef 0%, #2d93cc 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              marginBottom: 10,
+            }}>
+              {s.display}
+            </div>
+            <div style={{
+              fontSize: 12, color: 'rgba(180,195,220,0.65)', fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '0.1em',
+            }}>
+              {t(s.labelKey)}
+            </div>
           </div>
         ))}
-      </div>
+      </section>
+
+      {/* Feature cards */}
+      <section style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        gap: 20,
+        padding: 'clamp(40px, 6vw, 72px) clamp(20px, 5vw, 72px)',
+        maxWidth: 1100, margin: '0 auto', width: '100%',
+        boxSizing: 'border-box', position: 'relative', zIndex: 1,
+      }}>
+        {FEATURES.map((f, i) => (
+          <div key={f.key} className={`feature-card feature-card-${i}`} style={{
+            background: 'rgba(255,255,255,0.035)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 14, padding: '32px 28px',
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 16 }}>{f.icon}</div>
+            <p style={{ margin: 0, fontSize: 15, color: 'rgba(220,230,245,0.9)', fontWeight: 500, lineHeight: 1.6 }}>
+              {t(f.key)}
+            </p>
+          </div>
+        ))}
+      </section>
 
       {/* Learn more */}
-      <Link to="/about" style={{
-        fontSize: 15, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600,
-      }}>
-        {t('login.learnMore')} →
-      </Link>
+      <div style={{ textAlign: 'center', paddingBottom: 48, position: 'relative', zIndex: 1 }}>
+        <Link to="/about" style={{
+          color: 'rgba(83,229,239,0.8)', textDecoration: 'none',
+          fontWeight: 600, fontSize: 15, letterSpacing: '0.02em',
+        }}>
+          {t('login.learnMore')} →
+        </Link>
+      </div>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-  const [view, setView] = useState('signin') // 'signin' | 'request'
+  const [modal, setModal] = useState(null) // null | 'signin' | 'request'
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-      {/* Slim header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 24px', borderBottom: '1px solid var(--border)',
-        background: 'var(--surface)',
-      }}>
-        <h1 style={{
-          display: 'flex', alignItems: 'center', gap: 2,
-          fontWeight: 900, fontSize: '2rem', letterSpacing: '0.08em',
-          fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, direction: 'ltr',
-        }}>
-          <img src="/favicon.png" alt="V" style={{ height: '2.4rem', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,210,255,0.6))' }} />
-          <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
-        </h1>
-        <LanguageSwitcher />
-      </div>
-
-      <div style={{
-        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 32, padding: '40px 24px', flexWrap: 'wrap',
-      }}>
-
-        {/* Left: branding info — hidden on small screens via inline style trick */}
-        <div className="login-branding-panel">
-          <BrandingPanel />
-        </div>
-
-        {/* Divider */}
-        <div className="login-divider" />
-
-        {/* Right: login card */}
-        <div style={cardStyle}>
-          {view === 'signin'
-            ? <SignInForm onRequestAccess={() => setView('request')} />
-            : <RequestAccessForm onBack={() => setView('signin')} />
-          }
-        </div>
-      </div>
+    <div style={{ minHeight: '100vh', background: '#0b0e18', display: 'flex', flexDirection: 'column' }}>
+      <SlimHeader />
+      <LandingContent
+        onSignIn={() => setModal('signin')}
+        onRequest={() => setModal('request')}
+      />
       <Footer />
+
+      {modal === 'signin' && (
+        <Modal onClose={() => setModal(null)}>
+          <SignInForm onRequestAccess={() => setModal('request')} />
+        </Modal>
+      )}
+
+      {modal === 'request' && (
+        <Modal onClose={() => setModal(null)}>
+          <RequestAccessForm onBack={() => setModal('signin')} />
+        </Modal>
+      )}
     </div>
   )
 }
