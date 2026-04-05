@@ -96,8 +96,8 @@ By signing below, I confirm that I have read, fully understood, and voluntarily 
 
 def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
     pdf = FPDF()
-    pdf.add_page()
     pdf.set_margins(20, 20, 20)
+    pdf.add_page()
 
     # Title
     pdf.set_font("Helvetica", "B", 16)
