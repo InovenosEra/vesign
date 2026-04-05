@@ -58,24 +58,14 @@ function useCountdown(nextEventUtc) {
 // Language switcher
 // ---------------------------------------------------------------------------
 const LANGUAGES = [
-  { code: 'en', label: 'EN' },
-  { code: 'he', label: 'HE' },
-  { code: 'es', label: 'ES' },
-  { code: 'fr', label: 'FR' },
+  { code: 'en', label: 'EN', flag: '🇬🇧' },
+  { code: 'he', label: 'HE', flag: '🇮🇱' },
+  { code: 'es', label: 'ES', flag: '🇪🇸' },
+  { code: 'fr', label: 'FR', flag: '🇫🇷' },
 ]
 
 export function LanguageSwitcher() {
-  const [open, setOpen] = useState(false)
   const [currentLang, setCurrentLang] = useState(localStorage.getItem('lang') || 'en')
-  const ref = useRef(null)
-
-  useEffect(() => {
-    function onMouseDown(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
-  }, [])
 
   function switchLang(code) {
     i18n.changeLanguage(code)
@@ -83,63 +73,29 @@ export function LanguageSwitcher() {
     setCurrentLang(code)
     document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
     document.documentElement.lang = code
-    setOpen(false)
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          background: 'transparent',
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 10px',
-          cursor: 'pointer',
-          fontSize: 12,
-          fontWeight: 700,
-          color: 'var(--text)',
-          letterSpacing: '0.05em',
-        }}
-      >
-        {currentLang.toUpperCase()}
-      </button>
-      {open && (
-        <div style={{
-          position: 'absolute',
-          right: 0,
-          top: 'calc(100% + 6px)',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          zIndex: 100,
-          minWidth: 60,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          overflow: 'hidden',
-        }}>
-          {LANGUAGES.map(lang => (
-            <button
-              key={lang.code}
-              onClick={() => switchLang(lang.code)}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '8px 12px',
-                background: currentLang === lang.code ? 'rgba(0,210,255,0.12)' : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text)',
-                fontSize: 12,
-                fontWeight: 700,
-                textAlign: 'center',
-                letterSpacing: '0.05em',
-              }}
-            >
-              {lang.label}
-            </button>
-          ))}
-        </div>
-      )}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {LANGUAGES.map(lang => (
+        <button
+          key={lang.code}
+          onClick={() => switchLang(lang.code)}
+          title={lang.label}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '2px 3px', borderRadius: 4, lineHeight: 1,
+            fontSize: 20,
+            opacity: currentLang === lang.code ? 1 : 0.35,
+            filter: currentLang === lang.code
+              ? 'drop-shadow(0 0 5px rgba(83,229,239,0.7))'
+              : 'none',
+            transition: 'opacity 0.2s, filter 0.2s',
+          }}
+        >
+          {lang.flag}
+        </button>
+      ))}
     </div>
   )
 }
@@ -365,6 +321,7 @@ function Header() {
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="header-market-status-wrap"><MarketStatus /></span>
+          <a href="/contact" className="header-contact-link">{t('nav.contact')}</a>
           <FlagSelector />
           <span className="lang-switcher-header"><LanguageSwitcher /></span>
           <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
@@ -401,7 +358,7 @@ function Header() {
                   document.documentElement.lang = lang.code
                   closeNav()
                 }}
-              >{lang.label}</button>
+              >{lang.flag}</button>
             ))}
           </div>
         </div>

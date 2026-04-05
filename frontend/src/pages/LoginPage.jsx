@@ -65,7 +65,16 @@ function SlimHeader() {
         <img src="/favicon.png" alt="V" style={{ height: '2.4rem', objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,210,255,0.7))' }} />
         <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
       </h1>
-      <LanguageSwitcher />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <a href="/contact" style={{
+          fontSize: 12, fontWeight: 700, letterSpacing: '0.12em',
+          textTransform: 'uppercase', color: 'rgba(83,229,239,0.8)',
+          textDecoration: 'none',
+        }}>
+          Contact Us
+        </a>
+        <LanguageSwitcher />
+      </div>
     </div>
   )
 }
