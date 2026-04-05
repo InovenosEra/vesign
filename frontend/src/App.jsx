@@ -433,7 +433,7 @@ export function PublicHeader() {
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-      background: 'var(--surface)', direction: 'ltr',
+      background: 'rgba(11,14,24,0.92)', backdropFilter: 'blur(10px)', direction: 'ltr',
     }}>
       <Link to="/" style={{ textDecoration: 'none' }}>
         <h1 style={{
