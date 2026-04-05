@@ -50,6 +50,7 @@ function ErrorBox({ msg }) {
 
 // ── Slim header ───────────────────────────────────────────────────────────────
 function SlimHeader() {
+  const { t } = useTranslation()
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -71,7 +72,7 @@ function SlimHeader() {
           textTransform: 'uppercase', color: 'rgba(83,229,239,0.8)',
           textDecoration: 'none',
         }}>
-          Contact Us
+          {t('nav.contact')}
         </a>
         <LanguageSwitcher />
       </div>
