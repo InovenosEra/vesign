@@ -24,7 +24,7 @@ body {
   position: relative;
   overflow-x: hidden;
   background:
-    radial-gradient(ellipse at 15% 15%, rgba(45,147,204,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at 5% 0%, rgba(45,147,204,0.18) 0%, transparent 55%),
     radial-gradient(ellipse at 85% 85%, rgba(83,229,239,0.10) 0%, transparent 50%),
     #0b0e18;
   background-attachment: fixed;
