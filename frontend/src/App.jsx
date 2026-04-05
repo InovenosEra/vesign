@@ -100,6 +100,76 @@ export function LanguageSwitcher() {
   )
 }
 
+function LanguageSwitcherDropdown() {
+  const [currentLang, setCurrentLang] = useState(localStorage.getItem('lang') || 'en')
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onMouseDown(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [])
+
+  function switchLang(code) {
+    i18n.changeLanguage(code)
+    localStorage.setItem('lang', code)
+    setCurrentLang(code)
+    document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
+    document.documentElement.lang = code
+    setOpen(false)
+  }
+
+  const current = LANGUAGES.find(l => l.code === currentLang) ?? LANGUAGES[0]
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'transparent', border: '1px solid var(--border)',
+          borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 5,
+          color: 'var(--text)', fontSize: 13, fontWeight: 600,
+        }}
+      >
+        <span style={{ fontSize: 18, lineHeight: 1 }}>{current.flag}</span>
+        <span>{current.label}</span>
+        <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: 'calc(100% + 6px)',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 8, zIndex: 200, minWidth: 110,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
+        }}>
+          {LANGUAGES.map(lang => (
+            <button
+              key={lang.code}
+              onClick={() => switchLang(lang.code)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '8px 12px',
+                background: currentLang === lang.code ? 'rgba(83,229,239,0.1)' : 'transparent',
+                border: 'none', cursor: 'pointer',
+                color: currentLang === lang.code ? 'var(--accent)' : 'var(--text)',
+                fontSize: 13, fontWeight: currentLang === lang.code ? 700 : 400,
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{lang.flag}</span>
+              <span>{lang.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Flag selector — switches global market context
 // ---------------------------------------------------------------------------
@@ -322,7 +392,7 @@ function Header() {
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="header-market-status-wrap"><MarketStatus /></span>
           <FlagSelector />
-          <span className="lang-switcher-header"><LanguageSwitcher /></span>
+          <span className="lang-switcher-header"><LanguageSwitcherDropdown /></span>
           <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
             {market === 'IL' ? '₪' : '$'}
           </span>
