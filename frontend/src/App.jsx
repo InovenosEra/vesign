@@ -358,7 +358,6 @@ function Header() {
             <NavLink to="/trades">{t('nav.trades')}</NavLink>
             <NavLink to="/portfolio">{t('nav.portfolio')}</NavLink>
             <NavLink to="/about">{t('nav.about')}</NavLink>
-            <NavLink to="/contact">{t('nav.contact')}</NavLink>
           </nav>
         </div>
         <div className="header-search-wrap" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -387,7 +386,6 @@ function Header() {
           <NavLink to="/trades" onClick={closeNav}>{t('nav.trades')}</NavLink>
           <NavLink to="/portfolio" onClick={closeNav}>{t('nav.portfolio')}</NavLink>
           <NavLink to="/about" onClick={closeNav}>{t('nav.about')}</NavLink>
-          <NavLink to="/contact" onClick={closeNav}>{t('nav.contact')}</NavLink>
           <div className="mobile-menu-divider" />
           <div className="mobile-menu-market"><MarketStatus /></div>
           <div className="mobile-menu-divider" />
