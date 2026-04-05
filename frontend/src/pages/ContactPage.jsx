@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/react'
 import { useUser } from '@clerk/react'
 import { useTranslation } from 'react-i18next'
 import { submitContact } from '../api'
-import { Footer } from '../App'
+import { Footer, PublicHeader } from '../App'
 
 const inputStyle = {
   padding: '10px 12px',
@@ -171,26 +171,7 @@ export default function ContactPage({ standalone = false }) {
   if (standalone) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 28px', borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
-        }}>
-          <h1 style={{
-            display: 'flex', alignItems: 'center', gap: 2, direction: 'ltr',
-            fontWeight: 900, fontSize: '1.9rem', letterSpacing: '0.08em',
-            fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0,
-          }}>
-            <img src="/favicon.png" alt="V" style={{ height: '2.2rem', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,210,255,0.6))' }} />
-            <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
-          </h1>
-          <Link to="/sign-in" style={{
-            padding: '8px 22px', background: 'var(--accent)', color: '#000',
-            borderRadius: 6, fontWeight: 700, fontSize: 14, textDecoration: 'none',
-          }}>
-            {t('about.signIn')}
-          </Link>
-        </div>
+        <PublicHeader />
         <div style={{ flex: 1 }}>
           <ContactContent standalone />
         </div>

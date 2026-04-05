@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useClerk } from '@clerk/react'
 import { useTranslation } from 'react-i18next'
 import { requestAccess } from '../api'
-import { Footer, LanguageSwitcher } from '../App'
+import { Footer, PublicHeader } from '../App'
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 const inputStyle = {
@@ -44,40 +44,6 @@ function ErrorBox({ msg }) {
   return (
     <div style={{ color: '#ff6b6b', fontSize: 13, padding: '8px 12px', background: 'rgba(255,107,107,0.1)', borderRadius: 6, border: '1px solid rgba(255,107,107,0.3)' }}>
       {msg}
-    </div>
-  )
-}
-
-// ── Slim header ───────────────────────────────────────────────────────────────
-function SlimHeader() {
-  const { t } = useTranslation()
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-      background: 'rgba(11,14,24,0.85)', backdropFilter: 'blur(10px)',
-      position: 'sticky', top: 0, zIndex: 10, direction: 'ltr',
-    }}>
-      <Link to="/" style={{ textDecoration: 'none' }}>
-        <h1 style={{
-          display: 'flex', alignItems: 'center', gap: 2,
-          fontWeight: 900, fontSize: '2rem', letterSpacing: '0.08em',
-          fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, direction: 'ltr',
-        }}>
-          <img src="/favicon.png" alt="V" style={{ height: '2.4rem', objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,210,255,0.7))' }} />
-          <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
-        </h1>
-      </Link>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <a href="/contact" style={{
-          fontSize: 12, fontWeight: 700, letterSpacing: '0.12em',
-          textTransform: 'uppercase', color: 'rgba(83,229,239,0.8)',
-          textDecoration: 'none',
-        }}>
-          {t('nav.contact')}
-        </a>
-        <LanguageSwitcher />
-      </div>
     </div>
   )
 }
@@ -435,7 +401,7 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0b0e18', display: 'flex', flexDirection: 'column' }}>
-      <SlimHeader />
+      <PublicHeader />
       <LandingContent
         onSignIn={() => setModal('signin')}
         onRequest={() => setModal('request')}

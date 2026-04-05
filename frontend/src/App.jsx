@@ -427,6 +427,33 @@ function AppLayout() {
 // ---------------------------------------------------------------------------
 // Footer
 // ---------------------------------------------------------------------------
+export function PublicHeader() {
+  const { t } = useTranslation()
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+      background: 'var(--surface)', direction: 'ltr',
+    }}>
+      <Link to="/" style={{ textDecoration: 'none' }}>
+        <h1 style={{
+          display: 'flex', alignItems: 'center', gap: 2,
+          fontWeight: 900, fontSize: '2rem', letterSpacing: '0.08em',
+          fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, direction: 'ltr',
+        }}>
+          <img src="/favicon.png" alt="V" style={{ height: '2.4rem', objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,210,255,0.7))' }} />
+          <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
+        </h1>
+      </Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <Link to="/contact" className="header-contact-link">{t('nav.contact')}</Link>
+        <LanguageSwitcher />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 export function Footer() {
   return (
     <footer style={{

@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@clerk/react'
 import { useTranslation } from 'react-i18next'
-import { Footer } from '../App'
+import { Footer, PublicHeader } from '../App'
 
 const FEATURES = [
   { icon: '📊', titleKey: 'about.feature1Title', descKey: 'about.feature1Desc' },
@@ -131,33 +131,7 @@ export default function AboutPage({ standalone = false }) {
   if (standalone) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
-        {/* Minimal header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 28px', borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
-        }}>
-          <h1 style={{
-            display: 'flex', alignItems: 'center', gap: 2,
-            fontWeight: 900, fontSize: '1.9rem', letterSpacing: '0.08em',
-            fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, direction: 'ltr',
-          }}>
-            <img
-              src="/favicon.png" alt="V"
-              style={{ height: '2.2rem', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,210,255,0.6))' }}
-            />
-            <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
-          </h1>
-          <Link
-            to="/sign-in"
-            style={{
-              padding: '8px 22px', background: 'var(--accent)', color: '#000',
-              borderRadius: 6, fontWeight: 700, fontSize: 14, textDecoration: 'none',
-            }}
-          >
-            {t('about.signIn')}
-          </Link>
-        </div>
+        <PublicHeader />
         <AboutContent standalone />
         <Footer />
       </div>
