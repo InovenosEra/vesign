@@ -333,7 +333,7 @@ function LandingContent({ onSignIn, onRequest }) {
         borderTop: '1px solid rgba(255,255,255,0.07)',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
         position: 'relative', zIndex: 1,
-        background: 'rgba(255,255,255,0.02)',
+        background: 'transparent',
       }}>
         {STATS.map((s, i) => (
           <div key={s.labelKey} className={`stat-card stat-card-${i}`} style={{
@@ -370,8 +370,8 @@ function LandingContent({ onSignIn, onRequest }) {
       }}>
         {FEATURES.map((f, i) => (
           <div key={f.key} className={`feature-card feature-card-${i}`} style={{
-            background: 'rgba(255,255,255,0.035)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.06)',
             borderRadius: 14, padding: '32px 28px',
           }}>
             <div style={{ fontSize: 36, marginBottom: 16 }}>{f.icon}</div>
@@ -400,7 +400,7 @@ export default function LoginPage() {
   const [modal, setModal] = useState(null) // null | 'signin' | 'request'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0b0e18', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column' }}>
       <PublicHeader />
       <LandingContent
         onSignIn={() => setModal('signin')}
