@@ -324,13 +324,6 @@ function LandingContent({ onSignIn, onRequest }) {
         padding: 'clamp(60px, 10vh, 100px) 24px clamp(48px, 8vh, 80px)',
         position: 'relative', zIndex: 1,
       }}>
-        <p style={{
-          fontSize: 13, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-          margin: '0 0 20px', color: 'rgba(83,229,239,0.8)',
-        }}>
-          {t('login.aboutUs')}
-        </p>
-
         <h2 className="login-welcome-title" style={{
           fontSize: 'clamp(2.4rem, 7vw, 4.5rem)', fontWeight: 900,
           margin: '0 0 24px', letterSpacing: '-0.03em', lineHeight: 1.05,
