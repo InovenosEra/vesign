@@ -71,10 +71,10 @@ export function LanguageSwitcher() {
   const currentLang = i18nInstance.language
 
   function switchLang(code) {
-    i18nInstance.changeLanguage(code)
     localStorage.setItem('lang', code)
     document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
     document.documentElement.lang = code
+    i18nInstance.changeLanguage(code)
   }
 
   return (
@@ -117,10 +117,10 @@ function LanguageSwitcherDropdown() {
   }, [])
 
   function switchLang(code) {
-    i18nInstance.changeLanguage(code)
     localStorage.setItem('lang', code)
     document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
     document.documentElement.lang = code
+    i18nInstance.changeLanguage(code)
     setOpen(false)
   }
 

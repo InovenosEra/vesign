@@ -20,6 +20,7 @@ i18n.use(initReactI18next).init({
   },
   lng: savedLang,
   fallbackLng: 'en',
+  load: 'languageOnly',
   interpolation: { escapeValue: false },
 })
 
