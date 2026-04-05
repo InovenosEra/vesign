@@ -295,7 +295,7 @@ function LandingContent({ onSignIn, onRequest }) {
       }}>
         <h2 className="login-welcome-title" style={{
           fontSize: 'clamp(2.4rem, 7vw, 4.5rem)', fontWeight: 900,
-          margin: '0 0 24px', letterSpacing: '-0.03em', lineHeight: 1.05,
+          margin: '0 0 24px', letterSpacing: '-0.03em', lineHeight: 1.05, paddingBottom: '0.15em',
           background: 'linear-gradient(135deg, #ffffff 0%, #53e5ef 45%, #2d93cc 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
         }}>
