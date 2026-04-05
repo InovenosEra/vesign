@@ -137,12 +137,6 @@ function ContactContent({ standalone }) {
     <div style={{ maxWidth: 680, margin: '0 auto', padding: standalone ? '60px 24px 80px' : '20px 24px 60px' }}>
       {/* Header */}
       <div style={{ marginBottom: 36 }}>
-        <p style={{
-          fontSize: 12, fontWeight: 700, letterSpacing: '0.2em',
-          color: 'var(--accent)', textTransform: 'uppercase', margin: '0 0 10px',
-        }}>
-          Vesign
-        </p>
         <h2 style={{ fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 900, margin: '0 0 12px', color: 'var(--text)' }}>
           {t('contact.title')}
         </h2>
