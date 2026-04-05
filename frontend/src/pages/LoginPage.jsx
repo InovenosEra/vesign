@@ -329,7 +329,7 @@ function BrandingPanel() {
       {/* Sub-brand */}
       <p style={{
         fontSize: 16, fontWeight: 700, letterSpacing: '0.15em',
-        textTransform: 'uppercase', margin: '0 0 28px',
+        textTransform: 'uppercase', margin: '0 0 10px',
         background: 'linear-gradient(180deg, #53e5ef 0%, #2d93cc 55%, #2262a8 100%)',
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
       }}>
