@@ -95,15 +95,17 @@ By signing below, I confirm that I have read, fully understood, and voluntarily 
 
 
 def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
+    NX, NY = "LMARGIN", "NEXT"
+
     pdf = FPDF()
     pdf.set_margins(20, 20, 20)
     pdf.add_page()
 
     # Title
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "Vesign Platform", ln=True, align="C")
+    pdf.cell(0, 10, "Vesign Platform", new_x=NX, new_y=NY, align="C")
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, "Terms of Use Agreement", ln=True, align="C")
+    pdf.cell(0, 8, "Terms of Use Agreement", new_x=NX, new_y=NY, align="C")
     pdf.ln(6)
 
     # User info box
@@ -112,9 +114,9 @@ def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
     pdf.set_draw_color(180, 180, 200)
     pdf.rect(20, pdf.get_y(), 170, 22, style="FD")
     pdf.set_xy(24, pdf.get_y() + 3)
-    pdf.multi_cell(162, 6, f"Name:      {name}")
+    pdf.multi_cell(162, 6, f"Name:      {name}", new_x=NX, new_y=NY)
     pdf.set_x(24)
-    pdf.multi_cell(162, 6, f"Email:       {email}")
+    pdf.multi_cell(162, 6, f"Email:       {email}", new_x=NX, new_y=NY)
     pdf.ln(6)
 
     # Agreement body
@@ -125,10 +127,10 @@ def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
             pdf.ln(3)
         elif stripped == stripped.upper() and len(stripped) > 10:
             pdf.set_font("Helvetica", "B", 10)
-            pdf.multi_cell(0, 6, stripped)
+            pdf.multi_cell(0, 6, stripped, new_x=NX, new_y=NY)
             pdf.set_font("Helvetica", "", 10)
         else:
-            pdf.multi_cell(0, 6, stripped)
+            pdf.multi_cell(0, 6, stripped, new_x=NX, new_y=NY)
     pdf.ln(8)
 
     # Signature block
@@ -136,14 +138,14 @@ def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
     pdf.line(20, pdf.get_y(), 190, pdf.get_y())
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.multi_cell(0, 7, f"Digitally signed by: {name}")
+    pdf.multi_cell(0, 7, f"Digitally signed by: {name}", new_x=NX, new_y=NY)
     pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(0, 6, f"Date & Time: {agreed_at} (UTC)")
-    pdf.multi_cell(0, 6, f"Email: {email}")
+    pdf.multi_cell(0, 6, f"Date & Time: {agreed_at} (UTC)", new_x=NX, new_y=NY)
+    pdf.multi_cell(0, 6, f"Email: {email}", new_x=NX, new_y=NY)
     pdf.ln(4)
     pdf.set_font("Helvetica", "I", 9)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, "This document was generated automatically upon submission of an access request to ve-sign.com.", ln=True)
+    pdf.cell(0, 5, "This document was generated automatically upon submission of an access request to ve-sign.com.", new_x=NX, new_y=NY)
 
     return bytes(pdf.output())
 
