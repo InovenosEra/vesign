@@ -629,8 +629,18 @@ tr.clickable-row:hover td { background: rgba(79, 142, 247, 0.07); }
   .app-header { padding: 0 10px; }
 }
 
+/* ── Login split layout ── */
+.login-branding-panel { display: flex; }
+.login-divider {
+  width: 1px; background: var(--border);
+  align-self: stretch; min-height: 320px;
+}
+@media (max-width: 860px) {
+  .login-branding-panel { display: none; }
+  .login-divider { display: none; }
+}
+
 /* ── RTL (Hebrew) layout ── */
-[dir="rtl"] .app-header { flex-direction: row-reverse; }
 [dir="rtl"] .header-right { margin-left: 0; margin-right: auto; }
 [dir="rtl"] .mobile-menu { text-align: right; }
 [dir="rtl"] .data-table-wrap { direction: rtl; }

@@ -59,15 +59,28 @@ async function del(path) {
 }
 
 // --- Access request (public — no auth) ------------------------------------
-export async function requestAccess(email, message = '') {
+export async function requestAccess(email, message = '', agreementName = '', agreedAt = '') {
   const res = await fetch('/api/auth/request-access', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, message }),
+    body: JSON.stringify({ email, message, agreement_name: agreementName, agreed_at: agreedAt }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || 'Request failed')
+  }
+  return res.json()
+}
+
+export async function submitContact(name, email, subject, message) {
+  const res = await fetch('/api/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, subject, message }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to send message')
   }
   return res.json()
 }

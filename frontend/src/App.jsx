@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useRef } from 'react'
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { ClerkProvider, RedirectToSignIn, useAuth, useClerk, useUser } from '@clerk/react'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +14,8 @@ import GlobalSearch from './components/GlobalSearch'
 import ProfilePictureModal from './components/ProfilePictureModal'
 import LoginPage from './pages/LoginPage'
 import CompleteProfilePage from './pages/CompleteProfilePage'
+import AboutPage from './pages/AboutPage'
+import ContactPage from './pages/ContactPage'
 import './App.css'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
@@ -62,7 +64,7 @@ const LANGUAGES = [
   { code: 'fr', label: 'FR' },
 ]
 
-function LanguageSwitcher() {
+export function LanguageSwitcher() {
   const [open, setOpen] = useState(false)
   const [currentLang, setCurrentLang] = useState(localStorage.getItem('lang') || 'en')
   const ref = useRef(null)
@@ -346,7 +348,7 @@ function Header() {
       <header className="app-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
           <NavLink to="/" onClick={closeNav} style={{ textDecoration: 'none' }}>
-            <h1 style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 900, fontSize: '2.7rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, marginTop: '-6px', cursor: 'pointer' }}>
+            <h1 style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 900, fontSize: '2.7rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, marginTop: '-6px', cursor: 'pointer', direction: 'ltr' }}>
               <img src="/favicon.png" alt="V" style={{ height: '3.2rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0, 210, 255, 0.6))' }} />
               <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
             </h1>
@@ -355,6 +357,8 @@ function Header() {
             <NavLink to="/">{t('nav.signals')}</NavLink>
             <NavLink to="/trades">{t('nav.trades')}</NavLink>
             <NavLink to="/portfolio">{t('nav.portfolio')}</NavLink>
+            <NavLink to="/about">{t('nav.about')}</NavLink>
+            <NavLink to="/contact">{t('nav.contact')}</NavLink>
           </nav>
         </div>
         <div className="header-search-wrap" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -382,6 +386,8 @@ function Header() {
           <NavLink to="/" onClick={closeNav}>{t('nav.signals')}</NavLink>
           <NavLink to="/trades" onClick={closeNav}>{t('nav.trades')}</NavLink>
           <NavLink to="/portfolio" onClick={closeNav}>{t('nav.portfolio')}</NavLink>
+          <NavLink to="/about" onClick={closeNav}>{t('nav.about')}</NavLink>
+          <NavLink to="/contact" onClick={closeNav}>{t('nav.contact')}</NavLink>
           <div className="mobile-menu-divider" />
           <div className="mobile-menu-market"><MarketStatus /></div>
           <div className="mobile-menu-divider" />
@@ -429,10 +435,14 @@ function TokenSync({ onReady }) {
 function AppLayout() {
   const { isLoaded, userId } = useAuth()
   const { user } = useUser()
+  const location = useLocation()
   const [tokenReady, setTokenReady] = useState(false)
 
   if (!isLoaded) return null
-  if (!userId) return <RedirectToSignIn />
+  const PUBLIC_PATHS = ['/about', '/contact']
+  if (!userId && !PUBLIC_PATHS.includes(location.pathname)) return <RedirectToSignIn />
+  if (!userId && location.pathname === '/about') return <AboutPage standalone />
+  if (!userId) return <ContactPage standalone />
   if (user && (!user.firstName || !user.lastName)) return <CompleteProfilePage />
 
   return (
@@ -441,16 +451,40 @@ function AppLayout() {
         <TokenSync onReady={() => setTokenReady(true)} />
         {tokenReady && <Header />}
         {tokenReady && (
-          <main className="app-main">
-            <Routes>
-              <Route path="/" element={<SignalsPage />} />
-              <Route path="/portfolio" element={<WatchlistPage />} />
-              <Route path="/trades" element={<TradesPage />} />
-            </Routes>
-          </main>
+          <>
+            <main className="app-main">
+              <Routes>
+                <Route path="/" element={<SignalsPage />} />
+                <Route path="/portfolio" element={<WatchlistPage />} />
+                <Route path="/trades" element={<TradesPage />} />
+                <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              </Routes>
+            </main>
+            <Footer />
+          </>
         )}
       </QueryClientProvider>
     </MarketProvider>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Footer
+// ---------------------------------------------------------------------------
+export function Footer() {
+  return (
+    <footer style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      flexWrap: 'wrap', gap: 8,
+      padding: '18px 28px', borderTop: '1px solid var(--border)',
+      fontSize: 12, color: 'var(--muted, #666)',
+    }}>
+      <span>© {new Date().getFullYear()} Vesign. All rights reserved.</span>
+      <a href="/contact" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+        Contact Us
+      </a>
+    </footer>
   )
 }
 

@@ -1,3 +1,4 @@
+import base64
 import math
 import os
 import time
@@ -7,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, UTC, date
+from fpdf import FPDF
 from typing import Optional
 
 import pandas as pd
@@ -71,22 +73,110 @@ def _ensure_indexes():
 _ensure_indexes()
 
 
-def _send_access_request_email(requester_email: str, message: str):
+AGREEMENT_TEXT = """TERMS OF USE AGREEMENT - VESIGN PLATFORM
+
+1. NOT FINANCIAL ADVICE
+Vesign is an investment research and decision-support tool only. Nothing on this platform constitutes financial advice, investment recommendations, or solicitation to buy or sell any security or financial instrument. All content is provided for informational purposes only.
+
+2. PERSONAL RESPONSIBILITY
+All investment decisions I make, including any decisions influenced by information or signals provided by Vesign, are made entirely at my own discretion and risk. I accept full and sole responsibility for any and all financial outcomes - including losses - resulting from my investment decisions.
+
+3. NO LIABILITY
+Vesign, its owners, developers, and affiliates shall bear no liability whatsoever for any financial losses, damages, or adverse outcomes I may incur as a result of using this platform or acting upon any information, signal, or analysis it provides.
+
+4. PAST PERFORMANCE
+I understand that past signal performance displayed on Vesign is historical information only and is not indicative of future results. No guarantee of future performance is made or implied.
+
+5. DUE DILIGENCE
+I confirm that I will conduct my own independent research and due diligence before making any investment decision, and I will consult a qualified financial advisor where appropriate.
+
+6. ACKNOWLEDGEMENT
+By signing below, I confirm that I have read, fully understood, and voluntarily agree to all of the above terms."""
+
+
+def _generate_agreement_pdf(name: str, email: str, agreed_at: str) -> bytes:
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_margins(20, 20, 20)
+
+    # Title
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Vesign Platform", ln=True, align="C")
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, "Terms of Use Agreement", ln=True, align="C")
+    pdf.ln(6)
+
+    # User info box
+    pdf.set_fill_color(240, 240, 245)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_draw_color(180, 180, 200)
+    pdf.rect(20, pdf.get_y(), 170, 22, style="FD")
+    pdf.set_xy(24, pdf.get_y() + 3)
+    pdf.cell(0, 6, f"Name:      {name}", ln=True)
+    pdf.set_x(24)
+    pdf.cell(0, 6, f"Email:       {email}", ln=True)
+    pdf.ln(6)
+
+    # Agreement body
+    pdf.set_font("Helvetica", "", 10)
+    for line in AGREEMENT_TEXT.strip().split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            pdf.ln(3)
+        elif stripped == stripped.upper() and len(stripped) > 10:
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.multi_cell(0, 6, stripped)
+            pdf.set_font("Helvetica", "", 10)
+        else:
+            pdf.multi_cell(0, 6, stripped)
+    pdf.ln(8)
+
+    # Signature block
+    pdf.set_draw_color(100, 100, 100)
+    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 7, f"Digitally signed by: {name}", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"Date & Time: {agreed_at} (UTC)", ln=True)
+    pdf.cell(0, 6, f"Email: {email}", ln=True)
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 5, "This document was generated automatically upon submission of an access request to ve-sign.com.", ln=True)
+
+    return bytes(pdf.output())
+
+
+def _send_access_request_email(requester_email: str, message: str,
+                                agreement_name: str = "", agreed_at: str = ""):
     api_key     = os.getenv("RESEND_API_KEY")
     admin_email = os.getenv("ADMIN_EMAIL")
     from_addr   = os.getenv("RESEND_FROM", "noreply@ve-sign.com")
     if not all([api_key, admin_email]):
         return  # not configured — skip silently
     try:
+        body = (
+            f"New access request on Vesign:\n\n"
+            f"Email:   {requester_email}\n"
+            f"Message: {message or '(none)'}\n"
+        )
+        payload: dict = {
+            "from": from_addr,
+            "to": [admin_email],
+            "subject": f"[Vesign] Access request from {requester_email}",
+            "text": body,
+        }
+        if agreement_name and agreed_at:
+            pdf_bytes = _generate_agreement_pdf(agreement_name, requester_email, agreed_at)
+            payload["attachments"] = [{
+                "filename": "vesign-terms-agreement.pdf",
+                "content": base64.b64encode(pdf_bytes).decode(),
+            }]
         resp = requests.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "from": from_addr,
-                "to": [admin_email],
-                "subject": f"[Vesign] Access request from {requester_email}",
-                "text": f"New access request on Vesign:\n\nEmail: {requester_email}\nMessage: {message or '(none)'}",
-            },
+            json=payload,
             timeout=10,
         )
         if resp.status_code >= 400:
@@ -99,12 +189,19 @@ def _init_tables():
     with engine.begin() as conn:
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS access_requests (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                email      TEXT NOT NULL,
-                message    TEXT DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                email            TEXT NOT NULL,
+                message          TEXT DEFAULT '',
+                agreement_name   TEXT DEFAULT '',
+                agreed_at        TEXT DEFAULT '',
+                created_at       TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """))
+        for col, defn in [("agreement_name", "TEXT DEFAULT ''"), ("agreed_at", "TEXT DEFAULT ''")]:
+            try:
+                conn.execute(text(f"ALTER TABLE access_requests ADD COLUMN {col} {defn}"))
+            except Exception:
+                pass  # column already exists
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS watchlist_lists (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -316,16 +413,57 @@ def me(user=Depends(get_current_user)):
     return user
 
 
+@app.post("/api/contact")
+def contact_us(payload: dict):
+    name    = str(payload.get("name", "")).strip()
+    email   = str(payload.get("email", "")).strip()
+    subject = str(payload.get("subject", "")).strip() or "No subject"
+    message = str(payload.get("message", "")).strip()
+    if not email or not message:
+        raise HTTPException(status_code=400, detail="Email and message are required")
+    api_key       = os.getenv("RESEND_API_KEY")
+    contact_email = os.getenv("CONTACT_EMAIL")
+    from_addr     = os.getenv("RESEND_FROM", "noreply@ve-sign.com")
+    if all([api_key, contact_email]):
+        try:
+            body = (
+                f"New contact message from Vesign:\n\n"
+                f"Name:    {name or '(not provided)'}\n"
+                f"Email:   {email}\n"
+                f"Subject: {subject}\n\n"
+                f"Message:\n{message}"
+            )
+            requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "from": from_addr,
+                    "to": [contact_email],
+                    "reply_to": email,
+                    "subject": f"[Vesign Contact] {subject}",
+                    "text": body,
+                },
+                timeout=10,
+            )
+        except Exception as exc:
+            print(f"[email] Failed to send contact email: {exc}")
+    return {"ok": True}
+
+
 @app.post("/api/auth/request-access")
 def request_access(payload: dict):
-    email   = str(payload.get("email", "")).strip()
-    message = str(payload.get("message", "")).strip()
+    email          = str(payload.get("email", "")).strip()
+    message        = str(payload.get("message", "")).strip()
+    agreement_name = str(payload.get("agreement_name", "")).strip()
+    agreed_at      = str(payload.get("agreed_at", "")).strip()
     if not email:
         raise HTTPException(status_code=400, detail="Email required")
     with engine.begin() as conn:
-        conn.execute(text("INSERT INTO access_requests (email, message) VALUES (:e, :m)"),
-                     {"e": email, "m": message})
-    _send_access_request_email(email, message)
+        conn.execute(
+            text("INSERT INTO access_requests (email, message, agreement_name, agreed_at) VALUES (:e, :m, :an, :at)"),
+            {"e": email, "m": message, "an": agreement_name, "at": agreed_at},
+        )
+    _send_access_request_email(email, message, agreement_name, agreed_at)
     return {"ok": True}
 
 
