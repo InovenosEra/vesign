@@ -121,11 +121,8 @@ function ContactForm() {
       <button
         type="submit"
         disabled={loading}
-        style={{
-          padding: '12px', background: 'var(--accent)', color: '#000',
-          border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 15,
-          cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-        }}
+        className="landing-btn-primary"
+        style={{ width: '100%', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
       >
         {loading ? t('contact.sending') : t('contact.send')}
       </button>
