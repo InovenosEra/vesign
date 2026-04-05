@@ -193,6 +193,7 @@
   "contact.sentTitle": "Message envoyé !",
   "contact.sentDesc": "Merci de nous avoir contactés. Nous vous répondrons dans les plus brefs délais.",
   "contact.error": "Échec de l'envoi. Veuillez réessayer.",
+  "about.title": "À propos de Vesign",
   "about.tagline": "Signaux d'investissement, alimentés par les données",
   "about.intro": "Vesign est une plateforme de recherche en investissement qui surveille chaque jour de bourse les marchés américains et israéliens, identifiant automatiquement les opportunités d'achat et de vente à forte conviction grâce à une analyse multi-dimensionnelle des conditions de marché et des fondamentaux d'entreprise.",
   "about.feature1Title": "Signaux quotidiens",

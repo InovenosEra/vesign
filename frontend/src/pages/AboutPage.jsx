@@ -19,26 +19,13 @@ function AboutContent({ standalone }) {
       {/* Hero */}
       <div style={{ textAlign: 'center', marginBottom: 56 }}>
         <h1 style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-          fontWeight: 900, fontSize: 'clamp(2.2rem, 5vw, 3.8rem)',
-          letterSpacing: '0.06em', fontFamily: "'Segoe UI', system-ui, sans-serif",
-          margin: '0 0 18px', lineHeight: 1, direction: 'ltr',
+          fontWeight: 900, fontSize: 'clamp(2rem, 5vw, 3.2rem)',
+          letterSpacing: '-0.02em', margin: '0 0 20px', lineHeight: 1.1,
+          background: 'linear-gradient(135deg, #ffffff 0%, #53e5ef 45%, #2d93cc 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
         }}>
-          <img
-            src="/favicon.png" alt="V"
-            style={{ height: 'clamp(2.2rem, 5vw, 3.8rem)', objectFit: 'contain', filter: 'drop-shadow(0 2px 8px rgba(0,210,255,0.6))' }}
-          />
-          <span className="title-shimmer" style={{ letterSpacing: '0.06em' }}>esign</span>
+          {t('about.title')}
         </h1>
-        <p style={{
-          fontSize: 'clamp(1rem, 2.5vw, 1.35rem)', fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 28px',
-          background: 'linear-gradient(180deg, #53e5ef 0%, #2d93cc 55%, #2262a8 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-        }}>
-          Investing Signals
-        </p>
         <p style={{
           maxWidth: 620, margin: '0 auto', fontSize: 16,
           lineHeight: 1.75, color: 'var(--muted, #aaa)',

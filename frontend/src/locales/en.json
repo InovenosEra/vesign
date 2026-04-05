@@ -205,6 +205,7 @@
   "contact.sentTitle": "Message sent!",
   "contact.sentDesc": "Thank you for reaching out. We'll get back to you as soon as possible.",
   "contact.error": "Failed to send message. Please try again.",
+  "about.title": "About Vesign",
   "about.tagline": "Investing Signals, Powered by Data",
   "about.intro": "Vesign is an investment research platform that monitors US and Israeli stock markets every trading day, automatically identifying high-conviction buy and sell opportunities through a multi-layered analysis of market conditions and company fundamentals.",
   "about.feature1Title": "Daily Signals",
