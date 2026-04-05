@@ -320,7 +320,7 @@ function LandingContent({ onSignIn, onRequest }) {
       }}>
         <h2 className="login-welcome-title" style={{
           fontSize: 'clamp(2.4rem, 7vw, 4.5rem)', fontWeight: 900,
-          margin: '0 0 24px', letterSpacing: '-0.03em', lineHeight: 1.05, paddingBottom: '0.15em',
+          margin: '0 0 16px', letterSpacing: '-0.03em', lineHeight: 1.05, paddingBottom: '0.15em',
           background: 'linear-gradient(135deg, #ffffff 0%, #53e5ef 45%, #2d93cc 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
         }}>
@@ -328,10 +328,11 @@ function LandingContent({ onSignIn, onRequest }) {
         </h2>
 
         <p style={{
-          fontSize: 'clamp(1rem, 2.2vw, 1.2rem)', color: 'rgba(200,210,230,0.75)',
-          maxWidth: 580, lineHeight: 1.75, margin: '0 0 52px',
+          fontSize: 'clamp(1.05rem, 2.2vw, 1.25rem)', fontWeight: 500,
+          color: 'rgba(180,210,235,0.7)', letterSpacing: '0.02em',
+          margin: '0 0 52px',
         }}>
-          {t('login.pitch')}
+          {t('login.subtitle')}
         </p>
 
         {/* CTA buttons */}

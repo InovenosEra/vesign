@@ -210,6 +210,7 @@
   "landing.statWinRate": "Taux de réussite moy.",
   "landing.statAvgYield": "Rendement moy. par transaction",
   "landing.statStocks": "Actions analysées par jour",
+  "login.subtitle": "Votre compagnon de signaux d'investissement.",
   "login.pitch": "Une plateforme de recherche en investissement qui identifie chaque jour de bourse les opportunités d'achat et de vente à forte conviction sur les marchés américains et israéliens.",
   "login.featuresLabel": "Ce que vous obtenez",
   "login.feature1Title": "Signaux Quotidiens",

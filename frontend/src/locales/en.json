@@ -222,6 +222,7 @@
   "landing.statWinRate": "Avg. win rate",
   "landing.statAvgYield": "Avg. yield per trade",
   "landing.statStocks": "Stocks scanned daily",
+  "login.subtitle": "Your Investing Signals companion.",
   "login.pitch": "An investment research platform that identifies high-conviction buy and sell opportunities in US and Israeli markets every trading day.",
   "login.featuresLabel": "What you get",
   "login.feature1Title": "Daily Signals",

@@ -26,7 +26,6 @@
   "table.clear": "נקה",
   "table.prev": "‹ הקודם",
   "table.next": "הבא ›",
-
   "col.ticker": "סימול",
   "col.company": "חברה",
   "col.marketCap": "שווי שוק (B)",
@@ -211,6 +210,7 @@
   "landing.statWinRate": "אחוז הצלחה ממוצע",
   "landing.statAvgYield": "תשואה ממוצעת לעסקה",
   "landing.statStocks": "מניות נסרקות יומית",
+  "login.subtitle": "המלווה שלך לאיתותי השקעות.",
   "login.pitch": "פלטפורמת מחקר השקעות המזהה הזדמנויות קנייה ומכירה בעלות פוטנציאל גבוה בשווקי ארה\"ב וישראל בכל יום מסחר.",
   "login.featuresLabel": "מה תקבלו",
   "login.feature1Title": "איתותים יומיים",
