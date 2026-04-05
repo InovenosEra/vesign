@@ -319,7 +319,9 @@ function BrandingPanel() {
     }}>
       {/* Welcome title */}
       <h2 style={{
-        fontSize: 28, fontWeight: 700, margin: '0 0 16px', color: 'var(--text)',
+        fontSize: 30, fontWeight: 800, margin: '0 0 16px', letterSpacing: '-0.02em',
+        background: 'linear-gradient(135deg, #ffffff 0%, #53e5ef 40%, #2d93cc 100%)',
+        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
       }}>
         {t('login.welcome')}
       </h2>
