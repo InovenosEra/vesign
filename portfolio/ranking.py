@@ -6,15 +6,10 @@ def run_ranking():
 
     print("Running ranking engine...")
 
-    signals = pd.read_sql("SELECT * FROM signals", engine)
-
-    # ---------- keep only BUY candidates ----------
-    ranked = signals[signals["signal"] == "BUY"].copy()
+    ranked = pd.read_sql("SELECT * FROM signals WHERE signal='BUY'", engine)
 
     if ranked.empty:
         print("No BUY signals to rank")
-        ranked.to_sql("daily_ranked", engine,
-                      if_exists="replace", index=False)
         return
 
     # ---------- rank by ML prediction score ----------
