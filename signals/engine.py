@@ -191,8 +191,10 @@ def run_scoring(target_date=None):
     )
 
     # ---------- 52-week high distance ----------
+    # Pass through if no data (NULL) — same pattern as health/ML conditions.
     df["week52_condition"] = (
-        df["pct_from_52w_high"] <= -config.get("pct_from_52w_high_min", 0.10)
+        (df["pct_from_52w_high"] <= -config.get("pct_from_52w_high_min", 0.10))
+        | df["pct_from_52w_high"].isna()
     )
 
     # ---------- Health score gate ----------
