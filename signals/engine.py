@@ -139,7 +139,23 @@ def run_scoring(target_date=None):
     else:
         analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
 
-    health   = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
+    if target_date:
+        health = pd.read_sql(
+            """
+            SELECT ticker, score AS health_score
+            FROM company_health_history h1
+            WHERE recorded_at = (
+                SELECT MAX(recorded_at) FROM company_health_history h2
+                WHERE h2.ticker = h1.ticker AND DATE(h2.recorded_at) <= :td
+            )
+            """,
+            engine,
+            params={"td": target_date},
+        )
+        if health.empty:
+            health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
+    else:
+        health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
 
     df = features.merge(analyst, on="ticker", how="left")
     df = df.merge(health, on="ticker", how="left")
