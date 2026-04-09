@@ -1018,6 +1018,10 @@ def remove_ticker(list_id: int, ticker: str, user=Depends(get_current_user)):
             text("DELETE FROM watchlist WHERE list_id = :lid AND ticker = :ticker"),
             {"lid": list_id, "ticker": ticker.upper()},
         )
+        conn.execute(
+            text("DELETE FROM watchlist_holdings WHERE watchlist_id = :lid AND ticker = :ticker"),
+            {"lid": list_id, "ticker": ticker.upper()},
+        )
 
 
 # --- Watchlist holdings ------------------------------------------------------
