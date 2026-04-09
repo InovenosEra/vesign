@@ -434,7 +434,7 @@ export default function WatchlistPage() {
                 </div>
                 <div style={{ width: '100%', height: 160 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={compData} margin={{ top: 18, right: 8, left: -10, bottom: 0 }}>
+                    <BarChart data={compData} margin={{ top: 18, right: 8, left: -10, bottom: 0 }} cursor="default">
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text)' }} tickLine={false} axisLine={false} />
                       <YAxis tick={{ fontSize: 9, fill: 'var(--muted)' }} tickLine={false} axisLine={false}
@@ -444,7 +444,7 @@ export default function WatchlistPage() {
                         formatter={v => [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`]}
                         itemStyle={{ color: 'var(--text)' }}
                       />
-                      <Bar dataKey="yield" radius={[4, 4, 0, 0]}
+                      <Bar dataKey="yield" radius={[4, 4, 0, 0]} cursor={false}
                         label={{ position: 'top', fontSize: 10, fill: 'var(--text)', formatter: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` }}>
                         {compData.map((entry, i) => (
                           <Cell key={i} fill={entry.name === 'Vesign' ? 'var(--green)' : '#3498db'} />
