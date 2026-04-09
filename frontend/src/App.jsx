@@ -537,9 +537,9 @@ export function Footer() {
       fontSize: 12, color: 'var(--muted, #666)',
     }}>
       <span>© {new Date().getFullYear()} Vesign. All rights reserved.</span>
-      <a href="/contact" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+      <Link to="/contact" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
         Contact Us
-      </a>
+      </Link>
     </footer>
   )
 }
