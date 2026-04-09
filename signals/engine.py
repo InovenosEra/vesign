@@ -80,7 +80,7 @@ def run_scoring(target_date=None):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    trailing_stop_pct = config.get("trailing_stop_pct", 0.07)
+    trailing_stop_pct = config.get("trailing_stop_pct", 0.10)
 
     # ---------- Schema migration ----------
     _ensure_signals_columns()
@@ -236,6 +236,8 @@ def run_scoring(target_date=None):
     today_df = df[df["date"] == today].copy()
 
     # ---------- Trailing stop (vectorized) ----------
+    import numpy as np
+
     if open_positions:
         op_series = pd.Series(open_positions, name="entry_price")
         today_df = today_df.join(op_series, on="ticker")
@@ -248,8 +250,6 @@ def run_scoring(target_date=None):
         stop_hit = pd.Series(False, index=today_df.index)
 
     # ---------- Vectorized signal logic ----------
-    import numpy as np
-
     buy_cond = (
         (today_df["rsi_3day_flag"] == 3)
         & today_df["bb_condition"]
