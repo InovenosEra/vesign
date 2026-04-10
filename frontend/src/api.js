@@ -1,6 +1,6 @@
 const BASE = '/api'
 
-export const WHITE_BG_LOGOS = new Set(['CTVA', 'SNX', 'ZBH', 'PCTY'])
+export const WHITE_BG_LOGOS = new Set(['CTVA', 'SNX', 'ZBH', 'PCTY', 'PENG'])
 
 const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' }
 
