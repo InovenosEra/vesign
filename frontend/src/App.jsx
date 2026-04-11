@@ -385,8 +385,8 @@ function Header() {
           <nav className="desktop-nav">
             <NavLink to="/">{t('nav.signals')}</NavLink>
             <NavLink to="/trades">{t('nav.trades')}</NavLink>
-            <NavLink to="/research">Research</NavLink>
             <NavLink to="/portfolio">{t('nav.portfolio')}</NavLink>
+            <NavLink to="/research">Research</NavLink>
             <NavLink to="/about">{t('nav.about')}</NavLink>
           </nav>
         </div>
@@ -414,8 +414,8 @@ function Header() {
         <div className="mobile-menu">
           <NavLink to="/" onClick={closeNav}>{t('nav.signals')}</NavLink>
           <NavLink to="/trades" onClick={closeNav}>{t('nav.trades')}</NavLink>
-          <NavLink to="/research" onClick={closeNav}>Research</NavLink>
           <NavLink to="/portfolio" onClick={closeNav}>{t('nav.portfolio')}</NavLink>
+          <NavLink to="/research" onClick={closeNav}>Research</NavLink>
           <NavLink to="/about" onClick={closeNav}>{t('nav.about')}</NavLink>
           <div className="mobile-menu-divider" />
           <div className="mobile-menu-market"><MarketStatus /></div>
