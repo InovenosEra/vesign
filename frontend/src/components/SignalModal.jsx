@@ -152,7 +152,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
   }
   const openBuy = pendingBuy
 
-  const PLOT_TOP    = 70
+  const PLOT_TOP    = 100
   const PLOT_BOTTOM = 332
 
   function priceBox(cx, value, color, byOverride) {
@@ -293,7 +293,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
           <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden', outline: 'none' }}>
 
             {/* Period selector — overlaid at top of chart, aligned with plot area */}
-            <div style={{ position: 'absolute', top: 36, left: 56, right: 16, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
+            <div style={{ position: 'absolute', top: 8, left: 56, right: 16, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
               {CHART_PERIODS.map(m => (
                 <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
                   onClick={() => selectPeriod(m)}
@@ -310,7 +310,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
               </span>
             </div>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={chartData} margin={{ top: 70, right: 16, bottom: 8, left: 8 }}>
+              <LineChart data={chartData} margin={{ top: 100, right: 16, bottom: 8, left: 8 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
