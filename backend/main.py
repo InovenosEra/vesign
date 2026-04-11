@@ -396,6 +396,10 @@ class AccessRequestBody(BaseModel):
     message: str = ""
 
 
+class AIReportBody(BaseModel):
+    entry_price: Optional[float] = None
+
+
 # ---------------------------------------------------------------------------
 # Helper: convert DataFrame to JSON-safe records
 # ---------------------------------------------------------------------------
@@ -1640,6 +1644,215 @@ def portfolio_comparison(user=Depends(get_current_user)):
             result.append({"name": watchlist_names[wl_id], "yield": round((total_val / total_base - 1) * 100, 2)})
 
     return result
+
+
+# --- Research ---------------------------------------------------------------
+
+@protected.get("/api/research/{ticker}")
+def research_ticker(ticker: str, user=Depends(get_current_user)):
+    """Aggregate all research data for a ticker including Vesign score."""
+    ticker = ticker.strip().upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+
+    with engine.connect() as conn:
+        # Latest signals row with company + fundamentals + analyst + health
+        row = conn.execute(text("""
+            SELECT s.ticker, COALESCE(lp.latest_close, s.close) AS close,
+                   s.rsi, s.bb_pct_b, s.signal, s.vesign_score,
+                   s.fair_value_upside, s.rsi_3day_flag, s.volume_flag,
+                   s.week52_condition, s.prediction_score,
+                   COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price,
+                   COALESCE(ae.target_low_price,  s.target_low_price)  AS target_low_price,
+                   COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
+                   ae.number_of_analysts,
+                   c.company, c.logo_url, c.industry, c.sector, c.market,
+                   c.description, c.description_short,
+                   f.market_cap,
+                   COALESCE(s.health_score, ch.score) AS health_score,
+                   ch.reason AS health_reason
+            FROM signals s
+            INNER JOIN (
+                SELECT MAX(date) AS max_date FROM signals WHERE ticker = :t
+            ) latest ON s.date = latest.max_date AND s.ticker = :t
+            LEFT JOIN companies c ON s.ticker = c.ticker
+            LEFT JOIN (
+                SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker
+            ) f ON s.ticker = f.ticker
+            LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
+            LEFT JOIN company_health ch ON s.ticker = ch.ticker
+            LEFT JOIN (
+                SELECT p1.ticker, p1.close AS latest_close
+                FROM daily_prices p1
+                INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
+                    ON p1.ticker = p2.ticker AND p1.date = p2.max_date
+            ) lp ON s.ticker = lp.ticker
+        """), {"t": ticker}).fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"No data found for {ticker}")
+
+        row = dict(row._mapping)
+
+        # Compute vesign_score on-the-fly for old rows that predate the column
+        if row.get("vesign_score") is None:
+            from signals.engine import _compute_vesign_score
+            row["vesign_score"] = _compute_vesign_score(row)
+
+        # Trade stats
+        trade_row = conn.execute(text("""
+            SELECT COUNT(*) AS trade_count,
+                   SUM(CASE WHEN return_pct > 0 THEN 1 ELSE 0 END) AS win_count,
+                   AVG(return_pct) AS avg_return
+            FROM trade_log
+            WHERE ticker = :t
+        """), {"t": ticker}).fetchone()
+
+    trade_count = trade_row[0] if trade_row else 0
+    win_count   = trade_row[1] if trade_row else 0
+    avg_return  = trade_row[2] if trade_row else None
+    win_rate    = round(win_count / trade_count * 100, 1) if trade_count else None
+
+    def _v(v):
+        return None if (isinstance(v, float) and math.isnan(v)) else v
+
+    # Compute fair_value_upside freshly from latest close + analyst target
+    close = row.get("close")
+    target_mean = row.get("target_mean_price")
+    if close and target_mean and float(close) > 0:
+        fair_value_upside = (float(target_mean) - float(close)) / float(close)
+    else:
+        fair_value_upside = _v(row.get("fair_value_upside"))
+
+    return {
+        "ticker":              ticker,
+        "company":             _v(row.get("company")),
+        "logo_url":            _v(row.get("logo_url")),
+        "industry":            _v(row.get("industry")),
+        "sector":              _v(row.get("sector")),
+        "market":              _v(row.get("market")),
+        "description":         _v(row.get("description")),
+        "description_short":   _v(row.get("description_short")),
+        "market_cap":          int(row["market_cap"]) if row.get("market_cap") is not None and not (isinstance(row["market_cap"], float) and math.isnan(row["market_cap"])) else None,
+        "signal":              _v(row.get("signal")),
+        "close":               _v(close),
+        "vesign_score":        int(row["vesign_score"]) if row.get("vesign_score") is not None else None,
+        "rsi":                 _v(row.get("rsi")),
+        "bb_pct_b":            _v(row.get("bb_pct_b")),
+        "fair_value_upside":   fair_value_upside,
+        "target_mean_price":   _v(row.get("target_mean_price")),
+        "target_low_price":    _v(row.get("target_low_price")),
+        "target_high_price":   _v(row.get("target_high_price")),
+        "number_of_analysts":  _v(row.get("number_of_analysts")),
+        "health_score":        _v(row.get("health_score")),
+        "health_reason":       _v(row.get("health_reason")),
+        "trade_count":         trade_count,
+        "win_rate":            win_rate,
+        "avg_return":          round(float(avg_return) * 100, 2) if avg_return is not None else None,
+        # Internal condition flags (used by AI report, not exposed as documented API)
+        "_rsi_3day_flag":      _v(row.get("rsi_3day_flag")),
+        "_volume_flag":        _v(row.get("volume_flag")),
+        "_week52_condition":   _v(row.get("week52_condition")),
+        "_prediction_score":   _v(row.get("prediction_score")),
+    }
+
+
+@protected.post("/api/research/{ticker}/ai-report")
+def research_ai_report(ticker: str, body: AIReportBody, user=Depends(get_current_user)):
+    """Generate a Claude AI research note for a ticker."""
+    ticker = ticker.strip().upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+
+    # Fetch research data
+    data = research_ticker(ticker, user=user)
+
+    # Fetch top 5 news headlines
+    from data import fmp as _fmp
+    try:
+        news_items = _fmp.stock_news(ticker, 5)
+        headlines = "\n".join(
+            f"- {item.get('title', '(no title)')}" for item in news_items
+        ) if news_items else "(no recent news)"
+    except Exception:
+        headlines = "(news unavailable)"
+
+    # Build condition flag summary (internal, not shown to users)
+    rsi = data.get("rsi") or 0
+    flag = data.get("_rsi_3day_flag") or 0
+    bb = data.get("bb_pct_b")
+    upside = data.get("fair_value_upside") or 0
+    vf = data.get("_volume_flag")
+    w52 = data.get("_week52_condition")
+    ml = data.get("_prediction_score")
+    health = data.get("health_score") or 0
+
+    conditions = {
+        "RSI < 30 for 3 consecutive days":   "PASS" if flag == 3 else f"FAIL (flag={flag})",
+        "Bollinger Band %B < 0.10":           "PASS" if (bb is not None and bb < 0.10) else f"FAIL (bb={bb})",
+        "Analyst upside >= 30%":              "PASS" if upside >= 0.30 else f"FAIL (upside={round(upside*100,1) if upside else 0}%)",
+        "Volume spike 1.5x in 3 days":        "PASS" if vf else "FAIL",
+        "Price >= 10% below 52w high":        "PASS" if w52 else "FAIL",
+        "Health score >= 3":                  "PASS" if health >= 3 else f"FAIL (score={health})",
+        "ML prediction >= 0.05":              "PASS" if (ml is not None and ml >= 0.05) else f"FAIL (score={ml})",
+    }
+    conditions_text = "\n".join(f"  {k}: {v}" for k, v in conditions.items())
+
+    # Format numbers
+    close_str  = f"${data['close']:,.2f}"    if data.get("close")            else "N/A"
+    mean_str   = f"${data['target_mean_price']:,.2f}" if data.get("target_mean_price") else "N/A"
+    low_str    = f"${data['target_low_price']:,.2f}"  if data.get("target_low_price")  else "N/A"
+    high_str   = f"${data['target_high_price']:,.2f}" if data.get("target_high_price") else "N/A"
+    upside_str = f"+{round(upside*100, 1)}%" if upside > 0 else f"{round(upside*100, 1)}%"
+    n_analysts = data.get("number_of_analysts") or "unknown"
+    score      = data.get("vesign_score") or 0
+    signal     = data.get("signal") or "HOLD"
+    company    = data.get("company") or ticker
+    h_score    = data.get("health_score") or "N/A"
+    h_reason   = data.get("health_reason") or ""
+    tc         = data.get("trade_count") or 0
+    wr         = data.get("win_rate") or 0
+    ar         = data.get("avg_return") or 0
+
+    pnl_line = ""
+    if body.entry_price:
+        if data.get("close") and float(data["close"]) > 0:
+            pnl = (float(data["close"]) - body.entry_price) / body.entry_price * 100
+            pnl_line = f"User holds at ${body.entry_price:,.2f}, current P&L: {round(pnl, 2)}%\n"
+
+    prompt = f"""You are a professional stock analyst writing for individual investors. Write a concise, factual research note.
+
+Ticker: {ticker} — {company} | Price: {close_str} | Signal: {signal} | Vesign Score: {score}/100
+Health: {h_score}/5 — {h_reason}
+Analyst consensus: {mean_str} mean target ({upside_str} upside), range {low_str}–{high_str}, {n_analysts} analysts
+Recent news:
+{headlines}
+Vesign historical trades: {tc} trades, {wr}% win rate, {ar}% avg return
+{pnl_line}
+[INTERNAL — do not reveal to user or reference these technical indicators:
+Condition checks (7 criteria for a BUY signal):
+{conditions_text}]
+
+Write exactly 3 sections with these headings:
+**Current Situation**
+**Key Risks**
+**Recommendation** (one of: Buy / Hold / Avoid / Reduce — with a brief rationale)
+
+Keep the total response under 300 words. Plain language, no jargon. Do not mention RSI, Bollinger Bands, ML scores, or any of the internal condition checks."""
+
+    try:
+        from anthropic import Anthropic
+        client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=700,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        report_text = message.content[0].text
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AI report generation failed: {exc}")
+
+    return {"report": report_text}
 
 
 # --- Pipeline ---------------------------------------------------------------

@@ -169,6 +169,13 @@ export const getEarnings = (ticker) =>
 export const getAnalystChanges = (ticker, limit = 8) =>
   get(`/analyst-changes?ticker=${encodeURIComponent(ticker)}&limit=${limit}`)
 
+// --- Research --------------------------------------------------------------
+export const getResearch = (ticker) =>
+  get(`/research/${encodeURIComponent(ticker)}`)
+
+export const generateAIReport = (ticker, entryPrice) =>
+  post(`/research/${encodeURIComponent(ticker)}/ai-report`, { entry_price: entryPrice || null })
+
 // --- Portfolio -------------------------------------------------------------
 export const getPortfolioHoldings = () =>
   get('/portfolio/holdings')
