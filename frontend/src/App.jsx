@@ -375,7 +375,7 @@ function Header() {
   return (
     <>
       <header className="app-header">
-          <NavLink to="/" onClick={closeNav} style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+          <NavLink to="/" onClick={closeNav} style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', marginTop: '-6px' }}>
             <h1 style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 900, fontSize: '2.1rem', letterSpacing: '0.08em', fontFamily: "'Segoe UI', system-ui, sans-serif", margin: 0, lineHeight: 1, cursor: 'pointer', direction: 'ltr' }}>
               <img src="/favicon.png" alt="V" style={{ height: '2.5rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0, 210, 255, 0.6))' }} />
               <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>
