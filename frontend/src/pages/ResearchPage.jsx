@@ -1,44 +1,42 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { searchTickers, getResearch, generateAIReport, getNews, getAnalystChanges, WHITE_BG_LOGOS } from '../api'
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer,
+} from 'recharts'
+import {
+  searchTickers, getResearch, generateAIReport, getNews, getAnalystChanges,
+  getPriceHistory, getSignalMarkers, WHITE_BG_LOGOS,
+} from '../api'
 import SignalModal from '../components/SignalModal'
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function fmt(n, decimals = 2) {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(n, d = 2) {
   return n != null
-    ? Number(n).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    ? Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })
     : '—'
 }
-
-function fmtPct(n, decimals = 1) {
-  return n != null ? `${n > 0 ? '+' : ''}${Number(n * 100).toFixed(decimals)}%` : '—'
-}
-
 function fmtMktCap(v) {
   if (!v) return '—'
   const b = v / 1e9
   return b >= 1 ? `$${b.toFixed(1)}B` : `$${(v / 1e6).toFixed(0)}M`
 }
-
 function scoreColor(s) {
+  if (s == null) return '#8b90a0'
   if (s >= 86) return '#2ecc71'
   if (s >= 71) return '#3fb0de'
   if (s >= 51) return '#e67e22'
   if (s >= 31) return '#f39c12'
   return '#8b90a0'
 }
-
 function scoreLabel(s) {
+  if (s == null) return '—'
   if (s >= 86) return 'Signal active'
   if (s >= 71) return 'Approaching signal'
   if (s >= 51) return 'Watching closely'
   if (s >= 31) return 'Early watch'
   return 'Not on radar'
 }
-
-function signalBadgeStyle(signal) {
+function sigStyle(signal) {
   const map = {
     BUY:  { background: 'rgba(46,204,113,0.15)', color: '#2ecc71', border: '1px solid #2ecc71' },
     SELL: { background: 'rgba(231,76,60,0.15)',  color: '#e74c3c', border: '1px solid #e74c3c' },
@@ -46,10 +44,21 @@ function signalBadgeStyle(signal) {
   }
   return map[signal] || map.HOLD
 }
+function subDate(months) {
+  const d = new Date()
+  d.setMonth(d.getMonth() - months)
+  return d.toISOString().slice(0, 10)
+}
 
-// ---------------------------------------------------------------------------
-// Ticker search dropdown (reuses existing searchTickers API)
-// ---------------------------------------------------------------------------
+const PERIODS = [
+  { label: '1M', months: 1 },
+  { label: '3M', months: 3 },
+  { label: '6M', months: 6 },
+  { label: '1Y', months: 12 },
+  { label: '2Y', months: 24 },
+]
+
+// ─── TickerSearch ─────────────────────────────────────────────────────────────
 function TickerSearch({ onSelect }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
@@ -59,41 +68,29 @@ function TickerSearch({ onSelect }) {
   useEffect(() => {
     if (!q.trim()) { setResults([]); return }
     const id = setTimeout(async () => {
-      try {
-        const data = await searchTickers(q, 8)
-        setResults(data || [])
-        setOpen(true)
-      } catch (_) {}
+      try { const data = await searchTickers(q, 8); setResults(data || []); setOpen(true) }
+      catch (_) {}
     }, 250)
     return () => clearTimeout(id)
   }, [q])
 
   useEffect(() => {
-    function onMouseDown(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
+    function onMD(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onMD)
+    return () => document.removeEventListener('mousedown', onMD)
   }, [])
 
-  function select(item) {
-    setQ('')
-    setResults([])
-    setOpen(false)
-    onSelect(item)
-  }
+  function select(item) { setQ(''); setResults([]); setOpen(false); onSelect(item) }
 
   return (
-    <div ref={ref} style={{ position: 'relative', width: '100%', maxWidth: 480 }}>
+    <div ref={ref} style={{ position: 'relative', maxWidth: 500 }}>
       <input
-        value={q}
-        onChange={e => setQ(e.target.value)}
-        placeholder="Search ticker or company name..."
+        value={q} onChange={e => setQ(e.target.value)}
+        placeholder="Search ticker or company…"
         style={{
-          width: '100%', padding: '10px 16px', borderRadius: 10,
+          width: '100%', padding: '11px 16px', borderRadius: 12,
           border: '1px solid var(--border)', background: 'var(--surface)',
-          color: 'var(--text)', fontSize: 15, boxSizing: 'border-box',
-          outline: 'none',
+          color: 'var(--text)', fontSize: 15, boxSizing: 'border-box', outline: 'none',
         }}
         autoFocus
       />
@@ -101,19 +98,15 @@ function TickerSearch({ onSelect }) {
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 10, zIndex: 300, overflow: 'hidden',
+          borderRadius: 12, zIndex: 300, overflow: 'hidden',
           boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
         }}>
           {results.map(r => (
-            <button
-              key={r.ticker}
-              onClick={() => select(r)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '9px 14px',
-                background: 'transparent', border: 'none',
-                cursor: 'pointer', color: 'var(--text)', textAlign: 'left',
-              }}
+            <button key={r.ticker} onClick={() => select(r)} style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              padding: '9px 14px', background: 'transparent', border: 'none',
+              cursor: 'pointer', color: 'var(--text)', textAlign: 'left',
+            }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
@@ -131,16 +124,215 @@ function TickerSearch({ onSelect }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Main page
-// ---------------------------------------------------------------------------
+// ─── SVG Semi-circle Score Gauge ──────────────────────────────────────────────
+function ScoreGauge({ score }) {
+  const r = 65, cx = 80, cy = 85
+  const halfCirc = Math.PI * r       // ≈204.2
+  const fullCirc = 2 * Math.PI * r   // ≈408.4
+  const filled = score != null ? (score / 100) * halfCirc : 0
+  const color = scoreColor(score)
+
+  return (
+    <svg viewBox="0 0 160 90" style={{ width: '100%', display: 'block' }}>
+      {/* Track */}
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke="rgba(255,255,255,0.07)" strokeWidth={13} strokeLinecap="round"
+        strokeDasharray={`${halfCirc} ${fullCirc}`}
+        transform={`rotate(-180 ${cx} ${cy})`}
+      />
+      {/* Filled arc */}
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke={color} strokeWidth={13} strokeLinecap="round"
+        strokeDasharray={`${filled} ${fullCirc}`}
+        transform={`rotate(-180 ${cx} ${cy})`}
+        style={{ transition: 'stroke-dasharray 0.8s ease' }}
+      />
+      {/* Score number */}
+      <text x={cx} y={cy - 14} textAnchor="middle" dominantBaseline="middle"
+        fill={color} fontSize="30" fontWeight="800" fontFamily="inherit">
+        {score ?? '—'}
+      </text>
+      <text x={cx} y={cy + 5} textAnchor="middle" dominantBaseline="middle"
+        fill="#8b90a0" fontSize="11" fontFamily="inherit">
+        / 100
+      </text>
+    </svg>
+  )
+}
+
+// ─── Analyst Price Range Bar ──────────────────────────────────────────────────
+function AnalystRangeBar({ low, mean, high, current }) {
+  if (!low || !high) return (
+    <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 0' }}>No analyst targets</div>
+  )
+  const minV = Math.min(low, current ?? low) * 0.96
+  const maxV = Math.max(high, current ?? high) * 1.04
+  const span = maxV - minV
+  const pct = v => `${((v - minV) / span * 100).toFixed(2)}%`
+
+  return (
+    <div style={{ padding: '4px 0 8px' }}>
+      <div style={{ position: 'relative', height: 6, background: 'var(--border)', borderRadius: 99, margin: '22px 2px 30px' }}>
+        {/* Low→High range fill */}
+        <div style={{
+          position: 'absolute', top: 0, height: '100%', borderRadius: 99,
+          left: pct(low),
+          width: `${((high - low) / span * 100).toFixed(2)}%`,
+          background: 'linear-gradient(90deg, #f39c12 0%, #2ecc71 100%)',
+        }} />
+        {/* Current price pin */}
+        {current && (
+          <div style={{ position: 'absolute', left: pct(current), transform: 'translateX(-50%)', top: -7 }}>
+            <div style={{ width: 4, height: 20, background: 'var(--accent)', borderRadius: 2 }} />
+            <div style={{
+              position: 'absolute', top: 22, left: '50%', transform: 'translateX(-50%)',
+              fontSize: 10, color: 'var(--accent)', fontWeight: 700, whiteSpace: 'nowrap',
+            }}>
+              ${fmt(current, 0)}
+            </div>
+          </div>
+        )}
+        {/* Mean target pin */}
+        {mean && (
+          <div style={{ position: 'absolute', left: pct(mean), transform: 'translateX(-50%)', top: -5 }}>
+            <div style={{ width: 2, height: 16, background: '#f39c12', borderRadius: 2 }} />
+            <div style={{
+              position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)',
+              fontSize: 10, color: '#f39c12', fontWeight: 700, whiteSpace: 'nowrap',
+            }}>
+              ${fmt(mean, 0)}
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
+        <span>Low ${fmt(low, 0)}</span>
+        <span>High ${fmt(high, 0)}</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Price Chart ──────────────────────────────────────────────────────────────
+function PriceChart({ ticker }) {
+  const [periodIdx, setPeriodIdx] = useState(2)
+  const [prices, setPrices] = useState([])
+  const [markers, setMarkers] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const { months } = PERIODS[periodIdx]
+    const start = subDate(months)
+    const end = new Date().toISOString().slice(0, 10)
+    setLoading(true)
+    Promise.all([
+      getPriceHistory(ticker, { start, end }),
+      getSignalMarkers(ticker, months + 1),
+    ]).then(([priceData, sigData]) => {
+      const sorted = (priceData || [])
+        .filter(p => p.date >= start)
+        .sort((a, b) => a.date.localeCompare(b.date))
+      setPrices(sorted)
+      setMarkers((sigData || []).filter(s => s.date >= start))
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [ticker, periodIdx])
+
+  const { months } = PERIODS[periodIdx]
+  function fmtTick(d) {
+    const [y, m, day] = d.split('-')
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    return months <= 3 ? `${m}/${day}` : `${names[+m - 1]} '${y.slice(2)}`
+  }
+
+  const minY = prices.length ? Math.min(...prices.map(p => p.close)) * 0.98 : 0
+  const maxY = prices.length ? Math.max(...prices.map(p => p.close)) * 1.02 : 100
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          Price Chart
+        </span>
+        <div style={{ display: 'flex', gap: 5 }}>
+          {PERIODS.map((p, i) => (
+            <button key={p.label} onClick={() => setPeriodIdx(i)} style={{
+              padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+              border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+              background: periodIdx === i ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+              color: periodIdx === i ? '#0b0e18' : 'var(--muted)',
+            }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
+          Loading chart…
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={prices} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="researchAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor="#3fb0de" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#3fb0de" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="date" tickFormatter={fmtTick}
+              tick={{ fill: '#8b90a0', fontSize: 10 }} tickLine={false} axisLine={false}
+              interval="preserveStartEnd"
+            />
+            <YAxis domain={[minY, maxY]}
+              tick={{ fill: '#8b90a0', fontSize: 10 }} tickLine={false} axisLine={false}
+              tickFormatter={v => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v.toFixed(0)}`}
+              width={52}
+            />
+            <Tooltip
+              contentStyle={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
+              formatter={v => [`$${fmt(v)}`, 'Close']}
+            />
+            {markers.map(m => (
+              <ReferenceLine key={m.date + m.signal} x={m.date}
+                stroke={m.signal === 'BUY' ? '#2ecc71' : '#e74c3c'}
+                strokeDasharray="3 3" strokeWidth={1.5}
+                label={{ value: m.signal, position: 'top', fill: m.signal === 'BUY' ? '#2ecc71' : '#e74c3c', fontSize: 9, fontWeight: 700 }}
+              />
+            ))}
+            <Area type="monotone" dataKey="close" stroke="#3fb0de" strokeWidth={2}
+              fill="url(#researchAreaGrad)" dot={false}
+              activeDot={{ r: 4, fill: '#3fb0de', strokeWidth: 0 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  )
+}
+
+// ─── Metric Card ─────────────────────────────────────────────────────────────
+function MetricCard({ label, value, sub, color }) {
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 12, padding: '16px 12px', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: color || 'var(--text)', lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{sub}</div>}
+      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</div>
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ResearchPage() {
   const { ticker: urlTicker } = useParams()
   const navigate = useNavigate()
 
   const [research, setResearch] = useState(null)
-  const [loadingResearch, setLoadingResearch] = useState(false)
-  const [researchError, setResearchError] = useState(null)
+  const [loadingR, setLoadingR] = useState(false)
+  const [errR, setErrR] = useState(null)
 
   const [report, setReport] = useState(null)
   const [loadingReport, setLoadingReport] = useState(false)
@@ -153,52 +345,37 @@ export default function ResearchPage() {
 
   const [modalRow, setModalRow] = useState(null)
 
-  // Load ticker from URL param on mount
-  useEffect(() => {
-    if (urlTicker) loadResearch(urlTicker)
-  }, [urlTicker])
+  useEffect(() => { if (urlTicker) loadResearch(urlTicker) }, [urlTicker])
 
   async function loadResearch(ticker) {
-    setLoadingResearch(true)
-    setResearchError(null)
-    setResearch(null)
-    setReport(null)
-    setNews(null)
-    setAnalystChanges(null)
+    setLoadingR(true); setErrR(null); setResearch(null)
+    setReport(null); setNews(null); setAnalystChanges(null)
     try {
       const data = await getResearch(ticker)
       setResearch(data)
       navigate(`/research/${ticker}`, { replace: true })
-      // Load news by default
       loadTab('news', ticker)
     } catch (e) {
-      setResearchError(e.message || 'Failed to load research data')
+      setErrR(e.message || 'Failed to load research data')
     } finally {
-      setLoadingResearch(false)
+      setLoadingR(false)
     }
   }
 
   async function loadTab(tab, tickerOverride) {
     const t = tickerOverride || research?.ticker
     if (!t) return
-    setActiveTab(tab)
-    setLoadingTab(true)
+    setActiveTab(tab); setLoadingTab(true)
     try {
-      if (tab === 'news') {
-        const data = await getNews(t, 10)
-        setNews(data || [])
-      } else {
-        const data = await getAnalystChanges(t, 10)
-        setAnalystChanges(data || [])
-      }
+      if (tab === 'news') setNews(await getNews(t, 10))
+      else setAnalystChanges(await getAnalystChanges(t, 10))
     } catch (_) {}
     setLoadingTab(false)
   }
 
   async function handleGenerateReport() {
     if (!research) return
-    setLoadingReport(true)
-    setReport(null)
+    setLoadingReport(true); setReport(null)
     try {
       const ep = entryPrice ? parseFloat(entryPrice) : null
       const data = await generateAIReport(research.ticker, ep)
@@ -210,325 +387,317 @@ export default function ResearchPage() {
     }
   }
 
-  function openChart() {
+  function openModal() {
     if (!research) return
     setModalRow({
-      ticker:            research.ticker,
-      company:           research.company,
-      logo_url:          research.logo_url,
-      industry:          research.industry,
-      description:       research.description,
-      description_short: research.description_short,
-      signal:            research.signal,
-      close:             research.close,
-      rsi:               research.rsi,
-      fair_value_upside: research.fair_value_upside,
-      target_mean_price: research.target_mean_price,
-      target_low_price:  research.target_low_price,
-      target_high_price: research.target_high_price,
-      health_score:      research.health_score,
-      health_reason:     research.health_reason,
-      market_cap:        research.market_cap,
-      prediction_score:  research.prediction_score,
+      ticker: research.ticker, company: research.company, logo_url: research.logo_url,
+      industry: research.industry, signal: research.signal, close: research.close,
+      rsi: research.rsi, fair_value_upside: research.fair_value_upside,
+      target_mean_price: research.target_mean_price, target_low_price: research.target_low_price,
+      target_high_price: research.target_high_price, health_score: research.health_score,
+      health_reason: research.health_reason, market_cap: research.market_cap,
+      prediction_score: research.prediction_score,
     })
   }
 
-  const panelStyle = {
-    background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: 12, padding: '18px 20px',
+  // Metric card computed values
+  const rsi = research?.rsi
+  const rsiColor = rsi == null ? '#8b90a0' : rsi < 30 ? '#2ecc71' : rsi < 50 ? '#f39c12' : '#8b90a0'
+  const rsiSub = rsi == null ? null : rsi < 30 ? 'Oversold' : rsi < 50 ? 'Neutral' : 'Overbought'
+
+  const upside = research?.fair_value_upside
+  const upPct = upside != null ? `${upside >= 0 ? '+' : ''}${(upside * 100).toFixed(0)}%` : '—'
+  const upColor = upside == null ? '#8b90a0' : upside >= 0.30 ? '#2ecc71' : upside >= 0 ? '#f39c12' : '#e74c3c'
+
+  const winRate = research?.win_rate
+  const wrColor = winRate == null ? '#8b90a0' : winRate >= 60 ? '#2ecc71' : winRate >= 40 ? '#f39c12' : '#e74c3c'
+
+  const avgRet = research?.avg_return
+  const arColor = avgRet == null ? '#8b90a0' : avgRet > 0 ? '#2ecc71' : '#e74c3c'
+
+  const panel = {
+    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px',
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px 60px' }}>
-      <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 22, fontWeight: 700 }}>
-        Stock Research
-      </h2>
+    <div style={{ padding: '24px 24px 80px' }}>
 
-      {/* Search bar */}
-      <div style={{ marginBottom: 28 }}>
+      {/* Search */}
+      <div style={{ marginBottom: 24 }}>
         <TickerSearch onSelect={item => loadResearch(item.ticker)} />
       </div>
 
-      {loadingResearch && (
-        <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 48 }}>
-          Loading research data…
+      {loadingR && (
+        <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 60, fontSize: 15 }}>
+          Loading research…
         </div>
       )}
-
-      {researchError && (
-        <div style={{ color: '#e74c3c', padding: '12px 16px', borderRadius: 8, background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)', marginBottom: 20 }}>
-          {researchError}
+      {errR && (
+        <div style={{ color: '#e74c3c', padding: '12px 16px', borderRadius: 8, marginBottom: 20, background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)' }}>
+          {errR}
+        </div>
+      )}
+      {!research && !loadingR && !errR && (
+        <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '80px 0', fontSize: 15 }}>
+          Search for any stock to start your research.
         </div>
       )}
 
       {research && (
         <>
-          {/* Header row */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* ── Hero ─────────────────────────────────────────────────────── */}
+          <div style={{
+            ...panel, marginBottom: 20, padding: '20px 24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexWrap: 'wrap', gap: 16,
+            background: 'linear-gradient(135deg, var(--surface) 0%, rgba(63,176,222,0.05) 100%)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               {research.logo_url && (
-                <img
-                  src={research.logo_url}
-                  alt=""
+                <img src={research.logo_url} alt=""
                   className={WHITE_BG_LOGOS.has(research.ticker) ? 'logo logo-white-bg' : 'logo'}
-                  style={{ width: 52, height: 52, objectFit: 'contain', borderRadius: 10 }}
+                  style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 14, flexShrink: 0 }}
                   onError={e => e.target.style.display = 'none'}
                 />
               )}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 22, fontWeight: 800 }}>{research.ticker}</span>
-                  <span
-                    style={{
-                      ...signalBadgeStyle(research.signal),
-                      padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                    }}
-                  >
+                  <span style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>{research.ticker}</span>
+                  <span style={{ ...sigStyle(research.signal), padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
                     {research.signal || 'HOLD'}
                   </span>
                 </div>
-                <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>
-                  {research.company}
-                </div>
-                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 2 }}>
+                <div style={{ fontSize: 15, marginTop: 2 }}>{research.company}</div>
+                <div style={{ fontSize: 12, marginTop: 3, color: 'var(--muted)' }}>
                   {[research.industry, fmtMktCap(research.market_cap)].filter(Boolean).join(' · ')}
                 </div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>${fmt(research.close)}</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Last price</div>
+                <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1 }}>${fmt(research.close)}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Last close</div>
               </div>
-              <button
-                onClick={openChart}
-                style={{
-                  padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
-                  background: 'transparent', border: '1px solid var(--border)',
-                  color: 'var(--accent)', fontSize: 13, fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                }}
-              >
+              <button onClick={openModal} style={{
+                padding: '9px 18px', borderRadius: 10, cursor: 'pointer',
+                background: 'transparent', border: '1px solid var(--border)',
+                color: 'var(--accent)', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+              }}>
                 View Chart ↗
               </button>
             </div>
           </div>
 
-          {/* Vesign Score bar */}
-          <div style={{ ...panelStyle, marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Vesign Score</span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: scoreColor(research.vesign_score) }}>
-                {research.vesign_score ?? '—'} <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 400 }}>/ 100</span>
-              </span>
-            </div>
-            <div style={{ height: 12, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
-              <div style={{
-                height: '100%',
-                width: `${research.vesign_score ?? 0}%`,
-                background: scoreColor(research.vesign_score ?? 0),
-                borderRadius: 99,
-                transition: 'width 0.6s ease',
-              }} />
-            </div>
-            <div style={{ fontSize: 12, color: scoreColor(research.vesign_score ?? 0), fontWeight: 600 }}>
-              {scoreLabel(research.vesign_score ?? 0)}
-            </div>
-          </div>
+          {/* ── Two-column grid ───────────────────────────────────────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, alignItems: 'start' }}>
 
-          {/* Health + Analyst panels */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-            {/* Health */}
-            <div style={panelStyle}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--muted)' }}>COMPANY HEALTH</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                {[1,2,3,4,5].map(i => (
-                  <div key={i} style={{
-                    width: 18, height: 18, borderRadius: 4,
-                    background: research.health_score != null && i <= research.health_score
-                      ? '#3fb0de' : 'var(--border)',
-                  }} />
-                ))}
-                <span style={{ fontSize: 14, fontWeight: 700, marginLeft: 4 }}>
-                  {research.health_score != null ? `${research.health_score}/5` : '—'}
-                </span>
+            {/* ── Left column ──────────────────────────────────────────────── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* Price chart */}
+              <div style={panel}>
+                <PriceChart ticker={research.ticker} />
               </div>
-              {research.health_reason && (
-                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
-                  {research.health_reason}
+
+              {/* 4 Metric cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <MetricCard
+                  label="RSI"
+                  value={rsi != null ? rsi.toFixed(1) : '—'}
+                  sub={rsiSub}
+                  color={rsiColor}
+                />
+                <MetricCard
+                  label="Analyst Upside"
+                  value={upPct}
+                  sub={upside != null ? `${research.number_of_analysts ?? '?'} analysts` : null}
+                  color={upColor}
+                />
+                <MetricCard
+                  label="Win Rate"
+                  value={research.trade_count > 0 ? `${winRate}%` : '—'}
+                  sub={research.trade_count > 0 ? `${research.trade_count} trades` : 'No trades'}
+                  color={wrColor}
+                />
+                <MetricCard
+                  label="Avg Return"
+                  value={research.trade_count > 0 && avgRet != null
+                    ? `${avgRet > 0 ? '+' : ''}${avgRet}%` : '—'}
+                  color={arColor}
+                />
+              </div>
+
+              {/* AI Report */}
+              <div style={panel}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>AI Research Report</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    type="number" placeholder="Entry price (optional)" value={entryPrice}
+                    onChange={e => setEntryPrice(e.target.value)}
+                    style={{
+                      padding: '8px 12px', borderRadius: 8, width: 200,
+                      border: '1px solid var(--border)', background: 'var(--bg)',
+                      color: 'var(--text)', fontSize: 13,
+                    }}
+                  />
+                  <button onClick={handleGenerateReport} disabled={loadingReport} style={{
+                    padding: '8px 22px', borderRadius: 8,
+                    cursor: loadingReport ? 'not-allowed' : 'pointer',
+                    background: loadingReport ? 'var(--border)' : 'var(--accent)',
+                    border: 'none', color: '#0b0e18', fontSize: 13, fontWeight: 700,
+                    opacity: loadingReport ? 0.7 : 1,
+                  }}>
+                    {loadingReport ? 'Generating…' : 'Generate AI Report ▶'}
+                  </button>
                 </div>
-              )}
+                {loadingReport && (
+                  <div style={{ marginTop: 16, color: 'var(--muted)', fontSize: 13 }}>
+                    Analyzing {research.ticker}…
+                  </div>
+                )}
+                {report && !loadingReport && (
+                  <div style={{
+                    marginTop: 18, whiteSpace: 'pre-wrap', lineHeight: 1.8,
+                    fontSize: 14, borderTop: '1px solid var(--border)', paddingTop: 16,
+                  }}>
+                    {report}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Analyst consensus */}
-            <div style={panelStyle}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--muted)' }}>ANALYST CONSENSUS</div>
-              {research.target_mean_price ? (
-                <>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>
-                    ${fmt(research.target_mean_price)}
-                    {research.fair_value_upside != null && (
-                      <span style={{ fontSize: 13, marginLeft: 8, color: research.fair_value_upside >= 0 ? '#2ecc71' : '#e74c3c', fontWeight: 600 }}>
-                        {fmtPct(research.fair_value_upside)}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                    Range: ${fmt(research.target_low_price)} – ${fmt(research.target_high_price)}
-                  </div>
-                  {research.number_of_analysts && (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                      {research.number_of_analysts} analysts
+            {/* ── Right column ─────────────────────────────────────────────── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Vesign Score gauge */}
+              <div style={{ ...panel, textAlign: 'center', paddingBottom: 14 }}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>
+                  Vesign Score
+                </div>
+                <ScoreGauge score={research.vesign_score} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: scoreColor(research.vesign_score), marginTop: 6 }}>
+                  {scoreLabel(research.vesign_score)}
+                </div>
+              </div>
+
+              {/* Analyst consensus + range bar */}
+              <div style={panel}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                  Analyst Consensus
+                </div>
+                {research.target_mean_price ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                      <span style={{ fontSize: 22, fontWeight: 800 }}>${fmt(research.target_mean_price, 0)}</span>
+                      {upside != null && (
+                        <span style={{ fontSize: 14, fontWeight: 700, color: upColor }}>
+                          {upside >= 0 ? '+' : ''}{(upside * 100).toFixed(0)}%
+                        </span>
+                      )}
                     </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>No analyst data</div>
-              )}
-            </div>
-          </div>
-
-          {/* Trade history summary */}
-          {research.trade_count > 0 && (
-            <div style={{ ...panelStyle, marginBottom: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--muted)' }}>VESIGN TRACK RECORD</div>
-              <div style={{ display: 'flex', gap: 32 }}>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>{research.trade_count}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Trades</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: research.win_rate >= 50 ? '#2ecc71' : '#e74c3c' }}>
-                    {research.win_rate != null ? `${research.win_rate}%` : '—'}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Win rate</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: research.avg_return >= 0 ? '#2ecc71' : '#e74c3c' }}>
-                    {research.avg_return != null ? `${research.avg_return > 0 ? '+' : ''}${research.avg_return}%` : '—'}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Avg return</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* AI Report section */}
-          <div style={{ ...panelStyle, marginBottom: 20 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>AI Research Report</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <input
-                type="number"
-                placeholder="Entry price (optional)"
-                value={entryPrice}
-                onChange={e => setEntryPrice(e.target.value)}
-                style={{
-                  padding: '8px 12px', borderRadius: 8, width: 200,
-                  border: '1px solid var(--border)', background: 'var(--surface)',
-                  color: 'var(--text)', fontSize: 13,
-                }}
-              />
-              <button
-                onClick={handleGenerateReport}
-                disabled={loadingReport}
-                style={{
-                  padding: '8px 20px', borderRadius: 8, cursor: loadingReport ? 'not-allowed' : 'pointer',
-                  background: loadingReport ? 'var(--border)' : 'var(--accent)',
-                  border: 'none', color: '#0b0e18', fontSize: 13, fontWeight: 700,
-                  opacity: loadingReport ? 0.6 : 1,
-                }}
-              >
-                {loadingReport ? 'Generating…' : 'Generate AI Report ▶'}
-              </button>
-            </div>
-
-            {loadingReport && (
-              <div style={{ marginTop: 20, color: 'var(--muted)', fontSize: 13 }}>
-                Analyzing {research.ticker}…
-              </div>
-            )}
-
-            {report && !loadingReport && (
-              <div style={{
-                marginTop: 20, whiteSpace: 'pre-wrap', lineHeight: 1.75,
-                fontSize: 14, color: 'var(--text)',
-                borderTop: '1px solid var(--border)', paddingTop: 16,
-              }}>
-                {report}
-              </div>
-            )}
-          </div>
-
-          {/* News / Analyst Changes tabs */}
-          <div style={panelStyle}>
-            <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-              {['news', 'analyst'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => { if (tab !== activeTab) loadTab(tab) }}
-                  style={{
-                    padding: '8px 20px', background: 'transparent', border: 'none',
-                    cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                    color: activeTab === tab ? 'var(--accent)' : 'var(--muted)',
-                    borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
-                    marginBottom: -1,
-                  }}
-                >
-                  {tab === 'news' ? 'News' : 'Analyst Changes'}
-                </button>
-              ))}
-            </div>
-
-            {loadingTab && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Loading…</div>}
-
-            {!loadingTab && activeTab === 'news' && news && (
-              news.length === 0
-                ? <div style={{ color: 'var(--muted)', fontSize: 13 }}>No recent news.</div>
-                : news.map((item, i) => (
-                  <div key={i} style={{ paddingBottom: 14, marginBottom: 14, borderBottom: i < news.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: 'var(--text)', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}
-                    >
-                      {item.title}
-                    </a>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-                      {item.site} · {item.publishedDate ? item.publishedDate.slice(0, 10) : ''}
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      Mean target · {research.number_of_analysts ?? '?'} analysts
                     </div>
-                  </div>
-                ))
-            )}
+                    <AnalystRangeBar
+                      low={research.target_low_price}
+                      mean={research.target_mean_price}
+                      high={research.target_high_price}
+                      current={research.close}
+                    />
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>No analyst targets</div>
+                )}
+              </div>
 
-            {!loadingTab && activeTab === 'analyst' && analystChanges && (
-              analystChanges.length === 0
-                ? <div style={{ color: 'var(--muted)', fontSize: 13 }}>No recent analyst changes.</div>
-                : analystChanges.map((item, i) => (
-                  <div key={i} style={{ paddingBottom: 12, marginBottom: 12, borderBottom: i < analystChanges.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
-                    <span style={{ fontWeight: 700 }}>{item.analystCompany || item.analyst}</span>
-                    {' · '}
-                    <span style={{ color: item.action === 'upgrade' ? '#2ecc71' : item.action === 'downgrade' ? '#e74c3c' : 'var(--muted)' }}>
-                      {item.action || item.rating}
-                    </span>
-                    {item.priceTarget && <span style={{ color: 'var(--muted)' }}> · ${item.priceTarget}</span>}
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{item.date?.slice(0, 10)}</div>
+              {/* Company health */}
+              <div style={panel}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                  Company Health
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                  {[1,2,3,4,5].map(i => (
+                    <div key={i} style={{
+                      flex: 1, height: 8, borderRadius: 4,
+                      background: research.health_score != null && i <= research.health_score
+                        ? '#3fb0de' : 'var(--border)',
+                      transition: 'background 0.3s',
+                    }} />
+                  ))}
+                  <span style={{ fontSize: 13, fontWeight: 700, marginLeft: 6, flexShrink: 0 }}>
+                    {research.health_score != null ? `${research.health_score}/5` : '—'}
+                  </span>
+                </div>
+                {research.health_reason && (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+                    {research.health_reason}
                   </div>
-                ))
-            )}
+                )}
+              </div>
+
+              {/* News + Analyst changes tabs */}
+              <div style={panel}>
+                <div style={{ display: 'flex', marginBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                  {['news', 'analyst'].map(tab => (
+                    <button key={tab} onClick={() => { if (tab !== activeTab) loadTab(tab) }} style={{
+                      padding: '7px 14px', background: 'transparent', border: 'none',
+                      cursor: 'pointer', fontSize: 12, fontWeight: 600, marginBottom: -1,
+                      color: activeTab === tab ? 'var(--accent)' : 'var(--muted)',
+                      borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
+                    }}>
+                      {tab === 'news' ? 'News' : 'Analyst Changes'}
+                    </button>
+                  ))}
+                </div>
+
+                {loadingTab && (
+                  <div style={{ color: 'var(--muted)', fontSize: 12, padding: '8px 0' }}>Loading…</div>
+                )}
+
+                {!loadingTab && activeTab === 'news' && news && (
+                  news.length === 0
+                    ? <div style={{ color: 'var(--muted)', fontSize: 12 }}>No recent news.</div>
+                    : news.slice(0, 8).map((item, i) => (
+                      <div key={i} style={{
+                        paddingBottom: 12, marginBottom: 12,
+                        borderBottom: i < Math.min(news.length, 8) - 1 ? '1px solid var(--border)' : 'none',
+                      }}>
+                        <a href={item.url} target="_blank" rel="noopener noreferrer"
+                          style={{ color: 'var(--text)', fontWeight: 600, fontSize: 12, textDecoration: 'none', lineHeight: 1.4, display: 'block' }}>
+                          {item.title}
+                        </a>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                          {item.site} · {item.publishedDate?.slice(0, 10)}
+                        </div>
+                      </div>
+                    ))
+                )}
+
+                {!loadingTab && activeTab === 'analyst' && analystChanges && (
+                  analystChanges.length === 0
+                    ? <div style={{ color: 'var(--muted)', fontSize: 12 }}>No recent analyst changes.</div>
+                    : analystChanges.slice(0, 8).map((item, i) => (
+                      <div key={i} style={{
+                        paddingBottom: 10, marginBottom: 10, fontSize: 12,
+                        borderBottom: i < Math.min(analystChanges.length, 8) - 1 ? '1px solid var(--border)' : 'none',
+                      }}>
+                        <span style={{ fontWeight: 700 }}>{item.analystCompany || item.analyst}</span>
+                        {' · '}
+                        <span style={{ color: item.action === 'upgrade' ? '#2ecc71' : item.action === 'downgrade' ? '#e74c3c' : 'var(--muted)' }}>
+                          {item.action || item.rating}
+                        </span>
+                        {item.priceTarget && <span style={{ color: 'var(--muted)' }}> · ${item.priceTarget}</span>}
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{item.date?.slice(0, 10)}</div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
           </div>
         </>
       )}
 
-      {!research && !loadingResearch && !researchError && (
-        <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '64px 0', fontSize: 15 }}>
-          Search for a stock to get started.
-        </div>
-      )}
-
-      {modalRow && (
-        <SignalModal row={modalRow} onClose={() => setModalRow(null)} />
-      )}
+      {modalRow && <SignalModal row={modalRow} onClose={() => setModalRow(null)} />}
     </div>
   )
 }
