@@ -530,7 +530,7 @@ export default function ResearchPage() {
                 <MetricCard
                   label="Analyst Upside"
                   value={upPct}
-                  sub={upside != null ? `${research.number_of_analysts ?? '?'} analysts` : null}
+                  sub={upside != null && research.number_of_analysts ? `${research.number_of_analysts} analysts` : null}
                   color={upColor}
                 />
                 <MetricCard
@@ -616,7 +616,7 @@ export default function ResearchPage() {
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                      Mean target · {research.number_of_analysts ?? '?'} analysts
+                      Mean target{research.number_of_analysts ? ` · ${research.number_of_analysts} analysts` : ''}
                     </div>
                     <AnalystRangeBar
                       low={research.target_low_price}
