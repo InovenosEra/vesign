@@ -264,7 +264,31 @@ _init_tables()
 # ---------------------------------------------------------------------------
 
 _nyse_cal = mcal.get_calendar("NYSE")
-_tase_cal = mcal.get_calendar("TASE")
+
+# pandas_market_calendars TASE calendar still uses the old Sun-Thu schedule.
+# As of January 2026, TASE switched to Mon-Fri (same as NYSE).
+# Use NYSE calendar for day-of-week check but override TASE hours (07:00–12:59 UTC).
+class _TASECalendar:
+    """Wraps NYSE calendar (Mon-Fri days) with TASE trading hours (07:00–12:59 UTC)."""
+    name = "TASE_MonFri"
+    _nyse = mcal.get_calendar("NYSE")
+    _open_h, _open_m   = 7,  0
+    _close_h, _close_m = 12, 59
+
+    def schedule(self, start_date, end_date):
+        nyse_sched = self._nyse.schedule(start_date=start_date, end_date=end_date)
+        if nyse_sched.empty:
+            return nyse_sched
+        import pytz
+        utc = pytz.UTC
+        def _ts(d, h, m):
+            return pd.Timestamp(year=d.year, month=d.month, day=d.day,
+                                hour=h, minute=m, tz=utc)
+        nyse_sched["market_open"]  = [_ts(r.Index.date(), self._open_h,  self._open_m)  for r in nyse_sched.itertuples()]
+        nyse_sched["market_close"] = [_ts(r.Index.date(), self._close_h, self._close_m) for r in nyse_sched.itertuples()]
+        return nyse_sched
+
+_tase_cal = _TASECalendar()
 _sched_cache: dict = {}  # (cal_name, date) → schedule DataFrame
 
 
