@@ -337,7 +337,7 @@ def update_company_info():
                 target_high = consensus.get("targetHigh") or None
                 target_low  = consensus.get("targetLow") or None
 
-                # Fallback to yfinance when FMP has no analyst targets
+                # yfinance: fallback for targets, always used for analyst count (FMP doesn't provide it)
                 if target_mean is None:
                     try:
                         import yfinance as yf
@@ -346,6 +346,12 @@ def update_company_info():
                         target_low  = info.get("targetLowPrice") or None
                         target_high = info.get("targetHighPrice") or None
                         n_analysts  = info.get("numberOfAnalystOpinions") or None
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        import yfinance as yf
+                        n_analysts = (yf.Ticker(t).info or {}).get("numberOfAnalystOpinions") or None
                     except Exception:
                         pass
 
