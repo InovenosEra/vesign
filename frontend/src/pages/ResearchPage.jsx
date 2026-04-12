@@ -213,6 +213,18 @@ function AnalystRangeBar({ low, mean, high, current }) {
   )
 }
 
+// ─── Marker Label (signal name + price, two SVG text lines) ──────────────────
+function MarkerLabel({ viewBox, signal, price }) {
+  const { x, y } = viewBox
+  const color = signal === 'BUY' ? '#2ecc71' : '#e74c3c'
+  return (
+    <g>
+      <text x={x} y={y - 14} textAnchor="middle" fill={color} fontSize={9} fontWeight={700} fontFamily="inherit">{signal}</text>
+      <text x={x} y={y - 4}  textAnchor="middle" fill={color} fontSize={8}  fontFamily="inherit" opacity={0.85}>${Math.round(price)}</text>
+    </g>
+  )
+}
+
 // ─── Price Chart ──────────────────────────────────────────────────────────────
 function PriceChart({ ticker }) {
   const [periodIdx, setPeriodIdx] = useState(2)
@@ -281,7 +293,7 @@ function PriceChart({ ticker }) {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={prices} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <AreaChart data={prices} margin={{ top: 32, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="researchAreaGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor="#3fb0de" stopOpacity={0.35} />
@@ -305,7 +317,7 @@ function PriceChart({ ticker }) {
               <ReferenceLine key={m.date + m.signal} x={m.date}
                 stroke={m.signal === 'BUY' ? '#2ecc71' : '#e74c3c'}
                 strokeDasharray="3 3" strokeWidth={1.5}
-                label={{ value: m.signal, position: 'top', fill: m.signal === 'BUY' ? '#2ecc71' : '#e74c3c', fontSize: 9, fontWeight: 700 }}
+                label={props => <MarkerLabel {...props} signal={m.signal} price={m.close} />}
               />
             ))}
             <Area type="monotone" dataKey="close" stroke="#3fb0de" strokeWidth={2}
