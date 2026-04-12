@@ -343,9 +343,9 @@ export default function SignalModal({ row: rowProp, onClose }) {
                 />
                 <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} name="close" />
                 {hasTargets && <>
-                  <Line type="stepAfter" dataKey="target_low"  stroke="#e74c3c" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_low"  connectNulls={false} />
-                  <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
-                  <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" dot={false} strokeWidth={1.5} strokeDasharray="5 3" name="target_high" connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_low"  stroke="#e74c3c" dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_low"  connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_high" connectNulls={false} />
                 </>}
               </LineChart>
             </ResponsiveContainer>

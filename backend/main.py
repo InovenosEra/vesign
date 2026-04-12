@@ -555,7 +555,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
-                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, COALESCE(s.health_score, h.score) AS health_score, h.reason AS health_reason,
+                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, COALESCE(h.score, s.health_score) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -636,7 +636,13 @@ def signals(
                         WHERE ticker = s.ticker AND DATE(recorded_at) <= DATE(s.date)
                         ORDER BY recorded_at DESC LIMIT 1),
                        s.health_score, h.score
-                   ) AS health_score, h.reason AS health_reason,
+                   ) AS health_score,
+                   COALESCE(
+                       (SELECT reason FROM company_health_history
+                        WHERE ticker = s.ticker AND DATE(recorded_at) <= DATE(s.date)
+                        ORDER BY recorded_at DESC LIMIT 1),
+                       h.reason
+                   ) AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
