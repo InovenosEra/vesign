@@ -233,7 +233,15 @@ function PriceChart({ ticker }) {
         .filter(p => p.date >= start)
         .sort((a, b) => a.date.localeCompare(b.date))
       setPrices(sorted)
-      setMarkers((sigData || []).filter(s => s.date >= start))
+      // Only show SELL markers that follow a BUY (actual trade exits)
+      const filtered = (sigData || []).filter(s => s.date >= start).sort((a, b) => a.date.localeCompare(b.date))
+      const paired = []
+      let hasBuy = false
+      for (const s of filtered) {
+        if (s.signal === 'BUY') { hasBuy = true; paired.push(s) }
+        else if (s.signal === 'SELL' && hasBuy) { hasBuy = false; paired.push(s) }
+      }
+      setMarkers(paired)
     }).catch(() => {}).finally(() => setLoading(false))
   }, [ticker, periodIdx])
 
