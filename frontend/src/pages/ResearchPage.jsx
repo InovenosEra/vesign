@@ -133,7 +133,7 @@ function ScoreGauge({ score }) {
   const color = scoreColor(score)
 
   return (
-    <svg viewBox="0 0 160 90" style={{ width: '100%', display: 'block' }}>
+    <svg viewBox="0 0 160 100" style={{ width: '100%', display: 'block' }}>
       {/* Track */}
       <circle cx={cx} cy={cy} r={r} fill="none"
         stroke="rgba(255,255,255,0.07)" strokeWidth={13} strokeLinecap="round"
