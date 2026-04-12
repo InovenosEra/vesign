@@ -1376,18 +1376,19 @@ def analyst_changes_endpoint(ticker: str = Query(...), limit: int = Query(defaul
 # --- Portfolio holdings ------------------------------------------------------
 
 @protected.get("/api/portfolio/holdings")
-def portfolio_holdings(user=Depends(get_current_user)):
+def portfolio_holdings(user=Depends(get_current_user), market: str = Query(default="US")):
     """All holdings across all user's watchlists, aggregated per ticker."""
     uid = user["id"]
+    market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
     with engine.connect() as conn:
-        rows = conn.execute(text("""
+        rows = conn.execute(text(f"""
             SELECT wh.ticker,
                    SUM(wh.quantity) AS total_qty,
                    SUM(wh.quantity * wh.buy_price) AS total_cost,
                    MIN(wh.buy_date) AS first_buy_date
             FROM watchlist_holdings wh
             JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid
+            WHERE wl.user_id = :uid AND {market_filter}
             GROUP BY wh.ticker
             ORDER BY total_cost DESC
         """), {"uid": uid}).fetchall()
@@ -1440,7 +1441,7 @@ def portfolio_holdings(user=Depends(get_current_user)):
 # --- Portfolio performance ---------------------------------------------------
 
 @protected.get("/api/portfolio/performance")
-def portfolio_performance(user=Depends(get_current_user)):
+def portfolio_performance(user=Depends(get_current_user), market: str = Query(default="US")):
     """Weekly yield %: user portfolio + Vesign equal-weight model (last 52 weeks)."""
     from datetime import date as _date, timedelta
     from collections import defaultdict
@@ -1449,14 +1450,16 @@ def portfolio_performance(user=Depends(get_current_user)):
     today = _date.today()
     start_date = today - timedelta(weeks=52)
     weeks = [start_date + timedelta(weeks=i) for i in range(53)]
+    market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
+    trade_filter  = "ticker LIKE '%.TA'"    if market == "IL" else "ticker NOT LIKE '%.TA'"
 
     with engine.connect() as conn:
-        # User US holdings — individual lots with buy_date
-        user_rows = conn.execute(text("""
+        # User holdings — individual lots with buy_date
+        user_rows = conn.execute(text(f"""
             SELECT wh.ticker, wh.quantity, wh.buy_price, DATE(wh.buy_date) AS buy_date
             FROM watchlist_holdings wh
             JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid AND wh.ticker NOT LIKE '%.TA'
+            WHERE wl.user_id = :uid AND {market_filter}
               AND wh.quantity > 0
             ORDER BY wh.buy_date
         """), {"uid": uid}).fetchall()
@@ -1465,11 +1468,11 @@ def portfolio_performance(user=Depends(get_current_user)):
             return []
 
         # Vesign: all trades that CLOSED in the last 52 weeks (same set as Trades page)
-        trade_log_rows = conn.execute(text("""
+        trade_log_rows = conn.execute(text(f"""
             SELECT DATE(sell_date) AS sell_date, return_pct
             FROM trade_log
             WHERE DATE(sell_date) >= :start
-              AND ticker NOT LIKE '%.TA'
+              AND {trade_filter}
               AND sell_date IS NOT NULL AND return_pct IS NOT NULL
             ORDER BY sell_date
         """), {"start": start_date.isoformat()}).fetchall()
@@ -1554,7 +1557,7 @@ def portfolio_performance(user=Depends(get_current_user)):
 # --- Portfolio comparison (bar chart) ----------------------------------------
 
 @protected.get("/api/portfolio/comparison")
-def portfolio_comparison(user=Depends(get_current_user)):
+def portfolio_comparison(user=Depends(get_current_user), market: str = Query(default="US")):
     """Final 12M yield per watchlist + Vesign — for the bar chart."""
     from datetime import date as _date, timedelta
     from collections import defaultdict
@@ -1562,14 +1565,16 @@ def portfolio_comparison(user=Depends(get_current_user)):
     uid = user["id"]
     today = _date.today()
     start_date = today - timedelta(weeks=52)
+    market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
+    trade_filter  = "ticker LIKE '%.TA'"    if market == "IL" else "ticker NOT LIKE '%.TA'"
 
     with engine.connect() as conn:
         # Holdings grouped by watchlist
-        holdings_rows = conn.execute(text("""
+        holdings_rows = conn.execute(text(f"""
             SELECT wl.id, wl.name, wh.ticker, wh.quantity, wh.buy_price, DATE(wh.buy_date) AS buy_date
             FROM watchlist_holdings wh
             JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid AND wh.ticker NOT LIKE '%.TA' AND wh.quantity > 0
+            WHERE wl.user_id = :uid AND {market_filter} AND wh.quantity > 0
             ORDER BY wl.name, wh.buy_date
         """), {"uid": uid}).fetchall()
 
@@ -1577,11 +1582,11 @@ def portfolio_comparison(user=Depends(get_current_user)):
             return []
 
         # Vesign: avg of all trades that CLOSED in the last 52 weeks (= final point of green line)
-        vesign_trades_rows = conn.execute(text("""
+        vesign_trades_rows = conn.execute(text(f"""
             SELECT return_pct
             FROM trade_log
             WHERE DATE(sell_date) >= :start
-              AND ticker NOT LIKE '%.TA'
+              AND {trade_filter}
               AND sell_date IS NOT NULL AND return_pct IS NOT NULL
         """), {"start": start_date.isoformat()}).fetchall()
 

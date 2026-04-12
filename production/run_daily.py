@@ -132,10 +132,10 @@ def _repair_market_caps():
 
 
 def _repair_analyst_targets():
-    """Refresh US analyst targets from yfinance in parallel.
+    """Refresh analyst targets from yfinance in parallel (US + TASE).
 
-    Runs for ALL US tickers (not just NULL) so that stale values from FMP's
-    consensus endpoint are overwritten with yfinance's more current data.
+    Runs for ALL tickers so that stale values from FMP's consensus endpoint
+    are overwritten with yfinance's more current data.
     yfinance aggregates more analysts and updates more frequently than FMP.
     After updating analyst_expectations, re-snapshots today's history row.
     """
@@ -147,15 +147,15 @@ def _repair_analyst_targets():
     from data.market_data import snapshot_analyst_targets
 
     df = pd.read_sql(
-        "SELECT ticker FROM analyst_expectations WHERE ticker NOT LIKE '%.TA'",
+        "SELECT ticker FROM analyst_expectations",
         engine,
     )
     tickers = df["ticker"].tolist()
     if not tickers:
-        print("Analyst target refresh: no US tickers found.")
+        print("Analyst target refresh: no tickers found.")
         return
 
-    print(f"Analyst target refresh: {len(tickers)} US tickers via yfinance…")
+    print(f"Analyst target refresh: {len(tickers)} tickers via yfinance…")
 
     def _fetch(t):
         try:

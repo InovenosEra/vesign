@@ -177,11 +177,11 @@ export const generateAIReport = (ticker, entryPrice) =>
   post(`/research/${encodeURIComponent(ticker)}/ai-report`, { entry_price: entryPrice || null })
 
 // --- Portfolio -------------------------------------------------------------
-export const getPortfolioHoldings = () =>
-  get('/portfolio/holdings')
+export const getPortfolioHoldings = (market = 'US') =>
+  get(`/portfolio/holdings?market=${market}`)
 
-export const getPortfolioPerformance = () =>
-  get('/portfolio/performance')
+export const getPortfolioPerformance = (market = 'US') =>
+  get(`/portfolio/performance?market=${market}`)
 
-export const getPortfolioComparison = () =>
-  get('/portfolio/comparison')
+export const getPortfolioComparison = (market = 'US') =>
+  get(`/portfolio/comparison?market=${market}`)

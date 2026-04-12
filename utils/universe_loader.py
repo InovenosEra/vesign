@@ -137,7 +137,23 @@ def load_universe():
         print(f"Warning: Could not load TA-90: {e}")
         ta90 = pd.DataFrame()
 
-    il_frames = [df for df in [ta35, ta90] if not df.empty]
+    print("Loading TA-125 universe...")
+    try:
+        ta125 = _fetch_ta_index("https://en.wikipedia.org/wiki/TA-125_Index")
+        print(f"Loaded {len(ta125)} TA-125 tickers")
+    except Exception as e:
+        print(f"Warning: Could not load TA-125: {e}")
+        ta125 = pd.DataFrame()
+
+    print("Loading TA-SME60 universe...")
+    try:
+        tasme60 = _fetch_ta_index("https://en.wikipedia.org/wiki/TA-SME60")
+        print(f"Loaded {len(tasme60)} TA-SME60 tickers")
+    except Exception as e:
+        print(f"Warning: Could not load TA-SME60: {e}")
+        tasme60 = pd.DataFrame()
+
+    il_frames = [df for df in [ta35, ta90, ta125, tasme60] if not df.empty]
     if il_frames:
         il_companies = pd.concat(il_frames, ignore_index=True).drop_duplicates(subset=["ticker"])
         print(f"Loaded {len(il_companies)} total IL tickers")

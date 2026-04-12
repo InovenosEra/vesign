@@ -574,6 +574,37 @@ def update_company_health():
         "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
     )
 
+    _SYSTEM_IL = (
+        "You are a strict financial analyst rating company health on a FULL 1-5 scale. "
+        "Use the ENTIRE range — do NOT cluster scores around 2-3.\n\n"
+        "You are evaluating Israeli (TASE) companies. Apply these market-specific norms:\n"
+        "- Israeli banks, real estate, and infrastructure companies structurally carry high debt — "
+        "D/E > 2.0 is normal for these sectors. Do NOT penalize unless D/E > 5.0.\n"
+        "- The Tel Aviv market is heavily weighted toward real estate, banking, pharma, and defense — "
+        "benchmark against sector peers, not US norms.\n"
+        "- Stock prices may be quoted in agorot (1/100 shekel) — ignore absolute price levels.\n\n"
+        "Scale definition (use each level freely):\n"
+        "  1 = Weak:      Negative or near-zero margins, severe debt overload, negative/weak cash flow, "
+        "shrinking revenue, or near-distress signals.\n"
+        "  2 = Fair:      Below-average profitability, elevated leverage, modest or inconsistent cash flow, "
+        "slow/flat growth. Survivable but uninspiring.\n"
+        "  3 = Good:      Solid, average performance for the industry. Profitable, manageable debt, "
+        "positive cash flow, stable growth.\n"
+        "  4 = Great:     Above-average margins, strong free cash flow, low-to-moderate debt, "
+        "healthy revenue/earnings growth. Financially sound.\n"
+        "  5 = Excellent: Exceptional across ALL metrics — industry-leading margins, minimal debt, "
+        "strong growing free cash flow, consistent double-digit growth.\n\n"
+        "Rules:\n"
+        "- If debtToEquity > 5.0 or profitMargins < 0, lean toward 1-2.\n"
+        "- If freeCashflow < 0 and revenueGrowth < 0, that is a 1 or 2.\n"
+        "- If profitMargins > 0.15 and revenueGrowth > 0.08, lean toward 4-5.\n"
+        "- Score 5 requires excellence in ALL dimensions simultaneously.\n"
+        "- If the company had a net loss in the prior year (one year ago), the score MUST be 3 or lower. No exceptions.\n"
+        "- A single strong recovery year after a loss does NOT warrant a 4 or 5.\n"
+        "- Context matters: benchmark within the company's industry and Israeli market.\n\n"
+        "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
+    )
+
     us_pending   = [t for t in pending if not t.endswith('.TA')]
     tase_pending = [t for t in pending if t.endswith('.TA')]
 
@@ -714,7 +745,7 @@ def update_company_health():
             msg = client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=120,
-                system=_SYSTEM,
+                system=_SYSTEM_IL,
                 messages=[{"role": "user", "content": prompt}],
             )
             result = _parse_claude(msg.content[0].text.strip())
@@ -807,6 +838,37 @@ def update_company_health_batch():
         "- If the company had a net loss in the prior year (one year ago), the score MUST be 3 or lower. No exceptions.\n"
         "- A single strong recovery year after a loss does NOT warrant a 4 or 5.\n"
         "- Context matters: benchmark within the company's industry.\n\n"
+        "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
+    )
+
+    _SYSTEM_IL = (
+        "You are a strict financial analyst rating company health on a FULL 1-5 scale. "
+        "Use the ENTIRE range — do NOT cluster scores around 2-3.\n\n"
+        "You are evaluating Israeli (TASE) companies. Apply these market-specific norms:\n"
+        "- Israeli banks, real estate, and infrastructure companies structurally carry high debt — "
+        "D/E > 2.0 is normal for these sectors. Do NOT penalize unless D/E > 5.0.\n"
+        "- The Tel Aviv market is heavily weighted toward real estate, banking, pharma, and defense — "
+        "benchmark against sector peers, not US norms.\n"
+        "- Stock prices may be quoted in agorot (1/100 shekel) — ignore absolute price levels.\n\n"
+        "Scale definition (use each level freely):\n"
+        "  1 = Weak:      Negative or near-zero margins, severe debt overload, negative/weak cash flow, "
+        "shrinking revenue, or near-distress signals.\n"
+        "  2 = Fair:      Below-average profitability, elevated leverage, modest or inconsistent cash flow, "
+        "slow/flat growth. Survivable but uninspiring.\n"
+        "  3 = Good:      Solid, average performance for the industry. Profitable, manageable debt, "
+        "positive cash flow, stable growth.\n"
+        "  4 = Great:     Above-average margins, strong free cash flow, low-to-moderate debt, "
+        "healthy revenue/earnings growth. Financially sound.\n"
+        "  5 = Excellent: Exceptional across ALL metrics — industry-leading margins, minimal debt, "
+        "strong growing free cash flow, consistent double-digit growth.\n\n"
+        "Rules:\n"
+        "- If debtToEquity > 5.0 or profitMargins < 0, lean toward 1-2.\n"
+        "- If freeCashflow < 0 and revenueGrowth < 0, that is a 1 or 2.\n"
+        "- If profitMargins > 0.15 and revenueGrowth > 0.08, lean toward 4-5.\n"
+        "- Score 5 requires excellence in ALL dimensions simultaneously.\n"
+        "- If the company had a net loss in the prior year (one year ago), the score MUST be 3 or lower. No exceptions.\n"
+        "- A single strong recovery year after a loss does NOT warrant a 4 or 5.\n"
+        "- Context matters: benchmark within the company's industry and Israeli market.\n\n"
         "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
     )
 
@@ -975,7 +1037,7 @@ def update_company_health_batch():
                         "params": {
                             "model": "claude-haiku-4-5-20251001",
                             "max_tokens": 120,
-                            "system": _SYSTEM,
+                            "system": _SYSTEM_IL,
                             "messages": [{"role": "user", "content": prompt}],
                         },
                     })

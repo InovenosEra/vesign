@@ -1,6 +1,7 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useContext } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { MarketContext } from '../context/MarketContext'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts'
 import {
   getWatchlists, createWatchlist, deleteWatchlist,
@@ -105,6 +106,7 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
 
 export default function WatchlistPage() {
   const { t } = useTranslation()
+  const { market } = useContext(MarketContext)
   const qc = useQueryClient()
   const [selectedId, setSelectedId]   = useState(null)
   const [newListName, setNewListName] = useState('')
@@ -168,18 +170,18 @@ export default function WatchlistPage() {
 
   // ── Portfolio-wide data (all lists) ─────────────────────────────────────
   const { data: portfolioHoldings = [] } = useQuery({
-    queryKey: ['portfolio-holdings'],
-    queryFn: getPortfolioHoldings,
+    queryKey: ['portfolio-holdings', market],
+    queryFn: () => getPortfolioHoldings(market),
     staleTime: 60_000,
   })
   const { data: compData = [] } = useQuery({
-    queryKey: ['portfolio-comparison'],
-    queryFn: getPortfolioComparison,
+    queryKey: ['portfolio-comparison', market],
+    queryFn: () => getPortfolioComparison(market),
     staleTime: 300_000,
   })
   const { data: perfData = [] } = useQuery({
-    queryKey: ['portfolio-performance'],
-    queryFn: getPortfolioPerformance,
+    queryKey: ['portfolio-performance', market],
+    queryFn: () => getPortfolioPerformance(market),
     staleTime: 300_000,
   })
   const portfolioTickers = useMemo(() => portfolioHoldings.map(h => h.ticker), [portfolioHoldings])
@@ -208,9 +210,9 @@ export default function WatchlistPage() {
   const invalidateTickers  = () => qc.invalidateQueries({ queryKey: ['watchlist-tickers', selectedId] })
   const invalidateHoldings = () => qc.invalidateQueries({ queryKey: ['watchlist-holdings', selectedId] })
   const invalidatePortfolio = () => {
-    qc.invalidateQueries({ queryKey: ['portfolio-holdings'] })
-    qc.invalidateQueries({ queryKey: ['portfolio-performance'] })
-    qc.invalidateQueries({ queryKey: ['portfolio-comparison'] })
+    qc.invalidateQueries({ queryKey: ['portfolio-holdings', market] })
+    qc.invalidateQueries({ queryKey: ['portfolio-performance', market] })
+    qc.invalidateQueries({ queryKey: ['portfolio-comparison', market] })
   }
 
   const addHoldingMut = useMutation({

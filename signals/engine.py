@@ -326,10 +326,12 @@ def run_scoring(target_date=None):
     )
 
     # ---------- Health score gate ----------
-    # Pass through if no score (new/unscored ticker), waived for IL (already have scores but safety net)
-    health_min = config.get("health_score_min", 3)
+    # Pass through if no score. IL uses a lower threshold (Israeli market norms differ from US).
+    health_min    = config.get("health_score_min",    3)
+    health_min_il = config.get("health_score_min_il", 2)
     df["health_condition"] = (
-        (df["health_score"] >= health_min) | df["health_score"].isna()
+        (df["ticker"].str.endswith(".TA")  & ((df["health_score"] >= health_min_il) | df["health_score"].isna()))
+        | (~df["ticker"].str.endswith(".TA") & ((df["health_score"] >= health_min)    | df["health_score"].isna()))
     )
 
     # ---------- ML score gate ----------
