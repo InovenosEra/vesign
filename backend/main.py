@@ -1665,7 +1665,7 @@ def research_ticker(ticker: str, user=Depends(get_current_user)):
         # Latest signals row with company + fundamentals + analyst + health
         row = conn.execute(text("""
             SELECT s.ticker, COALESCE(lp.latest_close, s.close) AS close,
-                   s.rsi, s.bb_pct_b, s.signal, s.vesign_score,
+                   s.rsi, s.bb_pct_b, s.signal, NULL AS vesign_score,
                    s.fair_value_upside, s.rsi_3day_flag, s.volume_flag,
                    s.week52_condition, s.prediction_score,
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price,
