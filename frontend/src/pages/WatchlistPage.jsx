@@ -185,17 +185,22 @@ export default function WatchlistPage() {
     staleTime: 300_000,
   })
   const portfolioTickers = useMemo(() => portfolioHoldings.map(h => h.ticker), [portfolioHoldings])
-  const { prices: portPrices } = useLivePrices(portfolioTickers)
+  const { prices: portPrices, marketOpen: portMarketOpen } = useLivePrices(portfolioTickers)
 
   const portEnriched = useMemo(() => portfolioHoldings.map(h => {
-    const currentPrice = portPrices[h.ticker] ?? h.latest_close
+    const livePrice = portPrices[h.ticker]
+    const currentPrice = livePrice ?? h.latest_close
     const currentVal = currentPrice != null ? currentPrice * h.total_qty : null
     const pnlPct = currentVal != null && h.total_cost ? ((currentVal - h.total_cost) / h.total_cost) * 100 : null
-    const refPrice = portPrices[h.ticker] ?? h.latest_close
-    const dailyPnlAbs = refPrice != null && h.prev_close != null
-      ? (refPrice - h.prev_close) * h.total_qty : null
-    return { ...h, currentVal, pnlPct, dailyPnlAbs }
-  }), [portfolioHoldings, portPrices])
+    // Daily P&L: if market open + live price → change vs last close; else last close vs prev close
+    const dailyPnlAbs = portMarketOpen && livePrice != null && h.latest_close != null
+      ? (livePrice - h.latest_close) * h.total_qty
+      : (h.latest_close != null && h.prev_close != null
+          ? (h.latest_close - h.prev_close) * h.total_qty
+          : null)
+    const dailyBase = portMarketOpen && livePrice != null ? h.latest_close : h.prev_close
+    return { ...h, livePrice, currentVal, pnlPct, dailyPnlAbs, dailyBase }
+  }), [portfolioHoldings, portPrices, portMarketOpen])
 
   const portTotalInvested = portEnriched.reduce((s, h) => s + (h.total_cost || 0), 0)
   const portTotalValue    = portEnriched.reduce((s, h) => s + (h.currentVal ?? h.total_cost ?? 0), 0)
@@ -203,9 +208,9 @@ export default function WatchlistPage() {
   const portPnlPct        = portTotalInvested > 0 ? (portPnlAbs / portTotalInvested) * 100 : null
   const portDailyPnlAbs   = portEnriched.every(h => h.dailyPnlAbs == null) ? null
     : portEnriched.reduce((s, h) => s + (h.dailyPnlAbs ?? 0), 0)
-  const portPrevTotal     = portEnriched.reduce((s, h) => s + (h.prev_close != null ? h.prev_close * h.total_qty : (h.currentVal ?? 0)), 0)
-  const portDailyPnlPct   = portDailyPnlAbs != null && portPrevTotal > 0
-    ? (portDailyPnlAbs / portPrevTotal) * 100 : null
+  const portBaseTotal     = portEnriched.reduce((s, h) => s + (h.dailyBase != null ? h.dailyBase * h.total_qty : (h.currentVal ?? 0)), 0)
+  const portDailyPnlPct   = portDailyPnlAbs != null && portBaseTotal > 0
+    ? (portDailyPnlAbs / portBaseTotal) * 100 : null
 
   const portPieData = useMemo(() => portEnriched
     .map(h => ({ name: h.ticker, value: h.currentVal ?? h.total_cost ?? 0 }))
