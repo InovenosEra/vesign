@@ -13,6 +13,7 @@ from typing import Optional
 
 import pandas as pd
 import pandas_market_calendars as mcal
+import exchange_calendars as xcals
 import pytz
 import yfinance as yf
 from dotenv import load_dotenv
@@ -265,28 +266,30 @@ _init_tables()
 
 _nyse_cal = mcal.get_calendar("NYSE")
 
-# pandas_market_calendars TASE calendar still uses the old Sun-Thu schedule.
-# As of January 2026, TASE switched to Mon-Fri (same as NYSE).
-# Use NYSE calendar for day-of-week check but override TASE hours (07:00–12:59 UTC).
+# exchange_calendars TASE correctly handles Mon-Fri since Jan 2026
+# and all Israeli public holidays (Passover, Yom Kippur, etc.)
 class _TASECalendar:
-    """Wraps NYSE calendar (Mon-Fri days) with TASE trading hours (07:00–12:59 UTC)."""
-    name = "TASE_MonFri"
-    _nyse = mcal.get_calendar("NYSE")
-    _open_h, _open_m   = 7,  0
-    _close_h, _close_m = 12, 59
+    """Wraps exchange_calendars TASE to match the pandas_market_calendars interface."""
+    name = "TASE_xcal"
+    _xcal = xcals.get_calendar("TASE")
 
     def schedule(self, start_date, end_date):
-        nyse_sched = self._nyse.schedule(start_date=start_date, end_date=end_date)
-        if nyse_sched.empty:
-            return nyse_sched
-        import pytz
-        utc = pytz.UTC
-        def _ts(d, h, m):
-            return pd.Timestamp(year=d.year, month=d.month, day=d.day,
-                                hour=h, minute=m, tz=utc)
-        nyse_sched["market_open"]  = [_ts(r.Index.date(), self._open_h,  self._open_m)  for r in nyse_sched.itertuples()]
-        nyse_sched["market_close"] = [_ts(r.Index.date(), self._close_h, self._close_m) for r in nyse_sched.itertuples()]
-        return nyse_sched
+        try:
+            sessions = self._xcal.sessions_in_range(
+                pd.Timestamp(start_date), pd.Timestamp(end_date)
+            )
+        except Exception:
+            return pd.DataFrame()
+        if len(sessions) == 0:
+            return pd.DataFrame()
+        rows = [
+            {
+                "market_open":  self._xcal.session_open(s),
+                "market_close": self._xcal.session_close(s),
+            }
+            for s in sessions
+        ]
+        return pd.DataFrame(rows, index=sessions)
 
 _tase_cal = _TASECalendar()
 _sched_cache: dict = {}  # (cal_name, date) → schedule DataFrame

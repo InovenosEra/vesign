@@ -246,6 +246,7 @@ def _validate_pipeline():
     """
     import pandas as pd
     import pandas_market_calendars as mcal
+    import exchange_calendars as xcals
     from datetime import datetime, UTC, timedelta
 
     print("\n── Pipeline validation ──────────────────────────────────────────────────")
@@ -253,6 +254,15 @@ def _validate_pipeline():
     today = datetime.now(UTC).date()
 
     def _last_closed(cal_name):
+        if cal_name == "TASE":
+            # exchange_calendars TASE correctly handles Mon-Fri since Jan 2026
+            # and all Israeli public holidays
+            cal = xcals.get_calendar("TASE")
+            sessions = cal.sessions_in_range(
+                pd.Timestamp(today - timedelta(days=14)),
+                pd.Timestamp(today - timedelta(days=1)),
+            )
+            return sessions[-1].date() if len(sessions) > 0 else today - timedelta(days=1)
         cal = mcal.get_calendar(cal_name)
         sched = cal.schedule(start_date=today - timedelta(days=14), end_date=today)
         dates = [d.date() for d in sched.index if d.date() < today]
