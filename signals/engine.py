@@ -38,27 +38,48 @@ def _get_open_positions(as_of_date=None):
     if "signals" not in inspector.get_table_names():
         return {}
 
-    date_filter = f"AND date < '{as_of_date}'" if as_of_date else ""
-    sql = f"""
-        WITH last_sell AS (
-            SELECT ticker, MAX(date) AS sell_date
-            FROM signals WHERE signal = 'SELL' {date_filter}
-            GROUP BY ticker
-        ),
-        first_open_buy AS (
-            SELECT b.ticker, MIN(b.date) AS buy_date
-            FROM signals b
-            LEFT JOIN last_sell ls ON b.ticker = ls.ticker
-            WHERE b.signal = 'BUY' {date_filter}
-            AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
-            GROUP BY b.ticker
-        )
-        SELECT s.ticker, s.close AS entry_price
-        FROM signals s
-        JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
-    """
+    if as_of_date:
+        sql = """
+            WITH last_sell AS (
+                SELECT ticker, MAX(date) AS sell_date
+                FROM signals WHERE signal = 'SELL' AND date < :dt
+                GROUP BY ticker
+            ),
+            first_open_buy AS (
+                SELECT b.ticker, MIN(b.date) AS buy_date
+                FROM signals b
+                LEFT JOIN last_sell ls ON b.ticker = ls.ticker
+                WHERE b.signal = 'BUY' AND b.date < :dt
+                AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
+                GROUP BY b.ticker
+            )
+            SELECT s.ticker, s.close AS entry_price
+            FROM signals s
+            JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
+        """
+        params = {"dt": str(as_of_date)}
+    else:
+        sql = """
+            WITH last_sell AS (
+                SELECT ticker, MAX(date) AS sell_date
+                FROM signals WHERE signal = 'SELL'
+                GROUP BY ticker
+            ),
+            first_open_buy AS (
+                SELECT b.ticker, MIN(b.date) AS buy_date
+                FROM signals b
+                LEFT JOIN last_sell ls ON b.ticker = ls.ticker
+                WHERE b.signal = 'BUY'
+                AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
+                GROUP BY b.ticker
+            )
+            SELECT s.ticker, s.close AS entry_price
+            FROM signals s
+            JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
+        """
+        params = {}
     try:
-        df = pd.read_sql(sql, engine)
+        df = pd.read_sql(sql, engine, params=params)
         return dict(zip(df["ticker"], df["entry_price"]))
     except Exception:
         return {}
@@ -293,7 +314,8 @@ def run_scoring(target_date=None):
     )
 
     # ---------- Bollinger condition ----------
-    df["bb_pct_b"] = (df["close"] - df["bb_low"]) / (df["bb_high"] - df["bb_low"])
+    bb_range = df["bb_high"] - df["bb_low"]
+    df["bb_pct_b"] = (df["close"] - df["bb_low"]) / bb_range.where(bb_range != 0, other=float("nan"))
     df["bb_condition"] = df["bb_pct_b"] < config.get("bb_pct_b_max", 0.1)
 
     # ensure strict ordering for rolling windows
@@ -315,7 +337,7 @@ def run_scoring(target_date=None):
         .rolling(3, min_periods=1)
         .max()
         .reset_index(level=0, drop=True)
-        >= config.get("volume_ratio_threshold", 1.5)
+        >= config.get("volume_ratio_threshold", 1.2)
     )
 
     # ---------- 52-week high distance ----------

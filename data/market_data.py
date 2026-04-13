@@ -149,14 +149,16 @@ def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0)
     dates = final_df["date"].dt.strftime("%Y-%m-%d").unique().tolist()
     batch_tickers = final_df["ticker"].unique().tolist()
     if dates and batch_tickers:
-        date_placeholders   = ",".join(f"'{d}'" for d in dates)
-        ticker_placeholders = "','".join(batch_tickers)
+        date_params = {f"d{i}": d for i, d in enumerate(dates)}
+        tick_params = {f"t{j}": t for j, t in enumerate(batch_tickers)}
+        date_phs = ",".join(f":d{i}" for i in range(len(dates)))
+        tick_phs = ",".join(f":t{j}" for j in range(len(batch_tickers)))
         with engine.begin() as conn:
             conn.execute(text(
                 f"DELETE FROM daily_prices "
-                f"WHERE date(date) IN ({date_placeholders}) "
-                f"AND ticker IN ('{ticker_placeholders}')"
-            ))
+                f"WHERE date(date) IN ({date_phs}) "
+                f"AND ticker IN ({tick_phs})"
+            ), {**date_params, **tick_params})
 
     final_df.to_sql("daily_prices", engine, if_exists="append", index=False)
     print(f"  Saved {len(final_df):,} rows for {final_df['ticker'].nunique():,} tickers.")
@@ -306,7 +308,7 @@ def snapshot_analyst_targets(date_str: str) -> None:
 
 def update_company_info():
     """Fetch fundamentals + analyst targets in a single parallel pass.
-    US tickers: FMP (company_profile + price_target_summary).
+    US tickers: FMP (company_profile + price_target_consensus).
     TASE tickers: yfinance .info (unchanged).
     """
 
@@ -463,8 +465,9 @@ def update_company_info():
         fund_df = df[["ticker", "market_cap"]]
         fetched = fund_df["ticker"].tolist()
         with engine.begin() as conn:
-            placeholders = ",".join(f"'{t}'" for t in fetched)
-            conn.execute(text(f"DELETE FROM fundamentals WHERE ticker IN ({placeholders})"))
+            tick_params = {f"t{j}": t for j, t in enumerate(fetched)}
+            tick_phs = ",".join(f":t{j}" for j in range(len(fetched)))
+            conn.execute(text(f"DELETE FROM fundamentals WHERE ticker IN ({tick_phs})"), tick_params)
         fund_df.to_sql("fundamentals", engine, if_exists="append", index=False)
         # Update industry, description, and logo_url in companies table
         with engine.begin() as conn:
@@ -688,7 +691,9 @@ def update_company_health():
                     prompt += f"  {yr}: revenue={rev:,}, netIncome={ni_str}, margin={margin_str}\n"
 
             if headlines:
-                prompt += "\nRecent news:\n" + "".join(f"  - {h}\n" for h in headlines)
+                prompt += "\nRecent news:\n" + "".join(
+                    f"  - {h.get('title', '') if isinstance(h, dict) else h}\n" for h in headlines
+                )
 
             msg = client.messages.create(
                 model="claude-haiku-4-5-20251001",

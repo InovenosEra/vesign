@@ -42,11 +42,14 @@ def compute_and_save_features_chunked(engine, days: int = 280, chunk_size: int =
     total = len(tickers)
     for i in range(0, total, chunk_size):
         chunk = tickers[i:i + chunk_size]
-        placeholders = ",".join([f"'{t}'" for t in chunk])
+        placeholders = ",".join([f":t{j}" for j in range(len(chunk))])
+        params = {f"t{j}": t for j, t in enumerate(chunk)}
+        params["cutoff"] = cutoff
         prices_chunk = pd.read_sql(
-            f"SELECT * FROM daily_prices WHERE date >= '{cutoff}'"
+            f"SELECT * FROM daily_prices WHERE date >= :cutoff"
             f" AND ticker IN ({placeholders}) ORDER BY ticker, date",
-            engine
+            engine,
+            params=params,
         )
         frames = []
         for ticker, df in prices_chunk.groupby("ticker"):

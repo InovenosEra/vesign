@@ -103,14 +103,6 @@ def cash_flow(ticker: str) -> "dict | None":
     return data[0] if data else None
 
 
-def price_target_summary(ticker: str) -> "dict | None":
-    """Analyst price target summary (last-month avg + count).
-    Note: high/low targets not available in this endpoint.
-    """
-    data = _get("price-target-summary", {"symbol": ticker})
-    return data[0] if data else None
-
-
 def price_target_consensus(ticker: str) -> "dict | None":
     """Analyst price target consensus with proper low/consensus/high from individual targets."""
     data = _get("price-target-consensus", {"symbol": ticker})

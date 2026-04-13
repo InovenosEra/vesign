@@ -121,7 +121,7 @@ def simulate(config=None, us_only=True):
             analyst_cond = signals["analyst_condition"] == 1
 
         buy_crit = (
-            (signals["rsi_3day_flag"]    == 1) &
+            (signals["rsi_3day_flag"]    == 3) &
             (signals["bb_condition"]     == 1) &
             volume_cond &
             (signals["week52_condition"] == 1) &

@@ -41,10 +41,12 @@ def backfill_signals():
     print(f"Backfilling {len(backfill_tickers)} tickers...")
 
     # ---------- Load all features for those tickers ----------
-    placeholders = ",".join(f"'{t}'" for t in backfill_tickers)
+    placeholders = ",".join([f":t{i}" for i in range(len(backfill_tickers))])
+    ticker_params = {f"t{i}": t for i, t in enumerate(backfill_tickers)}
     features = pd.read_sql(
         f"SELECT * FROM features WHERE ticker IN ({placeholders}) ORDER BY ticker, date",
-        engine
+        engine,
+        params=ticker_params,
     )
     print(f"Loaded {len(features):,} feature rows")
 
@@ -54,9 +56,11 @@ def backfill_signals():
 
     # ---------- Compute all derived columns ----------
     df["fair_value_upside"] = (df["target_mean_price"] - df["close"]) / df["close"]
-    df["analyst_condition"] = df["fair_value_upside"] >= 0.05
+    analyst_upside_min = config.get("analyst_upside_min", 0.30)
+    df["analyst_condition"] = df["fair_value_upside"] >= analyst_upside_min
 
-    df["bb_pct_b"] = (df["close"] - df["bb_low"]) / (df["bb_high"] - df["bb_low"])
+    bb_range = df["bb_high"] - df["bb_low"]
+    df["bb_pct_b"] = (df["close"] - df["bb_low"]) / bb_range.where(bb_range != 0, other=float("nan"))
     df["bb_condition"] = df["bb_pct_b"] < config.get("bb_pct_b_max", 0.1)
 
     df = df.sort_values(["ticker", "date"]).reset_index(drop=True)
@@ -99,7 +103,10 @@ def backfill_signals():
 
     # ---------- Delete existing (today-only) signals and replace with full history ----------
     with engine.begin() as conn:
-        conn.execute(text(f"DELETE FROM signals WHERE ticker IN ({placeholders})"))
+        conn.execute(
+            text(f"DELETE FROM signals WHERE ticker IN ({placeholders})"),
+            ticker_params,
+        )
 
     df.to_sql("signals", engine, if_exists="append", index=False)
 

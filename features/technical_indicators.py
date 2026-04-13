@@ -18,7 +18,7 @@ def add_indicators(df):
     df["bb_factor"] = (df["bb_low"] - df["close"]) / df["close"]
     df["macd_factor"] = df["macd"] / df["close"]
 
-    df["trend_factor"] = df["close"].pct_change(20, fill_method=None)
+    df["trend_factor"] = df["close"].pct_change(20)
 
     # ---------- Volume confirmation ----------
     df["volume_sma_20"] = df["volume"].rolling(20).mean()

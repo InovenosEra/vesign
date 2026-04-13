@@ -12,7 +12,6 @@ from fpdf import FPDF
 from typing import Optional
 
 import pandas as pd
-import pandas_market_calendars as mcal
 import exchange_calendars as xcals
 import pytz
 import yfinance as yf

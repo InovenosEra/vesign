@@ -41,7 +41,10 @@ def _repair_price_gaps():
     )
     if df.empty:
         return
-    expected = df["max_date"].mode()[0]
+    mode_vals = df["max_date"].mode()
+    if mode_vals.empty:
+        return
+    expected = mode_vals[0]
     lagging = df[df["max_date"] < expected]["ticker"].tolist()
     if lagging:
         print(f"Price gaps (tail): {len(lagging)} tickers behind {expected} — re-downloading…")
