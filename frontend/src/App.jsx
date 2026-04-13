@@ -1,11 +1,10 @@
 import { useState, useEffect, useContext, useRef } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ClerkProvider, RedirectToSignIn, useAuth, useClerk, useUser } from '@clerk/react'
 import { useTranslation } from 'react-i18next'
 import i18n from './i18n'
-import { setTokenGetter } from './api'
-import { getMarketStatus } from './api'
+import { setTokenGetter, getMarketStatus, getSignalsToday, getTrades, getOpenTrades, getWatchlists, getPortfolioHoldings, getPortfolioPerformance, getPortfolioComparison } from './api'
 import { MarketContext, MarketProvider } from './context/MarketContext'
 import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
@@ -440,6 +439,33 @@ function Header() {
 }
 
 // ---------------------------------------------------------------------------
+// Silent background prefetcher — warms the cache for all pages on login
+// ---------------------------------------------------------------------------
+function Prefetcher() {
+  const qc = useQueryClient()
+  const { market } = useContext(MarketContext)
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const oneYearAgo = new Date()
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+    const start = oneYearAgo.toISOString().slice(0, 10)
+
+    const opts = { staleTime: 5 * 60_000 }
+    qc.prefetchQuery({ queryKey: ['signals-today', 'BUY',  market], queryFn: () => getSignalsToday('BUY',  market), ...opts })
+    qc.prefetchQuery({ queryKey: ['signals-today', 'SELL', market], queryFn: () => getSignalsToday('SELL', market), ...opts })
+    qc.prefetchQuery({ queryKey: ['trades', start, today, market],  queryFn: () => getTrades({ start, end: today, market }), ...opts })
+    qc.prefetchQuery({ queryKey: ['trades-open', market],           queryFn: () => getOpenTrades(market), ...opts })
+    qc.prefetchQuery({ queryKey: ['watchlists'],                    queryFn: getWatchlists, ...opts })
+    qc.prefetchQuery({ queryKey: ['portfolio-holdings', market],    queryFn: () => getPortfolioHoldings(market), ...opts })
+    qc.prefetchQuery({ queryKey: ['portfolio-performance', market], queryFn: () => getPortfolioPerformance(market), ...opts })
+    qc.prefetchQuery({ queryKey: ['portfolio-comparison', market],  queryFn: () => getPortfolioComparison(market), ...opts })
+  }, [market, qc])
+
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Keeps api.js token getter in sync with Clerk session
 // ---------------------------------------------------------------------------
 function TokenSync({ onReady }) {
@@ -476,6 +502,7 @@ function AppLayout() {
     <MarketProvider>
       <QueryClientProvider client={queryClient}>
         <TokenSync onReady={() => setTokenReady(true)} />
+        {tokenReady && <Prefetcher />}
         {tokenReady && <Header />}
         {tokenReady && (
           <>
