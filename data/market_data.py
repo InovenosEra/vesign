@@ -696,7 +696,7 @@ def update_company_health():
                 )
 
             msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-4-6",
                 max_tokens=120,
                 system=_SYSTEM,
                 messages=[{"role": "user", "content": prompt}],
@@ -750,7 +750,7 @@ def update_company_health():
                 prompt += "\nRecent news:\n" + "".join(f"  - {h}\n" for h in headlines)
 
             msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-4-6",
                 max_tokens=120,
                 system=_SYSTEM_IL,
                 messages=[{"role": "user", "content": prompt}],
@@ -1013,7 +1013,7 @@ def update_company_health_batch():
                     batch_requests.append({
                         "custom_id": custom_id,
                         "params": {
-                            "model": "claude-haiku-4-5-20251001",
+                            "model": "claude-sonnet-4-6",
                             "max_tokens": 120,
                             "system": _SYSTEM,
                             "messages": [{"role": "user", "content": prompt}],
@@ -1042,7 +1042,7 @@ def update_company_health_batch():
                     batch_requests.append({
                         "custom_id": custom_id,
                         "params": {
-                            "model": "claude-haiku-4-5-20251001",
+                            "model": "claude-sonnet-4-6",
                             "max_tokens": 120,
                             "system": _SYSTEM_IL,
                             "messages": [{"role": "user", "content": prompt}],
@@ -1167,7 +1167,7 @@ def summarize_descriptions():
     for _, row in pending.iterrows():
         try:
             msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-4-6",
                 max_tokens=80,
                 messages=[{
                     "role": "user",
