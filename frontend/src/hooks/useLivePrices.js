@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getLivePrices } from '../api'
 
 /**
- * Polls /api/prices/live every 60 s for the given tickers.
+ * Polls /api/prices/live every 5 s for the given tickers.
  * Returns { prices: { TICKER: number|null }, marketOpen: bool }.
  * Does nothing if tickers is empty.
  */
@@ -14,7 +14,8 @@ export function useLivePrices(tickers) {
     queryFn: () => getLivePrices(tickers),
     enabled: tickers.length > 0,
     refetchInterval: 5_000,
-    staleTime: 4_000,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
   })
 
   return {

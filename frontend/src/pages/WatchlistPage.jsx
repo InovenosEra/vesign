@@ -329,7 +329,7 @@ export default function WatchlistPage() {
       {portEnriched.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           {/* Summary cards */}
-          <div className="metrics" style={{ marginBottom: 16 }}>
+          <div className="metrics" style={{ marginBottom: 16, alignItems: 'stretch' }}>
             <div className="metric-card">
               <div className="label">{t('watchlist.totalInvested')}</div>
               <div className="value">${portTotalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -338,6 +338,7 @@ export default function WatchlistPage() {
               <div className="label">{t('watchlist.currentValue')}</div>
               <div className="value">${portTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
+            <div style={{ width: 1, minHeight: 70, background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch', flexShrink: 0 }} />
             <div className="metric-card">
               <div className="label">{t('watchlist.totalPnlAbs')}</div>
               <div className={`value ${portPnlAbs >= 0 ? 'up' : 'down'}`}>
@@ -350,16 +351,18 @@ export default function WatchlistPage() {
                 {portPnlPct != null ? `${portPnlPct >= 0 ? '+' : ''}${portPnlPct.toFixed(2)}%` : '—'}
               </div>
             </div>
+            <div style={{ width: 1, minHeight: 70, background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch', flexShrink: 0 }} />
             <div className="metric-card">
-              <div className="label">{t('portfolio.dailyPnl')}</div>
+              <div className="label">{t('portfolio.dailyPnlAbs')}</div>
               <div className={`value ${portDailyPnlAbs != null && portDailyPnlAbs >= 0 ? 'up' : 'down'}`}>
                 {portDailyPnlAbs != null ? `${portDailyPnlAbs >= 0 ? '+' : ''}$${Math.abs(portDailyPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
               </div>
-              {portDailyPnlPct != null && (
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                  {portDailyPnlPct >= 0 ? '+' : ''}{portDailyPnlPct.toFixed(2)}% today
-                </div>
-              )}
+            </div>
+            <div className="metric-card">
+              <div className="label">{t('portfolio.dailyPnlPct')}</div>
+              <div className={`value ${portDailyPnlPct != null && portDailyPnlPct >= 0 ? 'up' : 'down'}`}>
+                {portDailyPnlPct != null ? `${portDailyPnlPct >= 0 ? '+' : ''}${portDailyPnlPct.toFixed(2)}%` : '—'}
+              </div>
             </div>
           </div>
 

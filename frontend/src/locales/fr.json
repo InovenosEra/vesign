@@ -175,7 +175,8 @@
   "portfolio.totalTrades": "Total des transactions",
   "portfolio.yourPortfolio": "Votre portefeuille",
   "portfolio.vesignSignals": "Moy. signaux Vesign",
-  "portfolio.dailyPnl": "G/P Journalier",
+  "portfolio.dailyPnlAbs": "G/P Journalier ($)",
+  "portfolio.dailyPnlPct": "G/P Journalier (%)",
   "portfolio.vsPortfolio": "vs Signaux",
 
   "nav.about": "À propos",

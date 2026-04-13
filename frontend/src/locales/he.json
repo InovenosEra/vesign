@@ -175,7 +175,8 @@
   "portfolio.totalTrades": "סה״כ עסקאות",
   "portfolio.yourPortfolio": "התיק שלך",
   "portfolio.vesignSignals": "ממוצע איתותי Vesign",
-  "portfolio.dailyPnl": "רווח/הפסד יומי",
+  "portfolio.dailyPnlAbs": "רווח/הפסד יומי ($)",
+  "portfolio.dailyPnlPct": "רווח/הפסד יומי (%)",
   "portfolio.vsPortfolio": "לעומת האיתותים",
 
   "nav.about": "אודות",

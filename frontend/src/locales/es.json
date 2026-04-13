@@ -175,7 +175,8 @@
   "portfolio.totalTrades": "Total de operaciones",
   "portfolio.yourPortfolio": "Tu portafolio",
   "portfolio.vesignSignals": "Prom. señales Vesign",
-  "portfolio.dailyPnl": "P&G Diario",
+  "portfolio.dailyPnlAbs": "P&G Diario ($)",
+  "portfolio.dailyPnlPct": "P&G Diario (%)",
   "portfolio.vsPortfolio": "vs Señales",
 
   "nav.about": "Acerca de",
