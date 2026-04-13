@@ -191,13 +191,21 @@ export default function WatchlistPage() {
     const currentPrice = portPrices[h.ticker] ?? h.latest_close
     const currentVal = currentPrice != null ? currentPrice * h.total_qty : null
     const pnlPct = currentVal != null && h.total_cost ? ((currentVal - h.total_cost) / h.total_cost) * 100 : null
-    return { ...h, currentVal, pnlPct }
+    const refPrice = portPrices[h.ticker] ?? h.latest_close
+    const dailyPnlAbs = refPrice != null && h.prev_close != null
+      ? (refPrice - h.prev_close) * h.total_qty : null
+    return { ...h, currentVal, pnlPct, dailyPnlAbs }
   }), [portfolioHoldings, portPrices])
 
   const portTotalInvested = portEnriched.reduce((s, h) => s + (h.total_cost || 0), 0)
   const portTotalValue    = portEnriched.reduce((s, h) => s + (h.currentVal ?? h.total_cost ?? 0), 0)
   const portPnlAbs        = portTotalValue - portTotalInvested
   const portPnlPct        = portTotalInvested > 0 ? (portPnlAbs / portTotalInvested) * 100 : null
+  const portDailyPnlAbs   = portEnriched.every(h => h.dailyPnlAbs == null) ? null
+    : portEnriched.reduce((s, h) => s + (h.dailyPnlAbs ?? 0), 0)
+  const portPrevTotal     = portEnriched.reduce((s, h) => s + (h.prev_close != null ? h.prev_close * h.total_qty : (h.currentVal ?? 0)), 0)
+  const portDailyPnlPct   = portDailyPnlAbs != null && portPrevTotal > 0
+    ? (portDailyPnlAbs / portPrevTotal) * 100 : null
 
   const portPieData = useMemo(() => portEnriched
     .map(h => ({ name: h.ticker, value: h.currentVal ?? h.total_cost ?? 0 }))
@@ -336,6 +344,17 @@ export default function WatchlistPage() {
               <div className={`value ${portPnlPct != null && portPnlPct >= 0 ? 'up' : 'down'}`}>
                 {portPnlPct != null ? `${portPnlPct >= 0 ? '+' : ''}${portPnlPct.toFixed(2)}%` : '—'}
               </div>
+            </div>
+            <div className="metric-card">
+              <div className="label">{t('portfolio.dailyPnl')}</div>
+              <div className={`value ${portDailyPnlAbs != null && portDailyPnlAbs >= 0 ? 'up' : 'down'}`}>
+                {portDailyPnlAbs != null ? `${portDailyPnlAbs >= 0 ? '+' : ''}$${Math.abs(portDailyPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+              </div>
+              {portDailyPnlPct != null && (
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  {portDailyPnlPct >= 0 ? '+' : ''}{portDailyPnlPct.toFixed(2)}% today
+                </div>
+              )}
             </div>
           </div>
 
