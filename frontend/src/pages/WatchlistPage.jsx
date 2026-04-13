@@ -367,7 +367,7 @@ export default function WatchlistPage() {
           </div>
 
           {/* Donut chart + What-If */}
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
             {/* Allocation donut */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '0 0 auto', display: 'flex', gap: 20, alignItems: 'center' }}>
               <div style={{ width: 160, height: 160, flexShrink: 0 }}>
@@ -411,7 +411,7 @@ export default function WatchlistPage() {
 
             {/* Performance line chart */}
             {perfData.length > 0 && (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '1.5 1 280px', minWidth: 280 }}>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '1.5 1 280px', minWidth: 280, margin: '0 16px' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Performance (last 12 months)</div>
                 <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 11 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
