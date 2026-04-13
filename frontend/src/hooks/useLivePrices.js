@@ -13,8 +13,8 @@ export function useLivePrices(tickers) {
     queryKey: ['live-prices', key],
     queryFn: () => getLivePrices(tickers),
     enabled: tickers.length > 0,
-    refetchInterval: 60_000,
-    staleTime: 55_000,
+    refetchInterval: 5_000,
+    staleTime: 4_000,
   })
 
   return {
