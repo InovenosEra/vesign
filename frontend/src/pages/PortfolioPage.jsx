@@ -58,11 +58,14 @@ export default function PortfolioPage() {
   // Enrich holdings with live prices
   const enriched = useMemo(() => holdings.map(h => {
     const livePrice = prices[h.ticker]
-    const currentPrice = livePrice ?? (h.avg_price)
+    const currentPrice = livePrice ?? h.latest_close ?? h.avg_price
     const currentValue = currentPrice != null ? currentPrice * h.total_qty : null
     const pnlAbs = currentValue != null ? currentValue - h.total_cost : null
     const pnlPct = pnlAbs != null && h.total_cost ? (pnlAbs / h.total_cost) * 100 : null
-    return { ...h, livePrice, currentValue, pnlAbs, pnlPct }
+    const refPrice = livePrice ?? h.latest_close
+    const dailyPnlAbs = refPrice != null && h.prev_close != null
+      ? (refPrice - h.prev_close) * h.total_qty : null
+    return { ...h, livePrice, currentValue, pnlAbs, pnlPct, dailyPnlAbs }
   }), [holdings, prices])
 
   // Summary totals
@@ -70,6 +73,15 @@ export default function PortfolioPage() {
   const totalValue = enriched.reduce((s, h) => s + (h.currentValue ?? h.total_cost ?? 0), 0)
   const totalPnlAbs = totalValue - totalInvested
   const totalPnlPct = totalInvested > 0 ? (totalPnlAbs / totalInvested) * 100 : null
+  const dailyPnlAbs = enriched.every(h => h.dailyPnlAbs == null)
+    ? null
+    : enriched.reduce((s, h) => s + (h.dailyPnlAbs ?? 0), 0)
+  const prevTotalValue = enriched.reduce((s, h) => {
+    const prev = h.prev_close != null ? h.prev_close * h.total_qty : (h.currentValue ?? 0)
+    return s + prev
+  }, 0)
+  const dailyPnlPct = dailyPnlAbs != null && prevTotalValue > 0
+    ? (dailyPnlAbs / prevTotalValue) * 100 : null
 
   // Allocation chart data
   const pieData = useMemo(() => {
@@ -135,6 +147,12 @@ export default function PortfolioPage() {
           label={t('watchlist.totalPnlPct')}
           value={totalPnlPct != null ? `${totalPnlPct >= 0 ? '+' : ''}${fmt(totalPnlPct)}%` : '—'}
           color={totalPnlPct != null ? (totalPnlPct >= 0 ? 'var(--green)' : 'var(--red)') : undefined}
+        />
+        <SummaryCard
+          label={t('portfolio.dailyPnl')}
+          value={dailyPnlAbs != null ? `${dailyPnlAbs >= 0 ? '+' : ''}$${fmt(Math.abs(dailyPnlAbs))}` : '—'}
+          sub={dailyPnlPct != null ? `${dailyPnlPct >= 0 ? '+' : ''}${fmt(dailyPnlPct)}% today` : undefined}
+          color={dailyPnlAbs != null ? (dailyPnlAbs >= 0 ? 'var(--green)' : 'var(--red)') : undefined}
         />
       </div>
 

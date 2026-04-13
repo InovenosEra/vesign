@@ -1428,7 +1428,8 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         meta = {r[0]: r for r in conn.execute(text(f"""
             SELECT c.ticker, c.company, c.logo_url, c.industry,
                    f.market_cap,
-                   lp.latest_close
+                   lp.latest_close,
+                   pp.prev_close
             FROM companies c
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
                 ON c.ticker = f.ticker
@@ -1438,6 +1439,15 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
                 INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
                     ON p1.ticker = p2.ticker AND p1.date = p2.max_date
             ) lp ON c.ticker = lp.ticker
+            LEFT JOIN (
+                SELECT ticker, close AS prev_close
+                FROM (
+                    SELECT ticker, close,
+                           ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+                    FROM daily_prices
+                    WHERE ticker IN ({ph})
+                ) WHERE rn = 2
+            ) pp ON c.ticker = pp.ticker
             WHERE c.ticker IN ({ph})
         """), tp).fetchall()}
 
@@ -1448,6 +1458,7 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         m = meta.get(ticker)
         mc = m[4] if m else None
         latest_close = m[5] if m else None
+        prev_close = m[6] if m else None
         result.append({
             "ticker": ticker,
             "company": m[1] if m else None,
@@ -1458,6 +1469,7 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             "total_cost": round(total_cost, 2) if total_cost is not None else None,
             "avg_price": round(avg_price, 4) if avg_price is not None else None,
             "latest_close": round(float(latest_close), 4) if latest_close is not None else None,
+            "prev_close": round(float(prev_close), 4) if prev_close is not None else None,
             "first_buy_date": first_buy_date,
         })
     return result
