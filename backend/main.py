@@ -264,14 +264,12 @@ _init_tables()
 # Market helpers
 # ---------------------------------------------------------------------------
 
-_nyse_cal = mcal.get_calendar("NYSE")
-
-# exchange_calendars TASE correctly handles Mon-Fri since Jan 2026
-# and all Israeli public holidays (Passover, Yom Kippur, etc.)
-class _TASECalendar:
-    """Wraps exchange_calendars TASE to match the pandas_market_calendars interface."""
-    name = "TASE_xcal"
-    _xcal = xcals.get_calendar("TASE")
+class _XCalWrapper:
+    """Wraps exchange_calendars to match the schedule() interface expected by _market_info.
+    Uses authoritative holiday data: XNYS for US, TASE for Israel (Mon-Fri since Jan 2026)."""
+    def __init__(self, xcal_id: str, name: str):
+        self._xcal = xcals.get_calendar(xcal_id)
+        self.name = name
 
     def schedule(self, start_date, end_date):
         try:
@@ -291,7 +289,8 @@ class _TASECalendar:
         ]
         return pd.DataFrame(rows, index=sessions)
 
-_tase_cal = _TASECalendar()
+_nyse_cal = _XCalWrapper("XNYS", name="NYSE_xcal")
+_tase_cal = _XCalWrapper("TASE", name="TASE_xcal")
 _sched_cache: dict = {}  # (cal_name, date) → schedule DataFrame
 
 

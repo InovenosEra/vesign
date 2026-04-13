@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, UTC
 from utils.universe_loader import load_universe
 from data.loaders import engine
 from sqlalchemy import text
-import pandas_market_calendars as mcal
+import exchange_calendars as xcals
 from utils.update_guard import should_run, mark_run
 from data import fmp
 
@@ -169,9 +169,11 @@ def update_prices():
     tickers = load_universe()
 
     today    = datetime.now(UTC).date()
-    nyse     = mcal.get_calendar("NYSE")
-    schedule = nyse.schedule(start_date=today - timedelta(days=10), end_date=today)
-    end_date = schedule.index[-1].date()
+    nyse     = xcals.get_calendar("XNYS")
+    sessions = nyse.sessions_in_range(
+        pd.Timestamp(today - timedelta(days=10)), pd.Timestamp(today)
+    )
+    end_date = sessions[-1].date() if len(sessions) > 0 else today - timedelta(days=1)
 
     # ── Step 1: backfill any tickers that have never been downloaded ──────────
     # New tickers (e.g. newly added NASDAQ stocks) won't appear in daily_prices

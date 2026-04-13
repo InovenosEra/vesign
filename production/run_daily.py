@@ -245,7 +245,6 @@ def _validate_pipeline():
     Logs a PASS/FAIL line for each check and returns True if everything passed.
     """
     import pandas as pd
-    import pandas_market_calendars as mcal
     import exchange_calendars as xcals
     from datetime import datetime, UTC, timedelta
 
@@ -253,22 +252,15 @@ def _validate_pipeline():
     passed = True
     today = datetime.now(UTC).date()
 
-    def _last_closed(cal_name):
-        if cal_name == "TASE":
-            # exchange_calendars TASE correctly handles Mon-Fri since Jan 2026
-            # and all Israeli public holidays
-            cal = xcals.get_calendar("TASE")
-            sessions = cal.sessions_in_range(
-                pd.Timestamp(today - timedelta(days=14)),
-                pd.Timestamp(today - timedelta(days=1)),
-            )
-            return sessions[-1].date() if len(sessions) > 0 else today - timedelta(days=1)
-        cal = mcal.get_calendar(cal_name)
-        sched = cal.schedule(start_date=today - timedelta(days=14), end_date=today)
-        dates = [d.date() for d in sched.index if d.date() < today]
-        return dates[-1] if dates else today - timedelta(days=1)
+    def _last_closed(xcal_id):
+        cal = xcals.get_calendar(xcal_id)
+        sessions = cal.sessions_in_range(
+            pd.Timestamp(today - timedelta(days=14)),
+            pd.Timestamp(today - timedelta(days=1)),
+        )
+        return sessions[-1].date() if len(sessions) > 0 else today - timedelta(days=1)
 
-    expected_us = _last_closed("NYSE")
+    expected_us   = _last_closed("XNYS")
     try:
         expected_tase = _last_closed("TASE")
     except Exception:
