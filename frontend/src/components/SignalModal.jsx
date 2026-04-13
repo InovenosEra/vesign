@@ -54,7 +54,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
   // Fetch a 7-day-earlier start so we have a base price for yield even if market was closed
   const fetchStart = (() => { const d = new Date(chartStart); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
-  const { data: history = [] } = useQuery({
+  const { data: history = [], isLoading } = useQuery({
     queryKey: ['price-history-signal', row.ticker, fetchStart, chartEnd],
     queryFn: () => getPriceHistory(row.ticker, { start: fetchStart, end: chartEnd }),
     staleTime: 300_000,
