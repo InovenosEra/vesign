@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getPriceHistory, getSignalMarkers, getAnalystHistory, getNews, getSignalsByTickers, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
@@ -54,10 +54,11 @@ export default function SignalModal({ row: rowProp, onClose }) {
   // Fetch a 7-day-earlier start so we have a base price for yield even if market was closed
   const fetchStart = (() => { const d = new Date(chartStart); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
-  const { data: history = [], isLoading } = useQuery({
+  const { data: history = [] } = useQuery({
     queryKey: ['price-history-signal', row.ticker, fetchStart, chartEnd],
     queryFn: () => getPriceHistory(row.ticker, { start: fetchStart, end: chartEnd }),
     staleTime: 300_000,
+    placeholderData: keepPreviousData,
   })
 
   const { data: markers = [] } = useQuery({
@@ -70,6 +71,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
     queryKey: ['analyst-history', row.ticker, fetchStart, chartEnd],
     queryFn: () => getAnalystHistory(row.ticker, { start: fetchStart, end: chartEnd }),
     staleTime: 300_000,
+    placeholderData: keepPreviousData,
   })
 
   const { data: newsData = [], isLoading: newsLoading } = useQuery({
