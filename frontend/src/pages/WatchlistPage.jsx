@@ -350,8 +350,8 @@ export default function WatchlistPage() {
           </div>
           {/* Col 2: divider */}
           <div style={{ background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch' }} />
-          {/* Col 3 */}
-          <div style={{ display: 'flex', gap: 16 }}>
+          {/* Col 3: all P&L cards in one flex row, second divider inside */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
             <div className="metric-card">
               <div className="label">{t('watchlist.totalPnlAbs')}</div>
               <div className={`value ${portPnlAbs >= 0 ? 'up' : 'down'}`}>
@@ -364,11 +364,7 @@ export default function WatchlistPage() {
                 {portPnlPct != null ? `${portPnlPct >= 0 ? '+' : ''}${portPnlPct.toFixed(2)}%` : '—'}
               </div>
             </div>
-          </div>
-          {/* Col 4: divider */}
-          <div style={{ background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch' }} />
-          {/* Col 5 */}
-          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch', flexShrink: 0 }} />
             <div className="metric-card">
               <div className="label">{t('portfolio.dailyPnlAbs')}</div>
               <div className={`value ${portDailyPnlAbs != null && portDailyPnlAbs >= 0 ? 'up' : 'down'}`}>
@@ -382,6 +378,10 @@ export default function WatchlistPage() {
               </div>
             </div>
           </div>
+          {/* Col 4: empty */}
+          <div />
+          {/* Col 5: empty */}
+          <div />
 
           {/* ── Row 2: charts ── */}
           {/* Col 1: Allocation donut */}
