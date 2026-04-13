@@ -327,9 +327,18 @@ export default function WatchlistPage() {
 
       {/* ── Portfolio summary (all lists) ── */}
       {portEnriched.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          {/* Summary cards */}
-          <div className="metrics" style={{ marginBottom: 16, alignItems: 'stretch' }}>
+        /* 5-col grid: [content] [1px divider] [content] [1px divider] [content]
+           Both rows (cards + charts) share the same columns so dividers align perfectly */
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1px 1fr 1px auto',
+          columnGap: 24,
+          rowGap: 16,
+          marginBottom: 24,
+        }}>
+          {/* ── Row 1: summary cards ── */}
+          {/* Col 1 */}
+          <div style={{ display: 'flex', gap: 16 }}>
             <div className="metric-card">
               <div className="label">{t('watchlist.totalInvested')}</div>
               <div className="value">${portTotalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -338,7 +347,11 @@ export default function WatchlistPage() {
               <div className="label">{t('watchlist.currentValue')}</div>
               <div className="value">${portTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
-            <div style={{ width: 1, minHeight: 70, background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch', flexShrink: 0 }} />
+          </div>
+          {/* Col 2: divider */}
+          <div style={{ background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch' }} />
+          {/* Col 3 */}
+          <div style={{ display: 'flex', gap: 16 }}>
             <div className="metric-card">
               <div className="label">{t('watchlist.totalPnlAbs')}</div>
               <div className={`value ${portPnlAbs >= 0 ? 'up' : 'down'}`}>
@@ -351,7 +364,11 @@ export default function WatchlistPage() {
                 {portPnlPct != null ? `${portPnlPct >= 0 ? '+' : ''}${portPnlPct.toFixed(2)}%` : '—'}
               </div>
             </div>
-            <div style={{ width: 1, minHeight: 70, background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch', flexShrink: 0 }} />
+          </div>
+          {/* Col 4: divider */}
+          <div style={{ background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch' }} />
+          {/* Col 5 */}
+          <div style={{ display: 'flex', gap: 16 }}>
             <div className="metric-card">
               <div className="label">{t('portfolio.dailyPnlAbs')}</div>
               <div className={`value ${portDailyPnlAbs != null && portDailyPnlAbs >= 0 ? 'up' : 'down'}`}>
@@ -366,52 +383,52 @@ export default function WatchlistPage() {
             </div>
           </div>
 
-          {/* Donut chart + What-If */}
-          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-            {/* Allocation donut */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '0 0 auto', display: 'flex', gap: 20, alignItems: 'center' }}>
-              <div style={{ width: 160, height: 160, flexShrink: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={portPieData} dataKey="value" cx="50%" cy="50%" innerRadius={44} outerRadius={74} strokeWidth={1}>
-                      {portPieData.map((_, i) => <Cell key={i} fill={_PIE_COLORS[i % _PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
-                      labelStyle={{ color: 'var(--text)', fontWeight: 700 }}
-                      itemStyle={{ color: 'var(--text)' }}
-                      formatter={(v, name) => [`$${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, name]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div style={{ fontSize: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, color: 'var(--muted)', fontSize: 10 }}>
-                  <span style={{ width: 8, flexShrink: 0 }} />
-                  <span style={{ minWidth: 50 }}>{t('col.ticker')}</span>
-                  <span style={{ minWidth: 36, textAlign: 'right' }}>{t('portfolio.allocation').slice(0,5)}%</span>
-                  <span style={{ minWidth: 42, textAlign: 'right' }}>{t('col.yield')}</span>
-                </div>
-                {portPieData.slice(0, 8).map((d, i) => {
-                  const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
-                  const h = portEnriched.find(x => x.ticker === d.name)
-                  return (
-                    <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], flexShrink: 0 }} />
-                      <span style={{ minWidth: 50, fontWeight: 600 }}>{d.name}</span>
-                      <span style={{ color: 'var(--muted)', minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
-                      <span className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ minWidth: 42, textAlign: 'right', fontSize: 11 }}>
-                        {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
+          {/* ── Row 2: charts ── */}
+          {/* Col 1: Allocation donut */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', display: 'flex', gap: 20, alignItems: 'center' }}>
+            <div style={{ width: 160, height: 160, flexShrink: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={portPieData} dataKey="value" cx="50%" cy="50%" innerRadius={44} outerRadius={74} strokeWidth={1}>
+                    {portPieData.map((_, i) => <Cell key={i} fill={_PIE_COLORS[i % _PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
+                    labelStyle={{ color: 'var(--text)', fontWeight: 700 }}
+                    itemStyle={{ color: 'var(--text)' }}
+                    formatter={(v, name) => [`$${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, name]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-
-            {/* Performance line chart */}
-            {perfData.length > 0 && (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '1.5 1 280px', minWidth: 280, margin: '0 16px' }}>
+            <div style={{ fontSize: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, color: 'var(--muted)', fontSize: 10 }}>
+                <span style={{ width: 8, flexShrink: 0 }} />
+                <span style={{ minWidth: 50 }}>{t('col.ticker')}</span>
+                <span style={{ minWidth: 36, textAlign: 'right' }}>{t('portfolio.allocation').slice(0,5)}%</span>
+                <span style={{ minWidth: 42, textAlign: 'right' }}>{t('col.yield')}</span>
+              </div>
+              {portPieData.slice(0, 8).map((d, i) => {
+                const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
+                const h = portEnriched.find(x => x.ticker === d.name)
+                return (
+                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], flexShrink: 0 }} />
+                    <span style={{ minWidth: 50, fontWeight: 600 }}>{d.name}</span>
+                    <span style={{ color: 'var(--muted)', minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
+                    <span className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ minWidth: 42, textAlign: 'right', fontSize: 11 }}>
+                      {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          {/* Col 2: empty (divider column) */}
+          <div />
+          {/* Col 3: Performance line chart */}
+          {perfData.length > 0
+            ? <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Performance (last 12 months)</div>
                 <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 11 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -427,19 +444,10 @@ export default function WatchlistPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={perfData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis
-                        dataKey="week"
-                        tick={{ fontSize: 9, fill: 'var(--muted)' }}
-                        tickLine={false}
-                        interval={7}
-                        tickFormatter={v => new Date(v).toLocaleDateString('en-US', { month: 'short' })}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 9, fill: 'var(--muted)' }}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`}
-                      />
+                      <XAxis dataKey="week" tick={{ fontSize: 9, fill: 'var(--muted)' }} tickLine={false} interval={7}
+                        tickFormatter={v => new Date(v).toLocaleDateString('en-US', { month: 'short' })} />
+                      <YAxis tick={{ fontSize: 9, fill: 'var(--muted)' }} tickLine={false} axisLine={false}
+                        tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`} />
                       <Tooltip
                         contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
                         labelStyle={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}
@@ -453,14 +461,14 @@ export default function WatchlistPage() {
                   </ResponsiveContainer>
                 </div>
               </div>
-            )}
-
-            {/* What-If */}
-            {compData.length > 0 && (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: 1, minWidth: 240 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-                  {t('portfolio.comparisonTitle')}
-                </div>
+            : <div />
+          }
+          {/* Col 4: empty (divider column) */}
+          <div />
+          {/* Col 5: Comparison bar chart */}
+          {compData.length > 0
+            ? <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>{t('portfolio.comparisonTitle')}</div>
                 <div style={{ width: '100%', height: 160 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={compData} margin={{ top: 18, right: 8, left: -10, bottom: 0 }}>
@@ -478,8 +486,8 @@ export default function WatchlistPage() {
                   </ResponsiveContainer>
                 </div>
               </div>
-            )}
-          </div>
+            : <div />
+          }
         </div>
       )}
 
