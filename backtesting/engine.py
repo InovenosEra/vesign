@@ -93,9 +93,4 @@ def run_backtest(eval_start_date=None):
 
     print(f"Average daily strategy return: {results:.6f}")
 
-    merged.to_sql("backtest_results",
-                  engine,
-                  if_exists="replace",
-                  index=False)
-
     print("Backtest completed")
