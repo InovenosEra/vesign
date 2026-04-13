@@ -398,7 +398,6 @@ export default function SignalsPage() {
       <div className="section">
         <p className="section-title">
           {t('signals.todayBuy', { count: loadingBuy ? '…' : (todayBuy?.length ?? 0) })}
-          {marketOpen && <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>{t('market.live')}</span>}
         </p>
         {loadingBuy
           ? <p className="loading">{t('table.loading')}</p>
@@ -408,7 +407,6 @@ export default function SignalsPage() {
       <div className="section">
         <p className="section-title">
           {t('signals.todaySell', { count: loadingSell ? '…' : (todaySell?.length ?? 0) })}
-          {marketOpen && <span style={{ color: 'var(--green)', fontSize: 12, marginLeft: 10 }}>{t('market.live')}</span>}
         </p>
         {loadingSell
           ? <p className="loading">{t('table.loading')}</p>
