@@ -332,7 +332,7 @@ export default function WatchlistPage() {
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'auto 1px 1fr 1px auto',
-          columnGap: 24,
+          columnGap: 12,
           rowGap: 16,
           marginBottom: 24,
         }}>
