@@ -138,6 +138,7 @@ export const getAnalystHistory = (ticker, { start, end } = {}) => {
 // --- Watchlists ------------------------------------------------------------
 export const getWatchlists = () => get('/watchlists')
 export const createWatchlist = (name) => post('/watchlists', { name })
+export const renameWatchlist = (id, name) => patch(`/watchlists/${id}`, { name })
 export const deleteWatchlist = (id) => del(`/watchlists/${id}`)
 export const getWatchlistTickers = (id) => get(`/watchlists/${id}/tickers`)
 export const addTicker = (id, ticker, note = '') =>

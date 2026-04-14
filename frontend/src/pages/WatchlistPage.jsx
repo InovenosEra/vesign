@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { MarketContext } from '../context/MarketContext'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts'
 import {
-  getWatchlists, createWatchlist, deleteWatchlist,
+  getWatchlists, createWatchlist, renameWatchlist, deleteWatchlist,
   getWatchlistTickers, addTicker, removeTicker,
   getSignalsByTickers, searchTickers,
   getHoldings, addHolding, deleteHolding,
@@ -119,6 +119,8 @@ export default function WatchlistPage() {
   const tickerDebounceRef = useRef(null)
   const [selected, setSelected]       = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null) // { id, name }
+  const [renamingId, setRenamingId] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
 
   const { data: lists = [] } = useQuery({
     queryKey: ['watchlists'],
@@ -249,6 +251,11 @@ export default function WatchlistPage() {
   const deleteMut = useMutation({
     mutationFn: (id) => deleteWatchlist(id),
     onSuccess: (_, id) => { invalidateLists(); invalidatePortfolio(); if (selectedId === id) setSelectedId(null) },
+  })
+
+  const renameMut = useMutation({
+    mutationFn: ({ id, name }) => renameWatchlist(id, name),
+    onSuccess: () => { invalidateLists(); invalidatePortfolio(); setRenamingId(null) },
   })
 
   const addMut = useMutation({
@@ -514,8 +521,37 @@ export default function WatchlistPage() {
             key={l.id}
             className={`list-card${selectedId === l.id ? ' active' : ''}`}
             onClick={() => setSelectedId(l.id)}
+            onDoubleClick={e => {
+              e.stopPropagation()
+              setRenamingId(l.id)
+              setRenameValue(l.name)
+            }}
           >
-            <span>{l.name}</span>
+            {renamingId === l.id ? (
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && renameValue.trim()) {
+                    renameMut.mutate({ id: l.id, name: renameValue.trim() })
+                  } else if (e.key === 'Escape') {
+                    setRenamingId(null)
+                  }
+                }}
+                onBlur={() => {
+                  if (renameValue.trim() && renameValue.trim() !== l.name) {
+                    renameMut.mutate({ id: l.id, name: renameValue.trim() })
+                  } else {
+                    setRenamingId(null)
+                  }
+                }}
+                onClick={e => e.stopPropagation()}
+                style={{ width: 100, padding: '2px 6px', fontSize: 13, background: 'var(--bg)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--text)', outline: 'none' }}
+              />
+            ) : (
+              <span>{l.name}</span>
+            )}
             <button
               className="card-delete"
               onClick={e => {

@@ -994,6 +994,26 @@ def create_watchlist(body: WatchlistCreate, user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@protected.patch("/api/watchlists/{list_id}")
+def rename_watchlist(list_id: int, body: WatchlistCreate, user=Depends(get_current_user)):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    with engine.begin() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
+        dup = conn.execute(
+            text("SELECT id FROM watchlist_lists WHERE user_id = :uid AND name = :name AND id != :lid"),
+            {"uid": user["id"], "name": name, "lid": list_id},
+        ).fetchone()
+        if dup:
+            raise HTTPException(status_code=409, detail=f"List '{name}' already exists")
+        conn.execute(
+            text("UPDATE watchlist_lists SET name = :name WHERE id = :lid AND user_id = :uid"),
+            {"name": name, "lid": list_id, "uid": user["id"]},
+        )
+    return {"id": list_id, "name": name}
+
+
 @protected.delete("/api/watchlists/{list_id}", status_code=204)
 def delete_watchlist(list_id: int, user=Depends(get_current_user)):
     with engine.begin() as conn:
