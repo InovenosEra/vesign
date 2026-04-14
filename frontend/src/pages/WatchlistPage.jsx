@@ -9,7 +9,7 @@ import {
   getSignalsByTickers, searchTickers,
   getHoldings, addHolding, deleteHolding,
   getPortfolioHoldings, getPortfolioPerformance, getPortfolioComparison,
-  WHITE_BG_LOGOS,
+  WHITE_BG_LOGOS, COMPANY_NAME_OVERRIDES,
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
@@ -618,38 +618,34 @@ export default function WatchlistPage() {
                       <colgroup>
                         <col style={{ width: '3%' }} />   {/* logo */}
                         <col style={{ width: '5%' }} />   {/* ticker */}
-                        <col style={{ width: '12%' }} />  {/* company */}
+                        <col style={{ width: '12%' }} />  {/* name */}
                         <col style={{ width: '6%' }} />   {/* signal */}
-                        <col style={{ width: '7%' }} />   {/* market cap */}
-                        <col style={{ width: '6%' }} />   {/* price */}
-                        <col style={{ width: '5%' }} />   {/* rsi */}
-                        <col style={{ width: '6%' }} />   {/* health */}
-                        <col style={{ width: '6%' }} />   {/* upside */}
+                        <col style={{ width: '6%' }} />   {/* health score */}
+                        <col style={{ width: '6%' }} />   {/* target */}
                         <col style={{ width: '6%' }} />   {/* ml score */}
-                        <col style={{ width: '8%' }} />   {/* live price */}
-                        <col style={{ width: '5%' }} />   {/* qty */}
+                        <col style={{ width: '6%' }} />   {/* amount */}
                         <col style={{ width: '6%' }} />   {/* avg price */}
-                        <col style={{ width: '7%' }} />   {/* invested */}
-                        <col style={{ width: '5%' }} />   {/* yield */}
+                        <col style={{ width: '7%' }} />   {/* current price */}
+                        <col style={{ width: '8%' }} />   {/* live price */}
+                        <col style={{ width: '7%' }} />   {/* investment */}
+                        <col style={{ width: '7%' }} />   {/* total p&l */}
                         <col style={{ width: '6%' }} />   {/* actions */}
                       </colgroup>
                       <thead>
                         <tr>
                           <th></th>
                           {th('col.ticker',         'ticker')}
-                          {th('col.company',        'company')}
+                          <Th label="Name" col="company" sort={sort} onSort={toggle} />
                           {th('col.signal',         'signal')}
-                          {th('col.mktCap',         'market_cap', 'col-hide-sm')}
-                          {th('col.price',          'close')}
-                          {th('col.rsi',            'rsi')}
-                          <th>{t('col.health')}</th>
-                          <th>{t('col.upside')}</th>
+                          <th>Health Score</th>
+                          <th>Target</th>
                           <th className="col-hide-sm">{t('col.mlScore')}</th>
-                          <th>{t('col.livePrice')}</th>
-                          <th>{t('col.qty')}</th>
+                          <th>Amount</th>
                           <th>{t('col.avgPrice')}</th>
-                          <th>{t('col.invested')}</th>
-                          <th>{t('col.yield')}</th>
+                          <Th label="Current Price" col="close" sort={sort} onSort={toggle} />
+                          <th>{t('col.livePrice')}</th>
+                          <th>Investment</th>
+                          <th>Total P&L (%)</th>
                           <th></th>
                         </tr>
                       </thead>
@@ -676,17 +672,15 @@ export default function WatchlistPage() {
                             <tr key={row.ticker} className="clickable-row" onClick={() => setSelected(row)}>
                               <td>{row.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(row.ticker) ? ' logo-white-bg' : ''}`} src={row.logo_url} alt="" /> : null}</td>
                               <td style={clip}><strong>{displayTicker(row.ticker)}</strong></td>
-                              <td style={clip}>{row.company ?? '—'}</td>
+                              <td style={clip}>{COMPANY_NAME_OVERRIDES[row.ticker] ?? row.company ?? '—'}</td>
                               <td>{row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'}</td>
-                              <td className="col-hide-sm">{fmtMktCap(row.market_cap, row.ticker)}</td>
-                              <td>{fmtPrice(row.close, row.ticker)}</td>
-                              <td>{row.rsi != null ? row.rsi.toFixed(1) : '—'}</td>
                               <HealthCell score={row.health_score} />
                               <UpsideCell targetMean={row.target_mean_price} close={row.close} prices={prices} ticker={row.ticker} />
                               <td className="col-hide-sm">{row.prediction_score != null ? <span className={row.prediction_score >= 0 ? 'up' : 'down'}>{row.prediction_score >= 0 ? '▲' : '▼'} {Math.abs(row.prediction_score * 100).toFixed(1)}%</span> : '—'}</td>
-                              <LivePriceCell ticker={row.ticker} closePrice={row.close} prices={prices} marketOpen={marketOpen} />
                               <td>{totalQty > 0 ? totalQty : '—'}</td>
                               <td>{avgPrice != null ? avgPrice.toFixed(2) : '—'}</td>
+                              <td>{fmtPrice(row.close, row.ticker)}</td>
+                              <LivePriceCell ticker={row.ticker} closePrice={row.close} prices={prices} marketOpen={marketOpen} />
                               <td>{totalCost > 0 ? `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</td>
                               <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
                                 {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(2)}%` : '—'}
@@ -707,7 +701,7 @@ export default function WatchlistPage() {
 
                             isExpanded && (
                               <tr key={`${row.ticker}-lots`}>
-                                <td colSpan={16} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
+                                <td colSpan={14} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
                                   <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--accent)' }}>
                                     {/* Existing lots */}
                                     {lots.length === 0

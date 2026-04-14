@@ -1,6 +1,12 @@
 const BASE = '/api'
 
-export const WHITE_BG_LOGOS = new Set(['CTVA', 'SNX', 'ZBH', 'PCTY', 'PENG', 'SM', 'SSTK', 'HWKN', 'CTS'])
+export const WHITE_BG_LOGOS = new Set(['CTVA', 'SNX', 'ZBH', 'PCTY', 'PENG', 'SM', 'SSTK', 'HWKN', 'CTS', 'PM'])
+
+export const COMPANY_NAME_OVERRIDES = {
+  PM: 'Philip Morris',
+  SPY: 'SPDR S&P 500 ETF',
+  GOOGL: 'Alphabet A',
+}
 
 const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' }
 
