@@ -338,7 +338,7 @@ export default function WatchlistPage() {
            Both rows (cards + charts) share the same columns so dividers align perfectly */
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '380px 1px 1fr 1px 380px',
+          gridTemplateColumns: '25% 1px 1fr 1px 25%',
           columnGap: 12,
           rowGap: 16,
           marginBottom: 24,
