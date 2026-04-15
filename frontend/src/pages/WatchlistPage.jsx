@@ -465,8 +465,8 @@ export default function WatchlistPage() {
                         formatter={(v, name) => v != null ? [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, name] : ['—', name]}
                         itemStyle={{ color: 'var(--text)' }}
                       />
-                      <Line type="monotone" dataKey="vesign" name="Vesign" stroke="var(--green)" strokeWidth={1.5} dot={false} connectNulls />
-                      <Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="#3498db" strokeWidth={1.5} dot={false} connectNulls />
+                      <Line type="monotone" dataKey="vesign" name="Vesign" stroke="var(--green)" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
+                      <Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="#3498db" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -485,7 +485,7 @@ export default function WatchlistPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text)' }} tickLine={false} axisLine={false} />
                       <YAxis hide width={0} />
-                      <Bar dataKey="yield" radius={[4, 4, 0, 0]}
+                      <Bar dataKey="yield" radius={[4, 4, 0, 0]} isAnimationActive={false}
                         label={{ position: 'top', fontSize: 10, fill: 'var(--text)', formatter: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` }}>
                         {compData.map((entry, i) => (
                           <Cell key={i} fill={entry.name === 'Vesign' ? 'var(--green)' : '#3498db'} />
