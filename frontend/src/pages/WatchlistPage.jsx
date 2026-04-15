@@ -121,6 +121,7 @@ export default function WatchlistPage() {
   const [confirmDelete, setConfirmDelete] = useState(null) // { id, name }
   const [renamingId, setRenamingId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  const [pieMode, setPieMode] = useState('ticker') // 'ticker' | 'industry'
 
   const { data: lists = [] } = useQuery({
     queryKey: ['watchlists'],
@@ -217,11 +218,23 @@ export default function WatchlistPage() {
   const portDailyPnlPct   = portDailyPnlAbs != null && portBaseTotal > 0
     ? (portDailyPnlAbs / portBaseTotal) * 100 : null
 
-  const portPieData = useMemo(() => portEnriched
-    .map(h => ({ name: h.ticker, value: h.currentVal ?? h.total_cost ?? 0 }))
-    .filter(d => d.value > 0)
-    .sort((a, b) => b.value - a.value),
-  [portEnriched])
+  const portPieData = useMemo(() => {
+    if (pieMode === 'industry') {
+      const byIndustry = {}
+      portEnriched.forEach(h => {
+        const key = h.industry || 'Other'
+        byIndustry[key] = (byIndustry[key] || 0) + (h.currentVal ?? h.total_cost ?? 0)
+      })
+      return Object.entries(byIndustry)
+        .map(([name, value]) => ({ name, value }))
+        .filter(d => d.value > 0)
+        .sort((a, b) => b.value - a.value)
+    }
+    return portEnriched
+      .map(h => ({ name: h.ticker, value: h.currentVal ?? h.total_cost ?? 0 }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value)
+  }, [portEnriched, pieMode])
   const portPieTotal = portPieData.reduce((s, d) => s + d.value, 0)
 
   const invalidateLists    = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
@@ -412,23 +425,35 @@ export default function WatchlistPage() {
               </ResponsiveContainer>
             </div>
             <div style={{ fontSize: 12 }}>
+              <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                {[['ticker', 'Ticker'], ['industry', 'Industry']].map(([mode, label]) => (
+                  <button key={mode}
+                    className={`period-chip${pieMode === mode ? ' active' : ''}`}
+                    onClick={() => setPieMode(mode)}
+                    style={{ fontSize: 10, padding: '2px 8px' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, color: 'var(--muted)', fontSize: 10 }}>
                 <span style={{ width: 8, flexShrink: 0 }} />
-                <span style={{ minWidth: 50 }}>{t('col.ticker')}</span>
-                <span style={{ minWidth: 36, textAlign: 'right' }}>{t('portfolio.allocation').slice(0,5)}%</span>
-                <span style={{ minWidth: 42, textAlign: 'right' }}>{t('col.yield')}</span>
+                <span style={{ minWidth: 50 }}>{pieMode === 'ticker' ? t('col.ticker') : 'Industry'}</span>
+                <span style={{ minWidth: 36, textAlign: 'right' }}>Alloc%</span>
+                {pieMode === 'ticker' && <span style={{ minWidth: 42, textAlign: 'right' }}>{t('col.yield')}</span>}
               </div>
               {portPieData.slice(0, 8).map((d, i) => {
                 const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
-                const h = portEnriched.find(x => x.ticker === d.name)
+                const h = pieMode === 'ticker' ? portEnriched.find(x => x.ticker === d.name) : null
                 return (
                   <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                     <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], flexShrink: 0 }} />
-                    <span style={{ minWidth: 50, fontWeight: 600 }}>{d.name}</span>
+                    <span style={{ minWidth: 50, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: pieMode === 'industry' ? 120 : undefined }}>{d.name}</span>
                     <span style={{ color: 'var(--muted)', minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
-                    <span className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ minWidth: 42, textAlign: 'right', fontSize: 11 }}>
-                      {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
-                    </span>
+                    {pieMode === 'ticker' && (
+                      <span className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ minWidth: 42, textAlign: 'right', fontSize: 11 }}>
+                        {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
+                      </span>
+                    )}
                   </div>
                 )
               })}
