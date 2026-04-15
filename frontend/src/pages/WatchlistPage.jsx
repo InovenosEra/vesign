@@ -678,7 +678,7 @@ export default function WatchlistPage() {
                           <th className="col-hide-sm">{t('col.mlScore')}</th>
                           <th>Amount</th>
                           <th>{t('col.avgPrice')}</th>
-                          <Th label="Current Price" col="close" sort={sort} onSort={toggle} />
+                          <Th label="Closed Price" col="close" sort={sort} onSort={toggle} />
                           <th>{t('col.livePrice')}</th>
                           <th>Investment</th>
                           <th>Total P&L (%)</th>
