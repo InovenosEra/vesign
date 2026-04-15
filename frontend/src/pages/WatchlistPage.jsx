@@ -453,7 +453,7 @@ export default function WatchlistPage() {
                   </button>
                 ))}
               </div>
-              <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%' }}>
+              <table style={{ fontSize: 11, borderCollapse: 'collapse', width: '100%' }}>
                 <thead>
                   <tr style={{ color: 'var(--muted)', fontSize: 10 }}>
                     <th style={{ padding: '0 6px 4px 0', fontWeight: 400, textAlign: 'left' }}>{pieMode === 'ticker' ? t('col.ticker') : 'Industry'}</th>
