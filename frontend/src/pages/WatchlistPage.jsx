@@ -435,28 +435,35 @@ export default function WatchlistPage() {
                   </button>
                 ))}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, color: 'var(--muted)', fontSize: 10 }}>
-                <span style={{ width: 8, flexShrink: 0 }} />
-                <span style={{ minWidth: 50 }}>{pieMode === 'ticker' ? t('col.ticker') : 'Industry'}</span>
-                <span style={{ minWidth: 36, textAlign: 'right' }}>Alloc%</span>
-                {pieMode === 'ticker' && <span style={{ minWidth: 42, textAlign: 'right' }}>{t('col.yield')}</span>}
-              </div>
-              {portPieData.slice(0, 8).map((d, i) => {
-                const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
-                const h = pieMode === 'ticker' ? portEnriched.find(x => x.ticker === d.name) : null
-                return (
-                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], flexShrink: 0 }} />
-                    <span style={{ minWidth: 50, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: pieMode === 'industry' ? 120 : undefined }}>{d.name}</span>
-                    <span style={{ color: 'var(--muted)', minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
-                    {pieMode === 'ticker' && (
-                      <span className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ minWidth: 42, textAlign: 'right', fontSize: 11 }}>
-                        {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
+              <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%' }}>
+                <thead>
+                  <tr style={{ color: 'var(--muted)', fontSize: 10 }}>
+                    <th style={{ padding: '0 6px 4px 0', fontWeight: 400, textAlign: 'left' }}>{pieMode === 'ticker' ? t('col.ticker') : 'Industry'}</th>
+                    <th style={{ padding: '0 0 4px 0', fontWeight: 400, textAlign: 'right' }}>Alloc%</th>
+                    {pieMode === 'ticker' && <th style={{ padding: '0 0 4px 6px', fontWeight: 400, textAlign: 'right' }}>Yield</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {portPieData.slice(0, 8).map((d, i) => {
+                    const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
+                    const h = pieMode === 'ticker' ? portEnriched.find(x => x.ticker === d.name) : null
+                    return (
+                      <tr key={d.name}>
+                        <td style={{ padding: '2px 6px 2px 0', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], marginRight: 6, verticalAlign: 'middle' }} />
+                          <span style={{ fontWeight: 600 }}>{d.name}</span>
+                        </td>
+                        <td style={{ padding: '2px 0', textAlign: 'right', color: 'var(--muted)' }}>{pct.toFixed(1)}%</td>
+                        {pieMode === 'ticker' && (
+                          <td className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ padding: '2px 0 2px 6px', textAlign: 'right', fontSize: 11 }}>
+                            {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
           {/* Col 2: empty (divider column) */}
