@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useContext } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { MarketContext } from '../context/MarketContext'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts'
@@ -175,16 +175,19 @@ export default function WatchlistPage() {
     queryKey: ['portfolio-holdings', market],
     queryFn: () => getPortfolioHoldings(market),
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
   })
   const { data: compData = [] } = useQuery({
     queryKey: ['portfolio-comparison', market],
     queryFn: () => getPortfolioComparison(market),
     staleTime: 300_000,
+    placeholderData: keepPreviousData,
   })
   const { data: perfData = [] } = useQuery({
     queryKey: ['portfolio-performance', market],
     queryFn: () => getPortfolioPerformance(market),
     staleTime: 300_000,
+    placeholderData: keepPreviousData,
   })
   const portfolioTickers = useMemo(() => portfolioHoldings.map(h => h.ticker), [portfolioHoldings])
   const { prices: portPrices, marketOpen: portMarketOpen } = useLivePrices(portfolioTickers)
