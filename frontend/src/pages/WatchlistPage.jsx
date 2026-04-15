@@ -139,7 +139,6 @@ export default function WatchlistPage() {
   const [confirmDelete, setConfirmDelete] = useState(null) // { id, name }
   const [renamingId, setRenamingId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
-  const [pieMode, setPieMode] = useState('ticker') // 'ticker' | 'industry'
 
   const { data: lists = [] } = useQuery({
     queryKey: ['watchlists'],
@@ -236,23 +235,11 @@ export default function WatchlistPage() {
   const portDailyPnlPct   = portDailyPnlAbs != null && portBaseTotal > 0
     ? (portDailyPnlAbs / portBaseTotal) * 100 : null
 
-  const portPieData = useMemo(() => {
-    if (pieMode === 'industry') {
-      const byIndustry = {}
-      portEnriched.forEach(h => {
-        const key = h.industry || 'Other'
-        byIndustry[key] = (byIndustry[key] || 0) + (h.currentVal ?? h.total_cost ?? 0)
-      })
-      return Object.entries(byIndustry)
-        .map(([name, value]) => ({ name, value }))
-        .filter(d => d.value > 0)
-        .sort((a, b) => b.value - a.value)
-    }
-    return portEnriched
-      .map(h => ({ name: h.ticker, value: h.currentVal ?? h.total_cost ?? 0 }))
-      .filter(d => d.value > 0)
-      .sort((a, b) => b.value - a.value)
-  }, [portEnriched, pieMode])
+  const portPieData = useMemo(() => portEnriched
+    .map(h => ({ name: h.ticker, value: h.currentVal ?? h.total_cost ?? 0 }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value),
+  [portEnriched])
   const portPieTotal = portPieData.reduce((s, d) => s + d.value, 0)
 
   const invalidateLists    = () => qc.invalidateQueries({ queryKey: ['watchlists'] })
@@ -426,8 +413,8 @@ export default function WatchlistPage() {
 
           {/* ── Row 2: charts ── */}
           {/* Col 1: Allocation donut */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 10px', display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div style={{ width: 150, height: 150, flexShrink: 0 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', display: 'flex', gap: 20, alignItems: 'center' }}>
+            <div style={{ width: 160, height: 160, flexShrink: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={portPieData} dataKey="value" cx="50%" cy="50%" innerRadius={44} outerRadius={74} strokeWidth={1}>
@@ -443,52 +430,26 @@ export default function WatchlistPage() {
               </ResponsiveContainer>
             </div>
             <div style={{ fontSize: 12 }}>
-              <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-                {[['ticker', 'Ticker'], ['industry', 'Industry']].map(([mode, label]) => (
-                  <button key={mode}
-                    className={`period-chip${pieMode === mode ? ' active' : ''}`}
-                    onClick={() => setPieMode(mode)}
-                    style={{ fontSize: 10, padding: '2px 8px' }}>
-                    {label}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, color: 'var(--muted)', fontSize: 10 }}>
+                <span style={{ width: 8, flexShrink: 0 }} />
+                <span style={{ minWidth: 50 }}>{t('col.ticker')}</span>
+                <span style={{ minWidth: 36, textAlign: 'right' }}>{t('portfolio.allocation').slice(0,5)}%</span>
+                <span style={{ minWidth: 42, textAlign: 'right' }}>{t('col.yield')}</span>
               </div>
-              <table style={{ fontSize: 11, borderCollapse: 'collapse', width: '100%' }}>
-                <thead>
-                  <tr style={{ color: 'var(--muted)', fontSize: 10 }}>
-                    <th style={{ padding: '0 6px 4px 0', fontWeight: 400, textAlign: 'left' }}>{pieMode === 'ticker' ? t('col.ticker') : 'Industry'}</th>
-                    <th style={{ padding: '0 0 4px 0', fontWeight: 400, textAlign: 'right' }}>Alloc%</th>
-                    <th style={{ padding: '0 0 4px 6px', fontWeight: 400, textAlign: 'right' }}>Yield</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {portPieData.slice(0, 8).map((d, i) => {
-                    const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
-                    let yieldPct = null
-                    if (pieMode === 'ticker') {
-                      const h = portEnriched.find(x => x.ticker === d.name)
-                      yieldPct = h?.pnlPct ?? null
-                    } else {
-                      const group = portEnriched.filter(x => (x.industry || 'Other') === d.name)
-                      const totalCost = group.reduce((s, x) => s + (x.total_cost || 0), 0)
-                      const totalVal = group.reduce((s, x) => s + (x.currentVal ?? x.total_cost ?? 0), 0)
-                      yieldPct = totalCost > 0 ? ((totalVal - totalCost) / totalCost) * 100 : null
-                    }
-                    return (
-                      <tr key={d.name}>
-                        <td style={{ padding: '2px 6px 2px 0', whiteSpace: 'nowrap' }}>
-                          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], marginRight: 6, verticalAlign: 'middle' }} />
-                          <span style={{ fontWeight: 600 }}>{pieMode === 'industry' ? (_SHORT_INDUSTRY[d.name] ?? d.name) : d.name}</span>
-                        </td>
-                        <td style={{ padding: '2px 0', textAlign: 'right', color: 'var(--muted)' }}>{pct.toFixed(1)}%</td>
-                        <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''} style={{ padding: '2px 0 2px 6px', textAlign: 'right', fontSize: 11 }}>
-                          {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(1)}%` : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              {portPieData.slice(0, 8).map((d, i) => {
+                const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
+                const h = portEnriched.find(x => x.ticker === d.name)
+                return (
+                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], flexShrink: 0 }} />
+                    <span style={{ minWidth: 50, fontWeight: 600 }}>{d.name}</span>
+                    <span style={{ color: 'var(--muted)', minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
+                    <span className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ minWidth: 42, textAlign: 'right', fontSize: 11 }}>
+                      {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
           {/* Col 2: empty (divider column) */}
