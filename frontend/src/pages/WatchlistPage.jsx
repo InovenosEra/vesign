@@ -426,8 +426,8 @@ export default function WatchlistPage() {
 
           {/* ── Row 2: charts ── */}
           {/* Col 1: Allocation donut */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', display: 'flex', gap: 20, alignItems: 'center' }}>
-            <div style={{ width: 160, height: 160, flexShrink: 0 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 10px', display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div style={{ width: 150, height: 150, flexShrink: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={portPieData} dataKey="value" cx="50%" cy="50%" innerRadius={44} outerRadius={74} strokeWidth={1}>
@@ -458,13 +458,22 @@ export default function WatchlistPage() {
                   <tr style={{ color: 'var(--muted)', fontSize: 10 }}>
                     <th style={{ padding: '0 6px 4px 0', fontWeight: 400, textAlign: 'left' }}>{pieMode === 'ticker' ? t('col.ticker') : 'Industry'}</th>
                     <th style={{ padding: '0 0 4px 0', fontWeight: 400, textAlign: 'right' }}>Alloc%</th>
-                    {pieMode === 'ticker' && <th style={{ padding: '0 0 4px 6px', fontWeight: 400, textAlign: 'right' }}>Yield</th>}
+                    <th style={{ padding: '0 0 4px 6px', fontWeight: 400, textAlign: 'right' }}>Yield</th>
                   </tr>
                 </thead>
                 <tbody>
                   {portPieData.slice(0, 8).map((d, i) => {
                     const pct = portPieTotal > 0 ? (d.value / portPieTotal) * 100 : 0
-                    const h = pieMode === 'ticker' ? portEnriched.find(x => x.ticker === d.name) : null
+                    let yieldPct = null
+                    if (pieMode === 'ticker') {
+                      const h = portEnriched.find(x => x.ticker === d.name)
+                      yieldPct = h?.pnlPct ?? null
+                    } else {
+                      const group = portEnriched.filter(x => (x.industry || 'Other') === d.name)
+                      const totalCost = group.reduce((s, x) => s + (x.total_cost || 0), 0)
+                      const totalVal = group.reduce((s, x) => s + (x.currentVal ?? x.total_cost ?? 0), 0)
+                      yieldPct = totalCost > 0 ? ((totalVal - totalCost) / totalCost) * 100 : null
+                    }
                     return (
                       <tr key={d.name}>
                         <td style={{ padding: '2px 6px 2px 0', whiteSpace: 'nowrap' }}>
@@ -472,11 +481,9 @@ export default function WatchlistPage() {
                           <span style={{ fontWeight: 600 }}>{pieMode === 'industry' ? (_SHORT_INDUSTRY[d.name] ?? d.name) : d.name}</span>
                         </td>
                         <td style={{ padding: '2px 0', textAlign: 'right', color: 'var(--muted)' }}>{pct.toFixed(1)}%</td>
-                        {pieMode === 'ticker' && (
-                          <td className={h?.pnlPct != null ? (h.pnlPct >= 0 ? 'up' : 'down') : ''} style={{ padding: '2px 0 2px 6px', textAlign: 'right', fontSize: 11 }}>
-                            {h?.pnlPct != null ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '—'}
-                          </td>
-                        )}
+                        <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''} style={{ padding: '2px 0 2px 6px', textAlign: 'right', fontSize: 11 }}>
+                          {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(1)}%` : '—'}
+                        </td>
                       </tr>
                     )
                   })}
