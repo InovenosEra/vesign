@@ -36,6 +36,24 @@ function fmtMktCap(n, ticker) {
 
 function displayTicker(ticker) { return ticker ? ticker.replace(/\.TA$/, '') : '—' }
 
+const _SHORT_INDUSTRY = {
+  'Internet Content & Information': 'Internet Content',
+  'Software - Application': 'Software App',
+  'Software - Infrastructure': 'Software Infra',
+  'Specialty Retail': 'Spec. Retail',
+  'Asset Management': 'Asset Mgmt',
+  'Consumer Electronics': 'Consumer Elec.',
+  'Semiconductors & Semiconductor Equipment': 'Semiconductors',
+  'Information Technology Services': 'IT Services',
+  'Communication Equipment': 'Comm. Equipment',
+  'Electronic Gaming & Multimedia': 'Gaming & Media',
+  'Drug Manufacturers - General': 'Drug Mfg',
+  'Diagnostics & Research': 'Diagnostics',
+  'Medical Instruments & Supplies': 'Med. Instruments',
+  'Household & Personal Products': 'Household Prod.',
+  'Oil & Gas Exploration & Production': 'Oil & Gas E&P',
+  'Real Estate Investment Trusts': 'REITs',
+}
 const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
 const _HEALTH_KEYS = ['', 'health.weak', 'health.fair', 'health.good', 'health.great', 'health.excellent']
 
@@ -451,7 +469,7 @@ export default function WatchlistPage() {
                       <tr key={d.name}>
                         <td style={{ padding: '2px 6px 2px 0', whiteSpace: 'nowrap' }}>
                           <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: _PIE_COLORS[i % _PIE_COLORS.length], marginRight: 6, verticalAlign: 'middle' }} />
-                          <span style={{ fontWeight: 600 }}>{d.name}</span>
+                          <span style={{ fontWeight: 600 }}>{pieMode === 'industry' ? (_SHORT_INDUSTRY[d.name] ?? d.name) : d.name}</span>
                         </td>
                         <td style={{ padding: '2px 0', textAlign: 'right', color: 'var(--muted)' }}>{pct.toFixed(1)}%</td>
                         {pieMode === 'ticker' && (
