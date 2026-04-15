@@ -481,11 +481,10 @@ export default function WatchlistPage() {
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>{t('portfolio.comparisonTitle')}</div>
                 <div style={{ width: '100%', height: 160 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={compData} margin={{ top: 18, right: 8, left: -10, bottom: 0 }}>
+                    <BarChart data={compData} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text)' }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 9, fill: 'var(--muted)' }} tickLine={false} axisLine={false}
-                        tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`} />
+                      <YAxis hide />
                       <Bar dataKey="yield" radius={[4, 4, 0, 0]}
                         label={{ position: 'top', fontSize: 10, fill: 'var(--text)', formatter: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` }}>
                         {compData.map((entry, i) => (
