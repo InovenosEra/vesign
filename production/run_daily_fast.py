@@ -11,6 +11,8 @@ from data.loaders import engine
 from features.technical import compute_and_save_features_chunked
 
 # ---------- Modeling ----------
+from models.train import train_factor_weights
+from features.forward_returns import compute_forward_returns
 from models.predict import run_prediction_engine
 from signals.engine import run_scoring
 
@@ -52,6 +54,14 @@ def run_daily_fast():
 
     # Chunked: avoids peak memory of loading+concatenating all 1,600 tickers at once
     compute_and_save_features_chunked(engine, days=280, chunk_size=100)
+    gc.collect()
+
+    # ── Daily ML retrain: refresh forward returns + retrain XGBoost models ─────
+    from datetime import datetime, timedelta
+    compute_forward_returns()
+    gc.collect()
+    cutoff = (datetime.today() - timedelta(days=20)).strftime("%Y-%m-%d")
+    train_factor_weights(train_end_date=cutoff)
     gc.collect()
 
     run_prediction_engine()
