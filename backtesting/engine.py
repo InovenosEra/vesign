@@ -44,11 +44,29 @@ def build_trade_log():
 
     trades_df = pd.DataFrame(trades)
 
+    if trades_df.empty:
+        # Ensure table exists with a proper schema even when no closed trades yet
+        # (fresh DB with too little history for BUY→SELL pairs to form).
+        from sqlalchemy import text as _text
+        with engine.begin() as conn:
+            conn.execute(_text("""
+                CREATE TABLE IF NOT EXISTS trade_log (
+                    ticker     TEXT,
+                    buy_date   TEXT,
+                    buy_price  REAL,
+                    sell_date  TEXT,
+                    sell_price REAL,
+                    return_pct REAL
+                )
+            """))
+        print("Trade log: 0 closed trades (table ensured)")
+        return
+
     trades_df.to_sql("trade_log", engine,
                      if_exists="replace",
                      index=False)
 
-    print("Trade log created")
+    print(f"Trade log created: {len(trades_df):,} closed trades")
 
 
 def run_backtest(eval_start_date=None):

@@ -11,3 +11,5 @@ __pycache__/
 .claude/settings.local.json
 .vscode/
 .claude/
+db_backups/
+logs/

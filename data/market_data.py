@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, UTC
 from utils.universe_loader import load_universe
 from data.loaders import engine
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 import exchange_calendars as xcals
 from utils.update_guard import should_run, mark_run
 from data import fmp
@@ -153,12 +154,16 @@ def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0)
         tick_params = {f"t{j}": t for j, t in enumerate(batch_tickers)}
         date_phs = ",".join(f":d{i}" for i in range(len(dates)))
         tick_phs = ",".join(f":t{j}" for j in range(len(batch_tickers)))
-        with engine.begin() as conn:
-            conn.execute(text(
-                f"DELETE FROM daily_prices "
-                f"WHERE date(date) IN ({date_phs}) "
-                f"AND ticker IN ({tick_phs})"
-            ), {**date_params, **tick_params})
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    f"DELETE FROM daily_prices "
+                    f"WHERE date(date) IN ({date_phs}) "
+                    f"AND ticker IN ({tick_phs})"
+                ), {**date_params, **tick_params})
+        except OperationalError:
+            # Table doesn't exist yet — fresh DB rebuild. First to_sql will create it.
+            pass
 
     final_df.to_sql("daily_prices", engine, if_exists="append", index=False)
     print(f"  Saved {len(final_df):,} rows for {final_df['ticker'].nunique():,} tickers.")
@@ -464,10 +469,14 @@ def update_company_info():
     if needs_fundamentals:
         fund_df = df[["ticker", "market_cap"]]
         fetched = fund_df["ticker"].tolist()
-        with engine.begin() as conn:
-            tick_params = {f"t{j}": t for j, t in enumerate(fetched)}
-            tick_phs = ",".join(f":t{j}" for j in range(len(fetched)))
-            conn.execute(text(f"DELETE FROM fundamentals WHERE ticker IN ({tick_phs})"), tick_params)
+        try:
+            with engine.begin() as conn:
+                tick_params = {f"t{j}": t for j, t in enumerate(fetched)}
+                tick_phs = ",".join(f":t{j}" for j in range(len(fetched)))
+                conn.execute(text(f"DELETE FROM fundamentals WHERE ticker IN ({tick_phs})"), tick_params)
+        except OperationalError:
+            # Table doesn't exist yet — fresh DB rebuild. First to_sql will create it.
+            pass
         fund_df.to_sql("fundamentals", engine, if_exists="append", index=False)
         # Update industry, description, and logo_url in companies table
         with engine.begin() as conn:
@@ -493,6 +502,16 @@ def update_company_info():
         analyst_df = df[["ticker", "target_mean_price", "target_high_price",
                           "target_low_price", "number_of_analysts", "last_update"]]
         with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS analyst_expectations (
+                    ticker             TEXT PRIMARY KEY,
+                    target_mean_price  REAL,
+                    target_high_price  REAL,
+                    target_low_price   REAL,
+                    number_of_analysts REAL,
+                    last_update        TEXT
+                )
+            """))
             for _, row in analyst_df.iterrows():
                 conn.execute(text("""
                     INSERT INTO analyst_expectations

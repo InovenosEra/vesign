@@ -1,6 +1,7 @@
 import gc
 import pandas as pd
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from features.technical_indicators import add_indicators
 
 
@@ -36,8 +37,12 @@ def compute_and_save_features_chunked(engine, days: int = 280, chunk_size: int =
             {"c": cutoff}
         ).fetchall()]
 
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM features WHERE date >= :c"), {"c": cutoff})
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM features WHERE date >= :c"), {"c": cutoff})
+    except OperationalError:
+        # Table doesn't exist yet — fresh DB rebuild. First to_sql will create it.
+        pass
 
     total = len(tickers)
     for i in range(0, total, chunk_size):

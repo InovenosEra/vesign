@@ -562,8 +562,6 @@ export default function TradesPage() {
 
   const [start, setStart]           = useState(oneYearAgo.toISOString().slice(0, 10))
   const [end,   setEnd]             = useState(new Date().toISOString().slice(0, 10))
-  const [openStart, setOpenStart]       = useState(oneYearAgo.toISOString().slice(0, 10))
-  const [openEnd,   setOpenEnd]         = useState(new Date().toISOString().slice(0, 10))
   const [openSearch, setOpenSearch]     = useState('')
   const [openPage, setOpenPage]         = useState(1)
   const [openPageSize, setOpenPageSize] = useState(10)
@@ -614,12 +612,12 @@ export default function TradesPage() {
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.to')}</label>
         <input type="date" value={end} onChange={e => setEnd(e.target.value)} />
         <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {[3, 6, 12, 24].map(m => (
+          {[[3, '3M'], [6, '6M'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
             <button
               key={m}
               className="period-chip"
               onClick={() => { setStart(isoMonthsAgo(m)); setEnd(new Date().toISOString().slice(0, 10)) }}
-            >{m}M</button>
+            >{label}</button>
           ))}
         </span>
       </div>
@@ -742,29 +740,10 @@ export default function TradesPage() {
       {/* Open Trades */}
       <p className="page-title" style={{ marginTop: 40 }}>{t('trades.openTitle')}</p>
 
-      <div className="controls">
-        <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.from')}</label>
-        <input type="date" value={openStart} onChange={e => setOpenStart(e.target.value)} />
-        <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.to')}</label>
-        <input type="date" value={openEnd} onChange={e => setOpenEnd(e.target.value)} />
-        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {[3, 6, 12].map(m => (
-            <button
-              key={m}
-              className="period-chip"
-              onClick={() => { setOpenStart(isoMonthsAgo(m)); setOpenEnd(new Date().toISOString().slice(0, 10)) }}
-            >{m}M</button>
-          ))}
-        </span>
-      </div>
-
       {loadingOpen && <p className="loading">{t('table.loading')}</p>}
       {errorOpen && <p className="error">Error: {openError?.message}</p>}
       {!loadingOpen && !errorOpen && (() => {
-        const filtered = openTrades.filter(t => {
-          const d = t.buy_date?.slice(0, 10)
-          return (!openStart || d >= openStart) && (!openEnd || d <= openEnd)
-        })
+        const filtered = openTrades
         const openCount  = filtered.length
         const winCount   = filtered.filter(t => (t.unrealized_pct ?? 0) > 0).length
         const winRate    = openCount > 0 ? (winCount / openCount) * 100 : null

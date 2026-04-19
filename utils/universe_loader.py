@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import requests
 from io import StringIO
@@ -120,6 +121,74 @@ def load_universe():
     print(f"Loaded {len(sp600)} S&P 600 tickers")
 
     us_companies = pd.concat([sp500, sp400, sp600], ignore_index=True).drop_duplicates(subset=["ticker"])
+
+    if os.getenv("VESIGN_US_ONLY") == "1":
+        print("VESIGN_US_ONLY=1: skipping TASE indexes")
+        ta35 = ta90 = ta125 = tasme60 = pd.DataFrame()
+        il_frames = []
+        il_companies = pd.DataFrame()
+
+        companies = us_companies.drop_duplicates(subset=["ticker"])
+
+        EXTRA_COLS = ["industry", "description", "description_short"]
+        try:
+            existing = pd.read_sql("SELECT * FROM companies", engine)
+            index_tickers = set(companies["ticker"])
+            custom = existing[~existing["ticker"].isin(index_tickers)].copy()
+            if "market" not in custom.columns:
+                custom["market"] = "US"
+            preserved_cols = [c for c in EXTRA_COLS if c in existing.columns]
+            if preserved_cols:
+                preserved = existing[["ticker"] + preserved_cols]
+                companies = companies.merge(preserved, on="ticker", how="left")
+                for col in preserved_cols:
+                    if col not in custom.columns:
+                        custom[col] = None
+        except Exception:
+            custom = pd.DataFrame()
+
+        # Ensure schema columns exist on a fresh rebuild (update_company_info
+        # and summarize_descriptions do UPDATE on these columns, which fails
+        # if the columns weren't created here).
+        for col in EXTRA_COLS:
+            if col not in companies.columns:
+                companies[col] = None
+
+        companies.to_sql("companies", engine, if_exists="replace", index=False)
+
+        if not custom.empty:
+            existing_cols = pd.read_sql("SELECT * FROM companies LIMIT 0", engine).columns.tolist()
+            custom = custom[[c for c in custom.columns if c in existing_cols]]
+            custom.to_sql("companies", engine, if_exists="append", index=False)
+
+        tickers = companies["ticker"].tolist()
+        print(f"Loaded {len(tickers)} total US tickers (US_ONLY mode)")
+
+        try:
+            watchlist_tickers = pd.read_sql("SELECT DISTINCT ticker FROM watchlist", engine)["ticker"].tolist()
+            # Only add US tickers (no .TA) from watchlist in US_ONLY mode
+            extra = [t for t in watchlist_tickers if t not in set(tickers) and not t.endswith(".TA")]
+            if extra:
+                print(f"Adding {len(extra)} watchlist ticker(s) to universe: {extra}")
+                existing_co = set(pd.read_sql("SELECT ticker FROM companies", engine)["ticker"])
+                new_co = [t for t in extra if t not in existing_co]
+                if new_co:
+                    pd.DataFrame({
+                        "ticker": new_co,
+                        "company": new_co,
+                        "sector": [""] * len(new_co),
+                        "market": ["US"] * len(new_co),
+                        "logo_url": [
+                            f"https://financialmodelingprep.com/image-stock/{t}.png"
+                            for t in new_co
+                        ],
+                    }).to_sql("companies", engine, if_exists="append", index=False)
+                tickers = tickers + extra
+        except Exception as e:
+            print(f"Could not add watchlist tickers to universe: {e}")
+
+        print(f"Total universe: {len(tickers)} tickers (US_ONLY)")
+        return tickers
 
     print("Loading TA-35 universe...")
     try:

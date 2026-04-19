@@ -365,6 +365,7 @@ export default function SignalsPage() {
     queryFn: () => getSignals({
       signal:    signalFilter === 'ALL' ? undefined : signalFilter,
       search:    debouncedSearch || undefined,
+      months:    120,
       page,
       page_size: pageSize,
       sort_by:   sortBy,
