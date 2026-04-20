@@ -1,3 +1,5 @@
+import os
+import yaml
 import pandas as pd
 from data.loaders import engine
 
@@ -6,43 +8,84 @@ def build_trade_log():
 
     print("Building trade log...")
 
-    signals = pd.read_sql(
-        "SELECT date, ticker, signal, close FROM signals",
-        engine
-    )
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(BASE_DIR, "config", "settings.yaml")) as f:
+        config = yaml.safe_load(f)
+    stop_pct = config.get("trailing_stop_pct", 0.15)
 
-    signals = signals.sort_values(["ticker", "date"])
+    # Merge signals + ML prediction into daily_prices so every day is iterated.
+    # SELL (stop or RSI>=70) now requires ML prediction_score < 0 (MASTER gate).
+    prices = pd.read_sql(
+        "SELECT date, ticker, close FROM daily_prices",
+        engine,
+    )
+    signals = pd.read_sql(
+        "SELECT date, ticker, signal, prediction_score FROM signals",
+        engine,
+    )
+    merged = prices.merge(signals, on=["date", "ticker"], how="left")
+    merged = merged.sort_values(["ticker", "date"])
+
+    def _ml_allows_sell(pred, ticker):
+        # Waived for TASE and when prediction is missing
+        if pred is None or pd.isna(pred) or ticker.endswith(".TA"):
+            return True
+        return pred < 0
 
     trades = []
+    stop_sells = []  # (ticker, sell_date) — stop-triggered exits to write back to signals
 
-    for ticker, df in signals.groupby("ticker"):
+    for ticker, df in merged.groupby("ticker"):
 
         open_trade = None
+        stop_price = None
 
         for _, row in df.iterrows():
 
-            if row["signal"] == "BUY" and open_trade is None:
-                open_trade = {
-                    "ticker": ticker,
-                    "buy_date": row["date"],
-                    "buy_price": row["close"]
-                }
+            close = row["close"]
+            sig = row["signal"]
+            pred = row.get("prediction_score")
 
-            elif row["signal"] == "SELL" and open_trade is not None:
-
-                trade = {
-                    **open_trade,
-                    "sell_date": row["date"],
-                    "sell_price": row["close"],
-                    "return_pct":
-                        (row["close"] - open_trade["buy_price"])
-                        / open_trade["buy_price"]
-                }
-
-                trades.append(trade)
-                open_trade = None
+            if open_trade is None:
+                if sig == "BUY":
+                    open_trade = {
+                        "ticker": ticker,
+                        "buy_date": row["date"],
+                        "buy_price": close,
+                    }
+                    stop_price = close * (1 - stop_pct)
+            else:
+                stop_hit = close <= stop_price
+                rsi_sell = sig == "SELL"
+                ml_ok = _ml_allows_sell(pred, ticker)
+                if (stop_hit or rsi_sell) and ml_ok:
+                    trade = {
+                        **open_trade,
+                        "sell_date": row["date"],
+                        "sell_price": close,
+                        "return_pct": (close - open_trade["buy_price"]) / open_trade["buy_price"],
+                    }
+                    trades.append(trade)
+                    # Track stop-triggered exits (where signal wasn't already SELL)
+                    if stop_hit and not rsi_sell:
+                        stop_sells.append((ticker, row["date"]))
+                    open_trade = None
+                    stop_price = None
 
     trades_df = pd.DataFrame(trades)
+
+    # Write stop-triggered SELL markers back to signals so they show in UI
+    if stop_sells:
+        from sqlalchemy import text as _text
+        with engine.begin() as conn:
+            for ticker, sell_date in stop_sells:
+                # Only upgrade HOLD → SELL; leave BUY alone (shouldn't happen but safe)
+                conn.execute(_text("""
+                    UPDATE signals
+                    SET signal = 'SELL'
+                    WHERE ticker = :t AND date = :d AND signal != 'BUY'
+                """), {"t": ticker, "d": sell_date})
+        print(f"Back-wrote {len(stop_sells):,} stop-triggered SELL markers to signals")
 
     if trades_df.empty:
         # Ensure table exists with a proper schema even when no closed trades yet

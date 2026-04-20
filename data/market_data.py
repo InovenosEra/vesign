@@ -19,6 +19,7 @@ _BACKFILL_BATCH = 200
 LOGO_OVERRIDES = {
     "PENG": "https://cdn.prod.website-files.com/6764579f0a24e5a0083f25bb/67bb88245ce879aaca499ddb_schema--penguin-logo.jpg",
     "HWKN": "https://www.hawkinsinc.com/wp-content/uploads/2025/10/Hawkins-logo-300-x-300.jpg",
+    "GTM":  "https://img.logo.dev/zoominfo.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
 }
 
 

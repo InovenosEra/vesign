@@ -401,11 +401,18 @@ def run_scoring(target_date=None):
         already_open = today_df["ticker"].isin(open_positions.keys())
         buy_cond = buy_cond & ~already_open
 
-    sell_cond = stop_hit | (today_df["rsi"] >= 70)
+    # MASTER gate: SELL requires ML prediction to be negative (or waived: NULL / TASE).
+    # Applies to BOTH trailing stop and RSI>=70 paths.
+    ml_negative = (
+        (today_df["prediction_score"] < 0)
+        | today_df["prediction_score"].isna()
+        | today_df["ticker"].str.endswith(".TA")
+    )
+    sell_cond = (stop_hit | (today_df["rsi"] >= 70)) & ml_negative
 
     today_df["signal"] = np.select(
-        [stop_hit, buy_cond, sell_cond],
-        ["SELL", "BUY", "SELL"],
+        [sell_cond, buy_cond],
+        ["SELL", "BUY"],
         default="HOLD"
     )
 

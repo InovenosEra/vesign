@@ -580,7 +580,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
-                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, COALESCE(h.score, s.health_score) AS health_score, h.reason AS health_reason,
+                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -604,7 +604,7 @@ _SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "
 _TICKER_RE = re.compile(r'^[A-Z0-9.\-]{1,10}$')
 _SORT_COL_SQL = {
     "company":    "c.company",
-    "market_cap": "f.market_cap",
+    "market_cap": "market_cap",  # alias of the per-date subquery in SELECT
 }
 
 
@@ -656,22 +656,25 @@ def signals(
                    COALESCE(s.target_mean_price, ae.target_mean_price) AS target_mean_price, COALESCE(s.target_low_price, ae.target_low_price) AS target_low_price, COALESCE(s.target_high_price, ae.target_high_price) AS target_high_price,
                    s.prediction_score,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short,
-                   COALESCE(
+                   CAST(COALESCE(
                        (SELECT score FROM company_health_history
                         WHERE ticker = s.ticker AND DATE(recorded_at) <= DATE(s.date)
                         ORDER BY recorded_at DESC LIMIT 1),
                        s.health_score, h.score
-                   ) AS health_score,
+                   ) AS INTEGER) AS health_score,
                    COALESCE(
                        (SELECT reason FROM company_health_history
                         WHERE ticker = s.ticker AND DATE(recorded_at) <= DATE(s.date)
                         ORDER BY recorded_at DESC LIMIT 1),
                        h.reason
                    ) AS health_reason,
-                   f.market_cap
+                   (s.close * (
+                       SELECT shares_outstanding FROM market_cap_history
+                       WHERE ticker = s.ticker AND date <= DATE(s.date)
+                       ORDER BY date DESC LIMIT 1
+                   )) AS market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
-            LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f ON s.ticker = f.ticker
             LEFT JOIN company_health h ON s.ticker = h.ticker
             LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
             {where}
@@ -1145,17 +1148,19 @@ def historical_trades(
         df = pd.read_sql(text(f"""
             SELECT tl.ticker, tl.buy_date, tl.buy_price, tl.sell_date, tl.sell_price, tl.return_pct,
                    c.company, c.logo_url, c.industry, c.description, c.description_short,
-                   f.market_cap,
-                   COALESCE(
+                   (tl.buy_price * (
+                       SELECT shares_outstanding FROM market_cap_history
+                       WHERE ticker = tl.ticker AND date <= DATE(tl.buy_date)
+                       ORDER BY date DESC LIMIT 1
+                   )) AS market_cap,
+                   CAST(COALESCE(
                        (SELECT score FROM company_health_history
                         WHERE ticker = tl.ticker AND DATE(recorded_at) <= DATE(tl.buy_date)
                         ORDER BY recorded_at DESC LIMIT 1),
                        sb.health_score, h.score
-                   ) AS health_score, h.reason AS health_reason
+                   ) AS INTEGER) AS health_score, h.reason AS health_reason
             FROM trade_log tl
             LEFT JOIN companies c ON tl.ticker = c.ticker
-            LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
-                ON tl.ticker = f.ticker
             LEFT JOIN company_health h ON tl.ticker = h.ticker
             LEFT JOIN signals sb ON sb.ticker = tl.ticker AND DATE(sb.date) = DATE(tl.buy_date)
             {where}
@@ -1212,7 +1217,7 @@ def historical_trades(
             "description":       _v(grp.iloc[0]["description"]),
             "description_short": _v(grp.iloc[0]["description_short"]),
             "market_cap":        int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
-            "health_score":      int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
+            "health_score":      int(float(score)) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
             "health_reason":     _v(grp.iloc[0]["health_reason"]),
             "trade_count":       len(closed_pairs),
             "win_count":         wins,
@@ -1381,7 +1386,7 @@ def open_trades(market: Optional[str] = None):
             "days_held":         days_held,
             "unrealized_pct":    unrealized,
             "current_signal":    cur_sig,
-            "health_score":      int(score) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
+            "health_score":      int(float(score)) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
             "health_reason":     _v(m.get("health_reason")),
         })
 
@@ -1737,7 +1742,7 @@ def research_ticker(ticker: str, user=Depends(get_current_user)):
                    c.company, c.logo_url, c.industry, c.sector, c.market,
                    c.description, c.description_short,
                    f.market_cap,
-                   COALESCE(s.health_score, ch.score) AS health_score,
+                   CAST(COALESCE(s.health_score, ch.score) AS INTEGER) AS health_score,
                    ch.reason AS health_reason
             FROM signals s
             INNER JOIN (
