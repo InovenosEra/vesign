@@ -116,7 +116,7 @@
   "modal.marketCap": "Market Cap (B)",
   "modal.currentSignal": "Current Signal",
   "modal.currentPrice": "Current Price",
-  "modal.yieldPeriod": "{{months}}M Yield",
+  "modal.yieldPeriod": "{{label}} Yield",
   "modal.yieldCustom": "Period Yield",
   "modal.yield12m": "12M Yield",
   "modal.yield12mOrganic": "12M Yield (organic)",

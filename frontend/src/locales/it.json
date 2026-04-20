@@ -107,7 +107,7 @@
   "modal.marketCap": "Cap. mercato (Mrd)",
   "modal.currentSignal": "Segnale attuale",
   "modal.currentPrice": "Prezzo attuale",
-  "modal.yieldPeriod": "Rendimento {{months}}M",
+  "modal.yieldPeriod": "Rendimento {{label}}",
   "modal.yieldCustom": "Rendimento periodo",
   "modal.yield12m": "Rendimento 12M",
   "modal.yield12mOrganic": "Rendimento 12M (organico)",

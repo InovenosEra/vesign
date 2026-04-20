@@ -107,7 +107,7 @@
   "modal.marketCap": "Marktkapitalisierung (Mrd)",
   "modal.currentSignal": "Aktuelles Signal",
   "modal.currentPrice": "Aktueller Kurs",
-  "modal.yieldPeriod": "{{months}}M-Rendite",
+  "modal.yieldPeriod": "{{label}}-Rendite",
   "modal.yieldCustom": "Periodenrendite",
   "modal.yield12m": "12M-Rendite",
   "modal.yield12mOrganic": "12M-Rendite (organisch)",

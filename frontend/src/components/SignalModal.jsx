@@ -14,7 +14,8 @@ function fmt(n, decimals = 2) {
     : '—'
 }
 
-const CHART_PERIODS = [1, 3, 6, 12, 24]
+const CHART_PERIODS = [[3, '3M'], [6, '6M'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']]
+const PERIOD_LABEL = Object.fromEntries(CHART_PERIODS)
 
 function monthsAgo(n) {
   const d = new Date(); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 10)
@@ -219,7 +220,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
                     [t('modal.rsi'),           row.rsi != null ? row.rsi.toFixed(1) : '—'],
                     [t('modal.analystTarget'), (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
                     [t('modal.mlScore'),       (() => { const s = row.prediction_score; if (s == null) return '—'; const pct = s * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span> })()],
-                    [activePeriod ? t('modal.yieldPeriod', { months: activePeriod }) : t('modal.yieldCustom'), yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
+                    [activePeriod ? t('modal.yieldPeriod', { label: PERIOD_LABEL[activePeriod] || `${activePeriod}M` }) : t('modal.yieldCustom'), yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
                   ].map(([label, value]) => (
                     <tr key={label}>
                       <td style={{ color: 'var(--muted)', padding: '6px 8px 6px 12px', verticalAlign: 'middle', whiteSpace: 'nowrap', width: 108 }}>{label}</td>
@@ -296,10 +297,10 @@ export default function SignalModal({ row: rowProp, onClose }) {
 
             {/* Period selector — overlaid at top of chart, aligned with plot area */}
             <div style={{ position: 'absolute', top: 8, left: 56, right: 16, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
-              {CHART_PERIODS.map(m => (
+              {CHART_PERIODS.map(([m, label]) => (
                 <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
                   onClick={() => selectPeriod(m)}
-                >{m}M</button>
+                >{label}</button>
               ))}
               <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input type="date" value={chartStart} max={chartEnd}

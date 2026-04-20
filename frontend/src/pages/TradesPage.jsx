@@ -256,8 +256,8 @@ function TradeModal({ row, start, end, onClose }) {
                     [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
                     [t('modal.currentSignal'), row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
                     [t('modal.currentPrice'),  history12m.length > 0 ? fmt(history12m.at(-1).close / (isIL ? 100 : 1)) : '—'],
-                    [activePeriod ? `${t('modal.yieldPeriod', { months: activePeriod })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
-                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { months: activePeriod })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
+                    [activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
+                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
                     ...(row.unrealized_pct != null ? [[t('modal.yieldSinceBuy'), <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
@@ -330,10 +330,10 @@ function TradeModal({ row, start, end, onClose }) {
 
             {/* Period selector — overlaid at top of chart */}
             <div style={{ position: 'absolute', top: 8, left: 56, right: 24, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
-              {[1, 3, 6, 12, 24].map(m => (
+              {[[3, '3M'], [6, '6M'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
                 <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
                   onClick={() => selectPeriod(m)}
-                >{m}M</button>
+                >{label}</button>
               ))}
               <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input type="date" value={chartStart} max={chartEnd}

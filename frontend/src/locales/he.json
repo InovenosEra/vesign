@@ -107,7 +107,7 @@
   "modal.marketCap": "שווי שוק (B)",
   "modal.currentSignal": "איתות נוכחי",
   "modal.currentPrice": "מחיר נוכחי",
-  "modal.yieldPeriod": "תשואה {{months}} חודשים",
+  "modal.yieldPeriod": "תשואת {{label}}",
   "modal.yieldCustom": "תשואת תקופה",
   "modal.yield12m": "תשואה 12 חודשים",
   "modal.yield12mOrganic": "תשואה 12 חודשים (אורגנית)",

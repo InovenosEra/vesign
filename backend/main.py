@@ -586,11 +586,13 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
             LEFT JOIN companies c ON s.ticker = c.ticker
             {_MARKET_CAP_JOIN}
             WHERE COALESCE(c.market, 'US') = :market
+            AND c.ticker NOT IN ('SPY')
             AND DATE(s.date) = (
                 SELECT DATE(MAX(s2.date))
                 FROM signals s2
                 LEFT JOIN companies c2 ON s2.ticker = c2.ticker
                 WHERE COALESCE(c2.market, 'US') = :market
+                  AND c2.ticker NOT IN ('SPY')
             )
         """), conn, params={"market": mkt})
 
@@ -628,6 +630,7 @@ def signals(
     conditions = [
         f"DATE(s.date) >= DATE('now', '-{months} months')",
         "COALESCE(c.market, 'US') = :market",
+        "c.ticker NOT IN ('SPY')",
     ]
     params: dict = {"market": mkt}
 
@@ -1130,7 +1133,10 @@ def historical_trades(
 ):
     """BUY→SELL trade pairs from pre-built trade_log table."""
     mkt = (market or "US").upper()
-    conditions = ["COALESCE(c.market, 'US') = :market"]
+    conditions = [
+        "COALESCE(c.market, 'US') = :market",
+        "c.ticker NOT IN ('SPY')",
+    ]
     params: dict = {"market": mkt}
     if start:
         conditions.append("DATE(tl.sell_date) >= :start")
@@ -1358,6 +1364,8 @@ def open_trades(market: Optional[str] = None):
         if m is None:
             continue
         if (m.get("market") or "US").upper() != mkt:
+            continue
+        if ticker in ("SPY",):
             continue
         cur_sig = cur_signals.get(ticker, "HOLD")
         if cur_sig not in ("BUY", "HOLD"):

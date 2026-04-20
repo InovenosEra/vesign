@@ -385,14 +385,10 @@ def run_scoring(target_date=None):
             today_df["entry_price"].notna()
             & (today_df["close"] < today_df["entry_price"] * (1 - trailing_stop_pct))
         )
-        # 365-day time-based exit for profitable positions (bypasses ML gate)
+        # 365-day time-based exit — hard cap regardless of yield (bypasses ML gate)
         today_ts = pd.to_datetime(today_df["date"].max())
         days_held = (today_ts - pd.to_datetime(today_df["buy_date"])).dt.days
-        time_exit = (
-            today_df["entry_price"].notna()
-            & (days_held >= 365)
-            & (today_df["close"] > today_df["entry_price"])
-        )
+        time_exit = today_df["entry_price"].notna() & (days_held >= 365)
         today_df.drop(columns=["entry_price", "buy_date"], inplace=True)
     else:
         stop_hit  = pd.Series(False, index=today_df.index)

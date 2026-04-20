@@ -60,9 +60,9 @@ def build_trade_log():
                 rsi_sell = sig == "SELL"
                 ml_ok = _ml_allows_sell(pred, ticker)
 
-                # 365-day time-based exit for profitable positions (bypasses ML gate)
+                # 365-day time-based exit — hard cap regardless of yield (bypasses ML gate)
                 days_held = (pd.to_datetime(row["date"]) - pd.to_datetime(open_trade["buy_date"])).days
-                time_exit = days_held >= 365 and close > open_trade["buy_price"]
+                time_exit = days_held >= 365
 
                 fires = ((stop_hit or rsi_sell) and ml_ok) or time_exit
 
