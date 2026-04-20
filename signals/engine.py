@@ -53,7 +53,7 @@ def _get_open_positions(as_of_date=None):
                 AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
                 GROUP BY b.ticker
             )
-            SELECT s.ticker, s.close AS entry_price
+            SELECT s.ticker, s.close AS entry_price, fob.buy_date
             FROM signals s
             JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
         """
@@ -73,14 +73,15 @@ def _get_open_positions(as_of_date=None):
                 AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
                 GROUP BY b.ticker
             )
-            SELECT s.ticker, s.close AS entry_price
+            SELECT s.ticker, s.close AS entry_price, fob.buy_date
             FROM signals s
             JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
         """
         params = {}
     try:
         df = pd.read_sql(sql, engine, params=params)
-        return dict(zip(df["ticker"], df["entry_price"]))
+        # Returns {ticker: (entry_price, buy_date)} — buy_date is ISO string
+        return {r["ticker"]: (r["entry_price"], r["buy_date"]) for _, r in df.iterrows()}
     except Exception:
         return {}
 
@@ -375,15 +376,27 @@ def run_scoring(target_date=None):
     import numpy as np
 
     if open_positions:
-        op_series = pd.Series(open_positions, name="entry_price")
-        today_df = today_df.join(op_series, on="ticker")
+        # open_positions: {ticker: (entry_price, buy_date)}
+        entry_prices = {t: v[0] for t, v in open_positions.items()}
+        buy_dates    = {t: v[1] for t, v in open_positions.items()}
+        today_df["entry_price"] = today_df["ticker"].map(entry_prices)
+        today_df["buy_date"]    = today_df["ticker"].map(buy_dates)
         stop_hit = (
             today_df["entry_price"].notna()
             & (today_df["close"] < today_df["entry_price"] * (1 - trailing_stop_pct))
         )
-        today_df.drop(columns=["entry_price"], inplace=True)
+        # 365-day time-based exit for profitable positions (bypasses ML gate)
+        today_ts = pd.to_datetime(today_df["date"].max())
+        days_held = (today_ts - pd.to_datetime(today_df["buy_date"])).dt.days
+        time_exit = (
+            today_df["entry_price"].notna()
+            & (days_held >= 365)
+            & (today_df["close"] > today_df["entry_price"])
+        )
+        today_df.drop(columns=["entry_price", "buy_date"], inplace=True)
     else:
-        stop_hit = pd.Series(False, index=today_df.index)
+        stop_hit  = pd.Series(False, index=today_df.index)
+        time_exit = pd.Series(False, index=today_df.index)
 
     # ---------- Vectorized signal logic ----------
     buy_cond = (
@@ -402,13 +415,14 @@ def run_scoring(target_date=None):
         buy_cond = buy_cond & ~already_open
 
     # MASTER gate: SELL requires ML prediction to be negative (or waived: NULL / TASE).
-    # Applies to BOTH trailing stop and RSI>=70 paths.
+    # Applies to trailing stop and RSI>=70. Time-based exit (365 days profitable)
+    # bypasses the ML gate — it's an unconditional rule.
     ml_negative = (
         (today_df["prediction_score"] < 0)
         | today_df["prediction_score"].isna()
         | today_df["ticker"].str.endswith(".TA")
     )
-    sell_cond = (stop_hit | (today_df["rsi"] >= 70)) & ml_negative
+    sell_cond = ((stop_hit | (today_df["rsi"] >= 70)) & ml_negative) | time_exit
 
     today_df["signal"] = np.select(
         [sell_cond, buy_cond],

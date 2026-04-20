@@ -34,6 +34,7 @@ def build_trade_log():
 
     trades = []
     stop_sells = []  # (ticker, sell_date) — stop-triggered exits to write back to signals
+    time_sells = []  # (ticker, sell_date) — 365-day time-based exits to write back
 
     for ticker, df in merged.groupby("ticker"):
 
@@ -58,7 +59,14 @@ def build_trade_log():
                 stop_hit = close <= stop_price
                 rsi_sell = sig == "SELL"
                 ml_ok = _ml_allows_sell(pred, ticker)
-                if (stop_hit or rsi_sell) and ml_ok:
+
+                # 365-day time-based exit for profitable positions (bypasses ML gate)
+                days_held = (pd.to_datetime(row["date"]) - pd.to_datetime(open_trade["buy_date"])).days
+                time_exit = days_held >= 365 and close > open_trade["buy_price"]
+
+                fires = ((stop_hit or rsi_sell) and ml_ok) or time_exit
+
+                if fires:
                     trade = {
                         **open_trade,
                         "sell_date": row["date"],
@@ -66,26 +74,31 @@ def build_trade_log():
                         "return_pct": (close - open_trade["buy_price"]) / open_trade["buy_price"],
                     }
                     trades.append(trade)
-                    # Track stop-triggered exits (where signal wasn't already SELL)
+                    # Tag the exit type for back-writing signal markers.
+                    # Priority: stop > rsi > time (if signal=SELL already, don't need back-write)
                     if stop_hit and not rsi_sell:
                         stop_sells.append((ticker, row["date"]))
+                    elif time_exit and not rsi_sell and not stop_hit:
+                        time_sells.append((ticker, row["date"]))
                     open_trade = None
                     stop_price = None
 
     trades_df = pd.DataFrame(trades)
 
-    # Write stop-triggered SELL markers back to signals so they show in UI
-    if stop_sells:
-        from sqlalchemy import text as _text
+    # Write stop-triggered + time-based SELL markers back to signals so they show in UI
+    from sqlalchemy import text as _text
+    if stop_sells or time_sells:
         with engine.begin() as conn:
-            for ticker, sell_date in stop_sells:
-                # Only upgrade HOLD → SELL; leave BUY alone (shouldn't happen but safe)
+            for ticker, sell_date in stop_sells + time_sells:
                 conn.execute(_text("""
                     UPDATE signals
                     SET signal = 'SELL'
                     WHERE ticker = :t AND date = :d AND signal != 'BUY'
                 """), {"t": ticker, "d": sell_date})
-        print(f"Back-wrote {len(stop_sells):,} stop-triggered SELL markers to signals")
+        if stop_sells:
+            print(f"Back-wrote {len(stop_sells):,} stop-triggered SELL markers")
+        if time_sells:
+            print(f"Back-wrote {len(time_sells):,} 365-day time-exit SELL markers")
 
     if trades_df.empty:
         # Ensure table exists with a proper schema even when no closed trades yet
