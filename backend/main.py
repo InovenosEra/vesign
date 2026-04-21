@@ -1640,14 +1640,11 @@ def portfolio_performance(
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        # Vesign: COMPOUND equity curve — each trade closed by this week multiplies equity
-        equity = 1.0
-        for sell_d, r in vesign_trades:
-            if sell_d <= week_date:
-                equity *= (1.0 + r)
-            else:
-                break  # trades are sorted by sell_date
-        vesign_yield = round((equity - 1.0) * 100, 2) if vesign_trades else None
+        # Vesign: running average of closed-trade returns.
+        # (Compound Π(1+r_i) blows up with hundreds of overlapping trades — avg is
+        # the honest apples-to-apples with the user portfolio's weighted-avg yield.)
+        closed = [r for sell_d, r in vesign_trades if sell_d <= week_date]
+        vesign_yield = round(sum(closed) / len(closed) * 100, 2) if closed else None
         # First week is the baseline — both lines start at 0
         if week_date == weeks[0]:
             vesign_yield = 0.0
