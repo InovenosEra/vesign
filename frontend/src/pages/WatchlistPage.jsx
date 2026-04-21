@@ -487,7 +487,7 @@ export default function WatchlistPage() {
                 <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 11 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ display: 'inline-block', width: 20, height: 2, background: 'var(--green)', borderRadius: 1 }} />
-                    Vesign Signals
+                    Vesign
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ display: 'inline-block', width: 20, height: 2, background: '#3498db', borderRadius: 1 }} />
