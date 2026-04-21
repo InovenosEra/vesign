@@ -14,16 +14,9 @@ from data import fmp
 # Batch size for backfilling large numbers of new tickers (avoids memory/timeout issues)
 _BACKFILL_BATCH = 200
 
-# Custom logo overrides — FMP returns placeholder/missing images for these tickers.
-# These are applied after every company info update to prevent FMP from overwriting them.
-LOGO_OVERRIDES = {
-    "PENG": "https://cdn.prod.website-files.com/6764579f0a24e5a0083f25bb/67bb88245ce879aaca499ddb_schema--penguin-logo.jpg",
-    "HWKN": "https://www.hawkinsinc.com/wp-content/uploads/2025/10/Hawkins-logo-300-x-300.jpg",
-    "GTM":  "https://img.logo.dev/zoominfo.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
-    "AAMI": "https://img.logo.dev/ticker/AAMI?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
-    "FLG":  "https://img.logo.dev/ticker/FLG?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
-    "VSNT": "https://img.logo.dev/ticker/VSNT?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
-}
+# Custom logo overrides moved to utils/logo_overrides.py so utils/universe_loader.py
+# can apply them too (keeps logos stable even when update_company_info is throttled).
+from utils.logo_overrides import LOGO_OVERRIDES
 
 
 def _build_ticker_df(raw, ticker, start_date, end_date, single=False):
