@@ -1523,15 +1523,27 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
 # --- Portfolio performance ---------------------------------------------------
 
 @protected.get("/api/portfolio/performance")
-def portfolio_performance(user=Depends(get_current_user), market: str = Query(default="US")):
-    """Weekly yield %: user portfolio + Vesign equal-weight model (last 52 weeks)."""
+def portfolio_performance(
+    user=Depends(get_current_user),
+    market: str = Query(default="US"),
+    months: int = Query(default=12, ge=1, le=60),
+):
+    """Weekly cumulative yield %: user portfolio + Vesign compound-equity model.
+    Chart spans the last `months` months; last point = yesterday, first point = 0."""
     from datetime import date as _date, timedelta
     from collections import defaultdict
 
     uid = user["id"]
-    today = _date.today()
-    start_date = today - timedelta(weeks=52)
-    weeks = [start_date + timedelta(weeks=i) for i in range(53)]
+    end_date = _date.today() - timedelta(days=1)  # yesterday
+    # Approx: months → days (30.44 avg); gives a clean start for any period
+    start_date = end_date - timedelta(days=int(round(months * 30.4375)))
+    # Build weekly timeline: start, +7, ..., up to end_date (last step may be partial)
+    weeks = [start_date]
+    d = start_date + timedelta(days=7)
+    while d < end_date:
+        weeks.append(d); d += timedelta(days=7)
+    if weeks[-1] != end_date:
+        weeks.append(end_date)
     market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
     trade_filter  = "ticker LIKE '%.TA'"    if market == "IL" else "ticker NOT LIKE '%.TA'"
 
@@ -1586,16 +1598,17 @@ def portfolio_performance(user=Depends(get_current_user), market: str = Query(de
                 return close
         return None
 
-    # Pre-parse Vesign closed trades: (sell_date, return_pct)
+    # Pre-parse Vesign closed trades: (sell_date, return_pct as fraction, NOT %)
     vesign_trades = []
     for sell_d_str, return_pct in trade_log_rows:
         try:
             vesign_trades.append((
                 _date.fromisoformat(str(sell_d_str)[:10]),
-                float(return_pct) * 100,
+                float(return_pct),  # keep as fraction for compounding
             ))
         except Exception:
             pass
+    vesign_trades.sort(key=lambda r: r[0])  # by sell_date
 
     # Parse user lots
     user_lots = []
@@ -1606,7 +1619,7 @@ def portfolio_performance(user=Depends(get_current_user), market: str = Query(de
             buy_d = _date.fromisoformat(str(buy_date_str)[:10])
         except Exception:
             continue
-        # Base price: price at week0 for pre-existing lots, actual buy_price for in-window lots
+        # Base price: price on chart start for pre-existing lots; actual buy_price for in-window lots
         if buy_d <= weeks[0]:
             base_p = get_price_at(ticker, weeks[0]) or float(buy_price)
         else:
@@ -1615,7 +1628,7 @@ def portfolio_performance(user=Depends(get_current_user), market: str = Query(de
 
     result = []
     for week_date in weeks:
-        # User portfolio: weighted avg return of all lots purchased by this week
+        # User portfolio: compound current vs base value (cumulative yield since chart start)
         total_val = 0.0
         total_base = 0.0
         for ticker, qty, buy_d, base_p in user_lots:
@@ -1627,9 +1640,18 @@ def portfolio_performance(user=Depends(get_current_user), market: str = Query(de
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        # Vesign: running avg of all trades that CLOSED by this week
-        closed = [ret for sell_d, ret in vesign_trades if sell_d <= week_date]
-        vesign_yield = round(sum(closed) / len(closed), 2) if closed else None
+        # Vesign: COMPOUND equity curve — each trade closed by this week multiplies equity
+        equity = 1.0
+        for sell_d, r in vesign_trades:
+            if sell_d <= week_date:
+                equity *= (1.0 + r)
+            else:
+                break  # trades are sorted by sell_date
+        vesign_yield = round((equity - 1.0) * 100, 2) if vesign_trades else None
+        # First week is the baseline — both lines start at 0
+        if week_date == weeks[0]:
+            vesign_yield = 0.0
+            port_yield = 0.0
 
         result.append({"week": week_date.isoformat(), "portfolio": port_yield, "vesign": vesign_yield})
 

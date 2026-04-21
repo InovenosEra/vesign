@@ -201,12 +201,23 @@ export default function WatchlistPage() {
     staleTime: 300_000,
     placeholderData: keepPreviousData,
   })
+  const [perfMonths, setPerfMonths] = useState(12)
   const { data: perfData = [] } = useQuery({
-    queryKey: ['portfolio-performance', market],
-    queryFn: () => getPortfolioPerformance(market),
+    queryKey: ['portfolio-performance', market, perfMonths],
+    queryFn: () => getPortfolioPerformance(market, perfMonths),
     staleTime: 300_000,
     placeholderData: keepPreviousData,
   })
+  // Prefetch all period options so chip clicks feel instant
+  useEffect(() => {
+    for (const m of [3, 6, 12, 24, 36]) {
+      qc.prefetchQuery({
+        queryKey: ['portfolio-performance', market, m],
+        queryFn: () => getPortfolioPerformance(market, m),
+        staleTime: 300_000,
+      })
+    }
+  }, [market, qc])
   const portfolioTickers = useMemo(() => portfolioHoldings.map(h => h.ticker), [portfolioHoldings])
   const { prices: portPrices, marketOpen: portMarketOpen } = useLivePrices(portfolioTickers)
 
@@ -457,7 +468,22 @@ export default function WatchlistPage() {
           {/* Col 3: Performance line chart */}
           {perfData.length > 0
             ? <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Performance (last 12 months)</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Performance</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[[3,'3M'],[6,'6M'],[12,'1Y'],[24,'2Y'],[36,'3Y']].map(([m, label]) => (
+                      <button key={m}
+                        onClick={() => setPerfMonths(m)}
+                        style={{
+                          fontSize: 10, padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
+                          border: '1px solid var(--border)',
+                          background: perfMonths === m ? 'var(--accent)' : 'transparent',
+                          color: perfMonths === m ? '#fff' : 'var(--text)',
+                          fontWeight: perfMonths === m ? 600 : 400,
+                        }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
                 <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 11 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ display: 'inline-block', width: 20, height: 2, background: 'var(--green)', borderRadius: 1 }} />

@@ -187,8 +187,8 @@ export const generateAIReport = (ticker, entryPrice) =>
 export const getPortfolioHoldings = (market = 'US') =>
   get(`/portfolio/holdings?market=${market}`)
 
-export const getPortfolioPerformance = (market = 'US') =>
-  get(`/portfolio/performance?market=${market}`)
+export const getPortfolioPerformance = (market = 'US', months = 12) =>
+  get(`/portfolio/performance?market=${market}&months=${months}`)
 
 export const getPortfolioComparison = (market = 'US') =>
   get(`/portfolio/comparison?market=${market}`)
