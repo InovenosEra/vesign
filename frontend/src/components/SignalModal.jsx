@@ -52,27 +52,40 @@ export default function SignalModal({ row: rowProp, onClose }) {
     setChartEnd(today)
   }
 
-  // Fetch a 7-day-earlier start so we have a base price for yield even if market was closed
-  const fetchStart = (() => { const d = new Date(chartStart); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+  // Fetch full 5Y history once per ticker; period switches filter client-side (no refetch)
+  const fullStart = monthsAgo(60)
+  const fetchStart = (() => { const d = new Date(fullStart); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
-  const { data: history = [], isLoading } = useQuery({
-    queryKey: ['price-history-signal', row.ticker, fetchStart, chartEnd],
-    queryFn: () => getPriceHistory(row.ticker, { start: fetchStart, end: chartEnd }),
+  const { data: fullHistory = [], isLoading } = useQuery({
+    queryKey: ['price-history-signal', row.ticker],
+    queryFn: () => getPriceHistory(row.ticker, { start: fetchStart, end: today }),
     staleTime: 300_000,
     placeholderData: keepPreviousData,
+  })
+
+  // Client-side slice to selected period
+  const history = fullHistory.filter(p => {
+    const d = p.date?.slice(0, 10) || p.date
+    return d >= chartStart && d <= chartEnd
   })
 
   const { data: markers = [] } = useQuery({
     queryKey: ['signal-markers', row.ticker],
-    queryFn: () => getSignalMarkers(row.ticker, 13),
+    queryFn: () => getSignalMarkers(row.ticker, 60),
     staleTime: 300_000,
   })
 
-  const { data: analystHistory = [] } = useQuery({
-    queryKey: ['analyst-history', row.ticker, fetchStart, chartEnd],
-    queryFn: () => getAnalystHistory(row.ticker, { start: fetchStart, end: chartEnd }),
+  const { data: fullAnalystHistory = [] } = useQuery({
+    queryKey: ['analyst-history', row.ticker],
+    queryFn: () => getAnalystHistory(row.ticker, { start: fetchStart, end: today }),
     staleTime: 300_000,
     placeholderData: keepPreviousData,
+  })
+
+  // Client-side slice to selected period
+  const analystHistory = fullAnalystHistory.filter(a => {
+    const d = a.date?.slice(0, 10) || a.date
+    return d >= chartStart && d <= chartEnd
   })
 
   const { data: newsData = [], isLoading: newsLoading } = useQuery({

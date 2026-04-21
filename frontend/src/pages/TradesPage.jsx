@@ -129,10 +129,16 @@ function TradeModal({ row, start, end, onClose }) {
     setChartEnd(today)
   }
 
-  const { data: history = [], isLoading } = useQuery({
-    queryKey: ['price-history', row.ticker, chartStart, chartEnd],
-    queryFn: () => getPriceHistory(row.ticker, { start: chartStart, end: chartEnd }),
+  // Fetch full 5Y history once; period switches slice client-side (no refetch)
+  const fullStart5y = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+  const { data: fullHistory = [], isLoading } = useQuery({
+    queryKey: ['price-history', row.ticker],
+    queryFn: () => getPriceHistory(row.ticker, { start: fullStart5y, end: today }),
     staleTime: 300_000,
+  })
+  const history = fullHistory.filter(p => {
+    const d = p.date?.slice(0, 10) || p.date
+    return d >= chartStart && d <= chartEnd
   })
 
   const end12m    = new Date().toISOString().slice(0, 10)
