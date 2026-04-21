@@ -1561,16 +1561,16 @@ def portfolio_performance(
         if not user_rows:
             return []
 
-        # Vesign closed trades in window (for portfolio simulator: need ticker + dates + prices)
+        # Vesign closed trades — ALL history (sim runs continuously; we normalize
+        # chart_start to 0% for display so the chart only shows the selected window).
         trade_log_rows = conn.execute(text(f"""
             SELECT ticker, DATE(buy_date) AS buy_date, buy_price,
                    DATE(sell_date) AS sell_date, return_pct
             FROM trade_log
-            WHERE DATE(buy_date) >= :start
-              AND {trade_filter}
+            WHERE {trade_filter}
               AND sell_date IS NOT NULL AND return_pct IS NOT NULL AND buy_price IS NOT NULL
             ORDER BY buy_date
-        """), {"start": start_date.isoformat()}).fetchall()
+        """)).fetchall()
 
         # Price data for both user holdings AND Vesign simulation tickers
         all_tickers = list({r[0] for r in user_rows} | {r[0] for r in trade_log_rows})
@@ -1634,26 +1634,28 @@ def portfolio_performance(
             base_p = float(buy_price)
         user_lots.append((ticker, float(qty), buy_d, base_p))
 
-    # Vesign simulator: $100 starting capital, N concurrent slots.
-    # Each BUY allocates (cash / free_slots) into that trade; each SELL returns
-    # cost × (1 + return_pct) to cash. At each weekly sample, open positions are
-    # marked-to-market using daily_prices.
+    # Vesign simulator: $100 start, N concurrent slots. Runs continuously from
+    # earliest trade through today; we then sample at every weekly chart point
+    # AND at chart_start, and normalize so chart_start = 0%.
     N_SLOTS = 10
     VESIGN_START = 100.0
-    # Build unified event list: BUYs, SELLs, and weekly SAMPLE points.
-    # Order on same day: BUY first, SELL next, SAMPLE last — so SAMPLE captures
-    # end-of-day equity after that day's trades.
+    # Build unified event list: every BUY, every SELL, plus SAMPLE points at
+    # chart_start and every week. Sort ensures BUY → SELL → SAMPLE on same day.
     events = []
     for tr in vesign_trades:
         events.append((tr["buy_date"],  0, "BUY",  tr))
         events.append((tr["sell_date"], 1, "SELL", tr))
-    for w in weeks:
+    sample_dates = set([weeks[0]] + list(weeks))
+    for w in sample_dates:
         events.append((w, 2, "SAMPLE", None))
     events.sort(key=lambda e: (e[0], e[1]))
 
+    # For MTM of Vesign open positions, we need prices for any ticker that might
+    # be open during the sample window — already in price_map.
+
     cash = VESIGN_START
-    open_pos = []   # list of (trade_dict, cost_allocated)
-    sample_equity = {}  # week_date -> equity
+    open_pos = []
+    sample_equity = {}
 
     for date, _, action, tr in events:
         if action == "BUY":
@@ -1669,6 +1671,8 @@ def portfolio_performance(
                     open_pos.pop(i)
                     break
         else:  # SAMPLE
+            if date in sample_equity:
+                continue  # already captured (duplicate sample date)
             mtm = 0.0
             for t, cost in open_pos:
                 p_now = get_price_at(t["ticker"], date)
@@ -1677,6 +1681,11 @@ def portfolio_performance(
                 else:
                     mtm += cost
             sample_equity[date] = cash + mtm
+
+    # Normalize: chart_start = 0%; every other week = % change from chart_start
+    baseline = sample_equity.get(weeks[0])
+    if baseline is None or baseline <= 0:
+        baseline = VESIGN_START
 
     result = []
     for week_date in weeks:
@@ -1692,9 +1701,9 @@ def portfolio_performance(
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        # Vesign: simulator equity relative to $100 start
+        # Vesign: simulator equity relative to chart_start (normalized to 0 there)
         eq = sample_equity.get(week_date)
-        vesign_yield = round((eq / VESIGN_START - 1.0) * 100, 2) if eq is not None else None
+        vesign_yield = round((eq / baseline - 1.0) * 100, 2) if eq is not None else None
 
         # Force chart to start exactly at 0
         if week_date == weeks[0]:
