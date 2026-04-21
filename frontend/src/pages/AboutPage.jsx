@@ -44,8 +44,8 @@ const DIMENSIONS = [
 
 const STATS = [
   { display: '1,500+', labelKey: 'landing.statStocks' },
-  { display: '500+',   labelKey: 'landing.statSignals' },
-  { display: '~90%',   labelKey: 'landing.statWinRate' },
+  { display: '900+',   labelKey: 'landing.statSignals' },
+  { display: '~80%',   labelKey: 'landing.statWinRate' },
   { display: '~25%',   labelKey: 'landing.statAvgYield' },
 ]
 
