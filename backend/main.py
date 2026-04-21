@@ -1561,28 +1561,32 @@ def portfolio_performance(
         if not user_rows:
             return []
 
-        # Vesign: all trades that CLOSED in the last 52 weeks (same set as Trades page)
+        # Vesign closed trades in window (for portfolio simulator: need ticker + dates + prices)
         trade_log_rows = conn.execute(text(f"""
-            SELECT DATE(sell_date) AS sell_date, return_pct
+            SELECT ticker, DATE(buy_date) AS buy_date, buy_price,
+                   DATE(sell_date) AS sell_date, return_pct
             FROM trade_log
-            WHERE DATE(sell_date) >= :start
+            WHERE DATE(buy_date) >= :start
               AND {trade_filter}
-              AND sell_date IS NOT NULL AND return_pct IS NOT NULL
-            ORDER BY sell_date
+              AND sell_date IS NOT NULL AND return_pct IS NOT NULL AND buy_price IS NOT NULL
+            ORDER BY buy_date
         """), {"start": start_date.isoformat()}).fetchall()
 
-        # Price data only needed for user holdings
-        holding_tickers = list({r[0] for r in user_rows})
-        ph = ", ".join([f":t{i}" for i in range(len(holding_tickers))])
-        tp = {f"t{i}": t for i, t in enumerate(holding_tickers)}
-        cutoff_buf = (start_date - timedelta(days=60)).isoformat()
+        # Price data for both user holdings AND Vesign simulation tickers
+        all_tickers = list({r[0] for r in user_rows} | {r[0] for r in trade_log_rows})
+        if all_tickers:
+            ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
+            tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
+            cutoff_buf = (start_date - timedelta(days=60)).isoformat()
 
-        price_rows = conn.execute(text(f"""
-            SELECT ticker, DATE(date) AS d, close
-            FROM daily_prices
-            WHERE ticker IN ({ph}) AND date >= :cutoff
-            ORDER BY ticker, date
-        """), {**tp, "cutoff": cutoff_buf}).fetchall()
+            price_rows = conn.execute(text(f"""
+                SELECT ticker, DATE(date) AS d, close
+                FROM daily_prices
+                WHERE ticker IN ({ph}) AND date >= :cutoff
+                ORDER BY ticker, date
+            """), {**tp, "cutoff": cutoff_buf}).fetchall()
+        else:
+            price_rows = []
 
     price_map = defaultdict(list)
     for ticker, d_str, close in price_rows:
@@ -1598,17 +1602,21 @@ def portfolio_performance(
                 return close
         return None
 
-    # Pre-parse Vesign closed trades: (sell_date, return_pct as fraction, NOT %)
+    # Pre-parse Vesign closed trades for the simulator.
+    # Each trade: ticker, buy_date, buy_price, sell_date, return_pct
     vesign_trades = []
-    for sell_d_str, return_pct in trade_log_rows:
+    for ticker, buy_d_str, buy_price, sell_d_str, return_pct in trade_log_rows:
         try:
-            vesign_trades.append((
-                _date.fromisoformat(str(sell_d_str)[:10]),
-                float(return_pct),  # keep as fraction for compounding
-            ))
+            vesign_trades.append({
+                "ticker": ticker,
+                "buy_date":  _date.fromisoformat(str(buy_d_str)[:10]),
+                "buy_price": float(buy_price),
+                "sell_date": _date.fromisoformat(str(sell_d_str)[:10]),
+                "return_pct": float(return_pct),
+            })
         except Exception:
             pass
-    vesign_trades.sort(key=lambda r: r[0])  # by sell_date
+    vesign_trades.sort(key=lambda t: t["buy_date"])
 
     # Parse user lots
     user_lots = []
@@ -1626,9 +1634,53 @@ def portfolio_performance(
             base_p = float(buy_price)
         user_lots.append((ticker, float(qty), buy_d, base_p))
 
+    # Vesign simulator: $100 starting capital, N concurrent slots.
+    # Each BUY allocates (cash / free_slots) into that trade; each SELL returns
+    # cost × (1 + return_pct) to cash. At each weekly sample, open positions are
+    # marked-to-market using daily_prices.
+    N_SLOTS = 10
+    VESIGN_START = 100.0
+    # Build unified event list: BUYs, SELLs, and weekly SAMPLE points.
+    # Order on same day: BUY first, SELL next, SAMPLE last — so SAMPLE captures
+    # end-of-day equity after that day's trades.
+    events = []
+    for tr in vesign_trades:
+        events.append((tr["buy_date"],  0, "BUY",  tr))
+        events.append((tr["sell_date"], 1, "SELL", tr))
+    for w in weeks:
+        events.append((w, 2, "SAMPLE", None))
+    events.sort(key=lambda e: (e[0], e[1]))
+
+    cash = VESIGN_START
+    open_pos = []   # list of (trade_dict, cost_allocated)
+    sample_equity = {}  # week_date -> equity
+
+    for date, _, action, tr in events:
+        if action == "BUY":
+            free = N_SLOTS - len(open_pos)
+            if free > 0 and cash > 0:
+                cost = cash / free
+                cash -= cost
+                open_pos.append((tr, cost))
+        elif action == "SELL":
+            for i, (t, cost) in enumerate(open_pos):
+                if t is tr:
+                    cash += cost * (1.0 + tr["return_pct"])
+                    open_pos.pop(i)
+                    break
+        else:  # SAMPLE
+            mtm = 0.0
+            for t, cost in open_pos:
+                p_now = get_price_at(t["ticker"], date)
+                if p_now is not None and t["buy_price"]:
+                    mtm += cost * (p_now / t["buy_price"])
+                else:
+                    mtm += cost
+            sample_equity[date] = cash + mtm
+
     result = []
     for week_date in weeks:
-        # User portfolio: compound current vs base value (cumulative yield since chart start)
+        # User portfolio: current / base yield
         total_val = 0.0
         total_base = 0.0
         for ticker, qty, buy_d, base_p in user_lots:
@@ -1640,12 +1692,11 @@ def portfolio_performance(
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        # Vesign: running average of closed-trade returns.
-        # (Compound Π(1+r_i) blows up with hundreds of overlapping trades — avg is
-        # the honest apples-to-apples with the user portfolio's weighted-avg yield.)
-        closed = [r for sell_d, r in vesign_trades if sell_d <= week_date]
-        vesign_yield = round(sum(closed) / len(closed) * 100, 2) if closed else None
-        # First week is the baseline — both lines start at 0
+        # Vesign: simulator equity relative to $100 start
+        eq = sample_equity.get(week_date)
+        vesign_yield = round((eq / VESIGN_START - 1.0) * 100, 2) if eq is not None else None
+
+        # Force chart to start exactly at 0
         if week_date == weeks[0]:
             vesign_yield = 0.0
             port_yield = 0.0
