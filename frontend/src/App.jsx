@@ -392,7 +392,7 @@ function Header() {
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="header-market-status-wrap"><MarketStatus /></span>
-          <FlagSelector />
+          {/* FlagSelector hidden — TASE disabled, US-only for now */}
           <span className="lang-switcher-header"><LanguageSwitcherDropdown /></span>
           <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
             {market === 'IL' ? '₪' : '$'}
