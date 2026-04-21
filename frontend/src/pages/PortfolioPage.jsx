@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { getPortfolioHoldings, getSuccessRate, WHITE_BG_LOGOS } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
+import { usePersistedState } from '../hooks/usePersistedState'
 import SignalModal from '../components/SignalModal'
 
 const PIE_COLORS = [
@@ -37,7 +38,7 @@ function SummaryCard({ label, value, sub, color }) {
 
 export default function PortfolioPage() {
   const { t } = useTranslation()
-  const [allocMode, setAllocMode] = useState('ticker')
+  const [allocMode, setAllocMode] = usePersistedState('portfolio.allocMode', 'ticker')
   const [selectedRow, setSelectedRow] = useState(null)
 
   const { data: holdings = [], isLoading } = useQuery({

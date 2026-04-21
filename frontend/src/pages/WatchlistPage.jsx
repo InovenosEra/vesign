@@ -13,6 +13,7 @@ import {
 } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
+import { usePersistedState } from '../hooks/usePersistedState'
 import SignalModal from '../components/SignalModal'
 
 const _PIE_COLORS = [
@@ -126,7 +127,7 @@ export default function WatchlistPage() {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const qc = useQueryClient()
-  const [selectedId, setSelectedId]   = useState(null)
+  const [selectedId, setSelectedId]   = usePersistedState('watchlist.selectedId', null)
   const [newListName, setNewListName] = useState('')
   const [newTicker, setNewTicker]         = useState('')
   const [tickerResults, setTickerResults] = useState([])
@@ -201,7 +202,7 @@ export default function WatchlistPage() {
     staleTime: 300_000,
     placeholderData: keepPreviousData,
   })
-  const [perfMonths, setPerfMonths] = useState(12)
+  const [perfMonths, setPerfMonths] = usePersistedState('watchlist.perfMonths', 12)
   const { data: perfData = [] } = useQuery({
     queryKey: ['portfolio-performance', market, perfMonths],
     queryFn: () => getPortfolioPerformance(market, perfMonths),

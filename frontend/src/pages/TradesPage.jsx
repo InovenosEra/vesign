@@ -8,6 +8,7 @@ import {
 import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
 import { useSort } from '../hooks/useSort'
 import { useLivePrices } from '../hooks/useLivePrices'
+import { usePersistedState } from '../hooks/usePersistedState'
 import { MarketContext } from '../context/MarketContext'
 
 function fmt(n, decimals = 2) {
@@ -622,16 +623,16 @@ export default function TradesPage() {
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
-  const [start, setStart]           = useState(oneYearAgo.toISOString().slice(0, 10))
-  const [end,   setEnd]             = useState(new Date().toISOString().slice(0, 10))
-  const [openSearch, setOpenSearch]     = useState('')
-  const [openPage, setOpenPage]         = useState(1)
-  const [openPageSize, setOpenPageSize] = useState(10)
+  const [start, setStart]           = usePersistedState('trades.start', oneYearAgo.toISOString().slice(0, 10))
+  const [end,   setEnd]             = usePersistedState('trades.end', new Date().toISOString().slice(0, 10))
+  const [openSearch, setOpenSearch]     = usePersistedState('trades.openSearch', '')
+  const [openPage, setOpenPage]         = usePersistedState('trades.openPage', 1)
+  const [openPageSize, setOpenPageSize] = usePersistedState('trades.openPageSize', 10)
   const [selected, setSelected]         = useState(null)
   const [selectedOpen, setSelectedOpen] = useState(null)
-  const [search, setSearch]         = useState('')
-  const [page, setPage]             = useState(1)
-  const [pageSize, setPageSize]     = useState(10)
+  const [search, setSearch]         = usePersistedState('trades.search', '')
+  const [page, setPage]             = usePersistedState('trades.page', 1)
+  const [pageSize, setPageSize]     = usePersistedState('trades.pageSize', 10)
 
   const { data: trades, isLoading, isError } = useQuery({
     queryKey: ['trades', start, end, market],

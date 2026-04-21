@@ -5,6 +5,7 @@ import { getSignalsToday, getSignals, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
+import { usePersistedState } from '../hooks/usePersistedState'
 import SignalModal from '../components/SignalModal'
 
 // ---------------------------------------------------------------------------
@@ -320,13 +321,13 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
 export default function SignalsPage() {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
-  const [signalFilter, setSignalFilter] = useState('ALL')
-  const [search, setSearch]             = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [page, setPage]                 = useState(1)
-  const [pageSize, setPageSize]         = useState(10)
-  const [sortBy, setSortBy]             = useState('date')
-  const [sortDir, setSortDir]           = useState('desc')
+  const [signalFilter, setSignalFilter] = usePersistedState('signals.filter', 'ALL')
+  const [search, setSearch]             = usePersistedState('signals.search', '')
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+  const [page, setPage]                 = usePersistedState('signals.page', 1)
+  const [pageSize, setPageSize]         = usePersistedState('signals.pageSize', 10)
+  const [sortBy, setSortBy]             = usePersistedState('signals.sortBy', 'date')
+  const [sortDir, setSortDir]           = usePersistedState('signals.sortDir', 'desc')
   const [selected, setSelected]         = useState(null)
 
   useEffect(() => {
