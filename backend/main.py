@@ -1345,11 +1345,22 @@ def open_trades(market: Optional[str] = None):
                 ON dp.ticker = lp.ticker AND dp.date = lp.md
         """), tp).fetchall()}
 
-        # Step 5: company info + health + market cap (IN query, small result)
+        # Step 5: company info + health + market cap (IN query, small result).
+        # Prefer latest company_health_history row over company_health so tickers
+        # without a current snapshot still show health (MLKN etc.).
         df_meta = pd.read_sql(text(f"""
             SELECT c.ticker, c.company, c.logo_url, c.industry, c.market,
-                   c.description_short, f.market_cap,
-                   h.score AS health_score, h.reason AS health_reason
+                   c.description, c.description_short, f.market_cap,
+                   CAST(COALESCE(
+                       (SELECT score FROM company_health_history
+                        WHERE ticker = c.ticker ORDER BY recorded_at DESC LIMIT 1),
+                       h.score
+                   ) AS INTEGER) AS health_score,
+                   COALESCE(
+                       (SELECT reason FROM company_health_history
+                        WHERE ticker = c.ticker ORDER BY recorded_at DESC LIMIT 1),
+                       h.reason
+                   ) AS health_reason
             FROM companies c
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
                 ON c.ticker = f.ticker
@@ -1386,6 +1397,7 @@ def open_trades(market: Optional[str] = None):
             "company":           _v(m.get("company")),
             "logo_url":          _v(m.get("logo_url")),
             "industry":          _v(m.get("industry")),
+            "description":       _v(m.get("description")),
             "description_short": _v(m.get("description_short")),
             "market_cap":        int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
             "buy_date":          buy_date_str,
