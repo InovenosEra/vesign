@@ -200,7 +200,7 @@
   "contact.error": "Échec de l'envoi. Veuillez réessayer.",
   "about.title": "À propos de Vesign",
   "about.tagline": "Signaux d'investissement, alimentés par les données",
-  "about.intro": "Vesign est une plateforme de recherche en investissement qui surveille chaque jour de bourse les marchés américains et israéliens, identifiant automatiquement les opportunités d'achat et de vente à forte conviction grâce à une analyse multi-dimensionnelle des conditions de marché et des fondamentaux d'entreprise.",
+  "about.intro": "Vesign est une plateforme de recherche en investissement qui surveille chaque jour de bourse le marché américain, identifiant automatiquement les opportunités d'achat et de vente à forte conviction grâce à une analyse multi-dimensionnelle des conditions de marché et des fondamentaux d'entreprise.",
   "about.feature1Title": "Signaux quotidiens",
   "about.feature1Desc": "Chaque jour de bourse, Vesign analyse des milliers d'actions et fait remonter les candidats répondant à des critères stricts d'entrée et de sortie — pour ne jamais manquer une opportunité.",
   "about.feature2Title": "Suivi du portefeuille",
