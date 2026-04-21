@@ -50,6 +50,7 @@
   "col.buyDate": "תאריך קנייה",
   "col.sellDate": "תאריך מכירה",
   "col.buyPrice": "מחיר קנייה",
+  "col.sellPrice": "מחיר מכירה",
   "col.lastDayPrice": "מחיר יום אחרון",
   "col.daysHeld": "ימי החזקה",
   "col.trades": "# עסקאות",

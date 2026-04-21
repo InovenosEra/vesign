@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useContext, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -660,23 +660,30 @@ export default function TradesPage() {
     queryFn: () => getOpenTrades(market),
   })
 
-  const { sorted, sort, toggle } = useSort(trades, 'last_sell_date', 'desc')
+  // Flatten: one row per closed trade (unpivot multi-trade tickers)
+  const flatTrades = useMemo(() => (trades ?? []).flatMap(tk =>
+    (tk.trades ?? [])
+      .filter(p => p.result !== 'Open')
+      .map(p => ({
+        ...tk,
+        buy_date:   p.buy_date,
+        sell_date:  p.sell_date,
+        buy_price:  p.buy_price,
+        sell_price: p.sell_price,
+        return_pct: p.return_pct,
+        days_held:  p.days_held,
+      }))
+  ), [trades])
 
-  const total     = trades ? trades.length : 0
-  const totalPairs = trades ? trades.reduce((s, t) => s + t.trade_count, 0) : 0
-  const wins      = trades ? trades.reduce((s, t) => s + t.win_count, 0) : 0
-  const avgReturn = total > 0
-    ? trades.reduce((s, t) => s + t.avg_return * t.trade_count, 0) / totalPairs
-    : null
-  const avgDays   = total > 0
-    ? trades.reduce((s, t) => s + t.avg_days * t.trade_count, 0) / totalPairs
-    : null
+  const { sorted, sort, toggle } = useSort(flatTrades, 'sell_date', 'desc')
 
-  const beatMarket = trades
-    ? trades.reduce((n, t) =>
-        n + (t.organic_yield != null
-          ? t.trades.filter(p => p.return_pct > t.organic_yield).length
-          : 0), 0)
+  const totalPairs = flatTrades.length
+  const wins       = flatTrades.filter(t => (t.return_pct ?? 0) > 0).length
+  const avgReturn  = totalPairs > 0
+    ? flatTrades.reduce((s, t) => s + (t.return_pct ?? 0), 0) / totalPairs
+    : null
+  const avgDays    = totalPairs > 0
+    ? flatTrades.reduce((s, t) => s + (t.days_held ?? 0), 0) / totalPairs
     : null
 
   const th = (label, col, className) => <Th label={label} col={col} sort={sort} onSort={toggle} className={className} />
@@ -704,7 +711,7 @@ export default function TradesPage() {
       {isLoading && <p className="loading">{t('table.loading')}</p>}
       {isError   && <p className="error">{t('trades.failedLoad')}</p>}
 
-      {trades && total > 0 && (
+      {trades && totalPairs > 0 && (
         <div className="metrics">
           <div className="metric-card">
             <div className="label">{t('trades.totalTrades')}</div>
@@ -727,11 +734,11 @@ export default function TradesPage() {
         </div>
       )}
 
-      {trades && total === 0 && (
+      {trades && totalPairs === 0 && (
         <p className="empty">{t('trades.noCompleted')}</p>
       )}
 
-      {trades && total > 0 && (() => {
+      {trades && totalPairs > 0 && (() => {
         const filtered = search
           ? sorted.filter(t =>
               t.ticker?.toLowerCase().includes(search.toLowerCase()) ||
@@ -768,36 +775,33 @@ export default function TradesPage() {
                 {th(t('col.ticker'),    'ticker')}
                 {th(t('col.company'),   'company')}
                 {th(t('col.marketCap'), 'market_cap', 'col-hide-sm')}
-                {th(t('col.trades'),    'trade_count')}
-                {th(t('col.buyDate'),   'first_buy_date')}
-                {th(t('col.sellDate'),  'last_sell_date')}
-                {th(t('col.avgDays'),   'avg_days', 'col-hide-sm')}
-                {th(t('col.winRate'),   'win_count')}
-                {th(t('col.avgYield'),  'avg_return')}
+                {th(t('col.buyDate'),   'buy_date')}
+                {th(t('col.buyPrice'),  'buy_price')}
+                {th(t('col.sellDate'),  'sell_date')}
+                {th(t('col.sellPrice'), 'sell_price')}
+                {th(t('col.daysHeld'),  'days_held', 'col-hide-sm')}
+                {th(t('col.yield'),     'return_pct')}
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0
                 ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>{t('trades.noMatches')}</td></tr>
-                : paginated.map((trade, i) => {
-                const winRate = trade.trade_count > 0 ? (trade.win_count / trade.trade_count) * 100 : 0
-                return (
+                : paginated.map((trade, i) => (
                   <tr key={i} className="clickable-row" onClick={() => setSelected(trade)}>
                     <td>{trade.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(trade.ticker) ? ' logo-white-bg' : ''}`} src={trade.logo_url} alt="" /> : null}</td>
                     <td><strong>{trade.ticker}</strong></td>
                     <td>{trade.company ?? '—'}</td>
                     <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
-                    <td>{trade.trade_count}</td>
-                    <td>{fmtDate(trade.first_buy_date)}</td>
-                    <td>{fmtDate(trade.last_sell_date)}</td>
-                    <td className="col-hide-sm">{Math.round(trade.avg_days)}</td>
-                    <td className={winRate >= 50 ? 'up' : 'down'}>{winRate.toFixed(0)}%</td>
-                    <td className={trade.avg_return >= 0 ? 'up' : 'down'}>
-                      {trade.avg_return >= 0 ? '+' : ''}{fmt(trade.avg_return)}%
+                    <td>{fmtDate(trade.buy_date)}</td>
+                    <td>{fmt(trade.buy_price)}</td>
+                    <td>{fmtDate(trade.sell_date)}</td>
+                    <td>{fmt(trade.sell_price)}</td>
+                    <td className="col-hide-sm">{trade.days_held ?? '—'}</td>
+                    <td className={trade.return_pct >= 0 ? 'up' : 'down'}>
+                      {trade.return_pct >= 0 ? '+' : ''}{fmt(trade.return_pct)}%
                     </td>
                   </tr>
-                )
-              })}
+                ))}
             </tbody>
           </table>
         </div>

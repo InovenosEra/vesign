@@ -50,6 +50,7 @@
   "col.buyDate": "Data acquisto",
   "col.sellDate": "Data vendita",
   "col.buyPrice": "Prezzo acquisto",
+  "col.sellPrice": "Prezzo vendita",
   "col.lastDayPrice": "Prezzo ultimo giorno",
   "col.daysHeld": "Giorni detenuto",
   "col.trades": "# Operazioni",

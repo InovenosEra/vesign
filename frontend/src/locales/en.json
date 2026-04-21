@@ -55,6 +55,7 @@
   "col.buyDate": "Buy Date",
   "col.sellDate": "Sell Date",
   "col.buyPrice": "Buy Price",
+  "col.sellPrice": "Sell Price",
   "col.lastDayPrice": "Last Day Price",
   "col.daysHeld": "Days Held",
   "col.trades": "# Trades",
