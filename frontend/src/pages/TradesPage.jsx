@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
-import { getTrades, getOpenTrades, getPriceHistory, getNews, WHITE_BG_LOGOS } from '../api'
+import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
 import { useSort } from '../hooks/useSort'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { MarketContext } from '../context/MarketContext'
@@ -161,8 +161,34 @@ function TradeModal({ row, start, end, onClose }) {
     staleTime: 300_000,
   })
 
+  // Full 5Y analyst history (sliced client-side to current chart window)
+  const { data: fullAnalystHistory = [] } = useQuery({
+    queryKey: ['analyst-history', row.ticker],
+    queryFn: () => getAnalystHistory(row.ticker, { start: fullStart5y, end: today }),
+    staleTime: 300_000,
+  })
+  const analystHistory = fullAnalystHistory.filter(a => {
+    const d = a.date?.slice(0, 10) || a.date
+    return d >= chartStart && d <= chartEnd
+  })
+
   // Scale prices for IL (agorot → ₪)
-  const chartData = history.map(d => ({ ...d, close: d.close / priceScale }))
+  const chartHistory = history.map(d => ({ ...d, close: d.close / priceScale }))
+
+  // Merge analyst targets into chart data (forward-fill)
+  const analystMap = Object.fromEntries(analystHistory.map(a => [a.date, a]))
+  let lastAnalyst = null
+  const chartData = chartHistory.map(d => {
+    if (analystMap[d.date]) lastAnalyst = analystMap[d.date]
+    if (!lastAnalyst) return d
+    return {
+      ...d,
+      target_low:  lastAnalyst.target_low_price  != null ? lastAnalyst.target_low_price  / priceScale : undefined,
+      target_mean: lastAnalyst.target_mean_price != null ? lastAnalyst.target_mean_price / priceScale : undefined,
+      target_high: lastAnalyst.target_high_price != null ? lastAnalyst.target_high_price / priceScale : undefined,
+    }
+  })
+  const hasTargets = chartData.some(d => d.target_low != null || d.target_mean != null || d.target_high != null)
 
   const basePeriod  = chartData.filter(d => d.date <= chartStart).at(-1) ?? chartData[0]
   const yieldPeriod = basePeriod && chartData.length > 0
@@ -353,7 +379,6 @@ function TradeModal({ row, start, end, onClose }) {
             </div>
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={chartData} margin={{ top: 100, right: 24, bottom: 8, left: 8 }}>
-                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
                   tick={{ fill: 'var(--muted)', fontSize: 11 }}
@@ -368,13 +393,44 @@ function TradeModal({ row, start, end, onClose }) {
                   width={48}
                 />
                 <Tooltip
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
-                  labelStyle={{ color: 'var(--muted)' }}
-                  itemStyle={{ color: 'var(--text)' }}
-                  labelFormatter={d => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y.slice(2)}` }}
-                  formatter={v => [`${currency}${v.toFixed(2)}`, t('modal.chartClose')]}
+                  wrapperStyle={{ zIndex: 50 }}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || !payload.length) return null
+                    const [y, m, day] = (label || '').split('-')
+                    const dateStr = y ? `${day}/${m}/${y.slice(2)}` : label
+                    const labels = {
+                      close: t('modal.chartClose'),
+                      target_low: t('modal.chartTargetLow'),
+                      target_mean: t('modal.chartTargetBase'),
+                      target_high: t('modal.chartTargetHigh'),
+                    }
+                    const order = { close: 0, target_high: 1, target_mean: 2, target_low: 3 }
+                    const sorted = [...payload].sort((a, b) =>
+                      (order[a.dataKey] ?? 99) - (order[b.dataKey] ?? 99)
+                    )
+                    return (
+                      <div style={{
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: 6, fontSize: 12, padding: '8px 12px',
+                        color: 'var(--text)',
+                      }}>
+                        <div style={{ color: 'var(--muted)', marginBottom: 4 }}>{dateStr}</div>
+                        {sorted.map(p => (
+                          <div key={p.dataKey}
+                               style={{ fontWeight: p.dataKey === 'close' ? 700 : 400 }}>
+                            {labels[p.dataKey] || p.dataKey} : {p.value != null ? p.value.toFixed(2) : '—'}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }}
                 />
                 <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} name="close" />
+                {hasTargets && <>
+                  <Line type="stepAfter" dataKey="target_low"  stroke="#e74c3c" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_low"  connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
+                  <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_high" connectNulls={false} />
+                </>}
               </LineChart>
             </ResponsiveContainer>
 
