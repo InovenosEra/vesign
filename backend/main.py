@@ -1708,14 +1708,16 @@ def portfolio_performance(
         user_lots.append((ticker, float(qty), buy_d, base_p))
 
     # Vesign line: progressive MTM.
-    # Universe = trades wholly within the chart window (buy and sell both inside).
+    # Universe = trades whose sell_date is inside the chart window (matches the
+    # Historical Trades card definition). Buy date can be before or inside.
     # Each trade notional = $1000 at buy_price.
     # Per day: contribution = $1000 × (price/buy_price) while open, $1000 × (1+ret) after sell.
-    # Entered trades contribute $1000 each to invested. Yield = (Σbal − Σinv) / Σinv.
+    # A trade only contributes once it has been bought (entered = buy_date ≤ target).
+    # Yield = (Σbal − Σinv) / Σinv. First point can be non-zero (reflects the MTM of
+    # legacy open positions at chart_start). Last point = mean realized = card value.
     INVEST = 1000.0
     universe = [t for t in vesign_trades
-                if weeks[0] <= t["buy_date"] and t["sell_date"] <= weeks[-1]]
-    # Sort by buy_date so we can incrementally add "entered" trades per day.
+                if weeks[0] <= t["sell_date"] <= weeks[-1]]
     universe.sort(key=lambda t: t["buy_date"])
 
     def vesign_yield_at(target):
@@ -1754,8 +1756,7 @@ def portfolio_performance(
         vesign_yield = round(vy * 100, 2) if vy is not None else None
 
         if week_date == weeks[0]:
-            vesign_yield = 0.0
-            port_yield = 0.0
+            port_yield = 0.0  # user portfolio normalized to start at 0; Vesign line shows actual MTM
 
         result.append({"week": week_date.isoformat(), "portfolio": port_yield, "vesign": vesign_yield})
 
