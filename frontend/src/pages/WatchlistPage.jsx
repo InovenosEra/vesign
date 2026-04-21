@@ -507,6 +507,7 @@ export default function WatchlistPage() {
                         labelStyle={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}
                         labelFormatter={v => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         formatter={(v, name) => v != null ? [`${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, name] : ['—', name]}
+                        itemSorter={item => item.dataKey === 'vesign' ? 0 : 1}
                         itemStyle={{ color: 'var(--text)' }}
                       />
                       <Line type="monotone" dataKey="vesign" name="Vesign" stroke="var(--green)" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
