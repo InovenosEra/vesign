@@ -637,7 +637,6 @@ export default function TradesPage() {
     queryKey: ['trades', start, end, market],
     queryFn: () => getTrades({ start, end, market }),
     staleTime: 300_000,
-    placeholderData: (prev) => prev,  // keep old data visible during refetch
   })
 
   // Prefetch all period chips on mount so switching is instant
