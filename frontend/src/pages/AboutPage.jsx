@@ -66,12 +66,6 @@ function AboutContent({ standalone }) {
           : 'clamp(32px, 6vh, 64px) 24px clamp(32px, 5vh, 56px)',
         position: 'relative', zIndex: 1,
       }}>
-        <p style={{
-          margin: '0 0 20px', fontSize: 12, fontWeight: 700, letterSpacing: '0.25em',
-          textTransform: 'uppercase', color: 'rgba(83,229,239,0.65)',
-        }}>
-          {t('about.heroTagline')}
-        </p>
         <h1 style={{
           fontSize: 'clamp(2rem, 5vw, 3.8rem)', fontWeight: 900,
           margin: '0 0 28px', letterSpacing: '-0.03em', lineHeight: 1.08, paddingBottom: '0.12em',
