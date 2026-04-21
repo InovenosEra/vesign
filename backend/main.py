@@ -1530,60 +1530,9 @@ _vesign_cache = {"US": None, "IL": None}
 _vesign_cache_lock = threading.Lock()
 
 
-def _build_equity_curve(vesign_trades, price_map):
-    """Equal-weight, daily-rebalanced index of all open Vesign trades.
-    Each day, portfolio return = mean of daily returns of currently-open trades.
-    No slot cap — every signal enters, weight = 1/N where N = open trades that day.
-    Returns {date: equity} (equity starts at 1.0 on the first trading date)."""
-    price_dict = {t: dict(price_map[t]) for t in price_map}
-    all_dates = sorted({d for lst in price_map.values() for d, _ in lst})
-    if not all_dates:
-        return {}
-
-    trades_sorted = sorted(vesign_trades, key=lambda t: t["buy_date"])
-    buy_idx = 0
-
-    equity = 1.0
-    equity_by_date = {}
-    active = []  # [{tr, last_price}]
-    prev_day = None
-
-    for d in all_dates:
-        while buy_idx < len(trades_sorted) and trades_sorted[buy_idx]["buy_date"] <= d:
-            tr = trades_sorted[buy_idx]
-            if tr["sell_date"] > d:
-                active.append({"tr": tr, "last_price": tr["buy_price"]})
-            buy_idx += 1
-
-        if prev_day is None:
-            equity_by_date[d] = equity
-            prev_day = d
-            continue
-
-        daily_rets = []
-        keep = []
-        for ap in active:
-            tr = ap["tr"]
-            last_p = ap["last_price"]
-            new_p = tr["sell_price"] if tr["sell_date"] == d else price_dict[tr["ticker"]].get(d)
-            if new_p is not None and last_p and last_p > 0:
-                daily_rets.append(new_p / last_p - 1)
-            if new_p is not None:
-                ap["last_price"] = new_p
-            if tr["sell_date"] > d:
-                keep.append(ap)
-        active = keep
-
-        portfolio_ret = sum(daily_rets) / len(daily_rets) if daily_rets else 0.0
-        equity *= 1 + portfolio_ret
-        equity_by_date[d] = equity
-        prev_day = d
-
-    return equity_by_date
-
-
 def _build_vesign_cache(market: str):
-    """Load trade_log + daily_prices; precompute Vesign equity curve. Cached per day."""
+    """Load trade_log + daily_prices. Price-lookup fast-paths are precomputed.
+    Progressive-MTM curve depends on chart window and is computed per request."""
     from datetime import date as _date
     from collections import defaultdict
 
@@ -1620,6 +1569,13 @@ def _build_vesign_cache(market: str):
         except Exception:
             pass
 
+    # Split into parallel arrays per ticker for O(log N) bisect lookup.
+    sorted_prices = {}
+    for t, lst in price_map.items():
+        dates  = [d for d, _ in lst]
+        closes = [c for _, c in lst]
+        sorted_prices[t] = (dates, closes)
+
     vesign_trades = []
     for ticker, buy_d_str, buy_price, sell_d_str, sell_price, return_pct in trade_log_rows:
         try:
@@ -1635,13 +1591,15 @@ def _build_vesign_cache(market: str):
             pass
     vesign_trades.sort(key=lambda t: t["buy_date"])
 
-    equity_by_date = _build_equity_curve(vesign_trades, price_map)
+    # Global trading calendar: union of all price dates.
+    all_dates = sorted({d for lst in price_map.values() for d, _ in lst})
 
     return {
-        "built_on":       _date.today().isoformat(),
-        "vesign_trades":  vesign_trades,
-        "price_map":      price_map,
-        "equity_by_date": equity_by_date,
+        "built_on":      _date.today().isoformat(),
+        "vesign_trades": vesign_trades,
+        "price_map":     price_map,
+        "sorted_prices": sorted_prices,
+        "all_dates":     all_dates,
     }
 
 
@@ -1709,7 +1667,18 @@ def portfolio_performance(
         """), {**tp, "cutoff": cutoff_buf}).fetchall()
 
     cache = _get_vesign_cache(market)
-    equity_by_date = cache["equity_by_date"]
+    vesign_trades = cache["vesign_trades"]
+    sorted_prices = cache["sorted_prices"]
+
+    import bisect
+
+    def price_at(ticker, target):
+        sp = sorted_prices.get(ticker)
+        if not sp:
+            return None
+        dates, closes = sp
+        i = bisect.bisect_right(dates, target)
+        return closes[i - 1] if i > 0 else None
 
     user_price_map = defaultdict(list)
     for ticker, d_str, close in user_price_rows:
@@ -1724,7 +1693,6 @@ def portfolio_performance(
                 return close
         return None
 
-    # Parse user lots (base price = week-0 price for pre-existing lots, else buy_price)
     user_lots = []
     for ticker, qty, buy_price, buy_date_str in user_rows:
         if qty is None or buy_price is None:
@@ -1739,27 +1707,35 @@ def portfolio_performance(
             base_p = float(buy_price)
         user_lots.append((ticker, float(qty), buy_d, base_p))
 
-    # Vesign equity curve: precomputed daily. Look up latest equity on or before
-    # each sample date and normalize to chart_start = 0%.
-    def equity_at(target):
-        closest = None
-        for d_obj in sorted(equity_by_date.keys()):
-            if d_obj <= target:
-                closest = equity_by_date[d_obj]
+    # Vesign line: progressive MTM.
+    # Universe = trades wholly within the chart window (buy and sell both inside).
+    # Each trade notional = $1000 at buy_price.
+    # Per day: contribution = $1000 × (price/buy_price) while open, $1000 × (1+ret) after sell.
+    # Entered trades contribute $1000 each to invested. Yield = (Σbal − Σinv) / Σinv.
+    INVEST = 1000.0
+    universe = [t for t in vesign_trades
+                if weeks[0] <= t["buy_date"] and t["sell_date"] <= weeks[-1]]
+    # Sort by buy_date so we can incrementally add "entered" trades per day.
+    universe.sort(key=lambda t: t["buy_date"])
+
+    def vesign_yield_at(target):
+        total_invested = 0.0
+        total_balance  = 0.0
+        for tr in universe:
+            if tr["buy_date"] > target:
+                break  # universe sorted by buy_date
+            total_invested += INVEST
+            if tr["sell_date"] <= target:
+                total_balance += INVEST * (1.0 + tr["return_pct"])
             else:
-                break
-        return closest
-
-    # Faster: sort once, bisect per sample
-    import bisect
-    sorted_eq_dates = sorted(equity_by_date.keys())
-    def equity_at_fast(target):
-        i = bisect.bisect_right(sorted_eq_dates, target)
-        if i == 0:
+                p = price_at(tr["ticker"], target)
+                if p is not None and tr["buy_price"] > 0:
+                    total_balance += INVEST * (p / tr["buy_price"])
+                else:
+                    total_balance += INVEST  # no price data → flat
+        if total_invested <= 0:
             return None
-        return equity_by_date[sorted_eq_dates[i - 1]]
-
-    baseline_eq = equity_at_fast(weeks[0])
+        return (total_balance - total_invested) / total_invested
 
     result = []
     for week_date in weeks:
@@ -1774,11 +1750,8 @@ def portfolio_performance(
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        eq = equity_at_fast(week_date)
-        if eq is not None and baseline_eq and baseline_eq > 0:
-            vesign_yield = round((eq / baseline_eq - 1.0) * 100, 2)
-        else:
-            vesign_yield = None
+        vy = vesign_yield_at(week_date)
+        vesign_yield = round(vy * 100, 2) if vy is not None else None
 
         if week_date == weeks[0]:
             vesign_yield = 0.0
