@@ -1,6 +1,7 @@
 import base64
 import math
 import os
+import threading
 import time
 import re
 import requests
@@ -1522,6 +1523,82 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
 
 # --- Portfolio performance ---------------------------------------------------
 
+# Module-level cache for the Vesign simulator inputs. These are user-independent
+# (same for every request) but loading ~870K price rows from daily_prices is slow
+# (~3.8s). Rebuild once per day per market; concurrent requests share the result.
+_vesign_cache = {"US": None, "IL": None}
+_vesign_cache_lock = threading.Lock()
+
+
+def _build_vesign_cache(market: str):
+    """Load trade_log + daily_prices for the Vesign simulator. Expensive — cached."""
+    from datetime import date as _date, timedelta
+    from collections import defaultdict
+
+    trade_filter = "ticker LIKE '%.TA'" if market == "IL" else "ticker NOT LIKE '%.TA'"
+
+    with engine.connect() as conn:
+        trade_log_rows = conn.execute(text(f"""
+            SELECT ticker, DATE(buy_date) AS buy_date, buy_price,
+                   DATE(sell_date) AS sell_date, return_pct
+            FROM trade_log
+            WHERE {trade_filter}
+              AND sell_date IS NOT NULL AND return_pct IS NOT NULL AND buy_price IS NOT NULL
+            ORDER BY buy_date
+        """)).fetchall()
+
+        all_tickers = list({r[0] for r in trade_log_rows})
+        price_rows = []
+        if all_tickers:
+            ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
+            tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
+            price_rows = conn.execute(text(f"""
+                SELECT ticker, DATE(date) AS d, close
+                FROM daily_prices
+                WHERE ticker IN ({ph})
+                ORDER BY ticker, date
+            """), tp).fetchall()
+
+    price_map = defaultdict(list)
+    for ticker, d_str, close in price_rows:
+        try:
+            d_obj = _date.fromisoformat(str(d_str)[:10])
+            price_map[ticker].append((d_obj, float(close)))
+        except Exception:
+            pass
+
+    vesign_trades = []
+    for ticker, buy_d_str, buy_price, sell_d_str, return_pct in trade_log_rows:
+        try:
+            vesign_trades.append({
+                "ticker": ticker,
+                "buy_date":  _date.fromisoformat(str(buy_d_str)[:10]),
+                "buy_price": float(buy_price),
+                "sell_date": _date.fromisoformat(str(sell_d_str)[:10]),
+                "return_pct": float(return_pct),
+            })
+        except Exception:
+            pass
+    vesign_trades.sort(key=lambda t: t["buy_date"])
+
+    return {
+        "built_on": _date.today().isoformat(),
+        "vesign_trades": vesign_trades,
+        "price_map": price_map,
+    }
+
+
+def _get_vesign_cache(market: str):
+    today_iso = date.today().isoformat()
+    with _vesign_cache_lock:
+        c = _vesign_cache.get(market)
+        if c is not None and c["built_on"] == today_iso:
+            return c
+        c = _build_vesign_cache(market)
+        _vesign_cache[market] = c
+        return c
+
+
 @protected.get("/api/portfolio/performance")
 def portfolio_performance(
     user=Depends(get_current_user),
@@ -1544,10 +1621,8 @@ def portfolio_performance(
     while d >= start_date:
         weeks.append(d); d -= timedelta(days=7)
     weeks.reverse()
-    # Reset start_date to actual first point (may be +1-6 days off the requested start)
     start_date = weeks[0]
     market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
-    trade_filter  = "ticker LIKE '%.TA'"    if market == "IL" else "ticker NOT LIKE '%.TA'"
 
     with engine.connect() as conn:
         # User holdings — individual lots with buy_date
@@ -1563,62 +1638,39 @@ def portfolio_performance(
         if not user_rows:
             return []
 
-        # Vesign closed trades — ALL history (sim runs continuously; we normalize
-        # chart_start to 0% for display so the chart only shows the selected window).
-        trade_log_rows = conn.execute(text(f"""
-            SELECT ticker, DATE(buy_date) AS buy_date, buy_price,
-                   DATE(sell_date) AS sell_date, return_pct
-            FROM trade_log
-            WHERE {trade_filter}
-              AND sell_date IS NOT NULL AND return_pct IS NOT NULL AND buy_price IS NOT NULL
-            ORDER BY buy_date
-        """)).fetchall()
+        # Only fetch prices for user holdings here (small, fast). Vesign simulator
+        # tickers are served from the module-level cache below.
+        user_tickers = list({r[0] for r in user_rows})
+        ph = ", ".join([f":t{i}" for i in range(len(user_tickers))])
+        tp = {f"t{i}": t for i, t in enumerate(user_tickers)}
+        cutoff_buf = (start_date - timedelta(days=60)).isoformat()
+        user_price_rows = conn.execute(text(f"""
+            SELECT ticker, DATE(date) AS d, close
+            FROM daily_prices
+            WHERE ticker IN ({ph}) AND date >= :cutoff
+            ORDER BY ticker, date
+        """), {**tp, "cutoff": cutoff_buf}).fetchall()
 
-        # Price data for both user holdings AND Vesign simulation tickers
-        all_tickers = list({r[0] for r in user_rows} | {r[0] for r in trade_log_rows})
-        if all_tickers:
-            ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
-            tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
-            cutoff_buf = (start_date - timedelta(days=60)).isoformat()
+    cache = _get_vesign_cache(market)
+    vesign_trades = cache["vesign_trades"]
+    price_map = defaultdict(list, cache["price_map"])
 
-            price_rows = conn.execute(text(f"""
-                SELECT ticker, DATE(date) AS d, close
-                FROM daily_prices
-                WHERE ticker IN ({ph}) AND date >= :cutoff
-                ORDER BY ticker, date
-            """), {**tp, "cutoff": cutoff_buf}).fetchall()
-        else:
-            price_rows = []
-
-    price_map = defaultdict(list)
-    for ticker, d_str, close in price_rows:
+    # Overlay user-holdings prices onto shared price_map (without mutating cache).
+    user_price_map = defaultdict(list)
+    for ticker, d_str, close in user_price_rows:
         try:
-            d_obj = _date.fromisoformat(str(d_str)[:10])
-            price_map[ticker].append((d_obj, float(close)))
+            user_price_map[ticker].append((_date.fromisoformat(str(d_str)[:10]), float(close)))
         except Exception:
             pass
+    for t, lst in user_price_map.items():
+        if t not in price_map:
+            price_map[t] = lst
 
     def get_price_at(ticker, target):
         for d_obj, close in reversed(price_map.get(ticker, [])):
             if d_obj <= target:
                 return close
         return None
-
-    # Pre-parse Vesign closed trades for the simulator.
-    # Each trade: ticker, buy_date, buy_price, sell_date, return_pct
-    vesign_trades = []
-    for ticker, buy_d_str, buy_price, sell_d_str, return_pct in trade_log_rows:
-        try:
-            vesign_trades.append({
-                "ticker": ticker,
-                "buy_date":  _date.fromisoformat(str(buy_d_str)[:10]),
-                "buy_price": float(buy_price),
-                "sell_date": _date.fromisoformat(str(sell_d_str)[:10]),
-                "return_pct": float(return_pct),
-            })
-        except Exception:
-            pass
-    vesign_trades.sort(key=lambda t: t["buy_date"])
 
     # Parse user lots
     user_lots = []
@@ -1629,9 +1681,15 @@ def portfolio_performance(
             buy_d = _date.fromisoformat(str(buy_date_str)[:10])
         except Exception:
             continue
-        # Base price: price on chart start for pre-existing lots; actual buy_price for in-window lots
+        lookup_map = user_price_map if ticker in user_price_map else price_map
         if buy_d <= weeks[0]:
-            base_p = get_price_at(ticker, weeks[0]) or float(buy_price)
+            base_p = None
+            for d_obj, close in reversed(lookup_map.get(ticker, [])):
+                if d_obj <= weeks[0]:
+                    base_p = close
+                    break
+            if base_p is None:
+                base_p = float(buy_price)
         else:
             base_p = float(buy_price)
         user_lots.append((ticker, float(qty), buy_d, base_p))
@@ -1641,8 +1699,6 @@ def portfolio_performance(
     # AND at chart_start, and normalize so chart_start = 0%.
     N_SLOTS = 10
     VESIGN_START = 100.0
-    # Build unified event list: every BUY, every SELL, plus SAMPLE points at
-    # chart_start and every week. Sort ensures BUY → SELL → SAMPLE on same day.
     events = []
     for tr in vesign_trades:
         events.append((tr["buy_date"],  0, "BUY",  tr))
@@ -1652,14 +1708,11 @@ def portfolio_performance(
         events.append((w, 2, "SAMPLE", None))
     events.sort(key=lambda e: (e[0], e[1]))
 
-    # For MTM of Vesign open positions, we need prices for any ticker that might
-    # be open during the sample window — already in price_map.
-
     cash = VESIGN_START
     open_pos = []
     sample_equity = {}
 
-    for date, _, action, tr in events:
+    for event_date, _, action, tr in events:
         if action == "BUY":
             free = N_SLOTS - len(open_pos)
             if free > 0 and cash > 0:
@@ -1673,25 +1726,23 @@ def portfolio_performance(
                     open_pos.pop(i)
                     break
         else:  # SAMPLE
-            if date in sample_equity:
-                continue  # already captured (duplicate sample date)
+            if event_date in sample_equity:
+                continue
             mtm = 0.0
             for t, cost in open_pos:
-                p_now = get_price_at(t["ticker"], date)
+                p_now = get_price_at(t["ticker"], event_date)
                 if p_now is not None and t["buy_price"]:
                     mtm += cost * (p_now / t["buy_price"])
                 else:
                     mtm += cost
-            sample_equity[date] = cash + mtm
+            sample_equity[event_date] = cash + mtm
 
-    # Normalize: chart_start = 0%; every other week = % change from chart_start
     baseline = sample_equity.get(weeks[0])
     if baseline is None or baseline <= 0:
         baseline = VESIGN_START
 
     result = []
     for week_date in weeks:
-        # User portfolio: current / base yield
         total_val = 0.0
         total_base = 0.0
         for ticker, qty, buy_d, base_p in user_lots:
@@ -1703,11 +1754,9 @@ def portfolio_performance(
                 total_base += qty * base_p
         port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
-        # Vesign: simulator equity relative to chart_start (normalized to 0 there)
         eq = sample_equity.get(week_date)
         vesign_yield = round((eq / baseline - 1.0) * 100, 2) if eq is not None else None
 
-        # Force chart to start exactly at 0
         if week_date == weeks[0]:
             vesign_yield = 0.0
             port_yield = 0.0
@@ -2074,6 +2123,17 @@ def pipeline_status():
 
 
 app.include_router(protected)
+
+
+# Warm the Vesign performance cache in a background thread so the first request
+# of the day doesn't pay the ~4s build cost.
+def _warm_vesign_cache_bg():
+    try:
+        _get_vesign_cache("US")
+    except Exception:
+        pass
+
+threading.Thread(target=_warm_vesign_cache_bg, daemon=True).start()
 
 # ---------------------------------------------------------------------------
 # SPA static file serving (production)
