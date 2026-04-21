@@ -1537,13 +1537,15 @@ def portfolio_performance(
     end_date = _date.today() - timedelta(days=1)  # yesterday
     # Approx: months → days (30.44 avg); gives a clean start for any period
     start_date = end_date - timedelta(days=int(round(months * 30.4375)))
-    # Build weekly timeline: start, +7, ..., up to end_date (last step may be partial)
-    weeks = [start_date]
-    d = start_date + timedelta(days=7)
-    while d < end_date:
-        weeks.append(d); d += timedelta(days=7)
-    if weeks[-1] != end_date:
-        weeks.append(end_date)
+    # Build weekly timeline walking BACKWARD from end_date so every point is
+    # exactly 7 days apart (last = yesterday, prev = -7d, prev = -7d, …).
+    weeks = []
+    d = end_date
+    while d >= start_date:
+        weeks.append(d); d -= timedelta(days=7)
+    weeks.reverse()
+    # Reset start_date to actual first point (may be +1-6 days off the requested start)
+    start_date = weeks[0]
     market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
     trade_filter  = "ticker LIKE '%.TA'"    if market == "IL" else "ticker NOT LIKE '%.TA'"
 
