@@ -31,7 +31,7 @@ function SummaryCard({ label, value, sub, color }) {
       padding: '14px 18px', minWidth: 140, flex: '1 1 140px',
     }}>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: color || 'var(--text)' }}>{value}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: color || 'var(--text)', whiteSpace: 'nowrap' }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
