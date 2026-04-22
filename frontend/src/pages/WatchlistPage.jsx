@@ -128,7 +128,7 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
 export default function WatchlistPage() {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
-  const { fmtPrice } = useCurrency()
+  const { fmtPrice, symbol } = useCurrency()
   const qc = useQueryClient()
   const [selectedId, setSelectedId]   = usePersistedState('watchlist.selectedId', null)
   const [newListName, setNewListName] = useState('')
@@ -396,7 +396,7 @@ export default function WatchlistPage() {
           {/* Col 3: all P&L cards in one flex row, second divider inside */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
             <div className="metric-card">
-              <div className="label">{t('watchlist.totalPnlAbs')}</div>
+              <div className="label">{t('watchlist.totalPnlAbs', { symbol })}</div>
               <div className={`value ${portPnlAbs >= 0 ? 'up' : 'down'}`}>
                 {portPnlAbs >= 0 ? '+' : ''}{fmtPrice(Math.abs(portPnlAbs))}
               </div>
@@ -409,7 +409,7 @@ export default function WatchlistPage() {
             </div>
             <div style={{ width: 1, background: 'rgba(255,255,255,0.35)', alignSelf: 'stretch', flexShrink: 0 }} />
             <div className="metric-card">
-              <div className="label">{t('portfolio.dailyPnlAbs')}</div>
+              <div className="label">{t('portfolio.dailyPnlAbs', { symbol })}</div>
               <div className={`value ${portDailyPnlAbs != null && portDailyPnlAbs >= 0 ? 'up' : 'down'}`}>
                 {portDailyPnlAbs != null ? `${portDailyPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(portDailyPnlAbs))}` : '—'}
               </div>

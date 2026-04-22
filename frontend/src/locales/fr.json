@@ -73,7 +73,7 @@
   "watchlist.noTickers": "Aucun ticker pour le moment. Ajoutez-en un ci-dessus.",
   "watchlist.totalInvested": "Total investi",
   "watchlist.currentValue": "Valeur actuelle",
-  "watchlist.totalPnlAbs": "P&L total ($)",
+  "watchlist.totalPnlAbs": "P&L total ({{symbol}})",
   "watchlist.totalPnlPct": "P&L total (%)",
   "watchlist.noLots": "Aucun lot pour le moment.",
   "watchlist.addLot": "+ Ajouter un lot",
@@ -176,7 +176,7 @@
   "portfolio.totalTrades": "Total des transactions",
   "portfolio.yourPortfolio": "Votre portefeuille",
   "portfolio.vesignSignals": "Moy. signaux Vesign",
-  "portfolio.dailyPnlAbs": "G/P Journalier ($)",
+  "portfolio.dailyPnlAbs": "G/P Journalier ({{symbol}})",
   "portfolio.dailyPnlPct": "G/P Journalier (%)",
   "portfolio.vsPortfolio": "vs Signaux",
 

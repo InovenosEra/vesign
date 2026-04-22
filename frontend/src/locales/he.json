@@ -73,7 +73,7 @@
   "watchlist.noTickers": "אין סימולים עדיין. הוסף אחד למעלה.",
   "watchlist.totalInvested": "סה״כ הושקע",
   "watchlist.currentValue": "שווי נוכחי",
-  "watchlist.totalPnlAbs": "סה״כ רווח/הפסד ($)",
+  "watchlist.totalPnlAbs": "סה״כ רווח/הפסד ({{symbol}})",
   "watchlist.totalPnlPct": "סה״כ רווח/הפסד (%)",
   "watchlist.noLots": "אין החזקות עדיין.",
   "watchlist.addLot": "+ הוסף החזקה",
@@ -176,7 +176,7 @@
   "portfolio.totalTrades": "סה״כ עסקאות",
   "portfolio.yourPortfolio": "התיק שלך",
   "portfolio.vesignSignals": "ממוצע איתותי Vesign",
-  "portfolio.dailyPnlAbs": "רווח/הפסד יומי ($)",
+  "portfolio.dailyPnlAbs": "רווח/הפסד יומי ({{symbol}})",
   "portfolio.dailyPnlPct": "רווח/הפסד יומי (%)",
   "portfolio.vsPortfolio": "לעומת האיתותים",
 

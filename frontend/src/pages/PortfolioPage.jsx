@@ -39,7 +39,7 @@ function SummaryCard({ label, value, sub, color }) {
 
 export default function PortfolioPage() {
   const { t } = useTranslation()
-  const { fmtPrice } = useCurrency()
+  const { fmtPrice, symbol } = useCurrency()
   const [allocMode, setAllocMode] = usePersistedState('portfolio.allocMode', 'ticker')
   const [selectedRow, setSelectedRow] = useState(null)
 
@@ -142,7 +142,7 @@ export default function PortfolioPage() {
         <SummaryCard label={t('watchlist.totalInvested')} value={fmtPrice(totalInvested)} />
         <SummaryCard label={t('watchlist.currentValue')} value={fmtPrice(totalValue)} />
         <SummaryCard
-          label={t('watchlist.totalPnlAbs')}
+          label={t('watchlist.totalPnlAbs', { symbol })}
           value={`${totalPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(totalPnlAbs))}`}
           color={totalPnlAbs >= 0 ? 'var(--green)' : 'var(--red)'}
         />

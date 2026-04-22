@@ -73,7 +73,7 @@
   "watchlist.noTickers": "Aún no hay tickers. Agrega uno arriba.",
   "watchlist.totalInvested": "Total invertido",
   "watchlist.currentValue": "Valor actual",
-  "watchlist.totalPnlAbs": "P&L total ($)",
+  "watchlist.totalPnlAbs": "P&L total ({{symbol}})",
   "watchlist.totalPnlPct": "P&L total (%)",
   "watchlist.noLots": "Aún no hay lotes.",
   "watchlist.addLot": "+ Agregar lote",
@@ -176,7 +176,7 @@
   "portfolio.totalTrades": "Total de operaciones",
   "portfolio.yourPortfolio": "Tu portafolio",
   "portfolio.vesignSignals": "Prom. señales Vesign",
-  "portfolio.dailyPnlAbs": "P&G Diario ($)",
+  "portfolio.dailyPnlAbs": "P&G Diario ({{symbol}})",
   "portfolio.dailyPnlPct": "P&G Diario (%)",
   "portfolio.vsPortfolio": "vs Señales",
 
