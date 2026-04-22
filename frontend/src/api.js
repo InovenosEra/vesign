@@ -95,6 +95,8 @@ export async function submitContact(name, email, subject, message) {
 export const getMarketStatus = (market = 'US') =>
   get(`/market/status?market=${market}`)
 
+export const getDataStatus = () => get('/data/status')
+
 // --- Signals ---------------------------------------------------------------
 export const getSignalsToday = (signal, market = 'US') => {
   const params = new URLSearchParams({ market })

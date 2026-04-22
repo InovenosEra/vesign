@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tan
 import { ClerkProvider, RedirectToSignIn, useAuth, useClerk, useUser } from '@clerk/react'
 import { useTranslation } from 'react-i18next'
 import i18n from './i18n'
-import { setTokenGetter, getMarketStatus, getSignalsToday, getTrades, getOpenTrades, getWatchlists, getPortfolioHoldings, getPortfolioPerformance, getPortfolioComparison } from './api'
+import { setTokenGetter, getMarketStatus, getSignalsToday, getTrades, getOpenTrades, getWatchlists, getPortfolioHoldings, getPortfolioPerformance, getPortfolioComparison, getDataStatus } from './api'
 import { MarketContext, MarketProvider } from './context/MarketContext'
 import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
@@ -485,6 +485,27 @@ function TokenSync({ onReady }) {
 // ---------------------------------------------------------------------------
 // Protected app layout
 // ---------------------------------------------------------------------------
+function StaleDataBanner() {
+  const { data } = useQuery({
+    queryKey: ['data-status'],
+    queryFn: getDataStatus,
+    refetchInterval: 10 * 60_000,
+    staleTime: 5 * 60_000,
+  })
+  if (!data?.stale) return null
+  const { latest, expected, days_stale } = data
+  return (
+    <div style={{
+      background: '#7a4d00', color: '#ffd48a', padding: '8px 16px', fontSize: 13,
+      textAlign: 'center', borderBottom: '1px solid #a36d00',
+    }}>
+      ⚠ Data is {days_stale || '?'} trading day{days_stale === 1 ? '' : 's'} behind.
+      Latest: {latest || '—'} · Expected: {expected}.
+      The overnight pipeline may have failed — contact the admin if this persists.
+    </div>
+  )
+}
+
 function AppLayout() {
   const { isLoaded, userId } = useAuth()
   const { user } = useUser()
@@ -504,6 +525,7 @@ function AppLayout() {
         <TokenSync onReady={() => setTokenReady(true)} />
         {tokenReady && <Prefetcher />}
         {tokenReady && <Header />}
+        {tokenReady && <StaleDataBanner />}
         {tokenReady && (
           <>
             <main className="app-main">

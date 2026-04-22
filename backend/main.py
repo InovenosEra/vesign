@@ -550,6 +550,41 @@ def market_status(market: Optional[str] = None):
     return _market_info(_nyse_cal)
 
 
+@protected.get("/api/data/status")
+def data_status():
+    """Freshness check for the stale-data banner.
+
+    Returns the latest US signal date vs. the last NYSE trading session. If the
+    daily pipeline OOM'd or was skipped, `stale=True` and the UI shows a banner.
+    """
+    from datetime import timedelta as _td
+    today = date.today()
+    # Last closed US trading session (today after close, else the prior session).
+    sessions = _nyse_cal.sessions_in_range(
+        (today - _td(days=14)).isoformat(),
+        (today - _td(days=1)).isoformat(),
+    )
+    expected = sessions[-1].date() if len(sessions) else (today - _td(days=1))
+
+    with engine.connect() as conn:
+        r = conn.execute(text(
+            "SELECT MAX(DATE(date)) FROM signals WHERE ticker NOT LIKE '%.TA'"
+        )).fetchone()
+    latest_str = r[0] if r else None
+
+    if latest_str is None:
+        return {"latest": None, "expected": expected.isoformat(), "stale": True, "days_stale": None}
+
+    latest_d = date.fromisoformat(latest_str)
+    days_stale = (expected - latest_d).days
+    return {
+        "latest":      latest_str,
+        "expected":    expected.isoformat(),
+        "days_stale":  days_stale,
+        "stale":       days_stale > 0,
+    }
+
+
 # --- Signals ----------------------------------------------------------------
 
 _MARKET_CAP_JOIN = """

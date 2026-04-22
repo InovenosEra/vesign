@@ -149,8 +149,10 @@ def _repair_analyst_targets():
     import yfinance as yf
     from data.market_data import snapshot_analyst_targets
 
+    # Skip TASE — yfinance retries on delisted .TA tickers burn memory and
+    # produced OOM kills. We're US-only in production.
     df = pd.read_sql(
-        "SELECT ticker FROM analyst_expectations",
+        "SELECT ticker FROM analyst_expectations WHERE ticker NOT LIKE '%.TA'",
         engine,
     )
     tickers = df["ticker"].tolist()
