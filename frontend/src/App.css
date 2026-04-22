@@ -275,7 +275,7 @@ img.logo-white-bg, img.modal-logo-white-bg {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px 24px;
+  padding: 16px 14px;
   min-width: 140px;
 }
 
