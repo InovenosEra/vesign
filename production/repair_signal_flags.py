@@ -64,6 +64,9 @@ def _process_year(year: int, cfg: dict) -> int:
         return 0
 
     feat["date"] = pd.to_datetime(feat["date"])
+    for col in ("rsi", "volume_ratio", "pct_from_52w_high", "close", "bb_high", "bb_low"):
+        if col in feat.columns:
+            feat[col] = pd.to_numeric(feat[col], errors="coerce")
     feat["rsi_below_30"] = feat["rsi"] < 30
     feat["rsi_3day_flag"] = (
         feat.groupby("ticker")["rsi_below_30"]
@@ -100,6 +103,9 @@ def _process_year(year: int, cfg: dict) -> int:
         return 0
 
     sig["date"] = pd.to_datetime(sig["date"])
+    for col in ("health_score", "prediction_score", "target_mean_price", "fair_value_upside"):
+        if col in sig.columns:
+            sig[col] = pd.to_numeric(sig[col], errors="coerce")
     df = feat.merge(sig, on=["ticker", "date"], how="inner")
     del feat
 
