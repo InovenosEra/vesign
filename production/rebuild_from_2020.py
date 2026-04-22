@@ -140,11 +140,11 @@ def backfill_all_historical_signals():
     )
 
     df["week52_condition"] = df["pct_from_52w_high"] <= -pct_52w_min
-    df["health_ok"] = (df["health_score"].isna()) | (df["health_score"] >= 3)
+    df["health_condition"] = (df["health_score"].isna()) | (df["health_score"] >= 3)
 
     # ML score passes if >= threshold OR NaN (TASE or too-early signal)
     ml_threshold = config.get("ml_threshold", 0.02)
-    df["ml_ok"] = (df["prediction_score"].isna()) | (df["prediction_score"] >= ml_threshold)
+    df["ml_condition"] = (df["prediction_score"].isna()) | (df["prediction_score"] >= ml_threshold)
 
     buy_cond = (
         (df["rsi_3day_flag"] == 3)
@@ -152,8 +152,8 @@ def backfill_all_historical_signals():
         & df["analyst_condition"]
         & df["volume_flag"]
         & df["week52_condition"]
-        & df["health_ok"]
-        & df["ml_ok"]
+        & df["health_condition"]
+        & df["ml_condition"]
     )
     sell_cond = df["rsi"] >= 70
 
@@ -164,6 +164,10 @@ def backfill_all_historical_signals():
     )
     df["score"] = 50 - df["rsi"]
 
+    # Vesign score (0–100) — same helper used by the live engine
+    from signals.engine import _compute_vesign_score
+    df["vesign_score"] = df.apply(_compute_vesign_score, axis=1)
+
     # Wipe existing signals (the 7 daily signals already generated) and insert full history
     with engine.begin() as conn:
         conn.execute(_text("DELETE FROM signals"))
@@ -173,7 +177,9 @@ def backfill_all_historical_signals():
     out_cols = [c for c in (
         "date", "ticker", "close", "rsi", "bb_pct_b", "fair_value_upside",
         "target_mean_price", "volume_ratio", "pct_from_52w_high",
-        "prediction_score", "health_score", "signal", "score"
+        "prediction_score", "health_score", "signal", "score",
+        "rsi_3day_flag", "volume_flag", "week52_condition",
+        "health_condition", "ml_condition", "vesign_score",
     ) if c in df.columns]
     df[out_cols].to_sql("signals", engine, if_exists="append", index=False)
 

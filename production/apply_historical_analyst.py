@@ -249,8 +249,8 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
         >= volume_threshold
     )
     df["week52_condition"] = df["pct_from_52w_high"] <= -pct_52w_min
-    df["health_ok"] = (df["health_score"].isna()) | (df["health_score"] >= 3)
-    df["ml_ok"] = (df["prediction_score"].isna()) | (df["prediction_score"] >= ml_threshold)
+    df["health_condition"] = (df["health_score"].isna()) | (df["health_score"] >= 3)
+    df["ml_condition"] = (df["prediction_score"].isna()) | (df["prediction_score"] >= ml_threshold)
 
     buy_cond = (
         (df["rsi_3day_flag"] == 3)
@@ -258,8 +258,8 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
         & df["analyst_condition"]
         & df["volume_flag"]
         & df["week52_condition"]
-        & df["health_ok"]
-        & df["ml_ok"]
+        & df["health_condition"]
+        & df["ml_condition"]
     )
     # MASTER gate: SELL requires ML < 0 (waived for NULL / TASE)
     ml_negative = (df["prediction_score"] < 0) | df["prediction_score"].isna() | df["ticker"].str.endswith(".TA")
@@ -268,6 +268,10 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
     df["signal"] = np.select([buy_cond, sell_cond], ["BUY", "SELL"], default="HOLD")
     df["score"] = 50 - df["rsi"]
 
+    # Vesign score (0–100) — same helper used by the live engine
+    from signals.engine import _compute_vesign_score
+    df["vesign_score"] = df.apply(_compute_vesign_score, axis=1)
+
     with engine.begin() as conn:
         conn.execute(_text("DELETE FROM signals"))
 
@@ -275,7 +279,9 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
         "date", "ticker", "close", "rsi", "bb_pct_b", "fair_value_upside",
         "target_mean_price", "target_high_price", "target_low_price",
         "number_of_analysts", "volume_ratio", "pct_from_52w_high",
-        "prediction_score", "health_score", "signal", "score"
+        "prediction_score", "health_score", "signal", "score",
+        "rsi_3day_flag", "volume_flag", "week52_condition",
+        "health_condition", "ml_condition", "vesign_score",
     ) if c in df.columns]
     df[out_cols].to_sql("signals", engine, if_exists="append", index=False)
 
