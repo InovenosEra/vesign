@@ -174,9 +174,9 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
             <td>{fmtMktCap(r.market_cap)}</td>
             <td><PriceCell value={r.close} ticker={r.ticker} /></td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-            <td className="col-hide-sm">{fmtPrice(r.target_low_price, r.ticker)}</td>
-            <td>{fmtPrice(r.target_mean_price, r.ticker)}</td>
-            <td className="col-hide-sm">{fmtPrice(r.target_high_price, r.ticker)}</td>
+            <td className="col-hide-sm"><PriceCell value={r.target_low_price} ticker={r.ticker} /></td>
+            <td><PriceCell value={r.target_mean_price} ticker={r.ticker} /></td>
+            <td className="col-hide-sm"><PriceCell value={r.target_high_price} ticker={r.ticker} /></td>
             <HealthCell score={r.health_score} />
             <UpsideCell targetMean={r.target_mean_price} close={r.close} />
             <MLScoreCell score={r.prediction_score} className="col-hide-sm" />
@@ -300,9 +300,9 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}</span> : '—'}</td>
                 <td><PriceCell value={r.close} ticker={r.ticker} /></td>
                 <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-                <td className="col-hide-sm">{fmtPrice(r.target_low_price, market)}</td>
-                <td>{fmtPrice(r.target_mean_price, market)}</td>
-                <td className="col-hide-sm">{fmtPrice(r.target_high_price, market)}</td>
+                <td className="col-hide-sm"><PriceCell value={r.target_low_price} ticker={r.ticker} /></td>
+                <td><PriceCell value={r.target_mean_price} ticker={r.ticker} /></td>
+                <td className="col-hide-sm"><PriceCell value={r.target_high_price} ticker={r.ticker} /></td>
                 <HealthCell score={r.health_score} />
                 <UpsideCell targetMean={r.target_mean_price} close={r.close} />
                 <MLScoreCell score={r.prediction_score} className="col-hide-sm" />
