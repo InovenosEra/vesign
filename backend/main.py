@@ -590,12 +590,9 @@ def data_status():
     """
     from datetime import timedelta as _td
     today = date.today()
-    # Last closed US trading session (today after close, else the prior session).
-    sessions = _nyse_cal.sessions_in_range(
-        (today - _td(days=14)).isoformat(),
-        (today - _td(days=1)).isoformat(),
-    )
-    expected = sessions[-1].date() if len(sessions) else (today - _td(days=1))
+    # Last closed US trading session (prior day, holiday-aware via XNYS calendar).
+    sched = _nyse_cal.schedule(today - _td(days=14), today - _td(days=1))
+    expected = sched.index[-1].date() if len(sched) else (today - _td(days=1))
 
     with engine.connect() as conn:
         r = conn.execute(text(
