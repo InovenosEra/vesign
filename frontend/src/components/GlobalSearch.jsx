@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { searchTickers } from '../api'
+import { useCurrency } from '../context/CurrencyContext'
 import SignalModal from './SignalModal'
 
 export default function GlobalSearch() {
   const { t } = useTranslation()
+  const { fmtPrice } = useCurrency()
   const [query, setQuery]       = useState('')
   const [results, setResults]   = useState([])
   const [open, setOpen]         = useState(false)
@@ -136,7 +138,7 @@ export default function GlobalSearch() {
                   <span className={`badge badge-${r.signal}`} style={{ flexShrink: 0, fontSize: 10 }}>{r.signal}</span>
                 )}
                 {r.close != null && (
-                  <span style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>${r.close.toFixed(2)}</span>
+                  <span style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>{fmtPrice(r.close)}</span>
                 )}
               </div>
             ))}

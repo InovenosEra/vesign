@@ -96,6 +96,7 @@ export const getMarketStatus = (market = 'US') =>
   get(`/market/status?market=${market}`)
 
 export const getDataStatus = () => get('/data/status')
+export const getFxRates    = () => get('/fx/rates')
 
 // --- Signals ---------------------------------------------------------------
 export const getSignalsToday = (signal, market = 'US') => {

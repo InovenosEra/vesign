@@ -3,6 +3,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getPriceHistory, getSignalMarkers, getAnalystHistory, getNews, getSignalsByTickers, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
+import { useCurrency } from '../context/CurrencyContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -37,7 +38,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
   const row = needsSupplement && tickerInfo ? { ...tickerInfo, ...rowProp } : rowProp
 
   const isIL      = row?.ticker?.endsWith('.TA') ?? market === 'IL'
-  const currency  = isIL ? '₪' : '$'
+  const { fmtPrice } = useCurrency()
   const priceScale = isIL ? 100 : 1  // IL prices stored in agorot, display in ₪
   const today     = new Date().toISOString().slice(0, 10)
 
@@ -229,7 +230,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
                     [t('modal.industry'),      row.industry ?? '—'],
                     [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
                     [t('col.signal'),          row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
-                    [t('modal.price'),         row.close != null ? fmt(row.close / priceScale) : '—'],
+                    [t('modal.price'),         row.close != null ? fmtPrice(row.close / priceScale) : '—'],
                     [t('modal.rsi'),           row.rsi != null ? row.rsi.toFixed(1) : '—'],
                     [t('modal.analystTarget'), (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
                     [t('modal.mlScore'),       (() => { const s = row.prediction_score; if (s == null) return '—'; const pct = s * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span> })()],
@@ -337,8 +338,8 @@ export default function SignalModal({ row: rowProp, onClose }) {
                 <YAxis
                   domain={[minPrice, maxPrice]}
                   tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                  tickFormatter={v => v.toFixed(0)}
-                  width={48}
+                  tickFormatter={v => fmtPrice(v, 0)}
+                  width={56}
                 />
                 <Tooltip
                   wrapperStyle={{ zIndex: 50 }}
@@ -366,7 +367,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
                         {sorted.map(p => (
                           <div key={p.dataKey}
                                style={{ fontWeight: p.dataKey === 'close' ? 700 : 400 }}>
-                            {labels[p.dataKey] || p.dataKey} : {p.value != null ? p.value.toFixed(2) : '—'}
+                            {labels[p.dataKey] || p.dataKey} : {p.value != null ? fmtPrice(p.value) : '—'}
                           </div>
                         ))}
                       </div>
@@ -397,11 +398,11 @@ export default function SignalModal({ row: rowProp, onClose }) {
                     <g key={i}>
                       {buyX  != null && <>
                         <line x1={buyX}  y1={PLOT_TOP} x2={buyX}  y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
-                        {p.buy.close  != null && priceBox(buyX,  fmt(p.buy.close  / priceScale, 1), 'var(--green)')}
+                        {p.buy.close  != null && priceBox(buyX,  fmtPrice(p.buy.close  / priceScale, 1), 'var(--green)')}
                       </>}
                       {sellX != null && <>
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)',   strokeWidth: 2 }} />
-                        {p.sell.close != null && priceBox(sellX, fmt(p.sell.close / priceScale, 1), 'var(--red)')}
+                        {p.sell.close != null && priceBox(sellX, fmtPrice(p.sell.close / priceScale, 1), 'var(--red)')}
                       </>}
                       {buyX != null && sellX != null && pct != null && (() => {
                         const label = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
@@ -431,7 +432,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
                   const currentPrice = chartData.at(-1).close
                   const pct       = openBuy.close ? ((currentPrice - openBuy.close / priceScale) / (openBuy.close / priceScale)) * 100 : null
                   const gainColor = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
-                  const priceText = openBuy.close != null ? fmt(openBuy.close / priceScale, 1) : ''
+                  const priceText = openBuy.close != null ? fmtPrice(openBuy.close / priceScale, 1) : ''
                   const yieldText = pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%` : ''
 
                   const price_bh = 21, gain_bh = 18, gap = 4
@@ -443,9 +444,9 @@ export default function SignalModal({ row: rowProp, onClose }) {
                     const bx = dateToX(p.buy.date)
                     const sx = dateToX(p.sell.date)
                     if (bx != null && p.buy.close != null)
-                      pairBoxes.push({ x: bx, w: fmt(p.buy.close / priceScale, 1).length * 6.8 + 16 })
+                      pairBoxes.push({ x: bx, w: fmtPrice(p.buy.close / priceScale, 1).length * 6.8 + 16 })
                     if (sx != null && p.sell.close != null)
-                      pairBoxes.push({ x: sx, w: fmt(p.sell.close / priceScale, 1).length * 6.8 + 16 })
+                      pairBoxes.push({ x: sx, w: fmtPrice(p.sell.close / priceScale, 1).length * 6.8 + 16 })
                   }
                   const hasCollision = pairBoxes.some(b => Math.abs(buyX - b.x) < (bw_price + b.w) / 2)
 

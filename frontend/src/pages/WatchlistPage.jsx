@@ -14,6 +14,7 @@ import {
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
 import { usePersistedState } from '../hooks/usePersistedState'
+import { useCurrency } from '../context/CurrencyContext'
 import SignalModal from '../components/SignalModal'
 
 const _PIE_COLORS = [
@@ -23,7 +24,7 @@ const _PIE_COLORS = [
 
 function tickerMarket(ticker) { return ticker?.endsWith('.TA') ? 'IL' : 'US' }
 
-function fmtPrice(n, ticker) {
+function fmtPriceRaw(n, ticker) {
   if (n == null) return '—'
   const isIL = tickerMarket(ticker) === 'IL'
   const val = isIL ? n / 100 : n
@@ -99,6 +100,7 @@ function UpsideCell({ targetMean, close, prices, ticker }) {
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const { t } = useTranslation()
+  const { fmtPrice } = useCurrency()
   const isIL = tickerMarket(ticker) === 'IL'
   const isOpen = isIL
     ? (marketOpen !== false)   // TASE: open unless explicitly false
@@ -115,9 +117,9 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const arrow = diff >= 0 ? '▲' : '▼'
   return (
     <td>
-      <div>{displayLive.toFixed(2)}</div>
+      <div>{fmtPrice(displayLive)}</div>
       <div className={cls} style={{ fontSize: 11 }}>
-        {arrow} {Math.abs(diff).toFixed(2)} ({Math.abs(pct).toFixed(2)}%)
+        {arrow} {fmtPrice(Math.abs(diff))} ({Math.abs(pct).toFixed(2)}%)
       </div>
     </td>
   )
@@ -126,6 +128,7 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
 export default function WatchlistPage() {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
+  const { fmtPrice } = useCurrency()
   const qc = useQueryClient()
   const [selectedId, setSelectedId]   = usePersistedState('watchlist.selectedId', null)
   const [newListName, setNewListName] = useState('')
@@ -381,11 +384,11 @@ export default function WatchlistPage() {
           <div style={{ display: 'flex', gap: 16 }}>
             <div className="metric-card">
               <div className="label">{t('watchlist.totalInvested')}</div>
-              <div className="value">${portTotalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="value">{fmtPrice(portTotalInvested)}</div>
             </div>
             <div className="metric-card">
               <div className="label">{t('watchlist.currentValue')}</div>
-              <div className="value">${portTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="value">{fmtPrice(portTotalValue)}</div>
             </div>
           </div>
           {/* Col 2: divider */}
@@ -395,7 +398,7 @@ export default function WatchlistPage() {
             <div className="metric-card">
               <div className="label">{t('watchlist.totalPnlAbs')}</div>
               <div className={`value ${portPnlAbs >= 0 ? 'up' : 'down'}`}>
-                {portPnlAbs >= 0 ? '+' : ''}${Math.abs(portPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {portPnlAbs >= 0 ? '+' : ''}{fmtPrice(Math.abs(portPnlAbs))}
               </div>
             </div>
             <div className="metric-card">
@@ -408,7 +411,7 @@ export default function WatchlistPage() {
             <div className="metric-card">
               <div className="label">{t('portfolio.dailyPnlAbs')}</div>
               <div className={`value ${portDailyPnlAbs != null && portDailyPnlAbs >= 0 ? 'up' : 'down'}`}>
-                {portDailyPnlAbs != null ? `${portDailyPnlAbs >= 0 ? '+' : ''}$${Math.abs(portDailyPnlAbs).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                {portDailyPnlAbs != null ? `${portDailyPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(portDailyPnlAbs))}` : '—'}
               </div>
             </div>
             <div className="metric-card">
@@ -436,7 +439,7 @@ export default function WatchlistPage() {
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
                     labelStyle={{ color: 'var(--text)', fontWeight: 700 }}
                     itemStyle={{ color: 'var(--text)' }}
-                    formatter={(v, name) => [`$${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, name]}
+                    formatter={(v, name) => [fmtPrice(v, 0), name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -677,7 +680,7 @@ export default function WatchlistPage() {
                             <span className={`badge badge-${r.signal}`} style={{ flexShrink: 0, fontSize: 10 }}>{r.signal}</span>
                           )}
                           {r.close != null && (
-                            <span style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>${r.close.toFixed(2)}</span>
+                            <span style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>{fmtPrice(r.close)}</span>
                           )}
                         </div>
                       ))}
@@ -762,10 +765,10 @@ export default function WatchlistPage() {
                               <UpsideCell targetMean={row.target_mean_price} close={row.close} prices={prices} ticker={row.ticker} />
                               <td className="col-hide-sm">{row.prediction_score != null ? <span className={row.prediction_score >= 0 ? 'up' : 'down'}>{row.prediction_score >= 0 ? '▲' : '▼'} {Math.abs(row.prediction_score * 100).toFixed(1)}%</span> : '—'}</td>
                               <td>{totalQty > 0 ? totalQty : '—'}</td>
-                              <td>{avgPrice != null ? avgPrice.toFixed(2) : '—'}</td>
-                              <td>{fmtPrice(row.close, row.ticker)}</td>
+                              <td>{fmtPrice(avgPrice)}</td>
+                              <td>{fmtPrice(row.close)}</td>
                               <LivePriceCell ticker={row.ticker} closePrice={row.close} prices={prices} marketOpen={marketOpen} />
-                              <td>{totalCost > 0 ? `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</td>
+                              <td>{totalCost > 0 ? fmtPrice(totalCost) : '—'}</td>
                               <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
                                 {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(2)}%` : '—'}
                               </td>
@@ -809,8 +812,8 @@ export default function WatchlistPage() {
                                                 <tr key={l.id}>
                                                   <td style={{ padding: '3px 16px 3px 0' }}>{l.buy_date}</td>
                                                   <td style={{ padding: '3px 16px 3px 0' }}>{l.quantity}</td>
-                                                  <td style={{ padding: '3px 16px 3px 0' }}>${l.buy_price.toFixed(2)}</td>
-                                                  <td style={{ padding: '3px 16px 3px 0' }}>${(l.quantity * l.buy_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                                  <td style={{ padding: '3px 16px 3px 0' }}>{fmtPrice(l.buy_price)}</td>
+                                                  <td style={{ padding: '3px 16px 3px 0' }}>{fmtPrice(l.quantity * l.buy_price)}</td>
                                                   <td className={lotYield != null ? (lotYield >= 0 ? 'up' : 'down') : ''} style={{ padding: '3px 16px 3px 0' }}>
                                                     {lotYield != null ? `${lotYield >= 0 ? '+' : ''}${lotYield.toFixed(2)}%` : '—'}
                                                   </td>

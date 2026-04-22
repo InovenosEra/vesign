@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { getPortfolioHoldings, getSuccessRate, WHITE_BG_LOGOS } from '../api'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { usePersistedState } from '../hooks/usePersistedState'
+import { useCurrency } from '../context/CurrencyContext'
 import SignalModal from '../components/SignalModal'
 
 const PIE_COLORS = [
@@ -38,6 +39,7 @@ function SummaryCard({ label, value, sub, color }) {
 
 export default function PortfolioPage() {
   const { t } = useTranslation()
+  const { fmtPrice } = useCurrency()
   const [allocMode, setAllocMode] = usePersistedState('portfolio.allocMode', 'ticker')
   const [selectedRow, setSelectedRow] = useState(null)
 
@@ -137,11 +139,11 @@ export default function PortfolioPage() {
 
       {/* Summary cards */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
-        <SummaryCard label={t('watchlist.totalInvested')} value={`$${fmt(totalInvested)}`} />
-        <SummaryCard label={t('watchlist.currentValue')} value={`$${fmt(totalValue)}`} />
+        <SummaryCard label={t('watchlist.totalInvested')} value={fmtPrice(totalInvested)} />
+        <SummaryCard label={t('watchlist.currentValue')} value={fmtPrice(totalValue)} />
         <SummaryCard
           label={t('watchlist.totalPnlAbs')}
-          value={`${totalPnlAbs >= 0 ? '+' : ''}$${fmt(Math.abs(totalPnlAbs))}`}
+          value={`${totalPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(totalPnlAbs))}`}
           color={totalPnlAbs >= 0 ? 'var(--green)' : 'var(--red)'}
         />
         <SummaryCard
@@ -151,7 +153,7 @@ export default function PortfolioPage() {
         />
         <SummaryCard
           label={t('portfolio.dailyPnl')}
-          value={dailyPnlAbs != null ? `${dailyPnlAbs >= 0 ? '+' : ''}$${fmt(Math.abs(dailyPnlAbs))}` : '—'}
+          value={dailyPnlAbs != null ? `${dailyPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(dailyPnlAbs))}` : '—'}
           sub={dailyPnlPct != null ? `${dailyPnlPct >= 0 ? '+' : ''}${fmt(dailyPnlPct)}% today` : undefined}
           color={dailyPnlAbs != null ? (dailyPnlAbs >= 0 ? 'var(--green)' : 'var(--red)') : undefined}
         />
@@ -183,7 +185,7 @@ export default function PortfolioPage() {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
-                  formatter={(v) => [`$${fmt(v)}`, '']}
+                  formatter={(v) => [fmtPrice(v), '']}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -200,7 +202,7 @@ export default function PortfolioPage() {
                         <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: PIE_COLORS[i % PIE_COLORS.length], marginRight: 6 }} />
                         {d.name}
                       </td>
-                      <td style={{ paddingBottom: 4, paddingRight: 12, textAlign: 'right' }}>${fmt(d.value, 0)}</td>
+                      <td style={{ paddingBottom: 4, paddingRight: 12, textAlign: 'right' }}>{fmtPrice(d.value, 0)}</td>
                       <td style={{ paddingBottom: 4, paddingRight: 12, textAlign: 'right', color: 'var(--muted)' }}>{pct.toFixed(1)}%</td>
                       {holding && (
                         <td style={{ paddingBottom: 4, textAlign: 'right', color: holding.pnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
@@ -246,13 +248,13 @@ export default function PortfolioPage() {
                 <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.company || '—'}</td>
                 <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{fmtMktCap(h.market_cap)}</td>
                 <td style={{ textAlign: 'right' }}>{fmt(h.total_qty, 0)}</td>
-                <td style={{ textAlign: 'right' }}>{fmt(h.avg_price)}</td>
-                <td style={{ textAlign: 'right' }}>${fmt(h.total_cost)}</td>
+                <td style={{ textAlign: 'right' }}>{fmtPrice(h.avg_price)}</td>
+                <td style={{ textAlign: 'right' }}>{fmtPrice(h.total_cost)}</td>
                 <td style={{ textAlign: 'right' }}>
-                  {h.livePrice != null ? fmt(h.livePrice) : <span style={{ color: 'var(--muted)', fontSize: 11 }}>—</span>}
+                  {h.livePrice != null ? fmtPrice(h.livePrice) : <span style={{ color: 'var(--muted)', fontSize: 11 }}>—</span>}
                 </td>
                 <td style={{ textAlign: 'right' }}>
-                  {h.currentValue != null ? `$${fmt(h.currentValue)}` : '—'}
+                  {h.currentValue != null ? fmtPrice(h.currentValue) : '—'}
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   {h.pnlPct != null

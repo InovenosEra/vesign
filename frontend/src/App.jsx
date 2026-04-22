@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import i18n from './i18n'
 import { setTokenGetter, getMarketStatus, getSignalsToday, getTrades, getOpenTrades, getWatchlists, getPortfolioHoldings, getPortfolioPerformance, getPortfolioComparison, getDataStatus } from './api'
 import { MarketContext, MarketProvider } from './context/MarketContext'
+import { CurrencyProvider, useCurrency } from './context/CurrencyContext'
 import SignalsPage from './pages/SignalsPage'
 import WatchlistPage from './pages/WatchlistPage'
 import TradesPage from './pages/TradesPage'
@@ -365,6 +366,26 @@ function UserMenu() {
 // ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
+function CurrencySelector() {
+  const { currency, setCurrency } = useCurrency()
+  return (
+    <select
+      value={currency}
+      onChange={e => setCurrency(e.target.value)}
+      aria-label="Currency"
+      style={{
+        fontSize: 12, padding: '4px 6px', borderRadius: 6,
+        border: '1px solid var(--border)', background: 'var(--surface)',
+        color: 'var(--text)', cursor: 'pointer',
+      }}
+    >
+      <option value="USD">$ USD</option>
+      <option value="EUR">€ EUR</option>
+      <option value="ILS">₪ ILS</option>
+    </select>
+  )
+}
+
 function Header() {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
@@ -394,9 +415,7 @@ function Header() {
           <span className="header-market-status-wrap"><MarketStatus /></span>
           {/* FlagSelector hidden — TASE disabled, US-only for now */}
           <span className="lang-switcher-header"><LanguageSwitcherDropdown /></span>
-          <span className="header-currency-wrap" style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', minWidth: 14, textAlign: 'center' }}>
-            {market === 'IL' ? '₪' : '$'}
-          </span>
+          <CurrencySelector />
           <UserMenu />
           <button
             className="hamburger"
@@ -522,26 +541,28 @@ function AppLayout() {
   return (
     <MarketProvider>
       <QueryClientProvider client={queryClient}>
-        <TokenSync onReady={() => setTokenReady(true)} />
-        {tokenReady && <Prefetcher />}
-        {tokenReady && <Header />}
-        {tokenReady && <StaleDataBanner />}
-        {tokenReady && (
-          <>
-            <main className="app-main">
-              <Routes>
-                <Route path="/" element={<SignalsPage />} />
-                <Route path="/portfolio" element={<WatchlistPage />} />
-                <Route path="/trades" element={<TradesPage />} />
-                <Route path="/research" element={<ResearchPage />} />
-                <Route path="/research/:ticker" element={<ResearchPage />} />
-                <Route path="/about" element={<AboutPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              </Routes>
-            </main>
-            <Footer />
-          </>
-        )}
+        <CurrencyProvider>
+          <TokenSync onReady={() => setTokenReady(true)} />
+          {tokenReady && <Prefetcher />}
+          {tokenReady && <Header />}
+          {tokenReady && <StaleDataBanner />}
+          {tokenReady && (
+            <>
+              <main className="app-main">
+                <Routes>
+                  <Route path="/" element={<SignalsPage />} />
+                  <Route path="/portfolio" element={<WatchlistPage />} />
+                  <Route path="/trades" element={<TradesPage />} />
+                  <Route path="/research" element={<ResearchPage />} />
+                  <Route path="/research/:ticker" element={<ResearchPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                </Routes>
+              </main>
+              <Footer />
+            </>
+          )}
+        </CurrencyProvider>
       </QueryClientProvider>
     </MarketProvider>
   )

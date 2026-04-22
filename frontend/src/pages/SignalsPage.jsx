@@ -6,6 +6,7 @@ import { MarketContext } from '../context/MarketContext'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
 import { usePersistedState } from '../hooks/usePersistedState'
+import { useCurrency } from '../context/CurrencyContext'
 import SignalModal from '../components/SignalModal'
 
 // ---------------------------------------------------------------------------
@@ -21,10 +22,11 @@ function fmt(n, decimals = 2) {
 // IL prices/targets are stored in agorot (×100). Divide by 100 for display in ₪.
 function isILTicker(ticker) { return ticker?.endsWith('.TA') ?? false }
 
-function fmtPrice(n, ticker) {
-  if (n == null) return '—'
-  const val = isILTicker(ticker) ? n / 100 : n
-  return fmt(val)
+function PriceCell({ value, ticker }) {
+  const { fmtPrice } = useCurrency()
+  if (value == null) return <>—</>
+  const v = isILTicker(ticker) ? value / 100 : value
+  return <>{fmtPrice(v)}</>
 }
 
 function fmtMktCap(n) {
@@ -86,6 +88,7 @@ function MLScoreCell({ score, className }) {
 
 function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const { t } = useTranslation()
+  const { fmtPrice } = useCurrency()
   const style = { whiteSpace: 'nowrap' }
   if (marketOpen === null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
   if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</td>
@@ -100,9 +103,9 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const arrow = diff >= 0 ? '▲' : '▼'
   return (
     <td style={style}>
-      <div>{fmt(displayLive)}</div>
+      <div>{fmtPrice(displayLive)}</div>
       <div className={cls} style={{ fontSize: 11 }}>
-        {arrow} {Math.abs(diff).toFixed(2)} ({Math.abs(pct).toFixed(2)}%)
+        {arrow} {fmtPrice(Math.abs(diff))} ({Math.abs(pct).toFixed(2)}%)
       </div>
     </td>
   )
@@ -169,7 +172,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
             <td><strong>{displayTicker(r.ticker)}</strong></td>
             <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
             <td>{fmtMktCap(r.market_cap)}</td>
-            <td>{fmtPrice(r.close, r.ticker)}</td>
+            <td><PriceCell value={r.close} ticker={r.ticker} /></td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
             <td className="col-hide-sm">{fmtPrice(r.target_low_price, r.ticker)}</td>
             <td>{fmtPrice(r.target_mean_price, r.ticker)}</td>
@@ -295,7 +298,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
                 <td>{fmtMktCap(r.market_cap, market)}</td>
                 <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}</span> : '—'}</td>
-                <td>{fmtPrice(r.close, market)}</td>
+                <td><PriceCell value={r.close} ticker={r.ticker} /></td>
                 <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
                 <td className="col-hide-sm">{fmtPrice(r.target_low_price, market)}</td>
                 <td>{fmtPrice(r.target_mean_price, market)}</td>

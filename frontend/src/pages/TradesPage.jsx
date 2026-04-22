@@ -10,6 +10,7 @@ import { useSort } from '../hooks/useSort'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { MarketContext } from '../context/MarketContext'
+import { useCurrency } from '../context/CurrencyContext'
 
 function fmt(n, decimals = 2) {
   return n != null
@@ -112,8 +113,8 @@ function PriceBoxLabel({ viewBox, value, color }) {
 function TradeModal({ row, start, end, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
+  const { fmtPrice } = useCurrency()
   const isIL      = row.ticker?.endsWith('.TA') ?? market === 'IL'
-  const currency  = isIL ? '₪' : '$'
   const priceScale = isIL ? 100 : 1
 
   const [descTab, setDescTab] = useState('info')
@@ -288,7 +289,7 @@ function TradeModal({ row, start, end, onClose }) {
                     [t('modal.industry'),      row.industry ?? '—'],
                     [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
                     [t('modal.currentSignal'), row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
-                    [t('modal.currentPrice'),  history12m.length > 0 ? fmt(history12m.at(-1).close / (isIL ? 100 : 1)) : '—'],
+                    [t('modal.currentPrice'),  history12m.length > 0 ? fmtPrice(history12m.at(-1).close / priceScale) : '—'],
                     [activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
                     ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
                     ...(row.unrealized_pct != null ? [[t('modal.yieldSinceBuy'), <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
@@ -390,8 +391,8 @@ function TradeModal({ row, start, end, onClose }) {
                 <YAxis
                   domain={[minPrice, maxPrice]}
                   tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                  tickFormatter={v => v.toFixed(0)}
-                  width={48}
+                  tickFormatter={v => fmtPrice(v, 0)}
+                  width={56}
                 />
                 <Tooltip
                   wrapperStyle={{ zIndex: 50 }}
@@ -419,7 +420,7 @@ function TradeModal({ row, start, end, onClose }) {
                         {sorted.map(p => (
                           <div key={p.dataKey}
                                style={{ fontWeight: p.dataKey === 'close' ? 700 : 400 }}>
-                            {labels[p.dataKey] || p.dataKey} : {p.value != null ? p.value.toFixed(2) : '—'}
+                            {labels[p.dataKey] || p.dataKey} : {p.value != null ? fmtPrice(p.value) : '—'}
                           </div>
                         ))}
                       </div>
@@ -444,11 +445,11 @@ function TradeModal({ row, start, end, onClose }) {
                     <g key={i}>
                       {buyX != null && <>
                         <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
-                        {trade.buy_price != null && priceBox(buyX, currency + fmt(trade.buy_price / priceScale, 1), 'var(--green)')}
+                        {trade.buy_price != null && priceBox(buyX, fmtPrice(trade.buy_price / priceScale, 1), 'var(--green)')}
                       </>}
                       {sellX != null && <>
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
-                        {trade.sell_price != null && priceBox(sellX, currency + fmt(trade.sell_price / priceScale, 1), 'var(--red)')}
+                        {trade.sell_price != null && priceBox(sellX, fmtPrice(trade.sell_price / priceScale, 1), 'var(--red)')}
                       </>}
                       {buyX != null && sellX != null && trade.buy_price != null && trade.sell_price != null && (() => {
                         const pct   = ((trade.sell_price - trade.buy_price) / trade.buy_price) * 100
@@ -523,6 +524,7 @@ function TradeModal({ row, start, end, onClose }) {
 
 function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
   const { t } = useTranslation()
+  const { fmtPrice } = useCurrency()
   const { sorted, sort, toggle } = useSort(data, 'buy_date', 'desc')
 
   const th = (label, col, className) => <Th label={label} col={col} sort={sort} onSort={toggle} className={className} />
@@ -577,8 +579,8 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     <td>{trade.company ?? '—'}</td>
                     <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{fmtDate(trade.buy_date)}</td>
-                    <td>{fmt(trade.buy_price)}</td>
-                    <td className="col-hide-sm">{fmt(trade.current_price)}</td>
+                    <td>{fmtPrice(trade.buy_price)}</td>
+                    <td className="col-hide-sm">{fmtPrice(trade.current_price)}</td>
                     <td>{trade.days_held ?? '—'}</td>
                     <td>
                       {!isOpen
@@ -586,8 +588,8 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                         : displayLive == null
                           ? <span style={{ color: 'var(--muted)' }}>—</span>
                           : <div>
-                              <div>{displayLive.toFixed(2)}</div>
-                              {diff != null && <div className={cls} style={{ fontSize: 11 }}>{arrow} {Math.abs(diff).toFixed(2)} ({Math.abs(pct).toFixed(2)}%)</div>}
+                              <div>{fmtPrice(displayLive)}</div>
+                              {diff != null && <div className={cls} style={{ fontSize: 11 }}>{arrow} {fmtPrice(Math.abs(diff))} ({Math.abs(pct).toFixed(2)}%)</div>}
                             </div>
                       }
                     </td>
@@ -620,6 +622,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
 export default function TradesPage() {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
+  const { fmtPrice } = useCurrency()
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
@@ -794,9 +797,9 @@ export default function TradesPage() {
                     <td>{trade.company ?? '—'}</td>
                     <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{fmtDate(trade.buy_date)}</td>
-                    <td>{fmt(trade.buy_price)}</td>
+                    <td>{fmtPrice(trade.buy_price)}</td>
                     <td>{fmtDate(trade.sell_date)}</td>
-                    <td>{fmt(trade.sell_price)}</td>
+                    <td>{fmtPrice(trade.sell_price)}</td>
                     <td className="col-hide-sm">{trade.days_held ?? '—'}</td>
                     <td className={trade.return_pct >= 0 ? 'up' : 'down'}>
                       {trade.return_pct >= 0 ? '+' : ''}{fmt(trade.return_pct)}%

@@ -550,6 +550,37 @@ def market_status(market: Optional[str] = None):
     return _market_info(_nyse_cal)
 
 
+_fx_cache = {"rates": None, "fetched_at": 0}
+_fx_cache_lock = threading.Lock()
+
+
+@protected.get("/api/fx/rates")
+def fx_rates():
+    """USD-base FX rates for the UI currency selector (USD / EUR / ILS).
+    Cached for 1 hour. Falls back to last cached / neutral rates on fetch error."""
+    with _fx_cache_lock:
+        now = time.time()
+        if _fx_cache["rates"] and now - _fx_cache["fetched_at"] < 3600:
+            return _fx_cache["rates"]
+        try:
+            r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=10)
+            data = r.json()
+            full = data.get("rates", {}) or {}
+            rates = {
+                "USD":     1.0,
+                "EUR":     float(full.get("EUR", 1.0)),
+                "ILS":     float(full.get("ILS", 1.0)),
+                "updated": data.get("time_last_update_utc", ""),
+            }
+            _fx_cache["rates"] = rates
+            _fx_cache["fetched_at"] = now
+            return rates
+        except Exception:
+            if _fx_cache["rates"]:
+                return _fx_cache["rates"]
+            return {"USD": 1.0, "EUR": 1.0, "ILS": 1.0, "updated": ""}
+
+
 @protected.get("/api/data/status")
 def data_status():
     """Freshness check for the stale-data banner.
