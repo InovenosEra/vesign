@@ -104,6 +104,15 @@ def _fetch_ta_index(url: str) -> pd.DataFrame:
     return companies
 
 
+# Tickers permanently excluded from the universe even if present in S&P indexes.
+# Reason kept inline so anyone reading load_universe() can see why.
+EXCLUDED_TICKERS = {
+    "HNI",  # 2026-04-23: 52/53-week fiscal calendar breaks _build_ttm_snapshot;
+            #  no historical health scores can be generated → BUY gate waived
+            #  inappropriately. Remove until fiscal-calendar parsing is fixed.
+}
+
+
 def load_universe():
     """Load the US ticker universe (S&P 500 + 400 + 600). TASE removed 2026-04-23."""
 
@@ -120,6 +129,14 @@ def load_universe():
     print(f"Loaded {len(sp600)} S&P 600 tickers")
 
     companies = pd.concat([sp500, sp400, sp600], ignore_index=True).drop_duplicates(subset=["ticker"])
+
+    if EXCLUDED_TICKERS:
+        before = len(companies)
+        companies = companies[~companies["ticker"].isin(EXCLUDED_TICKERS)]
+        excluded_n = before - len(companies)
+        if excluded_n:
+            print(f"Excluded {excluded_n} ticker(s) per EXCLUDED_TICKERS: "
+                  f"{sorted(EXCLUDED_TICKERS)}")
 
     EXTRA_COLS = ["industry", "description", "description_short"]
     try:
