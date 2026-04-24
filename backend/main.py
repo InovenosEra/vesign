@@ -357,7 +357,7 @@ def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Se
 
 _live_price_cache: dict = {}      # ticker -> price
 _live_price_cache_ts: float = 0.0 # last fetch timestamp
-_LIVE_CACHE_TTL = 60              # seconds
+_LIVE_CACHE_TTL = 5               # seconds — matches frontend polling cadence
 
 
 def fetch_live_prices(tickers: list[str]) -> dict:
