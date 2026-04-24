@@ -178,7 +178,13 @@ def _repair_analyst_targets():
             pass
         return None
 
+    # Circuit breaker: when Yahoo blocks the server (returns 401 'Invalid Crumb'),
+    # yfinance internal retries leak memory and have OOM-killed the pipeline twice
+    # (2026-04-22, 2026-04-24). If we see >=30 consecutive failures, abort the
+    # whole refresh — the FMP analyst data we already have is good enough.
     results = []
+    consec_fail = 0
+    aborted = False
     with ThreadPoolExecutor(max_workers=15) as ex:
         futures = {ex.submit(_fetch, t): t for t in tickers}
         done = 0
@@ -187,6 +193,17 @@ def _repair_analyst_targets():
             r = f.result()
             if r:
                 results.append(r)
+                consec_fail = 0
+            else:
+                consec_fail += 1
+                if consec_fail >= 30 and not aborted:
+                    print(f"  yfinance appears blocked ({consec_fail} consecutive "
+                          f"failures) — aborting refresh to avoid OOM. "
+                          f"Got {len(results)} ticker(s) before abort.")
+                    aborted = True
+                    for fut in list(futures):
+                        fut.cancel()
+                    break
             if done % 200 == 0:
                 print(f"  yfinance: {done}/{len(tickers)} done, {len(results)} with data")
 
