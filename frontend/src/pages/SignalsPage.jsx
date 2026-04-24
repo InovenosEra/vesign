@@ -90,11 +90,19 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const { t } = useTranslation()
   const { fmtPrice } = useCurrency()
   const style = { whiteSpace: 'nowrap' }
-  if (marketOpen === null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
+  const scale = isILTicker(ticker) ? 100 : 1
+  // While live prices are still loading on first paint, fall back to the
+  // close price so the table is visually complete instead of showing "—".
+  if (marketOpen === null) {
+    const displayClose = closePrice != null ? closePrice / scale : null
+    return <td style={{ ...style, color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</td>
+  }
   if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</td>
   const live = prices[ticker]
-  if (live == null) return <td style={{ ...style, color: 'var(--muted)' }}>—</td>
-  const scale = isILTicker(ticker) ? 100 : 1
+  if (live == null) {
+    const displayClose = closePrice != null ? closePrice / scale : null
+    return <td style={{ ...style, color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</td>
+  }
   const displayLive = live / scale
   const displayClose = closePrice / scale
   const diff  = displayLive - displayClose

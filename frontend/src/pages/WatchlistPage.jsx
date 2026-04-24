@@ -105,10 +105,17 @@ function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
   const isOpen = isIL
     ? (marketOpen !== false)   // TASE: open unless explicitly false
     : marketOpen
-  if (isOpen === null) return <td style={{ color: 'var(--muted)' }}>—</td>
+  // Show close as fallback during initial loading so the table renders complete.
+  if (isOpen === null) {
+    const displayClose = closePrice != null ? (isIL ? closePrice / 100 : closePrice) : null
+    return <td style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</td>
+  }
   if (!isOpen) return <td style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</td>
   const live = prices[ticker]
-  if (live == null) return <td style={{ color: 'var(--muted)' }}>—</td>
+  if (live == null) {
+    const displayClose = closePrice != null ? (isIL ? closePrice / 100 : closePrice) : null
+    return <td style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</td>
+  }
   const displayLive  = isIL ? live / 100 : live
   const displayClose = isIL ? closePrice / 100 : closePrice
   const diff = displayLive - displayClose

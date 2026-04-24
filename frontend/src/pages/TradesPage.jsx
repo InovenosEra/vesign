@@ -583,14 +583,16 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     <td className="col-hide-sm">{fmtPrice(trade.current_price)}</td>
                     <td>{trade.days_held ?? '—'}</td>
                     <td>
-                      {!isOpen
-                        ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</span>
-                        : displayLive == null
-                          ? <span style={{ color: 'var(--muted)' }}>—</span>
-                          : <div>
-                              <div>{fmtPrice(displayLive)}</div>
-                              {diff != null && <div className={cls} style={{ fontSize: 11 }}>{arrow} {fmtPrice(Math.abs(diff))} ({Math.abs(pct).toFixed(2)}%)</div>}
-                            </div>
+                      {marketOpen === null
+                        ? <span style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</span>
+                        : !isOpen
+                          ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</span>
+                          : displayLive == null
+                            ? <span style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</span>
+                            : <div>
+                                <div>{fmtPrice(displayLive)}</div>
+                                {diff != null && <div className={cls} style={{ fontSize: 11 }}>{arrow} {fmtPrice(Math.abs(diff))} ({Math.abs(pct).toFixed(2)}%)</div>}
+                              </div>
                       }
                     </td>
                     {(() => {
