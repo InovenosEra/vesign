@@ -343,23 +343,14 @@ def update_company_info():
                 target_high = consensus.get("targetHigh") or None
                 target_low  = consensus.get("targetLow") or None
 
-                # yfinance: fallback for targets, always used for analyst count (FMP doesn't provide it)
-                if target_mean is None:
-                    try:
-                        import yfinance as yf
-                        info = yf.Ticker(t).info or {}
-                        target_mean = info.get("targetMeanPrice") or None
-                        target_low  = info.get("targetLowPrice") or None
-                        target_high = info.get("targetHighPrice") or None
-                        n_analysts  = info.get("numberOfAnalystOpinions") or None
-                    except Exception:
-                        pass
-                else:
-                    try:
-                        import yfinance as yf
-                        n_analysts = (yf.Ticker(t).info or {}).get("numberOfAnalystOpinions") or None
-                    except Exception:
-                        pass
+                # yfinance disabled (2026-04-25): when Yahoo blocks the server IP it
+                # returns 401 'Invalid Crumb' and the internal retry loop leaks ~5MB
+                # per ticker — for ~1,500 US tickers that's ~7GB, which OOM-killed
+                # the daily pipeline on 2026-04-22, 2026-04-24, 2026-04-25.
+                # Trade-off: tickers where FMP has no analyst consensus stay null
+                # (~5% coverage gap), and we lose n_analysts entirely. Both are
+                # acceptable vs daily pipeline failure.
+                # If yfinance becomes reliable again, restore by reverting this block.
 
             return {
                 "ticker":             t,

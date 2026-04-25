@@ -135,13 +135,23 @@ def _repair_market_caps():
 
 
 def _repair_analyst_targets():
-    """Refresh analyst targets from yfinance in parallel (US + TASE).
+    """DISABLED 2026-04-25.
 
-    Runs for ALL tickers so that stale values from FMP's consensus endpoint
-    are overwritten with yfinance's more current data.
-    yfinance aggregates more analysts and updates more frequently than FMP.
-    After updating analyst_expectations, re-snapshots today's history row.
+    This function used yfinance to refresh analyst targets. When Yahoo blocks
+    the server IP (which it does periodically), the internal retry loop leaks
+    ~5MB per ticker and OOM-kills the entire daily pipeline. Three OOMs in
+    five days (2026-04-22, 2026-04-24, 2026-04-25) — costing prediction +
+    signals + trade_log generation each time.
+
+    FMP analyst data is good enough (~95% US coverage). Disabling this is
+    safer than the circuit-breaker patch I tried — too late after damage starts.
+
+    Re-enable only if yfinance becomes reliable again. To restore: git revert
+    the commit that introduced this stub.
     """
+    print("Analyst target refresh: DISABLED (yfinance OOM risk)")
+    return
+    # ---- legacy code below kept for reference, but unreachable ----
     import pandas as pd
     import sqlalchemy as sa
     from datetime import datetime, timezone
