@@ -40,23 +40,40 @@ def train_factor_weights(train_end_date=None):
     print("Training factor weights (per-sector XGBoost)..." if use_xgb
           else "Training rolling factor weights (multi-horizon)...")
 
-    features = pd.read_sql("SELECT * FROM features", engine)
-    fwd = pd.read_sql("SELECT date,ticker,fwd_5d,fwd_20d FROM forward_returns", engine)
+    # Memory: filter at SQL level. Loading the full features table (2.3M rows)
+    # OOM-killed the daily pipeline on a 2GB server (Apr 24-28 2026). Training
+    # only uses the last 730 days anyway — load 800 days for a small buffer.
+    if train_end_date is not None:
+        train_end_ts = pd.Timestamp(train_end_date)
+    else:
+        train_end_ts = pd.Timestamp.utcnow().normalize() + pd.Timedelta(days=1)
+    sql_start = (train_end_ts - pd.Timedelta(days=800)).strftime("%Y-%m-%d")
+    sql_end = train_end_ts.strftime("%Y-%m-%d")
+
+    features = pd.read_sql(
+        f"SELECT * FROM features WHERE date >= '{sql_start}' AND date < '{sql_end}'",
+        engine,
+    )
+    fwd = pd.read_sql(
+        f"SELECT date,ticker,fwd_5d,fwd_20d FROM forward_returns "
+        f"WHERE date >= '{sql_start}' AND date < '{sql_end}'",
+        engine,
+    )
 
     # Load sector info
     companies = pd.read_sql("SELECT ticker, sector FROM companies", engine)
 
     df = features.merge(fwd, on=["date", "ticker"]).dropna(subset=FEATURE_COLS + ["fwd_5d", "fwd_20d"])
+    del features, fwd
     df = df.merge(companies, on="ticker", how="left")
     df["date"] = pd.to_datetime(df["date"])
 
     if train_end_date is not None:
-        train_end_date = pd.Timestamp(train_end_date)
-        df = df[df["date"] < train_end_date]
-        print(f"Training on data before {train_end_date.date()} (out-of-sample guard)")
+        print(f"Training on data before {train_end_ts.date()} (out-of-sample guard)")
 
     cutoff = df["date"].max() - pd.Timedelta(days=730)
     train_df = df[df["date"] >= cutoff].copy()
+    del df
 
     X_all = train_df[FEATURE_COLS]
 
