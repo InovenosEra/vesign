@@ -758,6 +758,54 @@ def signals(
     }
 
 
+@protected.get("/api/signals/export.xlsx")
+def signals_export(
+    signal: Optional[str] = None,
+    search: Optional[str] = None,
+    months: int = Query(default=12, ge=1, le=120),
+    sort_by: str = Query(default="date"),
+    sort_dir: str = Query(default="desc"),
+):
+    """XLSX export of the Signals table — full per-ticker columns, all pages.
+
+    Mirrors the filter params of `/api/signals` but ignores pagination
+    (page/page_size) so the user gets every row that matches their filters.
+    """
+    from backend.exports import dataframe_to_xlsx_response
+
+    sort_col = sort_by if sort_by in {
+        "date", "ticker", "close", "rsi", "vesign_score", "score", "signal", "prediction_score",
+    } else "date"
+    sort_dir_sql = "ASC" if str(sort_dir).lower() == "asc" else "DESC"
+
+    where = ["s.date >= DATE('now', :months)", "s.ticker NOT LIKE '%.TA'"]
+    params: dict = {"months": f"-{months} months"}
+
+    if signal:
+        where.append("s.signal = :signal")
+        params["signal"] = signal.upper()
+    if search:
+        where.append("(s.ticker LIKE :q OR c.company LIKE :q)")
+        params["q"] = f"%{search}%"
+
+    sql = f"""
+        SELECT s.*,
+               c.company, c.sector, c.industry, c.logo_url,
+               f.market_cap
+        FROM signals s
+        LEFT JOIN companies c ON c.ticker = s.ticker
+        LEFT JOIN fundamentals f ON f.ticker = s.ticker
+        WHERE {' AND '.join(where)}
+        ORDER BY s.{sort_col} {sort_dir_sql}, s.ticker ASC
+    """
+
+    with engine.connect() as conn:
+        df = pd.read_sql(text(sql), conn, params=params)
+
+    today = datetime.now(UTC).date().isoformat()
+    return dataframe_to_xlsx_response(df, filename=f"signals_{today}", sheet_name="signals")
+
+
 @protected.get("/api/signals/by-tickers")
 def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ticker symbols")):
     """Latest signal row for each of the given tickers (used by watchlist)."""

@@ -6,6 +6,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import inspect
 import io
+import subprocess
+import time
+import urllib.error
+import urllib.request
 import pandas as pd
 from openpyxl import load_workbook
 
@@ -73,8 +77,50 @@ def test_pandas_sentinels_serialize_cleanly():
     print("test_pandas_sentinels_serialize_cleanly PASS")
 
 
+def _start_uvicorn():
+    """Boot uvicorn in the background for HTTP smoke tests."""
+    p = subprocess.Popen(
+        ["venv/bin/uvicorn", "backend.main:app", "--port", "8765"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    # Wait for /api/health to respond
+    for _ in range(60):
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8765/api/health", timeout=1) as r:
+                if r.status == 200:
+                    return p
+        except Exception:
+            time.sleep(0.5)
+    p.terminate()
+    raise RuntimeError("uvicorn did not start in 30s")
+
+
+def _http_get(path: str, token: str | None = None) -> tuple[int, bytes, dict]:
+    req = urllib.request.Request("http://127.0.0.1:8765" + path)
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status, r.read(), dict(r.headers)
+    except urllib.error.HTTPError as e:
+        return e.code, e.read(), dict(e.headers)
+
+
+def test_signals_export_requires_auth():
+    status, body, _ = _http_get("/api/signals/export.xlsx")
+    assert status == 401, f"expected 401 without token, got {status}: {body[:200]}"
+    print("test_signals_export_requires_auth PASS")
+
+
 if __name__ == "__main__":
     test_basic_workbook()
     test_pandas_sentinels_serialize_cleanly()
     test_empty_dataframe_still_emits_header()
     print("\nAll exports.py smoke tests passed.")
+
+    proc = _start_uvicorn()
+    try:
+        test_signals_export_requires_auth()
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
