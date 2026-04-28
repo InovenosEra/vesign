@@ -765,6 +765,7 @@ def signals_export(
     months: int = Query(default=12, ge=1, le=120),
     sort_by: str = Query(default="date"),
     sort_dir: str = Query(default="desc"),
+    market: Optional[str] = None,
 ):
     """XLSX export of the Signals table — full per-ticker columns, all pages.
 
@@ -773,20 +774,27 @@ def signals_export(
     """
     from backend.exports import dataframe_to_xlsx_response
 
-    sort_col = sort_by if sort_by in {
-        "date", "ticker", "close", "rsi", "vesign_score", "score", "signal", "prediction_score",
-    } else "date"
-    sort_dir_sql = "ASC" if str(sort_dir).lower() == "asc" else "DESC"
+    # Reuse the read endpoint's whitelist/translation so sort_by stays in sync.
+    _key = sort_by if sort_by in _SORTABLE else "date"
+    sort_col = _SORT_COL_SQL.get(_key, f"s.{_key}")
+    direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+    mkt = (market or "US").upper()
 
-    where = ["s.date >= DATE('now', :months)", "s.ticker NOT LIKE '%.TA'"]
-    params: dict = {"months": f"-{months} months"}
+    conditions = [
+        f"DATE(s.date) >= DATE('now', '-{months} months')",
+        "COALESCE(c.market, 'US') = :market",
+        "c.ticker NOT IN ('SPY')",
+    ]
+    params: dict = {"market": mkt}
 
     if signal:
-        where.append("s.signal = :signal")
+        conditions.append("s.signal = :signal")
         params["signal"] = signal.upper()
     if search:
-        where.append("(s.ticker LIKE :q OR c.company LIKE :q)")
-        params["q"] = f"%{search}%"
+        conditions.append("(LOWER(s.ticker) LIKE :search OR LOWER(c.company) LIKE :search)")
+        params["search"] = f"%{search.lower()}%"
+
+    where = "WHERE " + " AND ".join(conditions)
 
     sql = f"""
         SELECT s.*,
@@ -795,8 +803,8 @@ def signals_export(
         FROM signals s
         LEFT JOIN companies c ON c.ticker = s.ticker
         LEFT JOIN fundamentals f ON f.ticker = s.ticker
-        WHERE {' AND '.join(where)}
-        ORDER BY s.{sort_col} {sort_dir_sql}, s.ticker ASC
+        {where}
+        ORDER BY {sort_col} {direction}, s.ticker ASC
     """
 
     with engine.connect() as conn:
