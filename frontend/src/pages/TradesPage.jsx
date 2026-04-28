@@ -713,16 +713,6 @@ export default function TradesPage() {
             >{label}</button>
           ))}
         </span>
-        <span style={{ marginLeft: 'auto' }}>
-          <DownloadXLSXButton
-            url={`/api/trades/export.xlsx?${new URLSearchParams({
-              ...(start  ? { start }  : {}),
-              ...(end    ? { end }    : {}),
-              ...(market ? { market } : {}),
-            }).toString()}`}
-            filenameFallback="trades_closed"
-          />
-        </span>
       </div>
 
       {isLoading && <p className="loading">{t('table.loading')}</p>}
@@ -782,6 +772,14 @@ export default function TradesPage() {
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
+            <DownloadXLSXButton
+              url={`/api/trades/export.xlsx?${new URLSearchParams({
+                ...(start  ? { start }  : {}),
+                ...(end    ? { end }    : {}),
+                ...(market ? { market } : {}),
+              }).toString()}`}
+              filenameFallback="trades_closed"
+            />
           </span>
         </div>
         <div className="data-table-wrap">
@@ -838,15 +836,7 @@ export default function TradesPage() {
       )}
 
       {/* Open Trades */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 40 }}>
-        <p className="page-title" style={{ margin: 0 }}>{t('trades.openTitle')}</p>
-        <span style={{ marginLeft: 'auto' }}>
-          <DownloadXLSXButton
-            url={`/api/trades/open/export.xlsx${market ? `?market=${encodeURIComponent(market)}` : ''}`}
-            filenameFallback="trades_open"
-          />
-        </span>
-      </div>
+      <p className="page-title" style={{ marginTop: 40 }}>{t('trades.openTitle')}</p>
 
       {loadingOpen && <p className="loading">{t('table.loading')}</p>}
       {errorOpen && <p className="error">Error: {openError?.message}</p>}
@@ -897,6 +887,10 @@ export default function TradesPage() {
                   <option value={50}>50</option>
                   <option value={100}>100</option>
                 </select>
+                <DownloadXLSXButton
+                  url={`/api/trades/open/export.xlsx${market ? `?market=${encodeURIComponent(market)}` : ''}`}
+                  filenameFallback="trades_open"
+                />
               </span>
             </div>
             <OpenTradesTable data={filtered} search={openSearch} page={openPage} pageSize={openPageSize} setPage={setOpenPage} onSelect={setSelectedOpen} />
