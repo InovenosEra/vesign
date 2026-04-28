@@ -1567,6 +1567,33 @@ def open_trades(market: Optional[str] = None):
     return result
 
 
+@protected.get("/api/trades/open/export.xlsx")
+def open_trades_export(market: Optional[str] = None):
+    """XLSX of currently open positions (BUY with no subsequent SELL)."""
+    from backend.exports import dataframe_to_xlsx_response
+
+    mkt = (market or "US").upper()
+
+    rows = open_trades(market=mkt)            # returns list of dicts
+    df = pd.DataFrame(rows)
+
+    if not df.empty:
+        # Add company / sector / market_cap by joining in pandas to avoid
+        # touching the read endpoint's SQL.
+        with engine.connect() as conn:
+            extras = pd.read_sql(
+                text("""
+                    SELECT c.ticker, c.sector
+                    FROM companies c
+                """),
+                conn,
+            )
+        df = df.merge(extras, on="ticker", how="left")
+
+    today = datetime.now(UTC).date().isoformat()
+    return dataframe_to_xlsx_response(df, filename=f"trades_open_{today}", sheet_name="open_trades")
+
+
 # --- News & analyst endpoints -----------------------------------------------
 
 @protected.get("/api/news")
