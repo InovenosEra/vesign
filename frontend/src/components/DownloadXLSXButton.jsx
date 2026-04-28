@@ -50,7 +50,7 @@ export default function DownloadXLSXButton({ url, filenameFallback = 'export', l
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
     >
       <span aria-hidden="true">⬇</span>
-      <span>{busy ? 'Preparing…' : (err ? 'Retry XLSX' : 'XLSX')}</span>
+      <span>{busy ? 'Preparing…' : (err ? 'Retry' : 'Download')}</span>
     </button>
   )
 }
