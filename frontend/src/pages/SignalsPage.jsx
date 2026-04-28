@@ -436,12 +436,7 @@ export default function SignalsPage() {
       </div>
 
       <div className="section">
-        <p className="section-title">
-          {t('signals.allSignals')}
-          {allResult && <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 10 }}>
-            {t('signals.rows', { total: allResult.total.toLocaleString() })}
-          </span>}
-        </p>
+        <p className="section-title">{t('signals.allSignals')}</p>
         <div className="controls">
           <input
             placeholder={`🔍 ${t('table.search')}`}
