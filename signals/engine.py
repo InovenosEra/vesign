@@ -196,11 +196,16 @@ def _compute_vesign_score(row):
     return int(score)
 
 
-def run_scoring(target_date=None):
+def run_scoring(target_date=None, open_positions=None):
     """Run signal scoring.
 
     target_date: if provided (str 'YYYY-MM-DD'), score that specific date instead of
                  the latest date in the features table. Used for backfilling missing dates.
+    open_positions: optional pre-computed {ticker: (entry_price, buy_date)} dict.
+                 When provided, skips the SQL self-join on the (large, growing)
+                 signals table. The full backfill loop maintains this dict in
+                 memory across iterations — avoids repaying the lookup cost
+                 (~11s near end of history) on every call.
     """
     if target_date:
         print(f"Running hybrid scoring engine for {target_date}...")
@@ -221,7 +226,8 @@ def run_scoring(target_date=None):
 
     # ---------- Load open positions for trailing stop ----------
     # For backfill: only consider positions opened before target_date
-    open_positions = _get_open_positions(as_of_date=target_date)
+    if open_positions is None:
+        open_positions = _get_open_positions(as_of_date=target_date)
 
     # ---------- Load data ----------
     # Only the last 5 trading days are needed: the rolling conditions
