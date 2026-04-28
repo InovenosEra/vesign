@@ -47,18 +47,7 @@ export default function DownloadXLSXButton({ url, filenameFallback = 'export', l
       onClick={handleClick}
       disabled={busy}
       title={err ? `Failed: ${err}` : label}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '6px 10px',
-        borderRadius: 6,
-        border: '1px solid #d0d7de',
-        background: busy ? '#f3f4f6' : '#ffffff',
-        color: '#1f2937',
-        cursor: busy ? 'wait' : 'pointer',
-        fontSize: 13,
-      }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
     >
       <span aria-hidden="true">⬇</span>
       <span>{busy ? 'Preparing…' : (err ? 'Retry XLSX' : 'XLSX')}</span>
