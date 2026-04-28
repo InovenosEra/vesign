@@ -16,6 +16,7 @@ import { useSort } from '../hooks/useSort'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { useCurrency } from '../context/CurrencyContext'
 import SignalModal from '../components/SignalModal'
+import DownloadXLSXButton from '../components/DownloadXLSXButton'
 
 const _PIE_COLORS = [
   '#00d2ff', '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6',
@@ -700,6 +701,14 @@ export default function WatchlistPage() {
                   disabled={!newTicker || addMut.isPending}
                 >{t('watchlist.add')}</button>
                 {addMut.isError && <span className="error">{addMut.error.message}</span>}
+                {selectedId && (
+                  <div style={{ marginLeft: 'auto' }}>
+                    <DownloadXLSXButton
+                      url={`/api/watchlists/${selectedId}/export.xlsx`}
+                      filenameFallback="watchlist"
+                    />
+                  </div>
+                )}
               </div>
 
               {loadingTickers ? (
