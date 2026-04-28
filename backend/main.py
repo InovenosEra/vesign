@@ -1151,6 +1151,47 @@ def get_watchlist_tickers(list_id: int, user=Depends(get_current_user)):
     return _records(df)
 
 
+@protected.get("/api/watchlists/{list_id}/export.xlsx")
+def watchlist_export(list_id: int, user=Depends(get_current_user)):
+    """XLSX of the watchlist's tickers — one row per ticker, latest signals row + company refs."""
+    from backend.exports import dataframe_to_xlsx_response
+    import re
+
+    with engine.connect() as conn:
+        _assert_owns_list(conn, list_id, user["id"])
+        meta = conn.execute(
+            text("SELECT name FROM watchlist_lists WHERE id = :lid"),
+            {"lid": list_id},
+        ).fetchone()
+        watchlist_name = meta[0] if meta else f"list_{list_id}"
+
+        df = pd.read_sql(
+            text("""
+                WITH latest AS (
+                    SELECT ticker, MAX(date) AS d
+                    FROM signals
+                    WHERE ticker NOT LIKE '%.TA'
+                    GROUP BY ticker
+                )
+                SELECT s.*, c.company, c.sector, c.industry, c.logo_url, f.market_cap
+                FROM watchlist w
+                JOIN latest    ON latest.ticker = w.ticker
+                JOIN signals s ON s.ticker = latest.ticker AND s.date = latest.d
+                LEFT JOIN companies    c ON c.ticker = w.ticker
+                LEFT JOIN fundamentals f ON f.ticker = w.ticker
+                WHERE w.list_id = :lid
+                ORDER BY w.ticker ASC
+            """),
+            conn, params={"lid": list_id},
+        )
+
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", watchlist_name).strip("_") or f"list_{list_id}"
+    today = datetime.now(UTC).date().isoformat()
+    return dataframe_to_xlsx_response(
+        df, filename=f"watchlist_{safe}_{today}", sheet_name="watchlist",
+    )
+
+
 @protected.post("/api/watchlists/{list_id}/tickers", status_code=201)
 def add_ticker(list_id: int, body: TickerAdd, user=Depends(get_current_user)):
     ticker = body.ticker.strip().upper()

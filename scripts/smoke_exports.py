@@ -124,6 +124,12 @@ def test_open_trades_export_requires_auth():
     print("test_open_trades_export_requires_auth PASS")
 
 
+def test_watchlist_export_requires_auth():
+    status, body, _ = _http_get("/api/watchlists/1/export.xlsx")
+    assert status == 401, f"expected 401, got {status}: {body[:200]}"
+    print("test_watchlist_export_requires_auth PASS")
+
+
 if __name__ == "__main__":
     test_basic_workbook()
     test_pandas_sentinels_serialize_cleanly()
@@ -135,6 +141,7 @@ if __name__ == "__main__":
         test_signals_export_requires_auth()
         test_trades_export_requires_auth()
         test_open_trades_export_requires_auth()
+        test_watchlist_export_requires_auth()
     finally:
         proc.terminate()
         proc.wait(timeout=5)
