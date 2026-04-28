@@ -295,10 +295,21 @@ def run_scoring(target_date=None):
     df = df.merge(health, on="ticker", how="left")
 
     # ---------- ML prediction scores (loaded early — used as BUY gate) ----------
+    # Filter to the date range of df — loading the full 2.3M-row table per call
+    # made backfill take ~44s/date (predictions is ~50% of total runtime).
     if "predictions" in inspect(engine).get_table_names():
-        predictions = pd.read_sql(
-            "SELECT date, ticker, prediction_score FROM predictions", engine
-        )
+        if not df.empty:
+            date_min = df["date"].min()
+            date_max = df["date"].max()
+            predictions = pd.read_sql(
+                text(
+                    "SELECT date, ticker, prediction_score FROM predictions "
+                    "WHERE date >= :dmin AND date <= :dmax"
+                ),
+                engine, params={"dmin": str(date_min), "dmax": str(date_max)},
+            )
+        else:
+            predictions = pd.DataFrame(columns=["date", "ticker", "prediction_score"])
         df = df.merge(predictions, on=["date", "ticker"], how="left")
     else:
         df["prediction_score"] = float("nan")
