@@ -1741,6 +1741,38 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
     return result
 
 
+@protected.get("/api/portfolio/holdings/export.xlsx")
+def portfolio_holdings_export(
+    user=Depends(get_current_user),
+    market: str = Query(default="US"),
+):
+    """XLSX of aggregated portfolio holdings — same shape as /api/portfolio/holdings."""
+    from backend.exports import dataframe_to_xlsx_response
+
+    rows = portfolio_holdings(user=user, market=market)   # reuse existing function
+    df = pd.DataFrame(rows)
+
+    if not df.empty:
+        # Watchlists-per-ticker summary (comma-joined names) — useful for analysis.
+        with engine.connect() as conn:
+            wl = pd.read_sql(
+                text("""
+                    SELECT wh.ticker, GROUP_CONCAT(wll.name, ', ') AS watchlists
+                    FROM watchlist_holdings wh
+                    JOIN watchlist_lists wll ON wll.id = wh.watchlist_id
+                    WHERE wll.user_id = :uid
+                    GROUP BY wh.ticker
+                """),
+                conn, params={"uid": user["id"]},
+            )
+        df = df.merge(wl, on="ticker", how="left")
+
+    today = datetime.now(UTC).date().isoformat()
+    return dataframe_to_xlsx_response(
+        df, filename=f"portfolio_holdings_{today}", sheet_name="holdings",
+    )
+
+
 # --- Portfolio performance ---------------------------------------------------
 
 # Module-level cache for the Vesign simulator inputs. These are user-independent
