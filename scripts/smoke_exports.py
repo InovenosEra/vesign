@@ -112,6 +112,12 @@ def test_signals_export_requires_auth():
     print("test_signals_export_requires_auth PASS")
 
 
+def test_trades_export_requires_auth():
+    status, body, _ = _http_get("/api/trades/export.xlsx")
+    assert status == 401, f"expected 401, got {status}: {body[:200]}"
+    print("test_trades_export_requires_auth PASS")
+
+
 if __name__ == "__main__":
     test_basic_workbook()
     test_pandas_sentinels_serialize_cleanly()
@@ -121,6 +127,7 @@ if __name__ == "__main__":
     proc = _start_uvicorn()
     try:
         test_signals_export_requires_auth()
+        test_trades_export_requires_auth()
     finally:
         proc.terminate()
         proc.wait(timeout=5)

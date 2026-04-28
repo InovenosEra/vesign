@@ -1397,6 +1397,47 @@ def historical_trades(
     return list(ticker_trades.values())
 
 
+@protected.get("/api/trades/export.xlsx")
+def trades_export(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    market: Optional[str] = None,
+):
+    """XLSX export of closed trades — one row per trade, full columns + company refs."""
+    from backend.exports import dataframe_to_xlsx_response
+
+    mkt = (market or "US").upper()
+    where = ["1=1"]
+    params: dict = {}
+    if start:
+        where.append("tl.sell_date >= :start")
+        params["start"] = start
+    if end:
+        where.append("tl.sell_date <= :end")
+        params["end"] = end
+    if mkt == "US":
+        where.append("tl.ticker NOT LIKE '%.TA'")
+    elif mkt == "IL":
+        where.append("tl.ticker LIKE '%.TA'")
+
+    sql = f"""
+        SELECT tl.*,
+               c.company, c.sector, c.industry, c.logo_url,
+               f.market_cap
+        FROM trade_log tl
+        LEFT JOIN companies c    ON c.ticker = tl.ticker
+        LEFT JOIN fundamentals f ON f.ticker = tl.ticker
+        WHERE {' AND '.join(where)}
+        ORDER BY tl.sell_date DESC, tl.ticker ASC
+    """
+
+    with engine.connect() as conn:
+        df = pd.read_sql(text(sql), conn, params=params)
+
+    today = datetime.now(UTC).date().isoformat()
+    return dataframe_to_xlsx_response(df, filename=f"trades_closed_{today}", sheet_name="trades")
+
+
 @protected.get("/api/trades/open")
 def open_trades(market: Optional[str] = None):
     """Tickers with a BUY signal and no SELL since — currently open positions."""
