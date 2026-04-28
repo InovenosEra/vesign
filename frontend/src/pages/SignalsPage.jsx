@@ -8,6 +8,7 @@ import { useSort } from '../hooks/useSort'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { useCurrency } from '../context/CurrencyContext'
 import SignalModal from '../components/SignalModal'
+import DownloadXLSXButton from '../components/DownloadXLSXButton'
 
 // ---------------------------------------------------------------------------
 // Shared primitives
@@ -372,6 +373,14 @@ export default function SignalsPage() {
     refetchInterval: 120_000,
   })
 
+  const exportUrl = `/api/signals/export.xlsx?${new URLSearchParams({
+    ...(signalFilter && signalFilter !== 'ALL' ? { signal: signalFilter } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    months: 120,
+    sort_by: sortBy,
+    sort_dir: sortDir,
+  }).toString()}`
+
   const { data: allResult, isLoading: loadingAll } = useQuery({
     queryKey: ['signals', signalFilter, debouncedSearch, page, pageSize, sortBy, sortDir, market],
     queryFn: () => getSignals({
@@ -454,6 +463,7 @@ export default function SignalsPage() {
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
+            <DownloadXLSXButton url={exportUrl} filenameFallback="signals" />
           </span>
         </div>
         {loadingAll && !allResult
