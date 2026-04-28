@@ -292,11 +292,7 @@ def _validate_pipeline():
         )
         return sessions[-1].date() if len(sessions) > 0 else today - timedelta(days=1)
 
-    expected_us   = _last_closed("XNYS")
-    try:
-        expected_tase = _last_closed("TASE")
-    except Exception:
-        expected_tase = expected_us
+    expected_us = _last_closed("XNYS")
 
     def check(label, actual, expected):
         nonlocal passed
@@ -311,13 +307,6 @@ def _validate_pipeline():
         engine,
     ).iloc[0]
     check(f"US prices ({row['cnt']} tickers)", row["latest"], expected_us)
-
-    row = pd.read_sql(
-        "SELECT COUNT(DISTINCT ticker) AS cnt, DATE(MAX(date)) AS latest "
-        "FROM daily_prices WHERE ticker LIKE '%.TA'",
-        engine,
-    ).iloc[0]
-    check(f"TASE prices ({row['cnt']} tickers)", row["latest"], expected_tase)
 
     row = pd.read_sql("SELECT DATE(MAX(date)) AS latest FROM vix", engine).iloc[0]
     check("VIX", row["latest"], expected_us)
