@@ -7,6 +7,7 @@ import { useLivePrices } from '../hooks/useLivePrices'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { useCurrency } from '../context/CurrencyContext'
 import SignalModal from '../components/SignalModal'
+import DownloadXLSXButton from '../components/DownloadXLSXButton'
 
 const PIE_COLORS = [
   '#00d2ff', '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6',
@@ -219,6 +220,15 @@ export default function PortfolioPage() {
       </div>
 
       {/* Holdings table */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{t('portfolio.holdings', 'Holdings')}</span>
+        <div style={{ marginLeft: 'auto' }}>
+          <DownloadXLSXButton
+            url="/api/portfolio/holdings/export.xlsx"
+            filenameFallback="portfolio_holdings"
+          />
+        </div>
+      </div>
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 24, overflow: 'hidden' }}>
         <table className="signals-table" style={{ width: '100%' }}>
           <thead>
