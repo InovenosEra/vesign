@@ -14,7 +14,11 @@ XLSX_MEDIA_TYPE = (
 )
 
 
-def _write_dataframe_to_workbook(df: pd.DataFrame, sheet_name: str) -> Workbook:
+def _write_dataframe_to_workbook(
+    df: pd.DataFrame,
+    sheet_name: str,
+    column_formats: dict | None = None,
+) -> Workbook:
     wb = Workbook(write_only=False)
     ws = wb.active
     ws.title = sheet_name[:31]  # Excel sheet-name limit
@@ -30,6 +34,15 @@ def _write_dataframe_to_workbook(df: pd.DataFrame, sheet_name: str) -> Workbook:
     for col_idx, _ in enumerate(columns, start=1):
         ws.cell(row=1, column=col_idx).font = ws.cell(row=1, column=col_idx).font.copy(bold=True)
     ws.freeze_panes = "A2"
+
+    # Apply Excel number formats to data cells in named columns.
+    formats = column_formats or {}
+    for col_idx, col_name in enumerate(columns, start=1):
+        fmt = formats.get(col_name)
+        if not fmt:
+            continue
+        for row_idx in range(2, ws.max_row + 1):
+            ws.cell(row=row_idx, column=col_idx).number_format = fmt
 
     # Auto-size columns based on the header length (cheap heuristic that
     # avoids walking every row for large exports).
@@ -58,14 +71,19 @@ def dataframe_to_xlsx_response(
     df: pd.DataFrame,
     filename: str,
     sheet_name: str = "Sheet1",
+    column_formats: dict | None = None,
 ) -> StreamingResponse:
     """Build an XLSX from `df` and return it as a download attachment.
 
     `filename` should NOT include the .xlsx extension — it's added here.
     Empty DataFrames produce a header-only workbook (caller's intent: "no rows
     matched my filters" should not be a hard error).
+
+    `column_formats` optionally maps a column name to an Excel number-format
+    string applied to every data cell in that column (e.g. {"sell_date":
+    "dd/mm/yy", "return_pct": "0.00%"}).
     """
-    wb = _write_dataframe_to_workbook(df, sheet_name=sheet_name)
+    wb = _write_dataframe_to_workbook(df, sheet_name=sheet_name, column_formats=column_formats)
 
     buf = io.BytesIO()
     wb.save(buf)

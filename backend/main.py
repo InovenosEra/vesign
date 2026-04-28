@@ -1470,12 +1470,17 @@ def trades_export(
         where.append("tl.ticker LIKE '%.TA'")
 
     sql = f"""
-        SELECT tl.*,
-               c.company, c.sector, c.industry, c.logo_url,
-               f.market_cap
+        SELECT tl.ticker,
+               c.company,
+               c.sector,
+               c.industry,
+               tl.buy_date,
+               tl.buy_price,
+               tl.sell_date,
+               tl.sell_price,
+               tl.return_pct
         FROM trade_log tl
-        LEFT JOIN companies c    ON c.ticker = tl.ticker
-        LEFT JOIN fundamentals f ON f.ticker = tl.ticker
+        LEFT JOIN companies c ON c.ticker = tl.ticker
         WHERE {' AND '.join(where)}
         ORDER BY tl.sell_date DESC, tl.ticker ASC
     """
@@ -1483,8 +1488,23 @@ def trades_export(
     with engine.connect() as conn:
         df = pd.read_sql(text(sql), conn, params=params)
 
+    # Convert ISO-string dates to real datetimes so Excel applies the
+    # date number-format instead of treating them as text.
+    for col in ("buy_date", "sell_date"):
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
     today = datetime.now(UTC).date().isoformat()
-    return dataframe_to_xlsx_response(df, filename=f"trades_closed_{today}", sheet_name="trades")
+    return dataframe_to_xlsx_response(
+        df,
+        filename=f"trades_closed_{today}",
+        sheet_name="trades",
+        column_formats={
+            "buy_date":   "dd/mm/yy",
+            "sell_date":  "dd/mm/yy",
+            "return_pct": "0.00%",
+        },
+    )
 
 
 @protected.get("/api/trades/open")
