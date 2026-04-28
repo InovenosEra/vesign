@@ -25,6 +25,7 @@ MarkupSafe==3.0.3
 multitasking==0.0.12
 narwhals==2.16.0
 numpy==2.4.2
+openpyxl==3.1.5
 packaging==26.0
 pandas==2.3.3
 pandas_market_calendars==5.3.0
