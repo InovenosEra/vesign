@@ -327,6 +327,12 @@ def _validate_pipeline():
     return passed
 
 
+def _download_missing_logos():
+    """Fetch logo PNGs for any tickers that don't have an on-disk file yet."""
+    from production.download_logos import download_all
+    download_all(missing_only=True)
+
+
 def run_daily():
     import gc
 
@@ -369,6 +375,7 @@ def run_daily():
     # ── Remaining self-healing repairs ───────────────────────────────────────
     _repair_market_caps()
     _repair_analyst_targets()
+    _download_missing_logos()
 
 
 if __name__ == "__main__":
