@@ -13,3 +13,7 @@ __pycache__/
 .claude/
 db_backups/
 logs/
+
+# Self-hosted logos — actual PNGs are downloaded at deploy time, not committed
+static/logos/*
+!static/logos/.gitkeep
