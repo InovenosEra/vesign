@@ -2,7 +2,6 @@ import pandas as pd
 import requests
 from io import StringIO
 from data.loaders import engine
-from utils.logo_overrides import apply_logo_overrides
 
 
 def _fetch_index_table(url: str) -> pd.DataFrame:
@@ -193,6 +192,5 @@ def load_universe():
     except Exception as e:
         print(f"Could not add watchlist tickers to universe: {e}")
 
-    apply_logo_overrides(engine)
     print(f"Total universe: {len(tickers)} tickers (US-only)")
     return tickers

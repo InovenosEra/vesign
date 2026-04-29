@@ -1,10 +1,9 @@
-"""Manual logo URL overrides for tickers where FMP returns a placeholder or 404.
+"""Manual logo URL overrides for tickers where the primary CDN returns junk.
 
-Applied in two places:
-  1. utils/universe_loader.py — right after load_universe() rewrites companies
-     (so the daily pipeline never loses overrides even if company_info is throttled).
-  2. data/market_data.py update_company_info — defense in depth, re-applies after
-     FMP has had its turn to set logo_url from the profile endpoint.
+These URLs are tried FIRST by `data.logo_sources.from_override()` during the
+bulk-download phase. The downloader fetches the bytes from these URLs, saves
+them to static/logos/, and updates companies.logo_url to /logos/{T}.png — so
+no caller needs to apply this dict to the DB anymore.
 """
 
 LOGO_OVERRIDES = {
@@ -17,12 +16,3 @@ LOGO_OVERRIDES = {
     "OPLN": "https://img.logo.dev/ticker/OPLN?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
     "HTO":  "https://img.logo.dev/ticker/HTO?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
 }
-
-
-def apply_logo_overrides(engine):
-    """UPDATE companies.logo_url for each override. Safe to call repeatedly."""
-    from sqlalchemy import text
-    with engine.begin() as conn:
-        for ticker, url in LOGO_OVERRIDES.items():
-            conn.execute(text("UPDATE companies SET logo_url = :url WHERE ticker = :t"),
-                         {"url": url, "t": ticker})

@@ -14,10 +14,6 @@ from data import fmp
 # Batch size for backfilling large numbers of new tickers (avoids memory/timeout issues)
 _BACKFILL_BATCH = 200
 
-# Custom logo overrides moved to utils/logo_overrides.py so utils/universe_loader.py
-# can apply them too (keeps logos stable even when update_company_info is throttled).
-from utils.logo_overrides import LOGO_OVERRIDES
-
 
 def _build_ticker_df(raw, ticker, start_date, end_date, single=False):
     """
@@ -479,12 +475,6 @@ def update_company_info():
                     ), {"ind": row["industry"], "desc": row["description"],
                         "logo": row["logo_url"], "t": row["ticker"]})
         mark_run("fundamentals_update")
-
-    # Re-apply custom logo overrides (FMP placeholder images would otherwise overwrite them)
-    with engine.begin() as conn:
-        for ticker, url in LOGO_OVERRIDES.items():
-            conn.execute(text("UPDATE companies SET logo_url = :url WHERE ticker = :t"),
-                         {"url": url, "t": ticker})
 
     if needs_analyst:
         analyst_df = df[["ticker", "target_mean_price", "target_high_price",
