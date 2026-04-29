@@ -44,9 +44,9 @@ def _logo_path(ticker: str) -> str:
     return os.path.join(LOGO_DIR, f"{ticker}.png")
 
 
-def download_one(ticker: str, website: Optional[str]) -> tuple[str, Optional[str]]:
+def download_one(ticker: str, domain: Optional[str]) -> tuple[str, Optional[str]]:
     """Resolve and save a logo for one ticker. Return (ticker, source_used or None)."""
-    data, src = resolve(ticker, website)
+    data, src = resolve(ticker, domain)
     if data is None:
         return ticker, None
     _save_atomic(_logo_path(ticker), data)
@@ -60,7 +60,7 @@ def download_all(missing_only: bool = False, max_workers: int = 20) -> dict:
     Also updates companies.logo_url in the DB to '/logos/{T}.png' on success, NULL on failure.
     """
     os.makedirs(LOGO_DIR, exist_ok=True)
-    df = pd.read_sql("SELECT ticker, website FROM companies", engine)
+    df = pd.read_sql("SELECT ticker, domain FROM companies", engine)
 
     if missing_only:
         df = df[~df["ticker"].apply(lambda t: os.path.exists(_logo_path(t)))]
@@ -77,7 +77,7 @@ def download_all(missing_only: bool = False, max_workers: int = 20) -> dict:
 
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {
-            ex.submit(download_one, row["ticker"], row.get("website")): row["ticker"]
+            ex.submit(download_one, row["ticker"], row.get("domain")): row["ticker"]
             for _, row in df.iterrows()
         }
         for i, fut in enumerate(as_completed(futures), 1):
