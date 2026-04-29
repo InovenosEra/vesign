@@ -74,6 +74,14 @@ def _ensure_indexes():
 _ensure_indexes()
 
 
+# ---------------------------------------------------------------------------
+# Self-hosted company logos (served at /logos/{TICKER}.png)
+# ---------------------------------------------------------------------------
+_LOGO_DIR = os.path.join(_APP_ROOT, "static", "logos")
+if os.path.isdir(_LOGO_DIR):
+    app.mount("/logos", StaticFiles(directory=_LOGO_DIR), name="logos")
+
+
 AGREEMENT_TEXT = """TERMS OF USE AGREEMENT - VESIGN PLATFORM
 
 1. NOT FINANCIAL ADVICE
