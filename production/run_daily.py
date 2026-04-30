@@ -135,111 +135,83 @@ def _repair_market_caps():
 
 
 def _repair_analyst_targets():
-    """DISABLED 2026-04-25.
+    """yfinance fallback for tickers FMP missed during today's run.
 
-    This function used yfinance to refresh analyst targets. When Yahoo blocks
-    the server IP (which it does periodically), the internal retry loop leaks
-    ~5MB per ticker and OOM-kills the entire daily pipeline. Three OOMs in
-    five days (2026-04-22, 2026-04-24, 2026-04-25) — costing prediction +
-    signals + trade_log generation each time.
+    Targeted scope: only fetches tickers with NULL target_mean_price in
+    analyst_expectations (typically 50-150 tickers after FMP completes).
+    Single-threaded with sleeps — avoids the OOM that bulk concurrent
+    yfinance caused on 2026-04-22/24/25. Hard cap at 300 tickers and a
+    consecutive-failure circuit breaker as additional safety nets.
 
-    FMP analyst data is good enough (~95% US coverage). Disabling this is
-    safer than the circuit-breaker patch I tried — too late after damage starts.
-
-    Re-enable only if yfinance becomes reliable again. To restore: git revert
-    the commit that introduced this stub.
+    Updates analyst_expectations and re-stamps today's analyst_targets_history
+    snapshot so downstream signals join the recovered values.
     """
-    print("Analyst target refresh: DISABLED (yfinance OOM risk)")
-    return
-    # ---- legacy code below kept for reference, but unreachable ----
-    import pandas as pd
+    import time
     import sqlalchemy as sa
-    from datetime import datetime, timezone
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     import yfinance as yf
-    from data.market_data import snapshot_analyst_targets
+    from datetime import datetime, timezone
 
-    # Skip TASE — yfinance retries on delisted .TA tickers burn memory and
-    # produced OOM kills. We're US-only in production.
-    df = pd.read_sql(
-        "SELECT ticker FROM analyst_expectations WHERE ticker NOT LIKE '%.TA'",
-        engine,
-    )
-    tickers = df["ticker"].tolist()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with engine.begin() as conn:
+        rows = conn.execute(sa.text(
+            "SELECT ticker FROM analyst_expectations "
+            "WHERE target_mean_price IS NULL AND ticker NOT LIKE '%.TA' "
+            "LIMIT 300"
+        )).fetchall()
+    tickers = [r[0] for r in rows]
+
     if not tickers:
-        print("Analyst target refresh: no tickers found.")
+        print("Analyst target refresh: no gaps to repair.")
         return
 
-    print(f"Analyst target refresh: {len(tickers)} tickers via yfinance…")
+    print(f"Analyst target refresh (yfinance, gap-only): {len(tickers)} tickers")
 
-    def _fetch(t):
+    fixed = 0
+    no_data = 0
+    consec_fail = 0
+    now = datetime.now(timezone.utc)
+
+    for i, t in enumerate(tickers, 1):
         try:
             info = yf.Ticker(t).info or {}
-            mean = info.get("targetMeanPrice") or None
-            if mean:
-                return {
-                    "ticker": t,
-                    "mean": mean,
-                    "low":  info.get("targetLowPrice") or None,
-                    "high": info.get("targetHighPrice") or None,
-                    "n":    info.get("numberOfAnalystOpinions") or None,
-                }
-        except Exception:
-            pass
-        return None
-
-    # Circuit breaker: when Yahoo blocks the server (returns 401 'Invalid Crumb'),
-    # yfinance internal retries leak memory and have OOM-killed the pipeline twice
-    # (2026-04-22, 2026-04-24). If we see >=30 consecutive failures, abort the
-    # whole refresh — the FMP analyst data we already have is good enough.
-    results = []
-    consec_fail = 0
-    aborted = False
-    with ThreadPoolExecutor(max_workers=15) as ex:
-        futures = {ex.submit(_fetch, t): t for t in tickers}
-        done = 0
-        for f in as_completed(futures):
-            done += 1
-            r = f.result()
-            if r:
-                results.append(r)
-                consec_fail = 0
-            else:
+            mean = info.get("targetMeanPrice")
+            if not mean:
+                no_data += 1
                 consec_fail += 1
-                if consec_fail >= 30 and not aborted:
-                    print(f"  yfinance appears blocked ({consec_fail} consecutive "
-                          f"failures) — aborting refresh to avoid OOM. "
-                          f"Got {len(results)} ticker(s) before abort.")
-                    aborted = True
-                    for fut in list(futures):
-                        fut.cancel()
+                if consec_fail >= 30:
+                    print(f"  yfinance appears blocked ({consec_fail} consecutive misses) — aborting at {i}/{len(tickers)}")
                     break
-            if done % 200 == 0:
-                print(f"  yfinance: {done}/{len(tickers)} done, {len(results)} with data")
-
-    if not results:
-        print("Analyst target refresh: no data returned from yfinance.")
-        return
-
-    now = datetime.now(timezone.utc)
-    with engine.begin() as conn:
-        for r in results:
-            conn.execute(
-                sa.text(
+                time.sleep(0.4)
+                continue
+            consec_fail = 0
+            low = info.get("targetLowPrice")
+            high = info.get("targetHighPrice")
+            n = info.get("numberOfAnalystOpinions")
+            with engine.begin() as conn:
+                conn.execute(sa.text(
                     "UPDATE analyst_expectations SET "
-                    "target_mean_price=:mean, target_low_price=:low, "
-                    "target_high_price=:high, number_of_analysts=:n, last_update=:ts "
-                    "WHERE ticker=:t"
-                ),
-                {"mean": r["mean"], "low": r["low"], "high": r["high"],
-                 "n": r["n"], "ts": now, "t": r["ticker"]},
-            )
+                    "target_mean_price=:m, target_low_price=:l, target_high_price=:h, "
+                    "number_of_analysts=:n, last_update=:ts WHERE ticker=:t"
+                ), {"m": mean, "l": low, "h": high, "n": n, "ts": now, "t": t})
+                conn.execute(sa.text(
+                    "DELETE FROM analyst_targets_history WHERE date=:d AND ticker=:t"
+                ), {"d": today_str, "t": t})
+                conn.execute(sa.text(
+                    "INSERT INTO analyst_targets_history "
+                    "(date, ticker, target_mean_price, target_high_price, target_low_price, number_of_analysts) "
+                    "VALUES (:d, :t, :m, :h, :l, :n)"
+                ), {"d": today_str, "t": t, "m": mean, "h": high, "l": low, "n": n})
+            fixed += 1
+        except Exception as e:
+            consec_fail += 1
+            if consec_fail >= 30:
+                print(f"  yfinance errors ({consec_fail} consecutive) — aborting at {i}/{len(tickers)}: {e}")
+                break
+        time.sleep(0.4)
+        if i % 25 == 0:
+            print(f"  yfinance: {i}/{len(tickers)} done, fixed={fixed}, no_data={no_data}")
 
-    print(f"Analyst target refresh done: {len(results)}/{len(tickers)} updated.")
-
-    # Re-snapshot so analyst_targets_history reflects the corrected yfinance values
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    snapshot_analyst_targets(today_str)
+    print(f"Analyst target refresh done: {fixed}/{len(tickers)} recovered, {no_data} no data.")
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -345,6 +317,9 @@ def run_daily():
     update_company_info()
     gc.collect()
 
+    _repair_analyst_targets()
+    gc.collect()
+
     summarize_descriptions()
     gc.collect()
 
@@ -374,7 +349,6 @@ def run_daily():
 
     # ── Remaining self-healing repairs ───────────────────────────────────────
     _repair_market_caps()
-    _repair_analyst_targets()
     _download_missing_logos()
 
 
