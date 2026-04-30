@@ -770,30 +770,27 @@ def signals(
 def signals_export(
     signal: Optional[str] = None,
     search: Optional[str] = None,
-    months: int = Query(default=12, ge=1, le=24),
     sort_by: str = Query(default="date"),
     sort_dir: str = Query(default="desc"),
     market: Optional[str] = None,
 ):
-    """XLSX export of the Signals table — full per-ticker columns, all pages.
+    """XLSX export of the Signals table — full per-ticker columns, all history.
 
-    Mirrors the filter params of `/api/signals` but ignores pagination
-    (page/page_size) so the user gets every row that matches their filters.
-
-    Capped at 24 months: at ALL filter that's ~750K rows × 40 cols, which is
-    near the practical limit of an in-memory pandas → openpyxl roundtrip on
-    the 4GB server. URL-tampered larger windows return 422.
+    Mirrors the signal/search/sort filters of `/api/signals` but ignores
+    pagination so the user gets every row that matches. No date scope (the
+    page itself has none); a hard LIMIT 200000 caps the worst case so the
+    server doesn't spend forever streaming HOLDs nobody reads.
     """
     from backend.exports import cursor_to_xlsx_response
 
-    # Reuse the read endpoint's whitelist/translation so sort_by stays in sync.
+    EXPORT_ROW_LIMIT = 200_000
+
     _key = sort_by if sort_by in _SORTABLE else "date"
     sort_col = _SORT_COL_SQL.get(_key, f"s.{_key}")
     direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
     mkt = (market or "US").upper()
 
     conditions = [
-        f"DATE(s.date) >= DATE('now', '-{months} months')",
         "COALESCE(c.market, 'US') = :market",
         "c.ticker NOT IN ('SPY')",
     ]
@@ -817,6 +814,7 @@ def signals_export(
         LEFT JOIN fundamentals f ON f.ticker = s.ticker
         {where}
         ORDER BY {sort_col} {direction}, s.ticker ASC
+        LIMIT {EXPORT_ROW_LIMIT}
     """)
 
     today = datetime.now(UTC).date().isoformat()

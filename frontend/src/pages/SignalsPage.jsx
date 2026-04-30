@@ -376,7 +376,6 @@ export default function SignalsPage() {
   const exportUrl = `/api/signals/export.xlsx?${new URLSearchParams({
     ...(signalFilter && signalFilter !== 'ALL' ? { signal: signalFilter } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
-    months: 12,
     sort_by: sortBy,
     sort_dir: sortDir,
   }).toString()}`
