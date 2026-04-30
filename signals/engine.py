@@ -155,13 +155,9 @@ def _compute_vesign_score(row):
         score += 3
 
     # --- Analyst upside (0–15) ---
-    ticker = row.get("ticker") if isinstance(row, dict) else row["ticker"]
-    is_tase = isinstance(ticker, str) and ticker.endswith(".TA")
     target = row.get("target_mean_price") if isinstance(row, dict) else row["target_mean_price"]
     upside = row.get("fair_value_upside") if isinstance(row, dict) else row["fair_value_upside"]
-    if is_tase or _isna(target):
-        score += 8
-    elif _isna(upside):
+    if _isna(target) or _isna(upside):
         score += 8
     elif float(upside) >= 0.60:
         score += 15
@@ -325,10 +321,8 @@ def run_scoring(target_date=None, open_positions=None):
         df["target_mean_price"] - df["close"]
     ) / df["close"]
 
-    # IL stocks with no analyst target pass through (rule waived — no free source covers them)
-    il_no_target = df["ticker"].str.endswith(".TA") & df["target_mean_price"].isna()
     df["analyst_condition"] = (
-        (df["fair_value_upside"] >= config.get("analyst_upside_min", 0.30)) | il_no_target
+        df["fair_value_upside"] >= config.get("analyst_upside_min", 0.30)
     )
 
     # ---------- Bollinger condition ----------
@@ -366,22 +360,14 @@ def run_scoring(target_date=None, open_positions=None):
     )
 
     # ---------- Health score gate ----------
-    # Pass through if no score. IL uses a lower threshold (Israeli market norms differ from US).
-    health_min    = config.get("health_score_min",    3)
-    health_min_il = config.get("health_score_min_il", 2)
-    df["health_condition"] = (
-        (df["ticker"].str.endswith(".TA")  & ((df["health_score"] >= health_min_il) | df["health_score"].isna()))
-        | (~df["ticker"].str.endswith(".TA") & ((df["health_score"] >= health_min)    | df["health_score"].isna()))
-    )
+    # Pass through if no score (new ticker without history yet).
+    health_min = config.get("health_score_min", 3)
+    df["health_condition"] = (df["health_score"] >= health_min) | df["health_score"].isna()
 
     # ---------- ML score gate ----------
-    # Waived for IL tickers (no ML model for TASE) and NULL scores (new tickers)
+    # Waived for NULL scores (new tickers without enough history for the per-sector model).
     ml_min = config.get("ml_score_min", 0.05)
-    df["ml_condition"] = (
-        (df["prediction_score"] >= ml_min)
-        | df["ticker"].str.endswith(".TA")
-        | df["prediction_score"].isna()
-    )
+    df["ml_condition"] = (df["prediction_score"] >= ml_min) | df["prediction_score"].isna()
 
     # ---------- Filter to today before signal assignment ----------
     # Rolling windows already computed above using full history.
@@ -427,13 +413,12 @@ def run_scoring(target_date=None, open_positions=None):
         already_open = today_df["ticker"].isin(open_positions.keys())
         buy_cond = buy_cond & ~already_open
 
-    # MASTER gate: SELL requires ML prediction to be negative (or waived: NULL / TASE).
-    # Applies to trailing stop and RSI>=70. Time-based exit (365 days profitable)
-    # bypasses the ML gate — it's an unconditional rule.
+    # MASTER gate: SELL requires ML prediction to be negative (or NULL — waived for
+    # new tickers). Applies to trailing stop and RSI>=70. Time-based exit (365 days
+    # profitable) bypasses the ML gate — it's an unconditional rule.
     ml_negative = (
         (today_df["prediction_score"] < 0)
         | today_df["prediction_score"].isna()
-        | today_df["ticker"].str.endswith(".TA")
     )
     sell_cond = ((stop_hit | (today_df["rsi"] >= 70)) & ml_negative) | time_exit
 

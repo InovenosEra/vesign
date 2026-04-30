@@ -27,8 +27,8 @@ def build_trade_log():
     merged = merged.sort_values(["ticker", "date"])
 
     def _ml_allows_sell(pred, ticker):
-        # Waived for TASE and when prediction is missing
-        if pred is None or pd.isna(pred) or ticker.endswith(".TA"):
+        # Waived when prediction is missing (new ticker without enough history).
+        if pred is None or pd.isna(pred):
             return True
         return pred < 0
 

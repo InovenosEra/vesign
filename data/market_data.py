@@ -15,121 +15,34 @@ from data import fmp
 _BACKFILL_BATCH = 200
 
 
-def _build_ticker_df(raw, ticker, start_date, end_date, single=False):
-    """
-    Extract and clean one ticker's DataFrame from a yfinance download result.
-    Returns a clean DataFrame or None if the ticker had no usable data.
-    """
-    try:
-        df = raw.copy() if single else raw[ticker].copy()
-    except (KeyError, TypeError):
-        return None
-
-    if df is None or df.empty:
-        return None
-
-    # Flatten MultiIndex columns (yfinance returns these for single-ticker downloads too)
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [col[0] for col in df.columns]
-
-    df = df.reset_index()
-    df["ticker"] = ticker
-    df.rename(columns={
-        "Date": "date", "Open": "open", "High": "high",
-        "Low": "low", "Close": "close", "Volume": "volume",
-    }, inplace=True)
-
-    today_ts = pd.Timestamp(datetime.now(UTC).date())
-    df = df[df["date"] < today_ts]
-
-    # Keep only the standard columns that exist
-    keep = [c for c in ("date", "ticker", "open", "high", "low", "close", "volume") if c in df.columns]
-    df = df[keep]
-
-    # Drop rows with no close price — these are non-trading days or incomplete data
-    # that would corrupt feature computation downstream.
-    if "close" in df.columns:
-        df = df[df["close"].notna()]
-
-    return df if not df.empty else None
-
-
 def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0):
     """
-    Download price data for *tickers* between *start_date* and *end_date*,
-    then upsert into daily_prices.
+    Download price data for *tickers* between *start_date* and *end_date*
+    via FMP (parallel, one request per ticker), then upsert into daily_prices.
 
-    US tickers: fetched from FMP (parallel, one request per ticker).
-    TASE tickers (.TA suffix): fetched from yfinance (existing logic).
-    batch_size only applies to TASE batches (ignored for US).
+    `batch_size` is unused — kept for API compatibility with old callers.
     """
     if not tickers:
         return
 
-    us_tickers   = [t for t in tickers if not t.endswith('.TA')]
-    tase_tickers = [t for t in tickers if t.endswith('.TA')]
-
     all_frames = []
     today_ts   = pd.Timestamp(datetime.now(UTC).date())
 
-    # ── US path: FMP parallel fetch ──────────────────────────────────────────
-    if us_tickers:
-        def _fetch_us(ticker):
-            return fmp.historical_prices(ticker, start_date, end_date)
+    def _fetch_us(ticker):
+        return fmp.historical_prices(ticker, start_date, end_date)
 
-        with ThreadPoolExecutor(max_workers=10) as ex:
-            futures = {ex.submit(_fetch_us, t): t for t in us_tickers}
-            done = 0
-            for f in as_completed(futures):
-                done += 1
-                df = f.result()
-                if df is not None and not df.empty:
-                    df = df[df["date"] < today_ts]
-                    if not df.empty:
-                        all_frames.append(df)
-                if done % 200 == 0:
-                    print(f"  FMP: {done}/{len(us_tickers)} US tickers fetched")
-
-    # ── TASE path: existing yfinance batch logic ──────────────────────────────
-    if tase_tickers:
-        batches = (
-            [tase_tickers[i:i + batch_size] for i in range(0, len(tase_tickers), batch_size)]
-            if batch_size > 0
-            else [tase_tickers]
-        )
-
-        for b_idx, batch in enumerate(batches):
-            if len(batches) > 1:
-                print(f"  TASE Batch {b_idx + 1}/{len(batches)} ({len(batch)} tickers)…")
-
-            query = batch[0] if len(batch) == 1 else batch
-            try:
-                data = yf.download(
-                    query,
-                    start=start_date,
-                    end=end_date,
-                    group_by="ticker",
-                    auto_adjust=False,
-                    progress=len(batches) == 1,
-                )
-            except Exception as e:
-                print(f"  TASE batch download failed: {e}")
-                continue
-
-            single = len(batch) == 1
-            for ticker in batch:
-                df = _build_ticker_df(data, ticker, start_date, end_date, single=single)
-                if df is None and not single:
-                    try:
-                        retry = yf.download(
-                            ticker, start=start_date, end=end_date,
-                            auto_adjust=False, progress=False,
-                        )
-                        df = _build_ticker_df(retry, ticker, start_date, end_date, single=True)
-                    except Exception:
-                        pass
-                if df is not None and not df.empty:
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(_fetch_us, t): t for t in tickers}
+        done = 0
+        for f in as_completed(futures):
+            done += 1
+            df = f.result()
+            if df is not None and not df.empty:
+                df = df[df["date"] < today_ts]
+                if not df.empty:
                     all_frames.append(df)
+            if done % 200 == 0:
+                print(f"  FMP: {done}/{len(tickers)} tickers fetched")
 
     if not all_frames:
         print("  No data downloaded.")
@@ -305,10 +218,7 @@ def snapshot_analyst_targets(date_str: str) -> None:
 
 
 def update_company_info():
-    """Fetch fundamentals + analyst targets in a single parallel pass.
-    US tickers: FMP (company_profile + price_target_consensus).
-    TASE tickers: yfinance .info (unchanged).
-    """
+    """Fetch fundamentals + analyst targets in a single parallel FMP pass."""
 
     needs_fundamentals = should_run("fundamentals_update", 168)   # weekly
     needs_analyst      = should_run("analyst_update", 24)         # daily
@@ -318,17 +228,13 @@ def update_company_info():
 
     print("Updating company info (fundamentals + analyst)...")
 
-    tickers      = pd.read_sql("SELECT ticker FROM companies", engine)["ticker"].tolist()
-    us_tickers   = [t for t in tickers if not t.endswith('.TA')]
-    tase_tickers = [t for t in tickers if t.endswith('.TA')]
-    now          = datetime.now(UTC)
+    tickers = pd.read_sql("SELECT ticker FROM companies", engine)["ticker"].tolist()
+    now     = datetime.now(UTC)
 
     rows = []
 
-    # ── US path: FMP ──────────────────────────────────────────────────────────
     def _fetch_us(t):
         try:
-            # Only fetch company profile when fundamentals need updating
             profile = fmp.company_profile(t) if needs_fundamentals else {}
             profile = profile or {}
 
@@ -338,15 +244,6 @@ def update_company_info():
                 target_mean = consensus.get("targetConsensus") or None
                 target_high = consensus.get("targetHigh") or None
                 target_low  = consensus.get("targetLow") or None
-
-                # yfinance disabled (2026-04-25): when Yahoo blocks the server IP it
-                # returns 401 'Invalid Crumb' and the internal retry loop leaks ~5MB
-                # per ticker — for ~1,500 US tickers that's ~7GB, which OOM-killed
-                # the daily pipeline on 2026-04-22, 2026-04-24, 2026-04-25.
-                # Trade-off: tickers where FMP has no analyst consensus stay null
-                # (~5% coverage gap), and we lose n_analysts entirely. Both are
-                # acceptable vs daily pipeline failure.
-                # If yfinance becomes reliable again, restore by reverting this block.
 
             return {
                 "ticker":             t,
@@ -363,86 +260,16 @@ def update_company_info():
         except Exception:
             return None
 
-    if us_tickers:
-        with ThreadPoolExecutor(max_workers=10) as ex:
-            futures = {ex.submit(_fetch_us, t): t for t in us_tickers}
-            done = 0
-            for f in as_completed(futures):
-                done += 1
-                result = f.result()
-                if result:
-                    rows.append(result)
-                if done % 200 == 0:
-                    print(f"  FMP: {done}/{len(us_tickers)} US done, {len(rows)} fetched")
-
-    # ── TASE path: yfinance + FMP fallback for dual-listed tickers ────────────
-    # Get USD/ILS rate once for converting FMP USD targets to agorot
-    try:
-        _usd_ils = yf.Ticker("ILS=X").fast_info.last_price or 3.6
-    except Exception:
-        _usd_ils = 3.6
-
-    # Pre-fetch FMP consensus sequentially (avoids rate-limit errors from parallel calls)
-    import time as _time
-    _fmp_targets: dict = {}
-    if needs_analyst and tase_tickers:
-        print(f"  Fetching FMP consensus for {len(tase_tickers)} TASE tickers...")
-        scale = _usd_ils * 100  # USD → agorot
-        for _t in tase_tickers:
-            try:
-                c = fmp.price_target_consensus(_t.replace(".TA", ""))
-                if c and c.get("targetConsensus"):
-                    _fmp_targets[_t] = {
-                        "target_mean_price": c["targetConsensus"] * scale,
-                        "target_low_price":  c.get("targetLow",  c["targetConsensus"]) * scale,
-                        "target_high_price": c.get("targetHigh", c["targetConsensus"]) * scale,
-                    }
-            except Exception:
-                pass
-            _time.sleep(0.15)
-        print(f"  FMP TASE coverage: {len(_fmp_targets)}/{len(tase_tickers)}")
-
-    def _fetch_tase(t):
-        try:
-            info = yf.Ticker(t).info
-            if t in _fmp_targets:
-                targets = _fmp_targets[t]
-            else:
-                targets = {
-                    "target_mean_price":  info.get("targetMeanPrice"),
-                    "target_low_price":   info.get("targetLowPrice"),
-                    "target_high_price":  info.get("targetHighPrice"),
-                }
-            return {
-                "ticker":             t,
-                "market_cap":         info.get("marketCap"),
-                "industry":           info.get("industry"),
-                "description":        info.get("longBusinessSummary"),
-                "logo_url":           None,
-                **targets,
-                "number_of_analysts": info.get("numberOfAnalystOpinions"),
-                "last_update":        now,
-            }
-        except Exception:
-            return None
-
-    if tase_tickers:
-        # Warm up yfinance session (crumb) before threading
-        try:
-            yf.Ticker(tase_tickers[0]).info
-        except Exception:
-            pass
-
-        with ThreadPoolExecutor(max_workers=3) as ex:
-            futures = {ex.submit(_fetch_tase, t): t for t in tase_tickers}
-            done = 0
-            for f in as_completed(futures):
-                done += 1
-                result = f.result()
-                if result:
-                    rows.append(result)
-                if done % 200 == 0:
-                    print(f"  yfinance: {done}/{len(tase_tickers)} TASE done")
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(_fetch_us, t): t for t in tickers}
+        done = 0
+        for f in as_completed(futures):
+            done += 1
+            result = f.result()
+            if result:
+                rows.append(result)
+            if done % 200 == 0:
+                print(f"  FMP: {done}/{len(tickers)} done, {len(rows)} fetched")
 
     if not rows:
         print("No company info downloaded")
@@ -513,8 +340,7 @@ def update_company_info():
 
 
 def update_company_health():
-    """Score company financial health (1-5) via Claude Haiku.
-    US tickers: FMP fundamentals + news. TASE tickers: yfinance (unchanged).
+    """Score company financial health (1-5) via Claude Sonnet from FMP data.
     Runs weekly; only re-scores tickers whose score is missing or older than 7 days.
     """
     import json as _json
@@ -576,39 +402,7 @@ def update_company_health():
         "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
     )
 
-    _SYSTEM_IL = (
-        "You are a strict financial analyst rating company health on a FULL 1-5 scale. "
-        "Use the ENTIRE range — do NOT cluster scores around 2-3.\n\n"
-        "You are evaluating Israeli (TASE) companies. Apply these market-specific norms:\n"
-        "- Israeli banks, real estate, and infrastructure companies structurally carry high debt — "
-        "D/E > 2.0 is normal for these sectors. Do NOT penalize unless D/E > 5.0.\n"
-        "- The Tel Aviv market is heavily weighted toward real estate, banking, pharma, and defense — "
-        "benchmark against sector peers, not US norms.\n"
-        "- Stock prices may be quoted in agorot (1/100 shekel) — ignore absolute price levels.\n\n"
-        "Scale definition (use each level freely):\n"
-        "  1 = Weak:      Negative or near-zero margins, severe debt overload, negative/weak cash flow, "
-        "shrinking revenue, or near-distress signals.\n"
-        "  2 = Fair:      Below-average profitability, elevated leverage, modest or inconsistent cash flow, "
-        "slow/flat growth. Survivable but uninspiring.\n"
-        "  3 = Good:      Solid, average performance for the industry. Profitable, manageable debt, "
-        "positive cash flow, stable growth.\n"
-        "  4 = Great:     Above-average margins, strong free cash flow, low-to-moderate debt, "
-        "healthy revenue/earnings growth. Financially sound.\n"
-        "  5 = Excellent: Exceptional across ALL metrics — industry-leading margins, minimal debt, "
-        "strong growing free cash flow, consistent double-digit growth.\n\n"
-        "Rules:\n"
-        "- If debtToEquity > 5.0 or profitMargins < 0, lean toward 1-2.\n"
-        "- If freeCashflow < 0 and revenueGrowth < 0, that is a 1 or 2.\n"
-        "- If profitMargins > 0.15 and revenueGrowth > 0.08, lean toward 4-5.\n"
-        "- Score 5 requires excellence in ALL dimensions simultaneously.\n"
-        "- If the company had a net loss in the prior year (one year ago), the score MUST be 3 or lower. No exceptions.\n"
-        "- A single strong recovery year after a loss does NOT warrant a 4 or 5.\n"
-        "- Context matters: benchmark within the company's industry and Israeli market.\n\n"
-        "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
-    )
-
-    us_pending   = [t for t in pending if not t.endswith('.TA')]
-    tase_pending = [t for t in pending if t.endswith('.TA')]
+    us_pending = pending
 
     done    = 0
     success = 0
@@ -716,74 +510,14 @@ def update_company_health():
                 if done % 100 == 0:
                     print(f"  {done}/{len(pending)} scored ({success} successful)")
 
-    # ── TASE path: yfinance data + Claude ─────────────────────────────────────
-    def _score_tase(ticker):
-        try:
-            info = yf.Ticker(ticker).info
-            metrics = {k: info.get(k) for k in (
-                "profitMargins", "operatingMargins", "grossMargins",
-                "returnOnEquity", "returnOnAssets",
-                "currentRatio", "quickRatio",
-                "debtToEquity", "totalDebt", "totalCash",
-                "freeCashflow", "operatingCashflow",
-                "revenueGrowth", "earningsGrowth",
-            )}
-            metrics = {k: v for k, v in metrics.items() if v is not None}
-
-            try:
-                headlines = [n["title"] for n in (yf.Ticker(ticker).news or [])[:5] if n.get("title")]
-            except Exception:
-                headlines = []
-
-            prompt = (
-                f"Company: {info.get('longName') or ticker} ({ticker})\n"
-                f"Industry: {info.get('industry') or 'Unknown'}\n\n"
-            )
-            if metrics:
-                prompt += "Financial metrics:\n"
-                for k, v in metrics.items():
-                    prompt += f"  {k}: {round(v, 4) if isinstance(v, float) else f'{v:,}'}\n"
-            if headlines:
-                prompt += "\nRecent news:\n" + "".join(f"  - {h}\n" for h in headlines)
-
-            msg = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=120,
-                system=_SYSTEM_IL,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result = _parse_claude(msg.content[0].text.strip())
-            return {"ticker": ticker, "score": max(1, min(5, int(result["score"]))),
-                    "reason": result["reason"], "last_update": now}
-        except Exception:
-            return None
-
-    if tase_pending:
-        # Warm up yfinance session (crumb) before threading
-        try:
-            yf.Ticker(tase_pending[0]).info
-        except Exception:
-            pass
-
-        with ThreadPoolExecutor(max_workers=3) as ex:
-            futures = {ex.submit(_score_tase, t): t for t in tase_pending}
-            for f in as_completed(futures):
-                done += 1
-                r = f.result()
-                if r:
-                    success += 1
-                    _write_score(r)
-                if done % 100 == 0:
-                    print(f"  {done}/{len(pending)} scored ({success} successful)")
-
     print(f"Health scoring complete: {success}/{len(pending)} scored.")
 
 
 def update_company_health_batch():
     """Score company financial health (1-5) via Claude Batches API.
-    Builds all prompts in parallel (FMP for US, yfinance for TASE), submits them
-    as a single batch, polls until complete, then saves results.
-    Skips tickers scored within the last 7 days.
+    Builds all prompts in parallel from FMP, submits them as a single batch,
+    polls until complete, then saves results. Skips tickers scored within the
+    last 7 days.
     """
     import json as _json
     import time as _time
@@ -845,37 +579,6 @@ def update_company_health_batch():
         "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
     )
 
-    _SYSTEM_IL = (
-        "You are a strict financial analyst rating company health on a FULL 1-5 scale. "
-        "Use the ENTIRE range — do NOT cluster scores around 2-3.\n\n"
-        "You are evaluating Israeli (TASE) companies. Apply these market-specific norms:\n"
-        "- Israeli banks, real estate, and infrastructure companies structurally carry high debt — "
-        "D/E > 2.0 is normal for these sectors. Do NOT penalize unless D/E > 5.0.\n"
-        "- The Tel Aviv market is heavily weighted toward real estate, banking, pharma, and defense — "
-        "benchmark against sector peers, not US norms.\n"
-        "- Stock prices may be quoted in agorot (1/100 shekel) — ignore absolute price levels.\n\n"
-        "Scale definition (use each level freely):\n"
-        "  1 = Weak:      Negative or near-zero margins, severe debt overload, negative/weak cash flow, "
-        "shrinking revenue, or near-distress signals.\n"
-        "  2 = Fair:      Below-average profitability, elevated leverage, modest or inconsistent cash flow, "
-        "slow/flat growth. Survivable but uninspiring.\n"
-        "  3 = Good:      Solid, average performance for the industry. Profitable, manageable debt, "
-        "positive cash flow, stable growth.\n"
-        "  4 = Great:     Above-average margins, strong free cash flow, low-to-moderate debt, "
-        "healthy revenue/earnings growth. Financially sound.\n"
-        "  5 = Excellent: Exceptional across ALL metrics — industry-leading margins, minimal debt, "
-        "strong growing free cash flow, consistent double-digit growth.\n\n"
-        "Rules:\n"
-        "- If debtToEquity > 5.0 or profitMargins < 0, lean toward 1-2.\n"
-        "- If freeCashflow < 0 and revenueGrowth < 0, that is a 1 or 2.\n"
-        "- If profitMargins > 0.15 and revenueGrowth > 0.08, lean toward 4-5.\n"
-        "- Score 5 requires excellence in ALL dimensions simultaneously.\n"
-        "- If the company had a net loss in the prior year (one year ago), the score MUST be 3 or lower. No exceptions.\n"
-        "- A single strong recovery year after a loss does NOT warrant a 4 or 5.\n"
-        "- Context matters: benchmark within the company's industry and Israeli market.\n\n"
-        "Respond with ONLY valid JSON: {\"score\": <integer 1-5>, \"reason\": \"<one concise sentence>\"}"
-    )
-
     def _parse_claude(raw):
         if raw.startswith("```"):
             raw = raw.split("```")[1]
@@ -901,8 +604,7 @@ def update_company_health_batch():
             """), r)
 
     # ── Build prompts in parallel ─────────────────────────────────────────────
-    us_pending   = [t for t in pending if not t.endswith('.TA')]
-    tase_pending = [t for t in pending if t.endswith('.TA')]
+    us_pending = pending
 
     # Map custom_id → ticker for result processing
     prompt_map: dict[str, str] = {}  # custom_id → ticker
@@ -963,39 +665,6 @@ def update_company_health_batch():
         except Exception:
             return ticker, None
 
-    def _build_tase_prompt(ticker):
-        try:
-            info = yf.Ticker(ticker).info
-            metrics = {k: info.get(k) for k in (
-                "profitMargins", "operatingMargins", "grossMargins",
-                "returnOnEquity", "returnOnAssets",
-                "currentRatio", "quickRatio",
-                "debtToEquity", "totalDebt", "totalCash",
-                "freeCashflow", "operatingCashflow",
-                "revenueGrowth", "earningsGrowth",
-            )}
-            metrics = {k: v for k, v in metrics.items() if v is not None}
-
-            try:
-                headlines = [n["title"] for n in (yf.Ticker(ticker).news or [])[:5] if n.get("title")]
-            except Exception:
-                headlines = []
-
-            prompt = (
-                f"Company: {info.get('longName') or ticker} ({ticker})\n"
-                f"Industry: {info.get('industry') or 'Unknown'}\n\n"
-            )
-            if metrics:
-                prompt += "Financial metrics:\n"
-                for k, v in metrics.items():
-                    prompt += f"  {k}: {round(v, 4) if isinstance(v, float) else f'{v:,}'}\n"
-            if headlines:
-                prompt += "\nRecent news:\n" + "".join(f"  - {h}\n" for h in headlines)
-
-            return ticker, prompt
-        except Exception:
-            return ticker, None
-
     # Fetch US prompts in parallel (FMP, 10 workers)
     if us_pending:
         with ThreadPoolExecutor(max_workers=10) as ex:
@@ -1018,36 +687,7 @@ def update_company_health_batch():
                     })
                 if done % 200 == 0:
                     print(f"  US prompts built: {done}/{len(us_pending)}")
-        print(f"  US prompts ready: {sum(1 for c in prompt_map if not prompt_map[c].endswith('.TA'))}")
-
-    # Fetch TASE prompts in parallel (yfinance, 3 workers)
-    if tase_pending:
-        try:
-            yf.Ticker(tase_pending[0]).info
-        except Exception:
-            pass
-
-        with ThreadPoolExecutor(max_workers=3) as ex:
-            futures = {ex.submit(_build_tase_prompt, t): t for t in tase_pending}
-            done = 0
-            for f in as_completed(futures):
-                done += 1
-                ticker, prompt = f.result()
-                if prompt:
-                    custom_id = f"health-{ticker}".replace(".", "_")
-                    prompt_map[custom_id] = ticker
-                    batch_requests.append({
-                        "custom_id": custom_id,
-                        "params": {
-                            "model": "claude-sonnet-4-6",
-                            "max_tokens": 120,
-                            "system": _SYSTEM_IL,
-                            "messages": [{"role": "user", "content": prompt}],
-                        },
-                    })
-                if done % 50 == 0:
-                    print(f"  TASE prompts built: {done}/{len(tase_pending)}")
-        print(f"  TASE prompts ready: {sum(1 for c in prompt_map if prompt_map[c].endswith('.TA'))}")
+        print(f"  US prompts ready: {len(prompt_map)}")
 
     if not batch_requests:
         print("No prompts built — nothing to score.")

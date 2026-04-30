@@ -274,7 +274,7 @@ _init_tables()
 
 class _XCalWrapper:
     """Wraps exchange_calendars to match the schedule() interface expected by _market_info.
-    Uses authoritative holiday data: XNYS for US, TASE for Israel (Mon-Fri since Jan 2026)."""
+    Uses XNYS for US holiday/session data."""
     def __init__(self, xcal_id: str, name: str):
         self._xcal = xcals.get_calendar(xcal_id)
         self.name = name
@@ -298,7 +298,6 @@ class _XCalWrapper:
         return pd.DataFrame(rows, index=sessions)
 
 _nyse_cal = _XCalWrapper("XNYS", name="NYSE_xcal")
-_tase_cal = _XCalWrapper("TASE", name="TASE_xcal")
 _sched_cache: dict = {}  # (cal_name, date) → schedule DataFrame
 
 
@@ -340,10 +339,6 @@ def market_is_open() -> bool:
     return _market_info(_nyse_cal)["is_open"]
 
 
-def tase_is_open() -> bool:
-    return _market_info(_tase_cal)["is_open"]
-
-
 def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Series:
     """Extract a Close price Series from a yf.download result, handling MultiIndex columns."""
     if raw.empty:
@@ -369,35 +364,12 @@ _LIVE_CACHE_TTL = 5               # seconds — matches frontend polling cadence
 
 
 def fetch_live_prices(tickers: list[str]) -> dict:
-    """Fetch latest prices. US tickers via FMP batch; TASE (.TA) via yfinance in parallel."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    """Fetch latest prices via a single FMP batch call."""
     from data import fmp as _fmp
 
-    us_tickers   = [t for t in tickers if not t.endswith('.TA')]
-    il_tickers   = [t for t in tickers if t.endswith('.TA')]
-
-    prices: dict = {}
-
-    # US: single FMP batch call
-    if us_tickers:
-        prices.update(_fmp.live_prices(us_tickers))
-
-    # TASE: yfinance fast_info in parallel
-    if il_tickers:
-        def _get(t):
-            try:
-                price = yf.Ticker(t).fast_info.last_price
-                return t, float(price) if price else None
-            except Exception:
-                return t, None
-
-        with ThreadPoolExecutor(max_workers=10) as ex:
-            futures = {ex.submit(_get, t): t for t in il_tickers}
-            for f in as_completed(futures):
-                t, price = f.result()
-                prices[t] = price
-
-    return prices
+    if not tickers:
+        return {}
+    return _fmp.live_prices(tickers)
 
 
 # ---------------------------------------------------------------------------
@@ -553,8 +525,6 @@ def health():
 
 @protected.get("/api/market/status")
 def market_status(market: Optional[str] = None):
-    if market and market.upper() == "IL":
-        return _market_info(_tase_cal)
     return _market_info(_nyse_cal)
 
 

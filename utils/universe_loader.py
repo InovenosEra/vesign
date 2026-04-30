@@ -46,63 +46,6 @@ def _fetch_index_table(url: str) -> pd.DataFrame:
     return companies
 
 
-def _fetch_ta_index(url: str) -> pd.DataFrame:
-    """Fetch a Wikipedia TASE index table and return a normalised companies DataFrame.
-
-    Israeli Wikipedia tables use Name/Symbol/Sector column names.
-    Tickers get a .TA suffix for yfinance (e.g. TEVA.TA).
-    """
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    html = StringIO(response.text)
-    tables = pd.read_html(html)
-
-    # Find the table that has a Symbol/Ticker column (flat or MultiIndex)
-    def _has_symbol_col(t):
-        if isinstance(t.columns, pd.MultiIndex):
-            return any("Symbol" in str(c) or "Ticker" in str(c) for c in t.columns)
-        return any(k in t.columns for k in ("Symbol", "Ticker"))
-
-    table = next((t for t in tables if _has_symbol_col(t)), None)
-    if table is None:
-        raise ValueError(f"No table with 'Symbol' column found at {url}")
-
-    # Flatten MultiIndex columns if present
-    if isinstance(table.columns, pd.MultiIndex):
-        table.columns = [" ".join(str(c) for c in col).strip() for col in table.columns]
-        # Re-find columns after flattening
-        sym_col = next((c for c in table.columns if "Symbol" in c or "Ticker" in c), None)
-        name_col = next((c for c in table.columns if "Name" in c or "Corporation" in c), None)
-        sec_col  = next((c for c in table.columns if "Sector" in c or "Industry" in c), None)
-    else:
-        sym_col  = next((c for c in ("Symbol", "Ticker") if c in table.columns), None) or "Symbol"
-        name_col = next((c for c in ("Name", "Company", "Security") if c in table.columns), table.columns[0])
-        sec_col  = next((c for c in ("Sector", "GICS Sector", "Industry") if c in table.columns), None)
-
-    if sym_col is None:
-        raise ValueError(f"Could not locate Symbol column in table from {url}")
-
-    tickers = (
-        table[sym_col]
-        .astype(str)
-        .str.strip()
-        .apply(lambda t: t if t.endswith(".TA") else t + ".TA")
-    )
-
-    companies = pd.DataFrame({
-        "ticker":  tickers,
-        "company": table[name_col].astype(str).str.strip() if name_col else tickers,
-        "sector":  table[sec_col].astype(str).str.strip() if sec_col else "",
-        "market":  "IL",
-    })
-
-    companies["logo_url"] = (
-        "https://financialmodelingprep.com/image-stock/" + companies["ticker"] + ".png"
-    )
-
-    return companies
-
-
 # Tickers permanently excluded from the universe even if present in S&P indexes.
 # Reason kept inline so anyone reading load_universe() can see why.
 EXCLUDED_TICKERS = {
@@ -142,8 +85,6 @@ def load_universe():
         existing = pd.read_sql("SELECT * FROM companies", engine)
         index_tickers = set(companies["ticker"])
         custom = existing[~existing["ticker"].isin(index_tickers)].copy()
-        # Drop any legacy TASE rows from the custom carryover
-        custom = custom[~custom["ticker"].str.endswith(".TA", na=False)]
         if "market" not in custom.columns:
             custom["market"] = "US"
         preserved_cols = [c for c in EXTRA_COLS if c in existing.columns]
@@ -172,7 +113,7 @@ def load_universe():
 
     try:
         watchlist_tickers = pd.read_sql("SELECT DISTINCT ticker FROM watchlist", engine)["ticker"].tolist()
-        extra = [t for t in watchlist_tickers if t not in set(tickers) and not t.endswith(".TA")]
+        extra = [t for t in watchlist_tickers if t not in set(tickers)]
         if extra:
             print(f"Adding {len(extra)} watchlist ticker(s) to universe: {extra}")
             existing_co = set(pd.read_sql("SELECT ticker FROM companies", engine)["ticker"])
