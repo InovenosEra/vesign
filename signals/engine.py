@@ -412,15 +412,14 @@ def run_scoring(target_date=None, open_positions=None):
         time_exit = pd.Series(False, index=today_df.index)
 
     # ---------- Vectorized signal logic ----------
-    # Lean BUY: technical filters only. Drops ml_condition / health_condition /
-    # analyst_condition because per-trade analysis showed they didn't discriminate
-    # winners from losers in 2024–2026 data, and including them was hurting returns
-    # by ~5–10× vs the lean rule. See analysis 2026-04-29.
     buy_cond = (
         (today_df["rsi_3day_flag"] == 3)
         & today_df["bb_condition"]
+        & today_df["analyst_condition"]
         & today_df["volume_flag"]
         & today_df["week52_condition"]
+        & today_df["health_condition"]
+        & today_df["ml_condition"]
     )
 
     # Suppress BUY if already in an open position (first BUY wins until SELL appears)
