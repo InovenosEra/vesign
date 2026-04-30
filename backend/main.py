@@ -1007,27 +1007,20 @@ def analyst_history_endpoint(
 
 @protected.get("/api/prices/live")
 def live_prices(tickers: str = Query(..., description="Comma-separated ticker symbols")):
-    """Fetch real-time prices. Handles US and IL market hours independently."""
+    """Fetch real-time prices when the US market is open."""
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="No tickers provided")
 
     us_open = market_is_open()
-    il_open = tase_is_open()
 
     active = []
     result_prices: dict = {}
     for t in ticker_list:
-        if t.endswith('.TA'):
-            if il_open:
-                active.append(t)
-            else:
-                result_prices[t] = None
+        if us_open:
+            active.append(t)
         else:
-            if us_open:
-                active.append(t)
-            else:
-                result_prices[t] = None
+            result_prices[t] = None
 
     if active:
         global _live_price_cache, _live_price_cache_ts
