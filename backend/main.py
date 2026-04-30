@@ -807,20 +807,18 @@ def signals_export(
 
     sql = text(f"""
         SELECT DATE(s.date) AS date,
-               s.ticker, s.open, s.high, s.low, s.close, s.volume,
+               s.ticker,
+               c.company, c.sector, c.industry, f.market_cap,
+               s.open, s.high, s.low, s.close, s.volume,
                s.rsi, s.bb_high, s.bb_low, s.macd,
                s.rsi_factor, s.bb_factor, s.macd_factor, s.trend_factor,
                s.volume_sma_20, s.volume_ratio,
                s.week52_high, s.pct_from_52w_high,
                s.target_mean_price, s.target_high_price, s.target_low_price,
-               s.number_of_analysts, s.last_update, s.health_score,
-               s.prediction_score, s.fair_value_upside,
-               s.analyst_condition, s.bb_pct_b, s.bb_condition,
-               s.rsi_below_30, s.rsi_3day_flag, s.volume_flag,
-               s.week52_condition, s.health_condition, s.ml_condition,
-               s.signal, s.score, s.vesign_score,
-               c.company, c.sector, c.industry,
-               f.market_cap
+               s.number_of_analysts,
+               s.health_score, s.prediction_score, s.fair_value_upside,
+               s.bb_pct_b,
+               s.signal, s.score, s.vesign_score
         FROM signals s
         LEFT JOIN companies c ON c.ticker = s.ticker
         LEFT JOIN fundamentals f ON f.ticker = s.ticker
