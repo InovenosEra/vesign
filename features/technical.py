@@ -19,27 +19,41 @@ def compute_features(prices_df: pd.DataFrame) -> pd.DataFrame:
     return final
 
 
-def compute_and_save_features_chunked(engine, days: int = 280, chunk_size: int = 50):
+def compute_and_save_features_chunked(engine, days: int = 280, chunk_size: int = 50, warmup: int = 252):
     """Memory-efficient feature computation: processes tickers in small chunks
     and writes directly to DB, avoiding the peak memory of concatenating all frames.
 
-    Uses `days` trading days of price history (need 252 for 52-week high rolling window).
+    Loads `days + warmup` trading days of prices but only writes the most recent
+    `days` of features. The warmup is required because rolling indicators (notably
+    `week52_high = close.rolling(252).max()`) produce NaN until they have 252
+    days of history. Without it, every recompute overwrote the cached
+    week52_high with NULL for the first ~251 of the `days` rows, ratcheting
+    NULLs across history and silently letting BUY signals through the
+    "pass through if NULL" 52-week gate.
     """
     with engine.connect() as conn:
-        cutoff = conn.execute(text("""
+        write_cutoff = conn.execute(text("""
             SELECT date FROM (
                 SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT :days
             ) ORDER BY date ASC LIMIT 1
         """), {"days": days}).scalar()
 
+        # Load `days + warmup` of prices so rolling(252) is fully warm before
+        # the first row we'll keep.
+        load_cutoff = conn.execute(text("""
+            SELECT date FROM (
+                SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT :n
+            ) ORDER BY date ASC LIMIT 1
+        """), {"n": days + warmup}).scalar()
+
         tickers = [r[0] for r in conn.execute(
             text("SELECT DISTINCT ticker FROM daily_prices WHERE date >= :c ORDER BY ticker"),
-            {"c": cutoff}
+            {"c": load_cutoff}
         ).fetchall()]
 
     try:
         with engine.begin() as conn:
-            conn.execute(text("DELETE FROM features WHERE date >= :c"), {"c": cutoff})
+            conn.execute(text("DELETE FROM features WHERE date >= :c"), {"c": write_cutoff})
     except OperationalError:
         # Table doesn't exist yet — fresh DB rebuild. First to_sql will create it.
         pass
@@ -49,7 +63,7 @@ def compute_and_save_features_chunked(engine, days: int = 280, chunk_size: int =
         chunk = tickers[i:i + chunk_size]
         placeholders = ",".join([f":t{j}" for j in range(len(chunk))])
         params = {f"t{j}": t for j, t in enumerate(chunk)}
-        params["cutoff"] = cutoff
+        params["cutoff"] = load_cutoff
         prices_chunk = pd.read_sql(
             f"SELECT * FROM daily_prices WHERE date >= :cutoff"
             f" AND ticker IN ({placeholders}) ORDER BY ticker, date",
@@ -63,6 +77,8 @@ def compute_and_save_features_chunked(engine, days: int = 280, chunk_size: int =
         if frames:
             features_chunk = pd.concat(frames)
             features_chunk.drop_duplicates(subset=["ticker", "date"], inplace=True)
+            # Only write the rows we promised — drop the warmup tail.
+            features_chunk = features_chunk[features_chunk["date"] >= write_cutoff]
             features_chunk.to_sql("features", engine, if_exists="append", index=False)
             del features_chunk
         del prices_chunk, frames
