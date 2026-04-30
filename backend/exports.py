@@ -133,19 +133,54 @@ def cursor_to_xlsx_response(
     params: dict,
     filename: str,
     sheet_name: str = "Sheet1",
+    column_formats: dict | None = None,
+    date_columns: tuple = (),
 ) -> StreamingResponse:
     """Stream SQL rows directly into an XLSX, bypassing pandas.
 
     Used by large exports where loading every row into a DataFrame would OOM.
     `conn` is an active SQLAlchemy connection. `sql` is a `text()` clause.
-    No per-column formatting (callers needing it should pre-format their
-    SELECT or use `dataframe_to_xlsx_response` instead).
+
+    `column_formats` maps column name → Excel number-format string applied to
+    every data cell in that column. `date_columns` is a list of column names
+    whose string values (`YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS...`) should be
+    parsed into Python `date` objects before write so Excel renders them as
+    real dates.
     """
+    from datetime import date, datetime
+
     result = conn.execute(sql, params)
     columns = list(result.keys())
     wb, ws = _new_workbook(columns, sheet_name)
 
+    formats = column_formats or {}
+    col_fmts = [formats.get(name) for name in columns]
+    is_date = [name in set(date_columns) for name in columns]
+
+    def _parse_date(v):
+        if v is None or isinstance(v, (date, datetime)):
+            return v
+        s = str(v)[:10]
+        try:
+            return datetime.strptime(s, "%Y-%m-%d").date()
+        except ValueError:
+            return v
+
+    has_formatting = any(col_fmts) or any(is_date)
+
     for row in result:
-        ws.append([_cell_value(v) for v in row])
+        if not has_formatting:
+            ws.append([_cell_value(v) for v in row])
+            continue
+        cells = []
+        for fmt, dt, raw in zip(col_fmts, is_date, row):
+            value = _parse_date(raw) if dt else _cell_value(raw)
+            if fmt:
+                cell = WriteOnlyCell(ws, value=value)
+                cell.number_format = fmt
+                cells.append(cell)
+            else:
+                cells.append(value)
+        ws.append(cells)
 
     return _save_and_stream(wb, filename)
