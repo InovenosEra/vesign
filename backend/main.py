@@ -1497,13 +1497,27 @@ def trades_export(
                c.company,
                c.sector,
                c.industry,
+               f.market_cap,
                tl.buy_date,
                tl.buy_price,
                tl.sell_date,
                tl.sell_price,
-               tl.return_pct
+               tl.return_pct,
+               s.open, s.high, s.low, s.close, s.volume,
+               s.rsi, s.bb_high, s.bb_low, s.macd,
+               s.rsi_factor, s.bb_factor, s.macd_factor, s.trend_factor,
+               s.volume_sma_20, s.volume_ratio,
+               s.week52_high, s.pct_from_52w_high,
+               s.target_mean_price, s.target_high_price, s.target_low_price,
+               s.number_of_analysts,
+               s.health_score, s.prediction_score, s.fair_value_upside,
+               s.bb_pct_b,
+               s.signal, s.score, s.vesign_score
         FROM trade_log tl
         LEFT JOIN companies c ON c.ticker = tl.ticker
+        LEFT JOIN fundamentals f ON f.ticker = tl.ticker
+        LEFT JOIN signals s
+          ON s.ticker = tl.ticker AND DATE(s.date) = DATE(tl.buy_date)
         WHERE {' AND '.join(where)}
         ORDER BY tl.sell_date DESC, tl.ticker ASC
     """
