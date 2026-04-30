@@ -21,6 +21,15 @@ export default function DownloadXLSXButton({ url, filenameFallback = 'export', l
       })
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
 
+      // Validate content-type — nginx serves an HTML maintenance page with status
+      // 200 if the backend errors out (502/503/504), which would otherwise be
+      // saved as a corrupt .xlsx that Excel refuses to open.
+      const ct = (res.headers.get('content-type') || '').toLowerCase()
+      const isXlsx = ct.includes('spreadsheetml') || ct.includes('octet-stream')
+      if (!isXlsx) {
+        throw new Error(`server returned ${ct || 'unknown content type'} — try again or narrow the date range`)
+      }
+
       // Prefer the filename the server told us; fall back to the prop.
       const cd = res.headers.get('content-disposition') || ''
       const m = /filename="([^"]+)"/.exec(cd)

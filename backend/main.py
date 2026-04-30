@@ -770,7 +770,7 @@ def signals(
 def signals_export(
     signal: Optional[str] = None,
     search: Optional[str] = None,
-    months: int = Query(default=12, ge=1, le=120),
+    months: int = Query(default=12, ge=1, le=24),
     sort_by: str = Query(default="date"),
     sort_dir: str = Query(default="desc"),
     market: Optional[str] = None,
@@ -779,6 +779,10 @@ def signals_export(
 
     Mirrors the filter params of `/api/signals` but ignores pagination
     (page/page_size) so the user gets every row that matches their filters.
+
+    Capped at 24 months: at ALL filter that's ~750K rows × 40 cols, which is
+    near the practical limit of an in-memory pandas → openpyxl roundtrip on
+    the 4GB server. URL-tampered larger windows return 422.
     """
     from backend.exports import dataframe_to_xlsx_response
 
