@@ -784,7 +784,7 @@ def signals_export(
     near the practical limit of an in-memory pandas → openpyxl roundtrip on
     the 4GB server. URL-tampered larger windows return 422.
     """
-    from backend.exports import dataframe_to_xlsx_response
+    from backend.exports import cursor_to_xlsx_response
 
     # Reuse the read endpoint's whitelist/translation so sort_by stays in sync.
     _key = sort_by if sort_by in _SORTABLE else "date"
@@ -808,7 +808,7 @@ def signals_export(
 
     where = "WHERE " + " AND ".join(conditions)
 
-    sql = f"""
+    sql = text(f"""
         SELECT s.*,
                c.company, c.sector, c.industry, c.logo_url,
                f.market_cap
@@ -817,13 +817,14 @@ def signals_export(
         LEFT JOIN fundamentals f ON f.ticker = s.ticker
         {where}
         ORDER BY {sort_col} {direction}, s.ticker ASC
-    """
-
-    with engine.connect() as conn:
-        df = pd.read_sql(text(sql), conn, params=params)
+    """)
 
     today = datetime.now(UTC).date().isoformat()
-    return dataframe_to_xlsx_response(df, filename=f"signals_{today}", sheet_name="signals")
+    with engine.connect() as conn:
+        return cursor_to_xlsx_response(
+            conn, sql, params,
+            filename=f"signals_{today}", sheet_name="signals",
+        )
 
 
 @protected.get("/api/signals/by-tickers")
