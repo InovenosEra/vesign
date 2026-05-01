@@ -788,7 +788,8 @@ def signals_export(
                s.number_of_analysts,
                s.health_score, s.prediction_score, s.fair_value_upside,
                s.bb_pct_b,
-               s.signal, s.score, s.vesign_score
+               s.signal, s.score, s.vesign_score,
+               s.news_block_reason
         FROM signals s
         LEFT JOIN companies c ON c.ticker = s.ticker
         LEFT JOIN fundamentals f ON f.ticker = s.ticker

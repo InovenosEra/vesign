@@ -341,6 +341,16 @@ def run_daily():
     # ── Backfill any interior dates still missing signals after repair ────────
     _backfill_missing_signal_dates()
 
+    # ── News-veto gate: catastrophic-news check on the few BUYs that fired ───
+    # Runs only on the latest scored date. Default-allows on any error so it
+    # can never silently suppress BUYs because of an API hiccup.
+    from signals.news_gate import apply_news_gate
+    try:
+        apply_news_gate()
+    except Exception as e:
+        print(f"News gate skipped: {e}")
+    gc.collect()
+
     build_trade_log()
     gc.collect()
 
