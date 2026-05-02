@@ -622,6 +622,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
+                   s.vqs,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
@@ -788,7 +789,7 @@ def signals_export(
                s.number_of_analysts,
                s.health_score, s.prediction_score, s.fair_value_upside,
                s.bb_pct_b,
-               s.signal, s.score, s.vesign_score,
+               s.vqs, s.signal, s.score, s.vesign_score,
                s.news_block_reason
         FROM signals s
         LEFT JOIN companies c ON c.ticker = s.ticker
@@ -823,7 +824,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
         df = pd.read_sql(text(f"""
             SELECT s.ticker, c.company, c.logo_url, c.industry,
                    c.description, c.description_short,
-                   COALESCE(lp.latest_close, s.close) AS close, s.signal, s.rsi,
+                   COALESCE(lp.latest_close, s.close) AS close, s.signal, s.vqs, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
@@ -1476,7 +1477,7 @@ def trades_export(
                s.number_of_analysts,
                s.health_score, s.prediction_score, s.fair_value_upside,
                s.bb_pct_b,
-               s.signal, s.score, s.vesign_score
+               s.vqs, s.signal, s.score, s.vesign_score
         FROM trade_log tl
         LEFT JOIN companies c ON c.ticker = tl.ticker
         LEFT JOIN fundamentals f ON f.ticker = tl.ticker
@@ -2160,7 +2161,7 @@ def research_ticker(ticker: str, user=Depends(get_current_user)):
         # Latest signals row with company + fundamentals + analyst + health
         row = conn.execute(text("""
             SELECT s.ticker, COALESCE(lp.latest_close, s.close) AS close,
-                   s.rsi, s.bb_pct_b, s.signal, NULL AS vesign_score,
+                   s.rsi, s.bb_pct_b, s.signal, s.vqs, NULL AS vesign_score,
                    s.fair_value_upside, s.rsi_3day_flag, s.volume_flag,
                    s.week52_condition, s.prediction_score,
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price,
