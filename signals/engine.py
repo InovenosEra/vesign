@@ -155,7 +155,7 @@ def _compute_vesign_score(row):
     return int(round(_compute_vqs(row) * 100 / 9))
 
 
-def run_scoring(target_date=None, open_positions=None):
+def run_scoring(target_date=None, open_positions=None, fast_v2=False):
     """Run signal scoring.
 
     target_date: if provided (str 'YYYY-MM-DD'), score that specific date instead of
@@ -165,6 +165,12 @@ def run_scoring(target_date=None, open_positions=None):
                  signals table. The full backfill loop maintains this dict in
                  memory across iterations — avoids repaying the lookup cost
                  (~11s near end of history) on every call.
+    fast_v2:    if True, skip loading historical analyst + health data (those
+                are V1-rule-only inputs not used by V2 BUY/SELL/vesign_score).
+                Saves ~6s per date during backfill. Backfilled rows will have
+                NULL for analyst_condition/health_condition/etc. (unused columns).
+                The live daily pipeline runs with fast_v2=False so going forward
+                those columns continue to be populated.
     """
     if target_date:
         print(f"Running hybrid scoring engine for {target_date}...")
@@ -217,7 +223,14 @@ def run_scoring(target_date=None, open_positions=None):
     # For historical re-runs (target_date set), use the most recent analyst snapshot
     # on or before that date so signals reflect what was current then, not today.
     # For today's live run (target_date=None), always use current analyst_expectations.
-    if target_date:
+    # fast_v2 skips both — V2 doesn't use analyst/health. Saves ~6s per call.
+    if fast_v2:
+        analyst = pd.DataFrame(columns=[
+            "ticker", "target_mean_price", "target_high_price",
+            "target_low_price", "number_of_analysts"
+        ])
+        health = pd.DataFrame(columns=["ticker", "health_score"])
+    elif target_date:
         analyst = pd.read_sql(
             """
             SELECT ticker, target_mean_price, target_high_price, target_low_price,
@@ -233,10 +246,6 @@ def run_scoring(target_date=None, open_positions=None):
         )
         if analyst.empty:
             analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
-    else:
-        analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
-
-    if target_date:
         health = pd.read_sql(
             """
             SELECT ticker, score AS health_score
@@ -252,6 +261,7 @@ def run_scoring(target_date=None, open_positions=None):
         if health.empty:
             health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
     else:
+        analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
         health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
 
     df = features.merge(analyst, on="ticker", how="left")

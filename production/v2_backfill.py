@@ -59,7 +59,7 @@ def main() -> None:
         # warm the open-positions dict from BEFORE the start date
         open_positions = _get_open_positions(as_of_date=args.start) if args.start else {}
         for i, d in enumerate(dates, 1):
-            run_scoring(target_date=d, open_positions=open_positions)
+            run_scoring(target_date=d, open_positions=open_positions, fast_v2=True)
             # Incrementally sync open_positions with this date's BUY/SELL emissions
             # so the next iteration's run_scoring sees fresh state. Without this,
             # a BUY on day D wouldn't appear as "open" until the next bulk refresh,
