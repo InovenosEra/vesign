@@ -189,10 +189,8 @@ def run_scoring(target_date=None, open_positions=None):
         open_positions = _get_open_positions(as_of_date=target_date)
 
     # ---------- Load data ----------
-    # Only the last 5 trading days are needed: the rolling conditions
-    # (rsi_3day_flag, volume_flag) look back at most 3 rows. All other
-    # indicator values (rsi, bb_*, volume_ratio, pct_from_52w_high) are
-    # already stored in the features table so no additional history is needed.
+    # V2 needs 65+ trading days of price history per call to compute mom_60d
+    # and the 50-day SMA. Older code loaded only 5 days; widened here.
     if target_date:
         # Dates are stored as 'YYYY-MM-DD HH:MM:SS.ffffff' strings in SQLite,
         # so 'YYYY-MM-DD' < 'YYYY-MM-DD 00:00:00'. Use next-day boundary to include the target.
@@ -208,7 +206,7 @@ def run_scoring(target_date=None, open_positions=None):
         SELECT * FROM features
         WHERE date >= (
             SELECT date FROM (
-                SELECT DISTINCT date FROM features {inner_filter} ORDER BY date DESC LIMIT 5
+                SELECT DISTINCT date FROM features {inner_filter} ORDER BY date DESC LIMIT 65
             ) ORDER BY date ASC LIMIT 1
         ) {outer_filter}
         ORDER BY ticker, date
@@ -259,7 +257,7 @@ def run_scoring(target_date=None, open_positions=None):
     df = features.merge(analyst, on="ticker", how="left")
     df = df.merge(health, on="ticker", how="left")
 
-    # ---------- ML prediction scores (loaded early — used as BUY gate) ----------
+    # ---------- ML prediction scores (used by V1 ml_condition AND V2 pred_5d) ----------
     # Filter to the date range of df — loading the full 2.3M-row table per call
     # made backfill take ~44s/date (predictions is ~50% of total runtime).
     if "predictions" in inspect(engine).get_table_names():
@@ -268,16 +266,53 @@ def run_scoring(target_date=None, open_positions=None):
             date_max = df["date"].max()
             predictions = pd.read_sql(
                 text(
-                    "SELECT date, ticker, prediction_score FROM predictions "
+                    "SELECT date, ticker, pred_5d, prediction_score FROM predictions "
                     "WHERE date >= :dmin AND date <= :dmax"
                 ),
                 engine, params={"dmin": str(date_min), "dmax": str(date_max)},
             )
         else:
-            predictions = pd.DataFrame(columns=["date", "ticker", "prediction_score"])
+            predictions = pd.DataFrame(columns=["date", "ticker", "pred_5d", "prediction_score"])
         df = df.merge(predictions, on=["date", "ticker"], how="left")
     else:
         df["prediction_score"] = float("nan")
+        df["pred_5d"] = float("nan")
+
+    # ---------- V2 macro signal: VIX close ----------
+    if not df.empty:
+        date_min = df["date"].min()
+        date_max = df["date"].max()
+        vix_df = pd.read_sql(
+            text("SELECT date, close AS vix_close FROM vix WHERE date >= :dmin AND date <= :dmax"),
+            engine, params={"dmin": str(date_min), "dmax": str(date_max)},
+        )
+        df = df.merge(vix_df, on="date", how="left")
+    else:
+        df["vix_close"] = float("nan")
+
+    # ---------- V2 size factor: market cap (as-of merge from quarterly snapshots) ----------
+    if not df.empty:
+        mch = pd.read_sql(
+            "SELECT ticker, date AS mc_date, market_cap FROM market_cap_history "
+            "WHERE date >= '2019-01-01'",
+            engine,
+        )
+        if not mch.empty:
+            mch["mc_date"] = pd.to_datetime(mch["mc_date"])
+            df["date"] = pd.to_datetime(df["date"])
+            df_sorted = df.sort_values(["date", "ticker"]).reset_index(drop=True)
+            mch_sorted = mch.sort_values(["mc_date", "ticker"]).reset_index(drop=True)
+            df = pd.merge_asof(
+                df_sorted, mch_sorted,
+                left_on="date", right_on="mc_date", by="ticker", direction="backward",
+            ).drop(columns=["mc_date"])
+        else:
+            df["market_cap"] = float("nan")
+        # log_market_cap (V2 condition C7 uses this)
+        import numpy as _np
+        df["log_market_cap"] = _np.log(df["market_cap"].replace(0, _np.nan))
+    else:
+        df["log_market_cap"] = float("nan")
 
     # ---------- Analyst upside ----------
     df["fair_value_upside"] = (
@@ -332,58 +367,91 @@ def run_scoring(target_date=None, open_positions=None):
     ml_min = config.get("ml_score_min", 0.05)
     df["ml_condition"] = (df["prediction_score"] >= ml_min) | df["prediction_score"].isna()
 
+    # ---------- V2 indicators: momentum, vol, ATR, SMA-50 distance ----------
+    import numpy as _np2
+    df = df.sort_values(["ticker", "date"]).reset_index(drop=True)
+    df["mom_5d"]  = df.groupby("ticker", sort=False)["close"].transform(lambda c: c / c.shift(5)  - 1)
+    df["mom_60d"] = df.groupby("ticker", sort=False)["close"].transform(lambda c: c / c.shift(60) - 1)
+    df["sma_50_dist"] = df["close"] / df.groupby("ticker", sort=False)["close"].transform(
+        lambda c: c.rolling(50, min_periods=20).mean()
+    ) - 1
+
+    # realized_vol_20: rolling 20d stdev of log returns, annualized
+    df["log_ret_tmp"] = df.groupby("ticker", sort=False)["close"].transform(
+        lambda c: _np2.log(c / c.shift(1))
+    )
+    df["realized_vol_20"] = df.groupby("ticker", sort=False)["log_ret_tmp"].transform(
+        lambda s: s.rolling(20).std()
+    ) * (252 ** 0.5)
+    df = df.drop(columns=["log_ret_tmp"])
+
+    # ATR_14: Wilder-style EWM of true range, normalized by close
+    prev_close = df.groupby("ticker", sort=False)["close"].shift(1)
+    df["tr_tmp"] = pd.concat([
+        (df["high"] - df["low"]).abs(),
+        (df["high"] - prev_close).abs(),
+        (df["low"]  - prev_close).abs(),
+    ], axis=1).max(axis=1)
+    df["atr_14_pct"] = df.groupby("ticker", sort=False)["tr_tmp"].transform(
+        lambda s: s.ewm(alpha=1/14, adjust=False).mean()
+    ) / df["close"]
+    df = df.drop(columns=["tr_tmp"])
+
     # ---------- Filter to today before signal assignment ----------
     # Rolling windows already computed above using full history.
     # Signal assignment only touches today's rows — much faster.
     today = df["date"].max()  # always use the actual max date in the loaded slice
     today_df = df[df["date"] == today].copy()
 
-    # ---------- Trailing stop (vectorized) ----------
+    # ---------- V2 SELL logic ----------
+    # V2 SELL: (RSI >= 70 AND price > entry) OR (calendar days held >= 175,
+    # which approximates 120 trading days). No trailing stop. No ML gate.
     import numpy as np
 
     if open_positions:
-        # open_positions: {ticker: (entry_price, buy_date)}
         entry_prices = {t: v[0] for t, v in open_positions.items()}
         buy_dates    = {t: v[1] for t, v in open_positions.items()}
         today_df["entry_price"] = today_df["ticker"].map(entry_prices)
         today_df["buy_date"]    = today_df["ticker"].map(buy_dates)
-        stop_hit = (
-            today_df["entry_price"].notna()
-            & (today_df["close"] < today_df["entry_price"] * (1 - trailing_stop_pct))
-        )
-        # 365-day time-based exit — hard cap regardless of yield (bypasses ML gate)
         today_ts = pd.to_datetime(today_df["date"].max())
         days_held = (today_ts - pd.to_datetime(today_df["buy_date"])).dt.days
-        time_exit = today_df["entry_price"].notna() & (days_held >= 365)
+
+        rsi_sell_profitable = (
+            today_df["entry_price"].notna()
+            & (today_df["rsi"] >= 70)
+            & (today_df["close"] > today_df["entry_price"])
+        )
+        time_exit = today_df["entry_price"].notna() & (days_held >= 175)
+
         today_df.drop(columns=["entry_price", "buy_date"], inplace=True)
     else:
-        stop_hit  = pd.Series(False, index=today_df.index)
+        rsi_sell_profitable = pd.Series(False, index=today_df.index)
         time_exit = pd.Series(False, index=today_df.index)
 
-    # ---------- Vectorized signal logic ----------
-    buy_cond = (
-        (today_df["rsi_3day_flag"] == 3)
-        & today_df["bb_condition"]
-        & today_df["analyst_condition"]
-        & today_df["volume_flag"]
-        & today_df["week52_condition"]
-        & today_df["health_condition"]
-        & today_df["ml_condition"]
+    # ---------- V2 BUY logic ----------
+    # Vectorized VQS — sum of 9 binary contrarian conditions, 0..9.
+    # Equivalent to _compute_vqs() but row-wise apply is ~10x slower at scale.
+    # Comparisons against NaN evaluate to False (matches "not met" semantics).
+    today_df["vqs"] = (
+        (today_df["vix_close"] > 22.0).astype(int)
+        + (today_df["vix_close"] > 29.0).astype(int)
+        + (today_df["mom_60d"] < -0.15).astype(int)
+        + (today_df["mom_5d"]  < -0.05).astype(int)
+        + (today_df["rsi"] < 35.0).astype(int)
+        + ((today_df["realized_vol_20"] > 0.50) | (today_df["atr_14_pct"] > 0.04)).astype(int)
+        + (today_df["log_market_cap"] < 22.0).astype(int)
+        + (today_df["pred_5d"] > 0.005).astype(int)
+        + (today_df["sma_50_dist"] < -0.07).astype(int)
     )
+    buy_cond = today_df["vqs"] >= 8
 
-    # Suppress BUY if already in an open position (first BUY wins until SELL appears)
+    # Suppress BUY if already in an open position (one position per ticker).
     if open_positions:
         already_open = today_df["ticker"].isin(open_positions.keys())
         buy_cond = buy_cond & ~already_open
 
-    # MASTER gate: SELL requires ML prediction to be negative (or NULL — waived for
-    # new tickers). Applies to trailing stop and RSI>=70. Time-based exit (365 days
-    # profitable) bypasses the ML gate — it's an unconditional rule.
-    ml_negative = (
-        (today_df["prediction_score"] < 0)
-        | today_df["prediction_score"].isna()
-    )
-    sell_cond = ((stop_hit | (today_df["rsi"] >= 70)) & ml_negative) | time_exit
+    # ---------- Combine into final signal ----------
+    sell_cond = rsi_sell_profitable | time_exit
 
     today_df["signal"] = np.select(
         [sell_cond, buy_cond],
@@ -391,15 +459,27 @@ def run_scoring(target_date=None, open_positions=None):
         default="HOLD"
     )
 
-    # RSI-based fallback score (always defined, always positive for BUY signals)
+    # RSI-based fallback score (kept for legacy backwards-compat — not displayed)
     today_df["score"] = 50 - today_df["rsi"]
 
-    today_df["vesign_score"] = today_df.apply(_compute_vesign_score, axis=1)
+    # vesign_score = round(vqs * 100 / 9) — vectorized, matches _compute_vesign_score()
+    today_df["vesign_score"] = ((today_df["vqs"] * 100 / 9).round()).astype(int)
+
+    # Drop transient V2 input columns that aren't part of the signals schema.
+    # vqs IS persisted (column exists). pred_5d/vix_close/market_cap/etc were
+    # only needed to compute vqs and aren't reused downstream.
+    _transient = [
+        "pred_5d", "vix_close", "market_cap", "log_market_cap",
+        "mom_5d", "mom_60d", "sma_50_dist", "realized_vol_20", "atr_14_pct",
+    ]
+    today_df = today_df.drop(columns=[c for c in _transient if c in today_df.columns])
 
     if "signals" in inspect(engine).get_table_names():
+        # SQLite stores dates as 'YYYY-MM-DD HH:MM:SS.ffffff' strings; match the
+        # date prefix to delete cleanly regardless of microseconds.
         with engine.begin() as conn:
             conn.execute(
-                text("DELETE FROM signals WHERE date = :date"),
+                text("DELETE FROM signals WHERE DATE(date) = DATE(:date)"),
                 {"date": str(today)}
             )
 
