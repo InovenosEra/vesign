@@ -15,6 +15,7 @@ self-join on every iteration (saves ~6 hours on a full backfill).
 import argparse
 import time
 import pandas as pd
+from sqlalchemy import text
 
 from data.loaders import engine
 from signals.engine import run_scoring, _get_open_positions, _ensure_signals_columns
@@ -59,9 +60,21 @@ def main() -> None:
         open_positions = _get_open_positions(as_of_date=args.start) if args.start else {}
         for i, d in enumerate(dates, 1):
             run_scoring(target_date=d, open_positions=open_positions)
-            # Refresh open_positions every N dates — buys/sells move forward,
-            # rebuilding the dict too often is expensive but never rebuilding
-            # leaves us stale.
+            # Incrementally sync open_positions with this date's BUY/SELL emissions
+            # so the next iteration's run_scoring sees fresh state. Without this,
+            # a BUY on day D wouldn't appear as "open" until the next bulk refresh,
+            # and any RSI>70-profitable SELL between D and the refresh would be missed.
+            with engine.connect() as conn:
+                new_signals = conn.execute(text(
+                    "SELECT ticker, signal, close FROM signals "
+                    "WHERE DATE(date) = DATE(:d) AND signal IN ('BUY', 'SELL')"
+                ), {"d": d}).fetchall()
+            for ticker, sig, close in new_signals:
+                if sig == "BUY":
+                    open_positions[ticker] = (float(close), d)
+                elif sig == "SELL" and ticker in open_positions:
+                    del open_positions[ticker]
+            # Periodic full refresh as drift insurance + to log progress.
             if i % args.refresh_positions_every == 0:
                 next_d = (pd.Timestamp(d) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
                 open_positions = _get_open_positions(as_of_date=next_d)
