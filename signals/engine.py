@@ -97,6 +97,46 @@ def _isna(v):
         return False
 
 
+def _compute_vqs(row):
+    """Vesign Quality Score (V2). Sum of 9 binary contrarian conditions, 0..9.
+
+    Treats missing values as the condition not firing (no leakage, no errors).
+    """
+    def _get(field):
+        if isinstance(row, dict):
+            return row.get(field)
+        try:
+            return row[field]
+        except (KeyError, IndexError):
+            return None
+
+    def _ge(field, threshold):
+        v = _get(field)
+        if _isna(v):
+            return False
+        return float(v) > threshold
+
+    def _le(field, threshold):
+        v = _get(field)
+        if _isna(v):
+            return False
+        return float(v) < threshold
+
+    score = 0
+    score += int(_ge("vix_close", 22.0))           # C1 macro stress
+    score += int(_ge("vix_close", 29.0))           # C2 severe macro stress (extra weight)
+    score += int(_le("mom_60d", -0.15))            # C3 deeply oversold over 60d
+    score += int(_le("mom_5d",  -0.05))            # C4 recent capitulation
+    score += int(_le("rsi", 35.0))                 # C5 technical oversold
+    # C6: high vol — RV>0.5 OR ATR>0.04
+    c6 = _ge("realized_vol_20", 0.50) or _ge("atr_14_pct", 0.04)
+    score += int(c6)
+    score += int(_le("log_market_cap", 22.0))      # C7 small/mid-cap
+    score += int(_ge("pred_5d", 0.005))            # C8 ML positive forecast
+    score += int(_le("sma_50_dist", -0.07))        # C9 far below 50-day SMA
+    return score
+
+
 def _compute_vesign_score(row):
     """Compute a 0–100 Vesign Score showing proximity to a BUY signal.
 
