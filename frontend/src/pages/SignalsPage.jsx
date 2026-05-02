@@ -178,7 +178,18 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
         {rows.map((r, i) => (
           <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
             <td>{r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
-            <td><strong>{displayTicker(r.ticker)}</strong></td>
+            <td>
+              <strong>{displayTicker(r.ticker)}</strong>
+              {r.vqs === 9 && (
+                <span
+                  title="Strong BUY"
+                  aria-label="Strong BUY"
+                  style={{ marginLeft: 6, color: '#f1c40f', fontSize: 14 }}
+                >
+                  ★
+                </span>
+              )}
+            </td>
             <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
             <td>{fmtMktCap(r.market_cap)}</td>
             <td><PriceCell value={r.close} ticker={r.ticker} /></td>
