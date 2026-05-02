@@ -139,20 +139,99 @@ def _compute_vqs(row):
 
 
 def _compute_vesign_score(row):
-    """V2-aligned 0–100 'proximity to BUY signal' score, derived from VQS.
+    """Compute a 0–100 Vesign Score showing proximity to a V1 BUY signal.
 
-    Mapping: vesign_score = round(vqs * 100 / 9). Examples:
-      VQS=9 → 100 ('Signal active' — Strong BUY)
-      VQS=8 → 89  ('Signal active' — regular BUY)
-      VQS=7 → 78  ('Approaching signal')
-      VQS=6 → 67  ('Watching closely')
-      VQS=4 → 44  ('Early watch')
-
-    The ResearchPage gauge labels (signal_active >=86, approaching >=71,
-    watching >=51, early_watch >=31) line up cleanly with the V2 BUY
-    threshold of VQS>=8.
+    Works on both a pandas Series (from apply) and a plain dict.
     """
-    return int(round(_compute_vqs(row) * 100 / 9))
+    score = 0
+
+    # --- RSI momentum (0–30) ---
+    flag = row.get("rsi_3day_flag") if isinstance(row, dict) else row["rsi_3day_flag"]
+    if _isna(flag):
+        flag = 0
+    else:
+        flag = int(flag)
+    rsi = row.get("rsi") if isinstance(row, dict) else row["rsi"]
+
+    if flag == 3 and not _isna(rsi) and float(rsi) < 25:
+        score += 30
+    elif flag == 3:
+        score += 27
+    elif flag == 2:
+        score += 18
+    elif flag == 1:
+        score += 10
+    elif not _isna(rsi) and float(rsi) < 33:
+        score += 5
+    elif not _isna(rsi) and float(rsi) < 37:
+        score += 3
+
+    # --- Bollinger Band (0–20) ---
+    bb = row.get("bb_pct_b") if isinstance(row, dict) else row["bb_pct_b"]
+    if _isna(bb):
+        score += 10
+    elif float(bb) < 0:
+        score += 20
+    elif float(bb) < 0.05:
+        score += 18
+    elif float(bb) < 0.10:
+        score += 15
+    elif float(bb) < 0.20:
+        score += 10
+    elif float(bb) < 0.30:
+        score += 5
+
+    # --- ML prediction (0–20) ---
+    ml = row.get("prediction_score") if isinstance(row, dict) else row["prediction_score"]
+    if _isna(ml):
+        score += 10
+    elif float(ml) >= 0.10:
+        score += 20
+    elif float(ml) >= 0.05:
+        score += 16
+    elif float(ml) >= 0.03:
+        score += 10
+    elif float(ml) >= 0.02:
+        score += 6
+    elif float(ml) >= 0.01:
+        score += 3
+
+    # --- Analyst upside (0–15) ---
+    target = row.get("target_mean_price") if isinstance(row, dict) else row["target_mean_price"]
+    upside = row.get("fair_value_upside") if isinstance(row, dict) else row["fair_value_upside"]
+    if _isna(target) or _isna(upside):
+        score += 8
+    elif float(upside) >= 0.60:
+        score += 15
+    elif float(upside) >= 0.30:
+        score += 12
+    elif float(upside) >= 0.15:
+        score += 7
+    elif float(upside) >= 0.0:
+        score += 3
+
+    # --- Volume (0–5) ---
+    vf = row.get("volume_flag") if isinstance(row, dict) else row["volume_flag"]
+    if not _isna(vf) and vf:
+        score += 5
+
+    # --- 52-week position (0–5) ---
+    w52 = row.get("week52_condition") if isinstance(row, dict) else row["week52_condition"]
+    if _isna(w52) or w52:
+        score += 5
+
+    # --- Health (0–5) ---
+    health = row.get("health_score") if isinstance(row, dict) else row["health_score"]
+    if _isna(health):
+        score += 3
+    elif float(health) >= 5:
+        score += 5
+    elif float(health) >= 4:
+        score += 4
+    elif float(health) >= 3:
+        score += 3
+
+    return int(score)
 
 
 def run_scoring(target_date=None, open_positions=None, fast_v2=False):
@@ -428,9 +507,7 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
     today = df["date"].max()  # always use the actual max date in the loaded slice
     today_df = df[df["date"] == today].copy()
 
-    # ---------- V2 SELL logic ----------
-    # V2 SELL: (RSI >= 70 AND price > entry) OR (calendar days held >= 175,
-    # which approximates 120 trading days). No trailing stop. No ML gate.
+    # ---------- V1 SELL logic (kept exactly as-is; gates ALL exits) ----------
     import numpy as np
 
     if open_positions:
@@ -438,25 +515,21 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
         buy_dates    = {t: v[1] for t, v in open_positions.items()}
         today_df["entry_price"] = today_df["ticker"].map(entry_prices)
         today_df["buy_date"]    = today_df["ticker"].map(buy_dates)
+        stop_hit = (
+            today_df["entry_price"].notna()
+            & (today_df["close"] < today_df["entry_price"] * (1 - trailing_stop_pct))
+        )
+        # 365-day time-based exit — hard cap regardless of yield (bypasses ML gate)
         today_ts = pd.to_datetime(today_df["date"].max())
         days_held = (today_ts - pd.to_datetime(today_df["buy_date"])).dt.days
-
-        rsi_sell_profitable = (
-            today_df["entry_price"].notna()
-            & (today_df["rsi"] >= 70)
-            & (today_df["close"] > today_df["entry_price"])
-        )
-        time_exit = today_df["entry_price"].notna() & (days_held >= 175)
-
+        time_exit = today_df["entry_price"].notna() & (days_held >= 365)
         today_df.drop(columns=["entry_price", "buy_date"], inplace=True)
     else:
-        rsi_sell_profitable = pd.Series(False, index=today_df.index)
+        stop_hit  = pd.Series(False, index=today_df.index)
         time_exit = pd.Series(False, index=today_df.index)
 
-    # ---------- V2 BUY logic ----------
-    # Vectorized VQS — sum of 9 binary contrarian conditions, 0..9.
-    # Equivalent to _compute_vqs() but row-wise apply is ~10x slower at scale.
-    # Comparisons against NaN evaluate to False (matches "not met" semantics).
+    # ---------- VQS computation (V2 quality score, used for hybrid BUY + UI) ----
+    # Vectorized — sum of 9 binary contrarian conditions, 0..9.
     today_df["vqs"] = (
         (today_df["vix_close"] > 22.0).astype(int)
         + (today_df["vix_close"] > 29.0).astype(int)
@@ -468,15 +541,35 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
         + (today_df["pred_5d"] > 0.005).astype(int)
         + (today_df["sma_50_dist"] < -0.07).astype(int)
     )
-    buy_cond = today_df["vqs"] >= 8
 
-    # Suppress BUY if already in an open position (one position per ticker).
+    # ---------- Hybrid BUY logic ----------
+    # Fire BUY if EITHER:
+    #   (a) V1's 7-gate AND condition is met, OR
+    #   (b) V2 VQS == 9 (the "Strong BUY" / 'creme de la creme' panic-buy tier).
+    # Same no-overlap rule applies in both branches.
+    v1_buy_cond = (
+        (today_df["rsi_3day_flag"] == 3)
+        & today_df["bb_condition"]
+        & today_df["analyst_condition"]
+        & today_df["volume_flag"]
+        & today_df["week52_condition"]
+        & today_df["health_condition"]
+        & today_df["ml_condition"]
+    )
+    v2_strong_buy_cond = today_df["vqs"] == 9
+    buy_cond = v1_buy_cond | v2_strong_buy_cond
+
+    # Suppress BUY if already in an open position (first BUY wins until SELL)
     if open_positions:
         already_open = today_df["ticker"].isin(open_positions.keys())
         buy_cond = buy_cond & ~already_open
 
-    # ---------- Combine into final signal ----------
-    sell_cond = rsi_sell_profitable | time_exit
+    # ---------- V1 SELL final wiring (RSI>=70 + ML negative gate, OR stop, OR 365d) ----
+    ml_negative = (
+        (today_df["prediction_score"] < 0)
+        | today_df["prediction_score"].isna()
+    )
+    sell_cond = ((stop_hit | (today_df["rsi"] >= 70)) & ml_negative) | time_exit
 
     today_df["signal"] = np.select(
         [sell_cond, buy_cond],
@@ -487,8 +580,9 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
     # RSI-based fallback score (kept for legacy backwards-compat — not displayed)
     today_df["score"] = 50 - today_df["rsi"]
 
-    # vesign_score = round(vqs * 100 / 9) — vectorized, matches _compute_vesign_score()
-    today_df["vesign_score"] = ((today_df["vqs"] * 100 / 9).round()).astype(int)
+    # vesign_score: stays as V1's component-weighted formula via _compute_vesign_score
+    # (the ResearchPage gauge keeps its V1 meaning of "proximity to V1 BUY signal").
+    today_df["vesign_score"] = today_df.apply(_compute_vesign_score, axis=1)
 
     # Drop transient V2 input columns that aren't part of the signals schema.
     # vqs IS persisted (column exists). pred_5d/vix_close/market_cap/etc were
