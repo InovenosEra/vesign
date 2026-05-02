@@ -20,6 +20,7 @@ def _ensure_signals_columns():
         "ml_condition":     "INTEGER",
         "vesign_score":     "REAL",
         "news_block_reason":"TEXT",
+        "vqs":              "INTEGER",
     }
     inspector = inspect(engine)
     if "signals" in inspector.get_table_names():
