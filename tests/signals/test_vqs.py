@@ -78,23 +78,7 @@ def test_vqs_at_buy_threshold():
     assert score == 8
 
 
-from signals.engine import _compute_vesign_score
-
-
-def test_vesign_score_derived_from_vqs():
-    """vesign_score = round(vqs * 100 / 9). Maps VQS=9 → 100, VQS=0 → 0."""
-    assert _compute_vesign_score(_row()) == 0  # VQS=0 → 0
-
-    # VQS=9 → 100
-    assert _compute_vesign_score(_row(
-        vix_close=30.0, mom_60d=-0.20, mom_5d=-0.10, rsi=30.0,
-        realized_vol_20=0.6, log_market_cap=20.0, pred_5d=0.01,
-        sma_50_dist=-0.10,
-    )) == 100
-
-    # VQS=8 → round(8 * 100/9) = 89
-    assert _compute_vesign_score(_row(
-        vix_close=23.0, mom_60d=-0.20, mom_5d=-0.10, rsi=30.0,
-        realized_vol_20=0.6, log_market_cap=20.0, pred_5d=0.01,
-        sma_50_dist=-0.10,
-    )) == 89
+# Note: in the hybrid design (V1 BUY/SELL preserved + V2 VQS=9 added),
+# _compute_vesign_score keeps V1's component-weighted 0-100 formula so the
+# ResearchPage gauge retains its V1 meaning ("proximity to V1 BUY signal").
+# It is NOT derived from VQS in this configuration.
