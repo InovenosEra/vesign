@@ -5,47 +5,25 @@ from data.loaders import engine
 
 
 def build_trade_log():
+    """V2 trade log: pair each BUY signal with the next SELL signal for the
+    same ticker. SELL fires either via signals.engine (RSI>=70 AND profitable)
+    or via 175-calendar-day expiration. No trailing stop in V2.
+    """
+    print("Building trade log (V2 — no trailing stop, 175-day cap)...")
 
-    print("Building trade log...")
-
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open(os.path.join(BASE_DIR, "config", "settings.yaml")) as f:
-        config = yaml.safe_load(f)
-    stop_pct = config.get("trailing_stop_pct", 0.15)
-
-    # Merge signals + ML prediction into daily_prices so every day is iterated.
-    # SELL (stop or RSI>=70) now requires ML prediction_score < 0 (MASTER gate).
-    prices = pd.read_sql(
-        "SELECT date, ticker, close FROM daily_prices",
-        engine,
-    )
-    signals = pd.read_sql(
-        "SELECT date, ticker, signal, prediction_score FROM signals",
-        engine,
-    )
+    prices = pd.read_sql("SELECT date, ticker, close FROM daily_prices", engine)
+    signals = pd.read_sql("SELECT date, ticker, signal FROM signals", engine)
     merged = prices.merge(signals, on=["date", "ticker"], how="left")
     merged = merged.sort_values(["ticker", "date"])
 
-    def _ml_allows_sell(pred, ticker):
-        # Waived when prediction is missing (new ticker without enough history).
-        if pred is None or pd.isna(pred):
-            return True
-        return pred < 0
-
     trades = []
-    stop_sells = []  # (ticker, sell_date) — stop-triggered exits to write back to signals
-    time_sells = []  # (ticker, sell_date) — 365-day time-based exits to write back
+    time_sells = []  # (ticker, sell_date) — back-write SELL marker for time exits
 
     for ticker, df in merged.groupby("ticker"):
-
         open_trade = None
-        stop_price = None
-
         for _, row in df.iterrows():
-
             close = row["close"]
             sig = row["signal"]
-            pred = row.get("prediction_score")
 
             if open_trade is None:
                 if sig == "BUY":
@@ -54,51 +32,37 @@ def build_trade_log():
                         "buy_date": row["date"],
                         "buy_price": close,
                     }
-                    stop_price = close * (1 - stop_pct)
             else:
-                stop_hit = close <= stop_price
+                # V2 exit: signal=='SELL' (which signals.engine emits when RSI>=70
+                # AND profitable) OR 175 calendar days held (~120 trading days).
+                days_held = (
+                    pd.to_datetime(row["date"]) - pd.to_datetime(open_trade["buy_date"])
+                ).days
                 rsi_sell = sig == "SELL"
-                ml_ok = _ml_allows_sell(pred, ticker)
+                time_exit = days_held >= 175
 
-                # 365-day time-based exit — hard cap regardless of yield (bypasses ML gate)
-                days_held = (pd.to_datetime(row["date"]) - pd.to_datetime(open_trade["buy_date"])).days
-                time_exit = days_held >= 365
-
-                fires = ((stop_hit or rsi_sell) and ml_ok) or time_exit
-
-                if fires:
-                    trade = {
+                if rsi_sell or time_exit:
+                    trades.append({
                         **open_trade,
                         "sell_date": row["date"],
                         "sell_price": close,
                         "return_pct": (close - open_trade["buy_price"]) / open_trade["buy_price"],
-                    }
-                    trades.append(trade)
-                    # Tag the exit type for back-writing signal markers.
-                    # Priority: stop > rsi > time (if signal=SELL already, don't need back-write)
-                    if stop_hit and not rsi_sell:
-                        stop_sells.append((ticker, row["date"]))
-                    elif time_exit and not rsi_sell and not stop_hit:
+                    })
+                    if time_exit and not rsi_sell:
                         time_sells.append((ticker, row["date"]))
                     open_trade = None
-                    stop_price = None
 
     trades_df = pd.DataFrame(trades)
 
-    # Write stop-triggered + time-based SELL markers back to signals so they show in UI
     from sqlalchemy import text as _text
-    if stop_sells or time_sells:
+    if time_sells:
         with engine.begin() as conn:
-            for ticker, sell_date in stop_sells + time_sells:
+            for ticker, sell_date in time_sells:
                 conn.execute(_text("""
-                    UPDATE signals
-                    SET signal = 'SELL'
+                    UPDATE signals SET signal = 'SELL'
                     WHERE ticker = :t AND date = :d AND signal != 'BUY'
                 """), {"t": ticker, "d": sell_date})
-        if stop_sells:
-            print(f"Back-wrote {len(stop_sells):,} stop-triggered SELL markers")
-        if time_sells:
-            print(f"Back-wrote {len(time_sells):,} 365-day time-exit SELL markers")
+        print(f"Back-wrote {len(time_sells):,} 175-day time-exit SELL markers")
 
     if trades_df.empty:
         # Ensure table exists with a proper schema even when no closed trades yet
