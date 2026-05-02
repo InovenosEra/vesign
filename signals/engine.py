@@ -223,13 +223,28 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
     # For historical re-runs (target_date set), use the most recent analyst snapshot
     # on or before that date so signals reflect what was current then, not today.
     # For today's live run (target_date=None), always use current analyst_expectations.
-    # fast_v2 skips both — V2 doesn't use analyst/health. Saves ~6s per call.
-    if fast_v2:
-        analyst = pd.DataFrame(columns=[
-            "ticker", "target_mean_price", "target_high_price",
-            "target_low_price", "number_of_analysts"
-        ])
-        health = pd.DataFrame(columns=["ticker", "health_score"])
+    # fast_v2 reuses values already stored in signals[date]: those were filled in
+    # historically by the same as-of-D logic, so they're the right values — and
+    # reading them is one fast indexed query vs the slow correlated subquery.
+    if fast_v2 and target_date:
+        existing = pd.read_sql(
+            text(
+                "SELECT ticker, target_mean_price, target_high_price, "
+                "target_low_price, number_of_analysts, health_score "
+                "FROM signals WHERE DATE(date) = DATE(:td)"
+            ),
+            engine, params={"td": target_date},
+        )
+        if not existing.empty:
+            analyst = existing[["ticker", "target_mean_price", "target_high_price",
+                              "target_low_price", "number_of_analysts"]].drop_duplicates("ticker")
+            health = existing[["ticker", "health_score"]].drop_duplicates("ticker")
+            # health_score is TEXT in V1 schema; coerce to numeric for the >=3 comparison
+            health["health_score"] = pd.to_numeric(health["health_score"], errors="coerce")
+        else:
+            # First-time backfill of this date — fall back to current snapshot.
+            analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+            health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
     elif target_date:
         analyst = pd.read_sql(
             """
