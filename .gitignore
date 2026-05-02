@@ -17,3 +17,9 @@ logs/
 # Self-hosted logos — actual PNGs are downloaded at deploy time, not committed
 static/logos/*
 !static/logos/.gitkeep
+
+# Local-only research artefacts (kept on disk, not in repo)
+.DS_Store
+analysis/
+docs/research/
+docs/superpowers/plans/
