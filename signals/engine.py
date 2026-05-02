@@ -139,99 +139,20 @@ def _compute_vqs(row):
 
 
 def _compute_vesign_score(row):
-    """Compute a 0–100 Vesign Score showing proximity to a BUY signal.
+    """V2-aligned 0–100 'proximity to BUY signal' score, derived from VQS.
 
-    Works on both a pandas Series (from apply) and a plain dict.
+    Mapping: vesign_score = round(vqs * 100 / 9). Examples:
+      VQS=9 → 100 ('Signal active' — Strong BUY)
+      VQS=8 → 89  ('Signal active' — regular BUY)
+      VQS=7 → 78  ('Approaching signal')
+      VQS=6 → 67  ('Watching closely')
+      VQS=4 → 44  ('Early watch')
+
+    The ResearchPage gauge labels (signal_active >=86, approaching >=71,
+    watching >=51, early_watch >=31) line up cleanly with the V2 BUY
+    threshold of VQS>=8.
     """
-    score = 0
-
-    # --- RSI momentum (0–30) ---
-    flag = row.get("rsi_3day_flag") if isinstance(row, dict) else row["rsi_3day_flag"]
-    if _isna(flag):
-        flag = 0
-    else:
-        flag = int(flag)
-    rsi = row.get("rsi") if isinstance(row, dict) else row["rsi"]
-
-    if flag == 3 and not _isna(rsi) and float(rsi) < 25:
-        score += 30
-    elif flag == 3:
-        score += 27
-    elif flag == 2:
-        score += 18
-    elif flag == 1:
-        score += 10
-    elif not _isna(rsi) and float(rsi) < 33:
-        score += 5
-    elif not _isna(rsi) and float(rsi) < 37:
-        score += 3
-
-    # --- Bollinger Band (0–20) ---
-    bb = row.get("bb_pct_b") if isinstance(row, dict) else row["bb_pct_b"]
-    if _isna(bb):
-        score += 10
-    elif float(bb) < 0:
-        score += 20
-    elif float(bb) < 0.05:
-        score += 18
-    elif float(bb) < 0.10:
-        score += 15
-    elif float(bb) < 0.20:
-        score += 10
-    elif float(bb) < 0.30:
-        score += 5
-
-    # --- ML prediction (0–20) ---
-    ml = row.get("prediction_score") if isinstance(row, dict) else row["prediction_score"]
-    if _isna(ml):
-        score += 10
-    elif float(ml) >= 0.10:
-        score += 20
-    elif float(ml) >= 0.05:
-        score += 16
-    elif float(ml) >= 0.03:
-        score += 10
-    elif float(ml) >= 0.02:
-        score += 6
-    elif float(ml) >= 0.01:
-        score += 3
-
-    # --- Analyst upside (0–15) ---
-    target = row.get("target_mean_price") if isinstance(row, dict) else row["target_mean_price"]
-    upside = row.get("fair_value_upside") if isinstance(row, dict) else row["fair_value_upside"]
-    if _isna(target) or _isna(upside):
-        score += 8
-    elif float(upside) >= 0.60:
-        score += 15
-    elif float(upside) >= 0.30:
-        score += 12
-    elif float(upside) >= 0.15:
-        score += 7
-    elif float(upside) >= 0.0:
-        score += 3
-
-    # --- Volume (0–5) ---
-    vf = row.get("volume_flag") if isinstance(row, dict) else row["volume_flag"]
-    if not _isna(vf) and vf:
-        score += 5
-
-    # --- 52-week position (0–5) ---
-    w52 = row.get("week52_condition") if isinstance(row, dict) else row["week52_condition"]
-    if _isna(w52) or w52:
-        score += 5
-
-    # --- Health (0–5) ---
-    health = row.get("health_score") if isinstance(row, dict) else row["health_score"]
-    if _isna(health):
-        score += 3
-    elif float(health) >= 5:
-        score += 5
-    elif float(health) >= 4:
-        score += 4
-    elif float(health) >= 3:
-        score += 3
-
-    return int(score)
+    return int(round(_compute_vqs(row) * 100 / 9))
 
 
 def run_scoring(target_date=None, open_positions=None):
