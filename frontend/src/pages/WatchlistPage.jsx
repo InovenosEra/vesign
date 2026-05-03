@@ -157,7 +157,7 @@ export default function WatchlistPage() {
     queryFn: getWatchlists,
   })
 
-  const { data: tickers = [], isLoading: loadingTickers } = useQuery({
+  const { data: tickers = [], isFetched: tickersFetched } = useQuery({
     queryKey: ['watchlist-tickers', selectedId],
     queryFn: () => getWatchlistTickers(selectedId),
     enabled: selectedId != null,
@@ -165,7 +165,7 @@ export default function WatchlistPage() {
 
   const tickerSymbols = useMemo(() => tickers.map(t => t.ticker), [tickers])
 
-  const { data: signalData = [] } = useQuery({
+  const { data: signalData = [], isFetched: signalsFetched } = useQuery({
     queryKey: ['watchlist-signals', tickerSymbols.join(',')],
     queryFn: () => getSignalsByTickers(tickerSymbols),
     enabled: tickerSymbols.length > 0,
@@ -184,11 +184,21 @@ export default function WatchlistPage() {
   const [expandedTickers, setExpandedTickers] = useState({})
   const [newLot, setNewLot] = useState({})   // { [ticker]: { quantity, buy_price, buy_date } }
 
-  const { data: holdings = [] } = useQuery({
+  const { data: holdings = [], isFetched: holdingsFetched } = useQuery({
     queryKey: ['watchlist-holdings', selectedId],
     queryFn: () => getHoldings(selectedId),
     enabled: selectedId != null,
   })
+
+  // Gate the watchlist table on tickers + signals + holdings all being ready
+  // for the current list — otherwise rows render with ticker symbols only and
+  // signal/health/price cells fill in a beat later. isFetched is per-key, so
+  // background refreshes don't re-hide the table.
+  const watchlistTableReady = (
+    tickersFetched
+    && (tickerSymbols.length === 0 || signalsFetched)
+    && holdingsFetched
+  )
 
   // Group holdings by ticker
   const holdingsByTicker = useMemo(() => {
@@ -715,7 +725,7 @@ export default function WatchlistPage() {
                 )}
               </div>
 
-              {loadingTickers ? (
+              {!watchlistTableReady ? (
                 <p className="loading">{t('table.loading')}</p>
               ) : tickers.length === 0 ? (
                 <p className="empty">{t('watchlist.noTickers')}</p>
