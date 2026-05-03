@@ -1,7 +1,7 @@
-"""Generate a simple, wordmark-style 'S&P 500' logo PNG.
+"""Generate a transparent 'S&P 500' text PNG.
 
-Clean white tile, bold black text, no border or decoration — matching the
-official S&P trademark wordmark aesthetic. Used for both SPY and VOO.
+Used for both SPY and VOO. Transparent background + white text so the
+visual reads as plain text floating in the dark UI cell, not as a tile.
 
 Renders at 2x then LANCZOS-downsamples for crisp typography.
 """
@@ -10,10 +10,9 @@ from PIL import Image, ImageDraw, ImageFont
 OUT_SIZE = 256
 RENDER = 512  # render at 2x then downsample
 
-WHITE = (255, 255, 255)
-BLACK = (15, 15, 15)
+WHITE = (232, 234, 240, 255)  # matches App.css var(--text)
 
-img = Image.new("RGB", (RENDER, RENDER), WHITE)
+img = Image.new("RGBA", (RENDER, RENDER), (0, 0, 0, 0))  # transparent
 draw = ImageDraw.Draw(img)
 
 # Helvetica Neue Bold via .ttc index 1
@@ -26,7 +25,7 @@ w = bbox[2] - bbox[0]
 h = bbox[3] - bbox[1]
 x = (RENDER - w) // 2 - bbox[0]
 y = (RENDER - h) // 2 - bbox[1]
-draw.text((x, y), text, font=font, fill=BLACK)
+draw.text((x, y), text, font=font, fill=WHITE)
 
 img = img.resize((OUT_SIZE, OUT_SIZE), Image.LANCZOS)
 img.save("/tmp/sp500_logo.png", "PNG", optimize=True)
