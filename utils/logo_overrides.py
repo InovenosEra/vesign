@@ -15,4 +15,6 @@ LOGO_OVERRIDES = {
     "VSNT": "https://img.logo.dev/ticker/VSNT?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
     "OPLN": "https://img.logo.dev/ticker/OPLN?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
     "HTO":  "https://img.logo.dev/ticker/HTO?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
+    "SPY":  "https://img.logo.dev/ticker/SPY?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
+    "NICE": "https://img.logo.dev/ticker/NICE?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
 }
