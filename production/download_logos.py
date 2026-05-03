@@ -72,12 +72,19 @@ def _sync_logo_urls_to_disk() -> int:
     fixed = 0
     with engine.begin() as conn:
         for t in on_disk:
+            # Skip rows that already point to the right file (with or without
+            # a cache-busting query string like '?v=2'). Without this, the
+            # sweep would strip the ?v query and re-trigger Cloudflare cache
+            # hits on stale edge content.
             res = conn.execute(
                 text(
                     "UPDATE companies SET logo_url = :u "
-                    "WHERE ticker = :t AND (logo_url IS NULL OR logo_url != :u)"
+                    "WHERE ticker = :t "
+                    "  AND (logo_url IS NULL "
+                    "       OR (logo_url != :u "
+                    "           AND logo_url NOT LIKE :prefix))"
                 ),
-                {"u": f"/logos/{t}.png", "t": t},
+                {"u": f"/logos/{t}.png", "t": t, "prefix": f"/logos/{t}.png?%"},
             )
             fixed += res.rowcount or 0
     return fixed
