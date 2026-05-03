@@ -629,13 +629,13 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
             LEFT JOIN companies c ON s.ticker = c.ticker
             {_MARKET_CAP_JOIN}
             WHERE COALESCE(c.market, 'US') = :market
-            AND c.ticker NOT IN ('SPY')
+            AND c.ticker NOT IN ('SPY', 'VOO')
             AND DATE(s.date) = (
                 SELECT DATE(MAX(s2.date))
                 FROM signals s2
                 LEFT JOIN companies c2 ON s2.ticker = c2.ticker
                 WHERE COALESCE(c2.market, 'US') = :market
-                  AND c2.ticker NOT IN ('SPY')
+                  AND c2.ticker NOT IN ('SPY', 'VOO')
             )
         """), conn, params={"market": mkt})
 
@@ -673,7 +673,7 @@ def signals(
     conditions = [
         f"DATE(s.date) >= DATE('now', '-{months} months')",
         "COALESCE(c.market, 'US') = :market",
-        "c.ticker NOT IN ('SPY')",
+        "c.ticker NOT IN ('SPY', 'VOO')",
     ]
     params: dict = {"market": mkt}
 
@@ -763,7 +763,7 @@ def signals_export(
 
     conditions = [
         "COALESCE(c.market, 'US') = :market",
-        "c.ticker NOT IN ('SPY')",
+        "c.ticker NOT IN ('SPY', 'VOO')",
     ]
     params: dict = {"market": mkt}
 
@@ -1284,7 +1284,7 @@ def historical_trades(
     mkt = (market or "US").upper()
     conditions = [
         "COALESCE(c.market, 'US') = :market",
-        "c.ticker NOT IN ('SPY')",
+        "c.ticker NOT IN ('SPY', 'VOO')",
     ]
     params: dict = {"market": mkt}
     if start:
@@ -1605,7 +1605,7 @@ def _build_open_trades(mkt: str) -> list[dict]:
             continue
         if (m.get("market") or "US").upper() != mkt:
             continue
-        if ticker in ("SPY",):
+        if ticker in ("SPY", "VOO"):
             continue
         cur_sig = cur_signals.get(ticker, "HOLD")
         if cur_sig not in ("BUY", "HOLD"):

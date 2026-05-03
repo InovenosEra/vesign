@@ -111,6 +111,16 @@ def load_universe():
     tickers = companies["ticker"].tolist()
     print(f"Loaded {len(tickers)} total US tickers")
 
+    # Always include custom (non-index) companies in the daily universe — these
+    # are typically ETFs we track (SPY, VOO, …). Without this they'd live in
+    # the companies table but get skipped by the pipeline that calls
+    # load_universe(), so prices/fundamentals would never refresh.
+    if not custom.empty:
+        custom_tickers = [t for t in custom["ticker"].tolist() if t not in set(tickers)]
+        if custom_tickers:
+            print(f"Adding {len(custom_tickers)} custom ticker(s) to universe: {custom_tickers}")
+            tickers = tickers + custom_tickers
+
     try:
         watchlist_tickers = pd.read_sql("SELECT DISTINCT ticker FROM watchlist", engine)["ticker"].tolist()
         extra = [t for t in watchlist_tickers if t not in set(tickers)]
