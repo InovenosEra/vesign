@@ -201,25 +201,29 @@ export default function WatchlistPage() {
   }, [holdings])
 
   // ── Portfolio-wide data (all lists) ─────────────────────────────────────
-  const { data: portfolioHoldings = [] } = useQuery({
+  const { data: portfolioHoldings = [], isLoading: holdingsLoading } = useQuery({
     queryKey: ['portfolio-holdings', market],
     queryFn: () => getPortfolioHoldings(market),
     staleTime: 60_000,
     placeholderData: keepPreviousData,
   })
-  const { data: compData = [] } = useQuery({
+  const { data: compData = [], isLoading: compLoading } = useQuery({
     queryKey: ['portfolio-comparison', market],
     queryFn: () => getPortfolioComparison(market),
     staleTime: 300_000,
     placeholderData: keepPreviousData,
   })
   const [perfMonths, setPerfMonths] = usePersistedState('watchlist.perfMonths', 12)
-  const { data: perfData = [] } = useQuery({
+  const { data: perfData = [], isLoading: perfLoading } = useQuery({
     queryKey: ['portfolio-performance', market, perfMonths],
     queryFn: () => getPortfolioPerformance(market, perfMonths),
     staleTime: 300_000,
     placeholderData: keepPreviousData,
   })
+  // Show the whole portfolio section in one shot — the line chart's endpoint
+  // is the slowest, so without this gate the donut/bar appear first and the
+  // line chart pops in a beat later.
+  const portfolioSectionReady = !holdingsLoading && !compLoading && !perfLoading
   // Prefetch all period options so chip clicks feel instant
   useEffect(() => {
     for (const m of [3, 6, 12, 24, 36]) {
@@ -377,7 +381,7 @@ export default function WatchlistPage() {
       <p className="page-title">{t('portfolio.title')}</p>
 
       {/* ── Portfolio summary (all lists) ── */}
-      {portEnriched.length > 0 && (
+      {portEnriched.length > 0 && portfolioSectionReady && (
         /* 5-col grid: [content] [1px divider] [content] [1px divider] [content]
            Both rows (cards + charts) share the same columns so dividers align perfectly */
         <div style={{
