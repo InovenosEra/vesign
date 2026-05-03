@@ -10,7 +10,7 @@ static/logos/. The bulk downloader skips these entirely so it never overwrites
 the file with whatever a CDN returns.
 """
 
-MANUAL_LOGOS: set[str] = {"SPY"}
+MANUAL_LOGOS: set[str] = {"SPY", "VOO"}
 
 LOGO_OVERRIDES = {
     "PENG": "https://cdn.prod.website-files.com/6764579f0a24e5a0083f25bb/67bb88245ce879aaca499ddb_schema--penguin-logo.jpg",

@@ -19,6 +19,7 @@ logs/
 static/logos/*
 !static/logos/.gitkeep
 !static/logos/SPY.png
+!static/logos/VOO.png
 
 # Local-only research artefacts (kept on disk, not in repo)
 .DS_Store
