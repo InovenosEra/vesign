@@ -53,6 +53,36 @@ def download_one(ticker: str, domain: Optional[str]) -> tuple[str, Optional[str]
     return ticker, src
 
 
+def _sync_logo_urls_to_disk() -> int:
+    """Ensure companies.logo_url == '/logos/{T}.png' for every ticker with an
+    on-disk PNG. Idempotent and self-healing — call it from any pipeline that
+    might have clobbered the column.
+
+    Returns number of rows actually updated.
+    """
+    if not os.path.isdir(LOGO_DIR):
+        return 0
+    on_disk = {
+        f.removesuffix(".png")
+        for f in os.listdir(LOGO_DIR)
+        if f.endswith(".png")
+    }
+    if not on_disk:
+        return 0
+    fixed = 0
+    with engine.begin() as conn:
+        for t in on_disk:
+            res = conn.execute(
+                text(
+                    "UPDATE companies SET logo_url = :u "
+                    "WHERE ticker = :t AND (logo_url IS NULL OR logo_url != :u)"
+                ),
+                {"u": f"/logos/{t}.png", "t": t},
+            )
+            fixed += res.rowcount or 0
+    return fixed
+
+
 def download_all(missing_only: bool = False, max_workers: int = 20) -> dict:
     """Download logos for every ticker (or only those without an on-disk file).
 
@@ -69,6 +99,9 @@ def download_all(missing_only: bool = False, max_workers: int = 20) -> dict:
         print(f"Full mode: {len(df)} tickers")
 
     if df.empty:
+        fixed = _sync_logo_urls_to_disk()
+        if fixed:
+            print(f"Repaired logo_url for {fixed} ticker(s) (DB out of sync with on-disk PNGs)")
         return {"downloaded": 0, "failed": 0, "failed_tickers": [], "sources": {}}
 
     succeeded: list[str] = []
@@ -97,19 +130,22 @@ def download_all(missing_only: bool = False, max_workers: int = 20) -> dict:
                 print(f"  {i}/{len(df)} processed, {len(succeeded)} ok, {len(failed)} failed")
 
     # ── Update DB rows ───────────────────────────────────────────────────────
+    fixed = _sync_logo_urls_to_disk()
+    on_disk = {
+        f.removesuffix(".png")
+        for f in os.listdir(LOGO_DIR)
+        if f.endswith(".png")
+    }
     with engine.begin() as conn:
-        for t in succeeded:
-            conn.execute(
-                text("UPDATE companies SET logo_url = :u WHERE ticker = :t"),
-                {"u": f"/logos/{t}.png", "t": t},
-            )
         for t in failed:
+            if t in on_disk:
+                continue  # download failed but a file exists — already synced above
             conn.execute(
                 text("UPDATE companies SET logo_url = NULL WHERE ticker = :t"),
                 {"t": t},
             )
 
-    print(f"\nDone: {len(succeeded)} downloaded, {len(failed)} failed")
+    print(f"\nDone: {len(succeeded)} downloaded, {len(failed)} failed, {fixed} URL(s) repaired")
     print(f"Sources: {sources}")
     if failed:
         print(f"Failed tickers (first 20): {failed[:20]}")

@@ -38,9 +38,6 @@ def _fetch_index_table(url: str) -> pd.DataFrame:
             .str.replace(" ", "") + ".com"
         )
 
-    companies["logo_url"] = (
-        "https://financialmodelingprep.com/image-stock/" + companies["ticker"] + ".png"
-    )
     companies["market"] = "US"
 
     return companies
@@ -80,7 +77,10 @@ def load_universe():
             print(f"Excluded {excluded_n} ticker(s) per EXCLUDED_TICKERS: "
                   f"{sorted(EXCLUDED_TICKERS)}")
 
-    EXTRA_COLS = ["industry", "description", "description_short"]
+    # logo_url is preserved across reloads — owned by production/download_logos.py.
+    # Without preservation, this table replace would clobber the self-hosted
+    # /logos/{T}.png paths back to NULL (or worse, an arbitrary URL).
+    EXTRA_COLS = ["industry", "description", "description_short", "logo_url"]
     try:
         existing = pd.read_sql("SELECT * FROM companies", engine)
         index_tickers = set(companies["ticker"])
@@ -124,10 +124,8 @@ def load_universe():
                     "company":  new_co,
                     "sector":   [""] * len(new_co),
                     "market":   ["US"] * len(new_co),
-                    "logo_url": [
-                        f"https://financialmodelingprep.com/image-stock/{t}.png"
-                        for t in new_co
-                    ],
+                    # logo_url left NULL — production/download_logos.py
+                    # (called from run_daily) will populate it.
                 }).to_sql("companies", engine, if_exists="append", index=False)
             tickers = tickers + extra
     except Exception as e:

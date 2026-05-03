@@ -250,7 +250,6 @@ def update_company_info():
                 "market_cap":         profile.get("marketCap"),
                 "industry":           profile.get("industry"),
                 "description":        profile.get("description"),
-                "logo_url":           profile.get("image"),
                 "target_mean_price":  target_mean,
                 "target_high_price":  target_high,
                 "target_low_price":   target_low,
@@ -289,18 +288,19 @@ def update_company_info():
             # Table doesn't exist yet — fresh DB rebuild. First to_sql will create it.
             pass
         fund_df.to_sql("fundamentals", engine, if_exists="append", index=False)
-        # Update industry, description, and logo_url in companies table
+        # Update industry and description in companies table.
+        # logo_url is owned by production/download_logos.py — do NOT touch it
+        # here, or every pipeline run would clobber the self-hosted /logos/{T}.png
+        # path back to the deprecated FMP CDN URL from profile["image"].
         with engine.begin() as conn:
-            for _, row in df[["ticker", "industry", "description", "logo_url"]].iterrows():
-                if row["industry"] or row["description"] or row["logo_url"]:
+            for _, row in df[["ticker", "industry", "description"]].iterrows():
+                if row["industry"] or row["description"]:
                     conn.execute(text(
                         "UPDATE companies SET "
                         "industry = :ind, "
-                        "description = :desc, "
-                        "logo_url = COALESCE(:logo, logo_url) "
+                        "description = :desc "
                         "WHERE ticker = :t"
-                    ), {"ind": row["industry"], "desc": row["description"],
-                        "logo": row["logo_url"], "t": row["ticker"]})
+                    ), {"ind": row["industry"], "desc": row["description"], "t": row["ticker"]})
         mark_run("fundamentals_update")
 
     if needs_analyst:
