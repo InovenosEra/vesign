@@ -1509,10 +1509,15 @@ def trades_export(
     )
 
 
-@protected.get("/api/trades/open")
-def open_trades(market: Optional[str] = None):
-    """Tickers with a BUY signal and no SELL since — currently open positions."""
-    mkt = (market or "US").upper()
+# In-memory cache for /api/trades/open — the underlying CTE scans the signals
+# table 3× and takes ~16s on prod data. The result only changes when the daily
+# pipeline rewrites signals, so a once-per-day rebuild per market is correct.
+_open_trades_cache: dict[str, dict] = {}
+_open_trades_cache_lock = threading.Lock()
+
+
+def _build_open_trades(mkt: str) -> list[dict]:
+    """Slow path — same body as the endpoint, kept here for the cache builder."""
 
     def _v(v):
         return None if (isinstance(v, float) and math.isnan(v)) else v
@@ -1636,6 +1641,23 @@ def open_trades(market: Optional[str] = None):
 
     result.sort(key=lambda x: x["buy_date"], reverse=True)
     return result
+
+
+def _get_open_trades_cached(mkt: str) -> list[dict]:
+    today_iso = date.today().isoformat()
+    with _open_trades_cache_lock:
+        c = _open_trades_cache.get(mkt)
+        if c is not None and c["built_on"] == today_iso:
+            return c["data"]
+        data = _build_open_trades(mkt)
+        _open_trades_cache[mkt] = {"built_on": today_iso, "data": data}
+        return data
+
+
+@protected.get("/api/trades/open")
+def open_trades(market: Optional[str] = None):
+    """Tickers with a BUY signal and no SELL since — currently open positions."""
+    return _get_open_trades_cached((market or "US").upper())
 
 
 @protected.get("/api/trades/open/export.xlsx")
@@ -2413,6 +2435,17 @@ def _warm_vesign_cache_bg():
         pass
 
 threading.Thread(target=_warm_vesign_cache_bg, daemon=True).start()
+
+
+# Warm the open-trades cache too — its CTE takes ~16s on cold cache and is the
+# slowest user-facing endpoint without warming.
+def _warm_open_trades_cache_bg():
+    try:
+        _get_open_trades_cached("US")
+    except Exception:
+        pass
+
+threading.Thread(target=_warm_open_trades_cache_bg, daemon=True).start()
 
 # ---------------------------------------------------------------------------
 # SPA static file serving (production)
