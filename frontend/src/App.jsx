@@ -1,6 +1,8 @@
 import { useState, useEffect, useContext, useRef } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
-import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
+import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { ClerkProvider, RedirectToSignIn, useAuth, useClerk, useUser } from '@clerk/react'
 import { useTranslation } from 'react-i18next'
 import i18n from './i18n'
@@ -21,9 +23,41 @@ import './App.css'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
+// gcTime must be ≥ persistOptions.maxAge so persisted entries aren't dropped
+// from memory before they can be restored on the next page load.
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 5 * 60_000, gcTime: 60 * 60_000 } },
+  defaultOptions: { queries: { retry: 1, staleTime: 5 * 60_000, gcTime: 24 * 60 * 60_000 } },
 })
+
+// Persist the React Query cache to localStorage so reloads paint instantly
+// from last-known data while React revalidates silently in the background.
+const queryPersister = createSyncStoragePersister({
+  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  key: 'vesign-rq-cache',
+})
+
+// Per-user query keys — never persist, otherwise after a logout/re-login as
+// a different user we'd briefly serve the previous user's data.
+const USER_SCOPED_QUERY_KEYS = new Set([
+  'watchlists',
+  'watchlist-tickers',
+  'watchlist-holdings',
+  'watchlist-signals',
+  'portfolio-holdings',
+  'portfolio-performance',
+  'portfolio-comparison',
+])
+
+const persistOptions = {
+  persister: queryPersister,
+  maxAge: 24 * 60 * 60_000,
+  // Bump this string whenever an API response shape changes so old caches
+  // are invalidated for everyone on next page load.
+  buster: 'v1',
+  dehydrateOptions: {
+    shouldDehydrateQuery: (q) => !USER_SCOPED_QUERY_KEYS.has(q.queryKey?.[0]),
+  },
+}
 
 // ---------------------------------------------------------------------------
 // Shared countdown formatter
@@ -540,7 +574,7 @@ function AppLayout() {
 
   return (
     <MarketProvider>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
         <CurrencyProvider>
           <TokenSync onReady={() => setTokenReady(true)} />
           {tokenReady && <Prefetcher />}
@@ -563,7 +597,7 @@ function AppLayout() {
             </>
           )}
         </CurrencyProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </MarketProvider>
   )
 }
