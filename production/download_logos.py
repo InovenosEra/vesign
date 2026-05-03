@@ -22,6 +22,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from data.loaders import engine
 from data.logo_sources import resolve
+from utils.logo_overrides import MANUAL_LOGOS
 
 _APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGO_DIR = os.path.join(_APP_ROOT, "static", "logos")
@@ -98,6 +99,9 @@ def download_all(missing_only: bool = False, max_workers: int = 20) -> dict:
     """
     os.makedirs(LOGO_DIR, exist_ok=True)
     df = pd.read_sql("SELECT ticker, domain FROM companies", engine)
+
+    if MANUAL_LOGOS:
+        df = df[~df["ticker"].isin(MANUAL_LOGOS)]
 
     if missing_only:
         df = df[~df["ticker"].apply(lambda t: os.path.exists(_logo_path(t)))]

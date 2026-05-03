@@ -4,7 +4,13 @@ These URLs are tried FIRST by `data.logo_sources.from_override()` during the
 bulk-download phase. The downloader fetches the bytes from these URLs, saves
 them to static/logos/, and updates companies.logo_url to /logos/{T}.png — so
 no caller needs to apply this dict to the DB anymore.
+
+`MANUAL_LOGOS` lists tickers whose PNG is hand-crafted and committed under
+static/logos/. The bulk downloader skips these entirely so it never overwrites
+the file with whatever a CDN returns.
 """
+
+MANUAL_LOGOS: set[str] = {"SPY"}
 
 LOGO_OVERRIDES = {
     "PENG": "https://cdn.prod.website-files.com/6764579f0a24e5a0083f25bb/67bb88245ce879aaca499ddb_schema--penguin-logo.jpg",
@@ -15,6 +21,5 @@ LOGO_OVERRIDES = {
     "VSNT": "https://img.logo.dev/ticker/VSNT?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
     "OPLN": "https://img.logo.dev/ticker/OPLN?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
     "HTO":  "https://img.logo.dev/ticker/HTO?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
-    "SPY":  "https://img.logo.dev/ticker/SPY?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
     "NICE": "https://img.logo.dev/ticker/NICE?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ",
 }

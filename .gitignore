@@ -15,8 +15,10 @@ db_backups/
 logs/
 
 # Self-hosted logos — actual PNGs are downloaded at deploy time, not committed
+# Exception: hand-crafted PNGs listed in utils.logo_overrides.MANUAL_LOGOS
 static/logos/*
 !static/logos/.gitkeep
+!static/logos/SPY.png
 
 # Local-only research artefacts (kept on disk, not in repo)
 .DS_Store
