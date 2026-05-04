@@ -6,6 +6,26 @@ import {
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
+
+// ---------- helper: pull all 5Y trades for one ticker -----------------------
+// Used by TradeModal so its chart shows the full historical trade history,
+// independent of the page-level date filter (which defaults to last 12 months
+// and would otherwise hide older closed trades from the modal chart).
+function useFiveYearTradesForTicker(ticker, market) {
+  const fiveYearsAgo = (() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 5)
+    d.setDate(d.getDate() - 7)
+    return d.toISOString().slice(0, 10)
+  })()
+  const todayStr = new Date().toISOString().slice(0, 10)
+  return useQuery({
+    queryKey: ['trades-5y-by-ticker', ticker, market],
+    queryFn: () => getTrades({ start: fiveYearsAgo, end: todayStr, market }),
+    staleTime: 5 * 60_000,
+    enabled: !!ticker,
+  })
+}
 import { useSort } from '../hooks/useSort'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { usePersistedState } from '../hooks/usePersistedState'
@@ -111,12 +131,25 @@ function PriceBoxLabel({ viewBox, value, color }) {
 // Trade chart modal — supports multiple BUY/SELL pairs
 // ---------------------------------------------------------------------------
 
-function TradeModal({ row, start, end, onClose }) {
+function TradeModal({ row: rowProp, start, end, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const { fmtPrice } = useCurrency()
-  const isIL      = row.ticker?.endsWith('.TA') ?? market === 'IL'
+  const isIL      = rowProp.ticker?.endsWith('.TA') ?? market === 'IL'
   const priceScale = isIL ? 100 : 1
+
+  // Override row.trades with the full 5Y history for this ticker so the chart
+  // shows every closed BUY→SELL pair regardless of the page-level filter.
+  // Without this, opening from the table while filtered to "last 1Y" only
+  // showed trades within the last year — INDO's 2021 trades were missing.
+  const { data: fiveYearTrades } = useFiveYearTradesForTicker(rowProp.ticker, market)
+  const row = useMemo(() => {
+    const all = (fiveYearTrades ?? []).find(tk => tk.ticker === rowProp.ticker)?.trades
+    if (!all || all.length === 0) return rowProp
+    // Keep the originally-clicked top-level fields (buy_date, buy_price, etc.)
+    // but replace the inner trades array with the full historical set.
+    return { ...rowProp, trades: all.filter(p => p.result !== 'Open') }
+  }, [rowProp, fiveYearTrades])
 
   const [descTab, setDescTab] = useState('info')
 
