@@ -29,6 +29,7 @@ static/logos/*
 !static/logos/TEAM.png
 !static/logos/MTUS.png
 !static/logos/TMST.png
+!static/logos/INDO.png
 
 # Local-only research artefacts (kept on disk, not in repo)
 .DS_Store

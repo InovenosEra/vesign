@@ -20,6 +20,7 @@ MANUAL_LOGOS: set[str] = {
     "FELE",             # parqet returned the *Franklin Resources* Ben Franklin engraving by mistake; corrected via logo.dev /franklin-electric.com
     "TEAM",             # parqet returned Ormat's logo by mistake; corrected via logo.dev /atlassian.com
     "MTUS", "TMST",     # both = Metallus Inc; parqet returned generic "metallic F"; corrected via logo.dev /metallus.com
+    "INDO",             # parqet served generic flame icon; corrected via logo.dev /indo-energy.com (Indonesia Energy proper wordmark)
 }
 
 LOGO_OVERRIDES = {
