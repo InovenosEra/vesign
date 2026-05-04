@@ -2,7 +2,7 @@ import os
 import yfinance as yf
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, UTC
+from datetime import date, datetime, timedelta, UTC
 from utils.universe_loader import load_universe
 from data.loaders import engine
 from sqlalchemy import text
@@ -13,6 +13,11 @@ from data import fmp
 
 # Batch size for backfilling large numbers of new tickers (avoids memory/timeout issues)
 _BACKFILL_BATCH = 200
+
+# Earliest date for which we keep price history. Newly-added tickers are
+# backfilled from this date so they match the depth of the rest of the DB.
+# Same constant as production/rebuild_from_2020.py — keep in sync.
+_HISTORY_START = date(2020, 1, 1)
 
 
 def _download_and_save(tickers: list, start_date, end_date, batch_size: int = 0):
@@ -102,7 +107,11 @@ def update_prices():
     new_tickers = [t for t in tickers if t not in initialized]
 
     if new_tickers:
-        backfill_start = end_date - timedelta(days=3 * 365)
+        # Backfill new tickers from the same anchor date used by the full
+        # rebuild (2020-01-01) so the DB stays uniform. Was 3 years previously,
+        # which left newly-added tickers (e.g. NASDAQ-100 expansions) shallower
+        # than the rest and broke point-in-time joins on older signals.
+        backfill_start = _HISTORY_START
         print(f"Backfilling {len(new_tickers):,} new tickers from {backfill_start} to {end_date}…")
         _download_and_save(new_tickers, backfill_start, end_date, batch_size=_BACKFILL_BATCH)
 

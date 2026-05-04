@@ -156,3 +156,44 @@ def analyst_upgrades(ticker: str, limit: int = 8) -> list:
              "action": item.get("action", ""), "from_grade": item.get("previousGrade", ""),
              "to_grade": item.get("newGrade", ""), "price_target": item.get("priceTarget")}
             for item in data[:limit]]
+
+
+# ─── Index constituents ───
+# All four sources used by utils.universe_loader. Returns a list of dicts with
+# at least {ticker, company, sector}. sector may be empty when the source is an
+# ETF-holdings call (FMP exposes S&P 400/600 only via IJH/IJR holdings, which
+# don't carry a sector field — universe_loader fills it from the existing
+# companies table where possible).
+
+def sp500_constituents() -> list:
+    """S&P 500 index members. Returns [{ticker, company, sector}]."""
+    data = _get("sp500-constituent", {})
+    if not isinstance(data, list):
+        return []
+    return [{"ticker":  (r.get("symbol") or "").replace(".", "-"),
+             "company": r.get("name") or r.get("symbol", ""),
+             "sector":  r.get("sector") or ""}
+            for r in data if r.get("symbol")]
+
+
+def nasdaq100_constituents() -> list:
+    """NASDAQ-100 index members. Returns [{ticker, company, sector}]."""
+    data = _get("nasdaq-constituent", {})
+    if not isinstance(data, list):
+        return []
+    return [{"ticker":  (r.get("symbol") or "").replace(".", "-"),
+             "company": r.get("name") or r.get("symbol", ""),
+             "sector":  r.get("sector") or ""}
+            for r in data if r.get("symbol")]
+
+
+def etf_holdings(symbol: str) -> list:
+    """Raw ETF holdings — used to derive S&P 400 (IJH) and S&P 600 (IJR).
+
+    Returns the raw FMP list with keys {symbol, asset, name, isin, securityCusip,
+    sharesNumber, weightPercentage, marketValue, updatedAt}. Filtering out cash
+    sleeves and non-stock entries is the caller's responsibility — see
+    utils.universe_loader._etf_holdings_as_constituents.
+    """
+    data = _get("etf/holdings", {"symbol": symbol})
+    return data if isinstance(data, list) else []
