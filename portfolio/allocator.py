@@ -57,6 +57,15 @@ def run_allocator():
         print("No BUY signals today")
         return
 
+    # Bucket NaN/empty sectors as "Unknown" so the per-sector loop doesn't end
+    # up with len(sector_df)==0 → ZeroDivisionError. Without this, any BUY
+    # whose company row has a NULL sector (typical for newly-added tickers
+    # before company_profile populates) crashes the entire allocator.
+    buys["sector"] = (
+        buys["sector"]
+            .where(buys["sector"].notna() & (buys["sector"].astype(str).str.strip() != ""), "Unknown")
+    )
+
     # Equal capital per sector
     sectors = buys["sector"].unique()
     sector_weight = 1 / len(sectors)
