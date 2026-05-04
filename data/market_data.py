@@ -408,15 +408,20 @@ def fill_analyst_consensus_from_events(window_days: int = 365) -> int:
         return 0
 
     # UPSERT — but only fill rows where target_mean_price is currently NULL.
-    # The DO UPDATE clause is gated by target_mean_price IS NULL so this can
-    # never overwrite an FMP-supplied consensus.
-    filled = 0
+    # Split the bulk-insert and the per-ticker UPDATEs into separate
+    # transactions: an earlier version mixed batch executemany (INSERT OR
+    # IGNORE with a list of dicts) and single-execute UPDATEs in one
+    # `engine.begin()` block. SQLAlchemy occasionally lost the binding for
+    # `number_of_analysts` mid-transaction (78 rows came out with
+    # mean/high/low set but n_analysts NULL). Two separate transactions
+    # avoid the issue.
     with engine.begin() as conn:
-        # Make sure rows exist for tickers that don't have any analyst_expectations row yet
-        conn.execute(text("""
-            INSERT OR IGNORE INTO analyst_expectations (ticker) VALUES (:t)
-        """), [{"t": r["ticker"]} for r in rows_to_write])
-        for r in rows_to_write:
+        conn.execute(text("INSERT OR IGNORE INTO analyst_expectations (ticker) VALUES (:t)"),
+                     [{"t": r["ticker"]} for r in rows_to_write])
+
+    filled = 0
+    for r in rows_to_write:
+        with engine.begin() as conn:
             res = conn.execute(text("""
                 UPDATE analyst_expectations
                 SET target_mean_price = :mean,
