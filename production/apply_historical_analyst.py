@@ -85,9 +85,13 @@ def compute_per_date_consensus(changes: pd.DataFrame, feature_keys: pd.DataFrame
     print(f"Computing per-date consensus (window={window_days}d, one target per analyst, {len(feature_keys):,} rows)…")
 
     changes = changes.copy()
-    changes["published_date"] = pd.to_datetime(changes["published_date"])
+    changes["published_date"] = pd.to_datetime(changes["published_date"], format="mixed", errors="coerce")
     feature_keys = feature_keys.copy()
-    feature_keys["date"] = pd.to_datetime(feature_keys["date"])
+    # `format="mixed"` tolerates rows where features.date is stored as plain
+    # YYYY-MM-DD alongside rows with full ISO datetimes. The features table is
+    # written by multiple paths (compute_and_save_features_chunked vs the daily
+    # incremental updates) which historically produced both shapes.
+    feature_keys["date"] = pd.to_datetime(feature_keys["date"], format="mixed", errors="coerce")
 
     if "analyst_company" not in changes.columns:
         changes["analyst_company"] = ""
@@ -177,7 +181,7 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
 
     print("Loading features (bulk)…")
     features = pd.read_sql("SELECT * FROM features ORDER BY ticker, date", engine)
-    features["date"] = pd.to_datetime(features["date"])
+    features["date"] = pd.to_datetime(features["date"], format="mixed", errors="coerce")
 
     # Drop the stale current-snapshot analyst columns that backfill used before
     for c in ("target_mean_price", "target_high_price", "target_low_price",
@@ -187,13 +191,13 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
 
     # Merge per-date analyst
     per_date_analyst = per_date_analyst.copy()
-    per_date_analyst["date"] = pd.to_datetime(per_date_analyst["date"])
+    per_date_analyst["date"] = pd.to_datetime(per_date_analyst["date"], format="mixed", errors="coerce")
     df = features.merge(per_date_analyst, on=["ticker", "date"], how="left")
 
     # Predictions + health
     try:
         predictions = pd.read_sql("SELECT ticker, date, prediction_score FROM predictions", engine)
-        predictions["date"] = pd.to_datetime(predictions["date"])
+        predictions["date"] = pd.to_datetime(predictions["date"], format="mixed", errors="coerce")
         df = df.merge(predictions, on=["ticker", "date"], how="left")
     except Exception:
         df["prediction_score"] = float("nan")
