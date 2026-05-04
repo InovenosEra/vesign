@@ -57,7 +57,12 @@ BLOCKED_ETFS = {
 
 # Columns preserved across reloads — owned by other parts of the pipeline.
 # Without preservation, replacing the companies table would clobber these.
-PRESERVED_COLS = ["industry", "description", "description_short", "logo_url"]
+#
+# `domain` was previously rebuilt every reload from Wikipedia's "Website" column,
+# but the FMP-based feeds don't carry it. We preserve whatever's already there
+# (legacy domain hints used by production/download_logos.py); new tickers get
+# NULL and download_logos.py falls back to ticker-only lookup strategies.
+PRESERVED_COLS = ["industry", "description", "description_short", "logo_url", "domain"]
 
 
 def _is_clean_stock_ticker(t: str) -> bool:
