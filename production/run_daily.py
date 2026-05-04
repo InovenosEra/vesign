@@ -95,8 +95,17 @@ def _repair_price_gaps():
 
 
 def _repair_market_caps():
-    """Re-fetch market_cap from FMP for any ticker where it is NULL."""
+    """Two-stage repair for NULL market_cap rows in fundamentals.
+
+    Stage 1: re-fetch FMP /profile (timing-flaky — sometimes returns marketCap
+             on retry when the original update_company_info call missed it).
+    Stage 2: fallback compute from close × latest shares_outstanding using
+             daily_prices and market_cap_history. Catches the case where FMP
+             /profile chronically omits marketCap for a ticker (we observed
+             ~84 such cases at one point — DASH, AXP, AZN, DE, DDOG, etc.).
+    """
     import pandas as pd
+    from sqlalchemy import text
     from data import fmp
 
     df = pd.read_sql(
@@ -108,7 +117,9 @@ def _repair_market_caps():
         print("Market cap repair: none needed.")
         return
     print(f"Market cap repair: {len(tickers)} tickers with NULL market_cap…")
-    fixed = 0
+
+    # Stage 1: re-fetch FMP profile
+    stage1 = 0
     with engine.begin() as conn:
         for t in tickers:
             try:
@@ -116,22 +127,54 @@ def _repair_market_caps():
                 mc = profile.get("marketCap")
                 if mc:
                     result = conn.execute(
-                        __import__("sqlalchemy").text(
-                            "UPDATE fundamentals SET market_cap=:mc WHERE ticker=:t"
-                        ),
+                        text("UPDATE fundamentals SET market_cap=:mc WHERE ticker=:t"),
                         {"mc": mc, "t": t},
                     )
                     if result.rowcount == 0:
                         conn.execute(
-                            __import__("sqlalchemy").text(
-                                "INSERT INTO fundamentals (ticker, market_cap) VALUES (:t, :mc)"
-                            ),
+                            text("INSERT INTO fundamentals (ticker, market_cap) VALUES (:t, :mc)"),
                             {"t": t, "mc": mc},
                         )
-                    fixed += 1
+                    stage1 += 1
             except Exception:
                 pass
-    print(f"Market cap repair done: {fixed}/{len(tickers)} fixed.")
+    print(f"  Stage 1 (FMP profile re-fetch): {stage1}/{len(tickers)} filled")
+
+    # Stage 2: anything still NULL — compute from close × shares_outstanding
+    still_null = pd.read_sql(
+        "SELECT ticker FROM fundamentals WHERE market_cap IS NULL",
+        engine,
+    )["ticker"].tolist()
+    if not still_null:
+        print(f"Market cap repair done: {stage1} fixed.")
+        return
+
+    stage2 = 0
+    with engine.begin() as conn:
+        for t in still_null:
+            try:
+                close_row = conn.execute(
+                    text("SELECT close FROM daily_prices WHERE ticker=:t ORDER BY date DESC LIMIT 1"),
+                    {"t": t},
+                ).fetchone()
+                if not close_row or not close_row[0]:
+                    continue
+                shares_row = conn.execute(
+                    text("SELECT shares_outstanding FROM market_cap_history WHERE ticker=:t ORDER BY date DESC LIMIT 1"),
+                    {"t": t},
+                ).fetchone()
+                if not shares_row or not shares_row[0]:
+                    continue
+                mc = float(close_row[0]) * float(shares_row[0])
+                conn.execute(
+                    text("UPDATE fundamentals SET market_cap=:mc WHERE ticker=:t"),
+                    {"mc": mc, "t": t},
+                )
+                stage2 += 1
+            except Exception:
+                pass
+    print(f"  Stage 2 (close × shares): {stage2} additional filled")
+    print(f"Market cap repair done: {stage1 + stage2}/{len(tickers)} fixed.")
 
 
 def _repair_analyst_targets():
