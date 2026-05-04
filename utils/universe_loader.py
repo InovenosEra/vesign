@@ -189,15 +189,22 @@ def load_universe():
                     custom[col] = None
 
         # Sector fallback: only fill blanks from existing data.
+        # Bug fix (2026-05-04): the previous predicate did
+        #   companies["sector"].astype(str).str.strip() != ""
+        # which converted None values to the string "None" — never empty after
+        # strip — so .where() KEPT None instead of falling back to existing.
+        # Result: every update_prices() call (which invokes load_universe) was
+        # silently nulling sector for ~1000 S&P 400/600 tickers, since IJH/IJR
+        # ETF holdings don't carry a sector field. Use isna() + empty-string
+        # check as the proper "blank" predicate.
         if "sector" in existing.columns:
             existing_sector = existing[["ticker", "sector"]].rename(
                 columns={"sector": "_existing_sector"}
             )
             companies = companies.merge(existing_sector, on="ticker", how="left")
-            companies["sector"] = companies["sector"].where(
-                companies["sector"].astype(str).str.strip() != "",
-                companies["_existing_sector"]
-            )
+            sec = companies["sector"]
+            is_blank = sec.isna() | (sec.astype(str).str.strip() == "")
+            companies["sector"] = sec.mask(is_blank, companies["_existing_sector"])
             companies = companies.drop(columns=["_existing_sector"])
     except Exception as e:
         print(f"  (no existing companies to merge from — fresh DB? {e})")
