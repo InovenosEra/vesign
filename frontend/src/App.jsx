@@ -579,11 +579,51 @@ function StaleDataBanner() {
   )
 }
 
+// "Your account has been disabled" full-screen — shown when the backend
+// returns 403 ACCOUNT_DISABLED. Listens for the global event emitted from
+// api.js so any failed call surfaces the same screen.
+function AccountDisabledScreen({ reason }) {
+  const clerk = useClerk()
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#0e1420', color: '#e6e8ec', padding: '32px',
+    }}>
+      <div style={{ maxWidth: 480, textAlign: 'center' }}>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>🔒</div>
+        <h1 style={{ fontSize: 28, marginBottom: 14, fontWeight: 600 }}>Account disabled</h1>
+        <p style={{ fontSize: 15, lineHeight: 1.55, color: '#a8b1c1', marginBottom: 28 }}>
+          {reason || 'Your access to Vesign has been suspended by the administrator. If you believe this is a mistake, please contact us.'}
+        </p>
+        <button
+          onClick={() => clerk.signOut().then(() => { window.location.href = '/' })}
+          style={{
+            background: '#2962ff', color: 'white', border: 'none', padding: '10px 24px',
+            borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer',
+          }}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AppLayout() {
   const { isLoaded, userId } = useAuth()
   const { user } = useUser()
   const location = useLocation()
   const [tokenReady, setTokenReady] = useState(false)
+  const [disabledReason, setDisabledReason] = useState(null)
+
+  // Listen for the global ACCOUNT_DISABLED event from api.js
+  useEffect(() => {
+    const handler = (e) => setDisabledReason(e.detail?.reason || 'Your account has been disabled.')
+    window.addEventListener('vesign:account-disabled', handler)
+    return () => window.removeEventListener('vesign:account-disabled', handler)
+  }, [])
+
+  if (disabledReason) return <AccountDisabledScreen reason={disabledReason} />
 
   if (!isLoaded) return null
   const PUBLIC_PATHS = ['/about', '/contact']

@@ -8,8 +8,61 @@ from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwk, jwt
+from sqlalchemy import text
+
+from data.loaders import engine
 
 load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# Blocked-users table — admin-controlled denylist that survives sessions
+# ---------------------------------------------------------------------------
+# Why a table (not a config var or Clerk's "Lock"):
+#   - Clerk's free-tier "Lock" only holds for the Attack Protection lockout
+#     duration (typically ~60 min) and Ban requires the Pro plan.
+#   - We want indefinite, admin-controlled blocking that survives Clerk's
+#     auto-unlock and doesn't require a redeploy to add/remove users.
+#
+# Block a user (one SQL line on the production server):
+#   INSERT INTO blocked_users (user_id, reason) VALUES ('user_xxx', 'reason');
+#
+# Unblock:
+#   DELETE FROM blocked_users WHERE user_id = 'user_xxx';
+
+def _ensure_blocked_users_table() -> None:
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS blocked_users (
+                user_id    TEXT PRIMARY KEY,
+                email      TEXT,
+                reason     TEXT,
+                blocked_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+
+
+_ensure_blocked_users_table()
+
+
+# Tiny in-process cache to avoid hitting the DB on every request. The TTL is
+# short because we want admin blocks to take effect within ~60s of the
+# INSERT — that's plenty fast for "kick this user out".
+_blocked_cache: dict = {"ids": None, "fetched_at": 0.0}
+_BLOCKED_TTL = 60  # seconds
+
+
+def _is_blocked(user_id: str) -> "tuple[bool, str | None]":
+    """Return (blocked, reason). Reason is the admin-supplied message or None."""
+    now = time.time()
+    if _blocked_cache["ids"] is None or now - _blocked_cache["fetched_at"] > _BLOCKED_TTL:
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT user_id, reason FROM blocked_users")).fetchall()
+        _blocked_cache["ids"] = {r[0]: r[1] for r in rows}
+        _blocked_cache["fetched_at"] = now
+    if user_id in _blocked_cache["ids"]:
+        return True, _blocked_cache["ids"][user_id]
+    return False, None
 
 # ---------------------------------------------------------------------------
 # JWKS helpers
@@ -79,9 +132,18 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer
         user_id: str = payload.get("sub")
         if not user_id:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
-        return {"id": user_id, "email": payload.get("email", "")}
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+
+    # Denylist gate — admin-controlled, survives Clerk's auto-unlock window.
+    blocked, reason = _is_blocked(user_id)
+    if blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ACCOUNT_DISABLED", "reason": reason or "Your account has been disabled."},
+        )
+
+    return {"id": user_id, "email": payload.get("email", "")}

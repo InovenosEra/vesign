@@ -28,6 +28,25 @@ async function authHeaders() {
 }
 
 async function handleResponse(res) {
+  if (res.status === 403) {
+    // Backend returns {detail: {code: "ACCOUNT_DISABLED", reason: "..."}} when
+    // the user is on the admin denylist. Surface a single "account-disabled"
+    // event so the app can render a clear screen instead of a generic 403.
+    let payload = null
+    try { payload = await res.json() } catch {}
+    const detail = payload?.detail
+    if (detail?.code === 'ACCOUNT_DISABLED') {
+      try {
+        window.dispatchEvent(new CustomEvent('vesign:account-disabled', {
+          detail: { reason: detail.reason || 'Your account has been disabled.' }
+        }))
+      } catch {}
+      const e = new Error('ACCOUNT_DISABLED')
+      e.code = 'ACCOUNT_DISABLED'
+      e.reason = detail.reason
+      throw e
+    }
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   if (res.status === 204) return null
   return res.json()
