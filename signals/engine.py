@@ -577,6 +577,20 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
         default="HOLD"
     )
 
+    # ETFs (SPY, VOO, ...) live in `companies` so the daily pipeline keeps their
+    # prices/fundamentals fresh — but they should never fire BUY/SELL: the
+    # technical conditions (RSI, BB, etc.) trigger on ETFs as easily as on
+    # individual stocks, and we'd surface signals the user can't act on.
+    # Force HOLD for any sector='ETF' ticker. Cheaper than gating earlier.
+    try:
+        etf_tickers = pd.read_sql(
+            "SELECT ticker FROM companies WHERE sector = 'ETF'", engine
+        )["ticker"].tolist()
+        if etf_tickers:
+            today_df.loc[today_df["ticker"].isin(etf_tickers), "signal"] = "HOLD"
+    except Exception:
+        pass
+
     # RSI-based fallback score (kept for legacy backwards-compat — not displayed)
     today_df["score"] = 50 - today_df["rsi"]
 

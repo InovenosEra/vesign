@@ -272,6 +272,17 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
     df["signal"] = np.select([buy_cond, sell_cond], ["BUY", "SELL"], default="HOLD")
     df["score"] = 50 - df["rsi"]
 
+    # Force HOLD for ETFs (sector='ETF') — they live in companies for tracking
+    # but should never fire BUY/SELL. Same guard as in signals/engine.py.
+    try:
+        etf_tickers = pd.read_sql(
+            "SELECT ticker FROM companies WHERE sector = 'ETF'", engine
+        )["ticker"].tolist()
+        if etf_tickers:
+            df.loc[df["ticker"].isin(etf_tickers), "signal"] = "HOLD"
+    except Exception:
+        pass
+
     # Vesign score (0–100) — same helper used by the live engine
     from signals.engine import _compute_vesign_score
     df["vesign_score"] = df.apply(_compute_vesign_score, axis=1)

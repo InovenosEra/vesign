@@ -124,11 +124,21 @@ def main() -> None:
 
     # --- 5. Walk forward per ticker; emit V2 VQS=9 BUYs that don't conflict
     #        with an already-open V1 position. Track new BUY rows.
+    # Skip ETFs (sector='ETF') — they live in `companies` for tracking but
+    # should never fire BUY/SELL. Same guard as in signals/engine.py.
+    try:
+        etf_tickers = set(pd.read_sql(
+            "SELECT ticker FROM companies WHERE sector = 'ETF'", engine
+        )["ticker"].tolist())
+    except Exception:
+        etf_tickers = set()
     t = time.time()
     print("Identifying V2 VQS=9 BUY additions (no-overlap) ...")
     df = df.sort_values(["ticker","date"]).reset_index(drop=True)
     new_buys = []  # list of (date, ticker)
     for ticker, g in df.groupby("ticker", sort=False):
+        if ticker in etf_tickers:
+            continue
         open_trade = False  # is there an open position right now?
         for _, row in g.iterrows():
             sig_v1 = row["signal"]
