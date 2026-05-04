@@ -48,14 +48,34 @@ const USER_SCOPED_QUERY_KEYS = new Set([
   'portfolio-comparison',
 ])
 
+// Queries whose displayed values change daily and must show fresh numbers,
+// not yesterday-while-revalidating. Persisting these caused visible flicker
+// on the SignalsPage header (e.g. "0 BUY / 49 SELL" → "1 BUY / 50 SELL"
+// after a few seconds) because the cached counts came from before the most
+// recent pipeline run. For financial counts, accuracy > instant paint.
+const NO_PERSIST_QUERY_KEYS = new Set([
+  'signals-today',
+  'signals',
+  'signals-success-rate',
+  'signals-markers',
+  'trades',
+  'trades-open',
+])
+
 const persistOptions = {
   persister: queryPersister,
   maxAge: 24 * 60 * 60_000,
-  // Bump this string whenever an API response shape changes so old caches
-  // are invalidated for everyone on next page load.
-  buster: 'v1',
+  // Bump this string whenever an API response shape changes OR a major prod
+  // data rebuild lands so old caches are invalidated for everyone on next
+  // page load.
+  // v2 (2026-05-04): post NDX-100 ticker addition + V1+V2 historical
+  //                  signal rebuild + signals-table dedup + ETF cleanup.
+  buster: 'v2',
   dehydrateOptions: {
-    shouldDehydrateQuery: (q) => !USER_SCOPED_QUERY_KEYS.has(q.queryKey?.[0]),
+    shouldDehydrateQuery: (q) => {
+      const key = q.queryKey?.[0]
+      return !USER_SCOPED_QUERY_KEYS.has(key) && !NO_PERSIST_QUERY_KEYS.has(key)
+    },
   },
 }
 
