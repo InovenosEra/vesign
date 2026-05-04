@@ -10,7 +10,10 @@ static/logos/. The bulk downloader skips these entirely so it never overwrites
 the file with whatever a CDN returns.
 """
 
-MANUAL_LOGOS: set[str] = {"SPY", "VOO"}
+MANUAL_LOGOS: set[str] = {"SPY", "VOO", "SONY"}
+# SONY: parqet returned a generic placeholder (green/blue circle), logo.dev
+# has no data for any sony.* domain, clearbit deprecated. We render the
+# SimpleIcons SVG to PNG once via cairosvg and lock with MANUAL_LOGOS.
 
 LOGO_OVERRIDES = {
     "PENG": "https://cdn.prod.website-files.com/6764579f0a24e5a0083f25bb/67bb88245ce879aaca499ddb_schema--penguin-logo.jpg",
