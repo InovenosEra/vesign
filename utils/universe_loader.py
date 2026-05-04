@@ -22,6 +22,7 @@ from data.fmp import (
     nasdaq100_constituents,
     etf_holdings,
 )
+from utils.sectors import normalize_sector
 
 
 # Tickers permanently excluded from the universe even if present in the source feeds.
@@ -104,6 +105,10 @@ def _etf_holdings_as_constituents(etf_symbol: str) -> list:
 def _to_companies_df(rows: list) -> pd.DataFrame:
     df = pd.DataFrame(rows, columns=["ticker", "company", "sector"]) if rows else pd.DataFrame(columns=["ticker", "company", "sector"])
     df["market"] = "US"
+    # Normalize FMP's sector names to GICS so sp500-constituent ('Technology')
+    # and S&P 500's actual GICS classification ('Information Technology')
+    # don't both exist in the DB.
+    df["sector"] = df["sector"].apply(normalize_sector)
     return df
 
 
