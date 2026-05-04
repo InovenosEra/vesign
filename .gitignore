@@ -21,6 +21,14 @@ static/logos/*
 !static/logos/SPY.png
 !static/logos/VOO.png
 !static/logos/SONY.png
+!static/logos/KLAC.png
+!static/logos/OXY.png
+!static/logos/MPT.png
+!static/logos/MRSH.png
+!static/logos/FELE.png
+!static/logos/TEAM.png
+!static/logos/MTUS.png
+!static/logos/TMST.png
 
 # Local-only research artefacts (kept on disk, not in repo)
 .DS_Store

@@ -10,10 +10,17 @@ static/logos/. The bulk downloader skips these entirely so it never overwrites
 the file with whatever a CDN returns.
 """
 
-MANUAL_LOGOS: set[str] = {"SPY", "VOO", "SONY"}
-# SONY: parqet returned a generic placeholder (green/blue circle), logo.dev
-# has no data for any sony.* domain, clearbit deprecated. We render the
-# SimpleIcons SVG to PNG once via cairosvg and lock with MANUAL_LOGOS.
+MANUAL_LOGOS: set[str] = {
+    "SPY", "VOO",       # ETFs — hand-crafted S&P 500 mark
+    "SONY",             # parqet placeholder; rendered from SimpleIcons SVG via cairosvg
+    "KLAC",             # parqet+logo.dev only had blue+ placeholder; rendered "KLA" wordmark
+    "OXY",              # parqet returned the same blue+ placeholder as KLAC; corrected via logo.dev /oxy.com
+    "MPT",              # parqet returned single-letter "M" placeholder; corrected via logo.dev /medicalpropertiestrust.com
+    "MRSH",             # parqet returned same single-letter "M"; corrected via logo.dev /marsh.com
+    "FELE",             # parqet returned the *Franklin Resources* Ben Franklin engraving by mistake; corrected via logo.dev /franklin-electric.com
+    "TEAM",             # parqet returned Ormat's logo by mistake; corrected via logo.dev /atlassian.com
+    "MTUS", "TMST",     # both = Metallus Inc; parqet returned generic "metallic F"; corrected via logo.dev /metallus.com
+}
 
 LOGO_OVERRIDES = {
     "PENG": "https://cdn.prod.website-files.com/6764579f0a24e5a0083f25bb/67bb88245ce879aaca499ddb_schema--penguin-logo.jpg",
