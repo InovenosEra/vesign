@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------- Data pipelines ----------
-from data.market_data import update_prices, update_vix, update_company_info, summarize_descriptions, update_company_health, _download_and_save
+from data.market_data import update_prices, update_vix, update_company_info, summarize_descriptions, update_company_health, _download_and_save, fill_analyst_consensus_from_events
 
 # ---------- Feature engineering ----------
 from data.loaders import load_prices, save_features, engine
@@ -328,6 +328,12 @@ def run_daily():
     gc.collect()
 
     _repair_analyst_targets()
+    gc.collect()
+
+    # Final fallback: synthesize consensus from our own analyst_target_changes
+    # events for tickers FMP /price-target-consensus and yfinance both miss.
+    # Strict guard: never overwrites existing non-NULL targets.
+    fill_analyst_consensus_from_events()
     gc.collect()
 
     summarize_descriptions()

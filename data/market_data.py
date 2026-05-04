@@ -348,6 +348,90 @@ def update_company_info():
     print(f"Company info updated ({len(rows)} tickers)")
 
 
+def fill_analyst_consensus_from_events(window_days: int = 365) -> int:
+    """Fallback: for tickers where FMP /price-target-consensus returns nothing
+    (typical for foreign ADRs), compute a current consensus from the existing
+    analyst_target_changes events table — same window + one-target-per-analyst
+    methodology as apply_historical_analyst.compute_per_date_consensus.
+
+    Strict safety:
+      - ONLY updates rows where target_mean_price IS NULL
+        (never overwrites FMP's authoritative consensus)
+      - Only synthesizes from >= 1 events within the window
+      - Idempotent (re-running is a no-op once values are filled)
+
+    Returns the number of rows filled.
+    """
+    cutoff = (datetime.now(UTC) - timedelta(days=window_days)).strftime("%Y-%m-%d")
+
+    # Tickers needing fill: row exists but target is NULL, or no row at all
+    missing = pd.read_sql(text("""
+        SELECT c.ticker FROM companies c
+        LEFT JOIN analyst_expectations a ON c.ticker = a.ticker
+        WHERE a.target_mean_price IS NULL
+    """), engine)["ticker"].tolist()
+    if not missing:
+        print("Consensus-from-events: no tickers need filling")
+        return 0
+
+    ph = ",".join(f":t{i}" for i in range(len(missing)))
+    params = {f"t{i}": t for i, t in enumerate(missing)}
+    params["cutoff"] = cutoff
+    events = pd.read_sql(text(
+        f"SELECT ticker, published_date, price_target, analyst_company "
+        f"FROM analyst_target_changes "
+        f"WHERE ticker IN ({ph}) AND published_date >= :cutoff"
+    ), engine, params=params)
+    if events.empty:
+        print(f"Consensus-from-events: 0 of {len(missing)} have events in window")
+        return 0
+
+    events["analyst_company"] = events["analyst_company"].fillna("").astype(str)
+    rows_to_write = []
+    now_iso = datetime.now(UTC).isoformat()
+    for ticker, grp in events.groupby("ticker"):
+        # One target per analyst — take their latest published_date
+        latest = (grp.sort_values("published_date")
+                     .drop_duplicates("analyst_company", keep="last"))
+        if latest.empty:
+            continue
+        rows_to_write.append({
+            "ticker": ticker,
+            "mean":   float(latest["price_target"].mean()),
+            "high":   float(latest["price_target"].max()),
+            "low":    float(latest["price_target"].min()),
+            "n":      int(len(latest)),
+            "upd":    now_iso,
+        })
+
+    if not rows_to_write:
+        return 0
+
+    # UPSERT — but only fill rows where target_mean_price is currently NULL.
+    # The DO UPDATE clause is gated by target_mean_price IS NULL so this can
+    # never overwrite an FMP-supplied consensus.
+    filled = 0
+    with engine.begin() as conn:
+        # Make sure rows exist for tickers that don't have any analyst_expectations row yet
+        conn.execute(text("""
+            INSERT OR IGNORE INTO analyst_expectations (ticker) VALUES (:t)
+        """), [{"t": r["ticker"]} for r in rows_to_write])
+        for r in rows_to_write:
+            res = conn.execute(text("""
+                UPDATE analyst_expectations
+                SET target_mean_price = :mean,
+                    target_high_price = :high,
+                    target_low_price  = :low,
+                    number_of_analysts = :n,
+                    last_update       = :upd
+                WHERE ticker = :t AND target_mean_price IS NULL
+            """), {"t": r["ticker"], "mean": r["mean"], "high": r["high"],
+                   "low": r["low"], "n": r["n"], "upd": r["upd"]})
+            filled += res.rowcount or 0
+    print(f"Consensus-from-events: filled {filled} ticker(s) from analyst_target_changes")
+    return filled
+
+
 def update_company_health():
     """Score company financial health (1-5) via Claude Sonnet from FMP data.
     Runs weekly; only re-scores tickers whose score is missing or older than 7 days.
