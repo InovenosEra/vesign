@@ -220,20 +220,30 @@ def _backfill_missing_signal_dates():
     """Score any dates within the last 10 days that have features but no signals.
 
     Runs after run_scoring() to catch interior gaps left by the price repair.
+
+    Implementation note: the previous `NOT EXISTS` query wrapped both sides in
+    `DATE()`, which prevented SQLite from using `idx_signals_date` and triggered
+    a full-table scan on signals (~2.3M rows) for every features row. On the
+    production server with a 1700-day, 1.5k-ticker universe this ran for hours
+    without finishing. We now compute the two date sets separately (each uses
+    the per-table date index) and diff in Python — typically <1s end-to-end.
     """
     import pandas as pd
-    missing = pd.read_sql(
+    feat_dates = pd.read_sql(
         """
-        SELECT DISTINCT DATE(f.date) AS d FROM features f
-        WHERE f.date >= DATE('now', '-10 days')
-          AND NOT EXISTS (
-              SELECT 1 FROM signals s WHERE DATE(s.date) = DATE(f.date)
-          )
-        ORDER BY d
+        SELECT DISTINCT date FROM features
+        WHERE date >= DATE('now', '-10 days')
         """,
         engine,
-    )
-    dates = missing["d"].tolist()
+    )["date"].astype(str).str[:10].tolist()
+    sig_dates = pd.read_sql(
+        """
+        SELECT DISTINCT date FROM signals
+        WHERE date >= DATE('now', '-10 days')
+        """,
+        engine,
+    )["date"].astype(str).str[:10].tolist()
+    dates = sorted(set(feat_dates) - set(sig_dates))
     if not dates:
         return
     print(f"Backfilling signals for {len(dates)} missing date(s): {dates}")
