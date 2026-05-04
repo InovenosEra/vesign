@@ -30,6 +30,19 @@ def _ensure_signals_columns():
                 if col not in existing["name"].values:
                     conn.execute(text(f"ALTER TABLE signals ADD COLUMN {col} {dtype}"))
 
+            # UNIQUE index on (ticker, date) — prevents duplicate signal rows
+            # from accumulating when run_scoring is called multiple times for
+            # the same date (the per-date DELETE+INSERT pattern relies on this
+            # invariant, and silently broke when called twice in quick
+            # succession before the DB enforced uniqueness). 4.5k duplicate
+            # rows accumulated on prod before this guard was added.
+            existing_indexes = pd.read_sql("PRAGMA index_list(signals)", conn)
+            if "idx_signals_unique_ticker_date" not in existing_indexes["name"].values:
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX idx_signals_unique_ticker_date "
+                    "ON signals(ticker, date)"
+                ))
+
 
 def _get_open_positions(as_of_date=None):
     """Return {ticker: entry_price} for tickers with an open BUY (no subsequent SELL).
