@@ -247,7 +247,7 @@ def _compute_vesign_score(row):
     return int(score)
 
 
-def run_scoring(target_date=None, open_positions=None, fast_v2=False):
+def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=None):
     """Run signal scoring.
 
     target_date: if provided (str 'YYYY-MM-DD'), score that specific date instead of
@@ -263,7 +263,27 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
                 NULL for analyst_condition/health_condition/etc. (unused columns).
                 The live daily pipeline runs with fast_v2=False so going forward
                 those columns continue to be populated.
+    tickers:    optional list of ticker symbols. When provided, ONLY these
+                tickers are scored — features are loaded for them only, and the
+                pre-write DELETE only removes rows for these tickers (other
+                tickers' signals on this date are untouched). Default None
+                preserves the original "score the entire universe" behavior used
+                by the daily 7AM pipeline. Used for new-ticker backfills.
     """
+    # Validate tickers param: must be a list/tuple of safe ticker strings to
+    # avoid SQL injection in the IN clause.
+    if tickers is not None:
+        if not isinstance(tickers, (list, tuple)) or len(tickers) == 0:
+            raise ValueError("tickers must be a non-empty list/tuple of strings")
+        for t in tickers:
+            if not isinstance(t, str) or not t:
+                raise ValueError(f"Invalid ticker: {t!r}")
+            # Allow letters, digits, hyphen, dot (covers BRK-A, RDS.A, etc.)
+            if not all(c.isalnum() or c in "-." for c in t):
+                raise ValueError(f"Invalid ticker characters: {t!r}")
+        ticker_in = " AND ticker IN (" + ", ".join(f"'{t}'" for t in tickers) + ")"
+    else:
+        ticker_in = ""
     if target_date:
         print(f"Running hybrid scoring engine for {target_date}...")
     else:
@@ -306,7 +326,7 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
             SELECT date FROM (
                 SELECT DISTINCT date FROM features {inner_filter} ORDER BY date DESC LIMIT 65
             ) ORDER BY date ASC LIMIT 1
-        ) {outer_filter}
+        ) {outer_filter}{ticker_in}
         ORDER BY ticker, date
         """,
         engine
@@ -622,10 +642,12 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False):
 
     if "signals" in inspect(engine).get_table_names():
         # SQLite stores dates as 'YYYY-MM-DD HH:MM:SS.ffffff' strings; match the
-        # date prefix to delete cleanly regardless of microseconds.
+        # date prefix to delete cleanly regardless of microseconds. When `tickers`
+        # is provided, scope the DELETE to those tickers so other tickers' rows
+        # on this date are NOT lost.
         with engine.begin() as conn:
             conn.execute(
-                text("DELETE FROM signals WHERE DATE(date) = DATE(:date)"),
+                text(f"DELETE FROM signals WHERE DATE(date) = DATE(:date){ticker_in}"),
                 {"date": str(today)}
             )
 
