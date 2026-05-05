@@ -56,6 +56,7 @@ from production.run_daily import (
     _backfill_missing_signal_dates,
     _validate_pipeline,
 )
+from production.backfill_trailing_stop import backfill_all_signals
 
 HISTORY_START = date(2020, 1, 1)
 
@@ -73,120 +74,6 @@ def _row_count(table: str) -> int:
             return conn.execute(_text(f'SELECT COUNT(*) FROM "{table}"')).scalar() or 0
     except Exception:
         return -1
-
-
-def backfill_all_historical_signals():
-    """Generate signals for ALL (ticker, date) combos in features table.
-
-    Adapted from production/backfill_signals.py but covers every ticker,
-    not just newly-added ones. Historical backfill uses RSI>=70 for SELL
-    (no trailing stop) — trailing stops are only for live positions.
-    """
-    import numpy as np
-    import yaml
-    from sqlalchemy import text as _text
-
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open(os.path.join(BASE_DIR, "config", "settings.yaml")) as f:
-        config = yaml.safe_load(f)
-
-    volume_threshold = config.get("volume_ratio_threshold", 1.5)
-    pct_52w_min      = config.get("pct_from_52w_high_min", 0.10)
-    bb_pct_b_max     = config.get("bb_pct_b_max", 0.10)
-    analyst_upside   = config.get("analyst_upside_min", 0.30)
-
-    # Load all features + analyst + predictions + health
-    print("Loading features (bulk)…")
-    features = pd.read_sql("SELECT * FROM features ORDER BY ticker, date", engine)
-    print(f"  features rows: {len(features):,}")
-
-    print("Loading analyst_expectations…")
-    analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
-
-    # Predictions (may be absent for TASE tickers)
-    try:
-        predictions = pd.read_sql("SELECT ticker, date, prediction_score FROM predictions", engine)
-    except Exception:
-        predictions = pd.DataFrame(columns=["ticker", "date", "prediction_score"])
-
-    # Health scores (may be empty at this stage of rebuild)
-    try:
-        health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
-    except Exception:
-        health = pd.DataFrame(columns=["ticker", "health_score"])
-
-    df = features.merge(analyst, on="ticker", how="left")
-    df = df.merge(predictions, on=["ticker", "date"], how="left")
-    df = df.merge(health, on="ticker", how="left")
-
-    df["fair_value_upside"] = (df["target_mean_price"] - df["close"]) / df["close"]
-    df["analyst_condition"] = df["fair_value_upside"] >= analyst_upside
-
-    bb_range = df["bb_high"] - df["bb_low"]
-    df["bb_pct_b"] = (df["close"] - df["bb_low"]) / bb_range.where(bb_range != 0, other=float("nan"))
-    df["bb_condition"] = df["bb_pct_b"] < bb_pct_b_max
-
-    df = df.sort_values(["ticker", "date"]).reset_index(drop=True)
-    df["rsi_below_30"] = df["rsi"] < 30
-    df["rsi_3day_flag"] = (
-        df.groupby("ticker")["rsi_below_30"]
-          .rolling(3, min_periods=3).sum().reset_index(level=0, drop=True)
-    )
-
-    df["volume_flag"] = (
-        df.groupby("ticker")["volume_ratio"]
-          .rolling(3, min_periods=1).max().reset_index(level=0, drop=True)
-        >= volume_threshold
-    )
-
-    df["week52_condition"] = df["pct_from_52w_high"] <= -pct_52w_min
-    df["health_condition"] = (df["health_score"].isna()) | (df["health_score"] >= 3)
-
-    # ML score passes if >= threshold OR NaN (TASE or too-early signal)
-    ml_threshold = config.get("ml_threshold", 0.02)
-    df["ml_condition"] = (df["prediction_score"].isna()) | (df["prediction_score"] >= ml_threshold)
-
-    buy_cond = (
-        (df["rsi_3day_flag"] == 3)
-        & df["bb_condition"]
-        & df["analyst_condition"]
-        & df["volume_flag"]
-        & df["week52_condition"]
-        & df["health_condition"]
-        & df["ml_condition"]
-    )
-    sell_cond = df["rsi"] >= 70
-
-    df["signal"] = np.select(
-        [buy_cond, sell_cond],
-        ["BUY", "SELL"],
-        default="HOLD",
-    )
-    df["score"] = 50 - df["rsi"]
-
-    # Vesign score (0–100) — same helper used by the live engine
-    from signals.engine import _compute_vesign_score
-    df["vesign_score"] = df.apply(_compute_vesign_score, axis=1)
-
-    # Wipe existing signals (the 7 daily signals already generated) and insert full history
-    with engine.begin() as conn:
-        conn.execute(_text("DELETE FROM signals"))
-
-    # Select columns that exist in the signals schema. Signals table created via to_sql
-    # so it infers columns from dataframe. Keep the essentials only.
-    out_cols = [c for c in (
-        "date", "ticker", "close", "rsi", "bb_pct_b", "fair_value_upside",
-        "target_mean_price", "volume_ratio", "pct_from_52w_high",
-        "prediction_score", "health_score", "signal", "score",
-        "rsi_3day_flag", "volume_flag", "week52_condition",
-        "health_condition", "ml_condition", "vesign_score",
-    ) if c in df.columns]
-    df[out_cols].to_sql("signals", engine, if_exists="append", index=False)
-
-    buy_count  = (df["signal"] == "BUY").sum()
-    sell_count = (df["signal"] == "SELL").sum()
-    hold_count = len(df) - buy_count - sell_count
-    print(f"  Inserted {len(df):,} signals — {buy_count:,} BUY, {sell_count:,} SELL, {hold_count:,} HOLD")
 
 
 def _latest_nyse_session():
@@ -307,7 +194,9 @@ def run_rebuild():
         print(f"[SKIP Phase 10a: signals has {_row_count('signals'):,} rows]")
     else:
         _banner("Phase 10a: Full historical signal backfill (2020+)")
-        backfill_all_historical_signals()
+        # Uses the canonical engine.run_scoring() per-date loop — same path as
+        # the daily 7AM pipeline. Single source of truth, no drift risk.
+        backfill_all_signals()
         gc.collect()
 
     _banner("Phase 10b: Recent-dates gap backfill (today's signals)")

@@ -7,8 +7,9 @@ Strategy:
   3. For each (ticker, feature_date), compute consensus from targets
      published in the prior 90 days. Where no targets exist, values remain
      NULL (signal engine's analyst_condition already passes NULL gracefully).
-  4. DELETE FROM signals and re-insert using backfill_all_historical_signals
-     with per-date analyst data.
+  4. DELETE FROM signals and re-insert using the canonical engine — the same
+     signals.engine.run_scoring loop pattern in production/backfill_trailing_stop.py
+     — with per-date analyst data.
   5. Rebuild trade_log (applies trailing stop from config).
 """
 import os
@@ -233,7 +234,7 @@ def backfill_signals_with_per_date_analyst(per_date_analyst: pd.DataFrame):
         except Exception:
             df["health_score"] = float("nan")
 
-    # Criteria computation (same as backfill_all_historical_signals)
+    # Criteria computation (mirrors signals.engine.run_scoring gates)
     df["fair_value_upside"] = (df["target_mean_price"] - df["close"]) / df["close"]
     df["analyst_condition"] = (df["fair_value_upside"] >= analyst_upside) | df["fair_value_upside"].isna()
 
