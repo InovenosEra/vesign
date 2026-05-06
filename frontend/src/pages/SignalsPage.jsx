@@ -351,32 +351,50 @@ export default function SignalsPage() {
   const [pageSize, setPageSize]         = usePersistedState('signals.pageSize', 10)
   const [sortBy, setSortBy]             = usePersistedState('signals.sortBy', 'date')
   const [sortDir, setSortDir]           = usePersistedState('signals.sortDir', 'desc')
-  const [activePeriod, setActivePeriod] = usePersistedState('signals.period', 12)
+  const [activePeriod, setActivePeriod] = usePersistedState('signals.period2', '1Y')
   const [startDate, setStartDate]       = usePersistedState('signals.start', '')
   const [endDate,   setEndDate]         = usePersistedState('signals.end',   '')
   const [selected, setSelected]         = useState(null)
   const todayISO = new Date().toISOString().slice(0, 10)
-  const monthsAgoISO = m => { const d = new Date(); d.setMonth(d.getMonth() - m); return d.toISOString().slice(0, 10) }
-  const PERIOD_CHIPS = [[1, '1M'], [3, '3M'], [12, '1Y'], [24, '2Y'], [36, '3Y']]
+  const PERIOD_CHIPS = ['1D', '1W', '1M', '1Y']
+
+  function periodStartISO(key) {
+    const d = new Date()
+    if (key === '1D') {/* today */}
+    else if (key === '1W') d.setDate(d.getDate() - 7)
+    else if (key === '1M') d.setMonth(d.getMonth() - 1)
+    else if (key === '1Y') d.setFullYear(d.getFullYear() - 1)
+    else return null
+    return d.toISOString().slice(0, 10)
+  }
 
   // Re-anchor a chip selection to "today" on each visit, so 1Y always means
   // the trailing 12 months. Bootstraps the very first visit too: default
-  // activePeriod=12 → start/end snap to a 1Y window.
+  // activePeriod='1Y' → start/end snap to a 1Y window.
   useEffect(() => {
-    if (activePeriod) {
-      const s = monthsAgoISO(activePeriod)
-      const e = todayISO
-      if (startDate !== s) setStartDate(s)
-      if (endDate   !== e) setEndDate(e)
+    const s = periodStartISO(activePeriod)
+    if (s != null) {
+      if (startDate !== s)       setStartDate(s)
+      if (endDate   !== todayISO) setEndDate(todayISO)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function selectPeriod(months) {
-    setActivePeriod(months)
-    setStartDate(monthsAgoISO(months))
+  function selectPeriod(key) {
+    const s = periodStartISO(key)
+    if (s == null) return
+    setActivePeriod(key)
+    setStartDate(s)
     setEndDate(todayISO)
     setPage(1)
+  }
+
+  const isDefaultView = !search && signalFilter === 'ALL' && activePeriod === '1Y'
+
+  function resetToDefault() {
+    setSearch('')
+    setSignalFilter('ALL')
+    selectPeriod('1Y')
   }
 
   useEffect(() => {
@@ -498,13 +516,18 @@ export default function SignalsPage() {
             <input type="date" value={endDate} min={startDate || undefined} max={todayISO}
               onChange={e => { setEndDate(e.target.value); setActivePeriod(null); setPage(1) }}
               style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }} />
-            {PERIOD_CHIPS.map(([m, label]) => (
-              <button key={m}
-                className={`period-chip${activePeriod === m ? ' active' : ''}`}
-                onClick={() => selectPeriod(m)}>
-                {label}
+            {PERIOD_CHIPS.map(p => (
+              <button key={p}
+                className={`period-chip${activePeriod === p ? ' active' : ''}`}
+                onClick={() => selectPeriod(p)}>
+                {p}
               </button>
             ))}
+            {!isDefaultView && (
+              <button onClick={resetToDefault} style={{ marginLeft: 6 }}>
+                RESET
+              </button>
+            )}
           </span>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
