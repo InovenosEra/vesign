@@ -231,6 +231,20 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
     ? ((chartData.at(-1).close - basePeriod.close) / basePeriod.close) * 100
     : null
 
+  // Vesign yield over the selected chart period — average return of trades
+  // whose buy and sell both fall inside [chartStart, chartEnd]. Mirrors the
+  // chart's yield labels (drawn only when both markers are visible).
+  const windowAvgReturn = useMemo(() => {
+    const inWindow = (row.trades ?? []).filter(p => {
+      if (p.result === 'Open' || !p.buy_date || !p.sell_date) return false
+      const buy  = p.buy_date.slice(0, 10)
+      const sell = p.sell_date.slice(0, 10)
+      return buy >= chartStart && sell <= chartEnd
+    })
+    if (inWindow.length === 0) return null
+    return inWindow.reduce((s, p) => s + (p.return_pct ?? 0), 0) / inWindow.length
+  }, [row.trades, chartStart, chartEnd])
+
   const minPrice = chartData.length ? Math.min(...chartData.map(d => d.close)) * 0.97 : 0
   const maxPrice = chartData.length ? Math.max(...chartData.map(d => d.close)) * 1.03 : 0
 
@@ -325,7 +339,7 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
                     [t('modal.currentSignal'), row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
                     [t('modal.currentPrice'),  history12m.length > 0 ? fmtPrice(history12m.at(-1).close / priceScale) : '—'],
                     [activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
-                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, row.avg_return != null ? <span className={row.avg_return >= 0 ? 'up' : 'down'}>{row.avg_return >= 0 ? '+' : ''}{fmt(row.avg_return)}%</span> : '—']] : []),
+                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, windowAvgReturn != null ? <span className={windowAvgReturn >= 0 ? 'up' : 'down'}>{windowAvgReturn >= 0 ? '+' : ''}{fmt(windowAvgReturn)}%</span> : '—']] : []),
                     ...(row.unrealized_pct != null ? [[t('modal.yieldSinceBuy'), <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
