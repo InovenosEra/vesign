@@ -681,6 +681,7 @@ export default function TradesPage() {
 
   const [start, setStart]           = usePersistedState('trades.start', oneYearAgo.toISOString().slice(0, 10))
   const [end,   setEnd]             = usePersistedState('trades.end', new Date().toISOString().slice(0, 10))
+  const [activePeriod, setActivePeriod] = usePersistedState('trades.period', 12)
   const [openSearch, setOpenSearch]     = usePersistedState('trades.openSearch', '')
   const [openPage, setOpenPage]         = usePersistedState('trades.openPage', 1)
   const [openPageSize, setOpenPageSize] = usePersistedState('trades.openPageSize', 10)
@@ -689,6 +690,25 @@ export default function TradesPage() {
   const [search, setSearch]         = usePersistedState('trades.search', '')
   const [page, setPage]             = usePersistedState('trades.page', 1)
   const [pageSize, setPageSize]     = usePersistedState('trades.pageSize', 10)
+
+  // Re-anchor a chip selection to "today" on each visit (so 1Y always means
+  // the trailing 12 months). Custom date ranges (activePeriod=null) are left
+  // alone. Default activePeriod=12 → first-ever visit lands on a 1Y window.
+  useEffect(() => {
+    if (activePeriod) {
+      const today = new Date().toISOString().slice(0, 10)
+      const s = isoMonthsAgo(activePeriod)
+      if (start !== s) setStart(s)
+      if (end !== today) setEnd(today)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function selectPeriod(months) {
+    setActivePeriod(months)
+    setStart(isoMonthsAgo(months))
+    setEnd(new Date().toISOString().slice(0, 10))
+  }
 
   const { data: trades, isLoading, isError } = useQuery({
     queryKey: ['trades', start, end, market],
@@ -751,15 +771,15 @@ export default function TradesPage() {
 
       <div className="controls">
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.from')}</label>
-        <input type="date" value={start} onChange={e => setStart(e.target.value)} />
+        <input type="date" value={start} onChange={e => { setStart(e.target.value); setActivePeriod(null) }} />
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.to')}</label>
-        <input type="date" value={end} onChange={e => setEnd(e.target.value)} />
+        <input type="date" value={end} onChange={e => { setEnd(e.target.value); setActivePeriod(null) }} />
         <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[[3, '3M'], [6, '6M'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
             <button
               key={m}
-              className="period-chip"
-              onClick={() => { setStart(isoMonthsAgo(m)); setEnd(new Date().toISOString().slice(0, 10)) }}
+              className={`period-chip${activePeriod === m ? ' active' : ''}`}
+              onClick={() => selectPeriod(m)}
             >{label}</button>
           ))}
         </span>
