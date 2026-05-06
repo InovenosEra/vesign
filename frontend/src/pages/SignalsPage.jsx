@@ -368,14 +368,16 @@ export default function SignalsPage() {
   })
   const anchorDate = dataStatus?.latest || todayISO
 
+  // Each chip = N calendar days inclusive of the anchor → subtract (N-1).
+  const PERIOD_DAYS = { '1D': 1, '1W': 7, '1M': 30, '1Y': 365 }
+
   function periodStartISO(key, anchor) {
-    if (key === '1D') return anchor   // single trading day, start == end
+    const n = PERIOD_DAYS[key]
+    if (!n) return null
+    if (n === 1) return anchor
     const [y, m, d] = anchor.split('-').map(Number)
     const dt = new Date(y, m - 1, d)  // local-time parse — avoids toISOString TZ shift
-    if      (key === '1W') dt.setDate(dt.getDate() - 6)         // 7 calendar days inclusive
-    else if (key === '1M') dt.setMonth(dt.getMonth() - 1)
-    else if (key === '1Y') dt.setFullYear(dt.getFullYear() - 1)
-    else return null
+    dt.setDate(dt.getDate() - (n - 1))
     const yy = dt.getFullYear()
     const mm = String(dt.getMonth() + 1).padStart(2, '0')
     const dd = String(dt.getDate()).padStart(2, '0')
