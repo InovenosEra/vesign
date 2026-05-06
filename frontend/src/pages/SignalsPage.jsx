@@ -490,14 +490,7 @@ export default function SignalsPage() {
             </button>
           ))}
           {search && <button onClick={() => handleSearch('')}>{t('table.clear')}</button>}
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            {PERIOD_CHIPS.map(([m, label]) => (
-              <button key={m}
-                className={`period-chip${activePeriod === m ? ' active' : ''}`}
-                onClick={() => selectPeriod(m)}>
-                {label}
-              </button>
-            ))}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginLeft: 24 }}>
             <input type="date" value={startDate} max={endDate || todayISO}
               onChange={e => { setStartDate(e.target.value); setActivePeriod(null); setPage(1) }}
               style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }} />
@@ -505,6 +498,13 @@ export default function SignalsPage() {
             <input type="date" value={endDate} min={startDate || undefined} max={todayISO}
               onChange={e => { setEndDate(e.target.value); setActivePeriod(null); setPage(1) }}
               style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }} />
+            {PERIOD_CHIPS.map(([m, label]) => (
+              <button key={m}
+                className={`period-chip${activePeriod === m ? ' active' : ''}`}
+                onClick={() => selectPeriod(m)}>
+                {label}
+              </button>
+            ))}
           </span>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
