@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getSignalsToday, getSignals, WHITE_BG_LOGOS } from '../api'
+import { getSignalsToday, getSignals, getDataStatus, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import { useLivePrices } from '../hooks/useLivePrices'
 import { useSort } from '../hooks/useSort'
@@ -358,9 +358,19 @@ export default function SignalsPage() {
   const todayISO = new Date().toISOString().slice(0, 10)
   const PERIOD_CHIPS = ['1D', '1W', '1M', '1Y']
 
-  function periodStartISO(key) {
-    const d = new Date()
-    if (key === '1D') {/* today */}
+  // Anchor chip ranges on the latest *trading* day (signals are produced
+  // overnight against yesterday's close), not today's calendar date —
+  // otherwise "1D" picks an empty calendar day on weekends/holidays.
+  const { data: dataStatus } = useQuery({
+    queryKey: ['data-status'],
+    queryFn: getDataStatus,
+    staleTime: 5 * 60_000,
+  })
+  const anchorDate = dataStatus?.latest || todayISO
+
+  function periodStartISO(key, anchor) {
+    const d = new Date(anchor + 'T00:00:00')
+    if (key === '1D') {/* same day as anchor */}
     else if (key === '1W') d.setDate(d.getDate() - 7)
     else if (key === '1M') d.setMonth(d.getMonth() - 1)
     else if (key === '1Y') d.setFullYear(d.getFullYear() - 1)
@@ -368,24 +378,24 @@ export default function SignalsPage() {
     return d.toISOString().slice(0, 10)
   }
 
-  // Re-anchor a chip selection to "today" on each visit, so 1Y always means
-  // the trailing 12 months. Bootstraps the very first visit too: default
-  // activePeriod='1Y' → start/end snap to a 1Y window.
+  // Re-anchor whenever the latest-trading-day shifts (and bootstrap the
+  // first visit). Only applies when a chip is the active selection — custom
+  // dates are left alone.
   useEffect(() => {
-    const s = periodStartISO(activePeriod)
-    if (s != null) {
-      if (startDate !== s)       setStartDate(s)
-      if (endDate   !== todayISO) setEndDate(todayISO)
-    }
+    if (!activePeriod) return
+    const s = periodStartISO(activePeriod, anchorDate)
+    if (s == null) return
+    if (startDate !== s)          setStartDate(s)
+    if (endDate   !== anchorDate) setEndDate(anchorDate)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [anchorDate, activePeriod])
 
   function selectPeriod(key) {
-    const s = periodStartISO(key)
+    const s = periodStartISO(key, anchorDate)
     if (s == null) return
     setActivePeriod(key)
     setStartDate(s)
-    setEndDate(todayISO)
+    setEndDate(anchorDate)
     setPage(1)
   }
 
