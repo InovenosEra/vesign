@@ -647,6 +647,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
 
 _SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap", "prediction_score"}
 _TICKER_RE = re.compile(r'^[A-Z0-9.\-]{1,10}$')
+_ISO_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 _SORT_COL_SQL = {
     "company":    "c.company",
     "market_cap": "market_cap",  # alias of the per-date subquery in SELECT
@@ -658,24 +659,40 @@ def signals(
     signal: Optional[str] = None,
     search: Optional[str] = None,
     months: int = Query(default=12, ge=1, le=120),
+    start: Optional[str] = None,
+    end: Optional[str] = None,
     sort_by: str = Query(default="date"),
     sort_dir: str = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=10, le=500),
     market: Optional[str] = None,
 ):
-    """Signals for the last N months with server-side sort and pagination."""
+    """Signals for the last N months with server-side sort and pagination.
+
+    `start`/`end` (ISO YYYY-MM-DD) override the rolling-`months` window when
+    provided. Either bound can be supplied independently.
+    """
     _key = sort_by if sort_by in _SORTABLE else "date"
     sort_col = _SORT_COL_SQL.get(_key, f"s.{_key}")
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
     mkt = (market or "US").upper()
 
+    start_v = start if start and _ISO_DATE_RE.match(start) else None
+    end_v   = end   if end   and _ISO_DATE_RE.match(end)   else None
+
     conditions = [
-        f"DATE(s.date) >= DATE('now', '-{months} months')",
         "COALESCE(c.market, 'US') = :market",
         "c.ticker NOT IN ('SPY', 'VOO')",
     ]
+    if start_v:
+        conditions.append("DATE(s.date) >= :start_date")
+    else:
+        conditions.append(f"DATE(s.date) >= DATE('now', '-{months} months')")
+    if end_v:
+        conditions.append("DATE(s.date) <= :end_date")
     params: dict = {"market": mkt}
+    if start_v: params["start_date"] = start_v
+    if end_v:   params["end_date"]   = end_v
 
     if signal:
         conditions.append("s.signal = :signal")
@@ -741,16 +758,18 @@ def signals(
 def signals_export(
     signal: Optional[str] = None,
     search: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
     sort_by: str = Query(default="date"),
     sort_dir: str = Query(default="desc"),
     market: Optional[str] = None,
 ):
     """XLSX export of the Signals table — full per-ticker columns, all history.
 
-    Mirrors the signal/search/sort filters of `/api/signals` but ignores
-    pagination so the user gets every row that matches. No date scope (the
-    page itself has none); a hard LIMIT 200000 caps the worst case so the
-    server doesn't spend forever streaming HOLDs nobody reads.
+    Mirrors the signal/search/sort filters of `/api/signals` (including the
+    optional `start`/`end` date range) but ignores pagination so the user
+    gets every row that matches. A hard LIMIT 200000 caps the worst case so
+    the server doesn't spend forever streaming HOLDs nobody reads.
     """
     from backend.exports import cursor_to_xlsx_response
 
@@ -761,12 +780,21 @@ def signals_export(
     direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
     mkt = (market or "US").upper()
 
+    start_v = start if start and _ISO_DATE_RE.match(start) else None
+    end_v   = end   if end   and _ISO_DATE_RE.match(end)   else None
+
     conditions = [
         "COALESCE(c.market, 'US') = :market",
         "c.ticker NOT IN ('SPY', 'VOO')",
     ]
     params: dict = {"market": mkt}
 
+    if start_v:
+        conditions.append("DATE(s.date) >= :start_date")
+        params["start_date"] = start_v
+    if end_v:
+        conditions.append("DATE(s.date) <= :end_date")
+        params["end_date"] = end_v
     if signal:
         conditions.append("s.signal = :signal")
         params["signal"] = signal.upper()

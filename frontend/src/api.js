@@ -124,10 +124,12 @@ export const getSignalsToday = (signal, market = 'US') => {
   return get(`/signals/today?${params}`)
 }
 
-export const getSignals = ({ signal, search, months = 12, page = 1, page_size = 100, sort_by = 'date', sort_dir = 'desc', market = 'US' } = {}) => {
+export const getSignals = ({ signal, search, months = 12, start, end, page = 1, page_size = 100, sort_by = 'date', sort_dir = 'desc', market = 'US' } = {}) => {
   const params = new URLSearchParams({ months, page, page_size, sort_by, sort_dir, market })
   if (signal) params.set('signal', signal)
   if (search) params.set('search', search)
+  if (start)  params.set('start', start)
+  if (end)    params.set('end', end)
   return get(`/signals?${params}`)
 }
 

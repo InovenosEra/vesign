@@ -351,7 +351,10 @@ export default function SignalsPage() {
   const [pageSize, setPageSize]         = usePersistedState('signals.pageSize', 10)
   const [sortBy, setSortBy]             = usePersistedState('signals.sortBy', 'date')
   const [sortDir, setSortDir]           = usePersistedState('signals.sortDir', 'desc')
+  const [startDate, setStartDate]       = usePersistedState('signals.start', '')
+  const [endDate,   setEndDate]         = usePersistedState('signals.end',   '')
   const [selected, setSelected]         = useState(null)
+  const todayISO = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
@@ -387,15 +390,19 @@ export default function SignalsPage() {
   const exportUrl = `/api/signals/export.xlsx?${new URLSearchParams({
     ...(signalFilter && signalFilter !== 'ALL' ? { signal: signalFilter } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(startDate ? { start: startDate } : {}),
+    ...(endDate   ? { end:   endDate   } : {}),
     sort_by: sortBy,
     sort_dir: sortDir,
   }).toString()}`
 
   const { data: allResult, isLoading: loadingAll } = useQuery({
-    queryKey: ['signals', signalFilter, debouncedSearch, page, pageSize, sortBy, sortDir, market],
+    queryKey: ['signals', signalFilter, debouncedSearch, startDate, endDate, page, pageSize, sortBy, sortDir, market],
     queryFn: () => getSignals({
       signal:    signalFilter === 'ALL' ? undefined : signalFilter,
       search:    debouncedSearch || undefined,
+      start:     startDate || undefined,
+      end:       endDate   || undefined,
       months:    120,
       page,
       page_size: pageSize,
@@ -460,6 +467,20 @@ export default function SignalsPage() {
             </button>
           ))}
           {search && <button onClick={() => handleSearch('')}>{t('table.clear')}</button>}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="date" value={startDate} max={endDate || todayISO}
+              onChange={e => { setStartDate(e.target.value); setPage(1) }}
+              style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }} />
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>→</span>
+            <input type="date" value={endDate} min={startDate || undefined} max={todayISO}
+              onChange={e => { setEndDate(e.target.value); setPage(1) }}
+              style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }} />
+            {(startDate || endDate) && (
+              <button onClick={() => { setStartDate(''); setEndDate(''); setPage(1) }}>
+                {t('table.clear')}
+              </button>
+            )}
+          </span>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
             <select value={pageSize} onChange={e => handlePageSize(e.target.value)}>
