@@ -351,10 +351,33 @@ export default function SignalsPage() {
   const [pageSize, setPageSize]         = usePersistedState('signals.pageSize', 10)
   const [sortBy, setSortBy]             = usePersistedState('signals.sortBy', 'date')
   const [sortDir, setSortDir]           = usePersistedState('signals.sortDir', 'desc')
+  const [activePeriod, setActivePeriod] = usePersistedState('signals.period', 12)
   const [startDate, setStartDate]       = usePersistedState('signals.start', '')
   const [endDate,   setEndDate]         = usePersistedState('signals.end',   '')
   const [selected, setSelected]         = useState(null)
   const todayISO = new Date().toISOString().slice(0, 10)
+  const monthsAgoISO = m => { const d = new Date(); d.setMonth(d.getMonth() - m); return d.toISOString().slice(0, 10) }
+  const PERIOD_CHIPS = [[1, '1M'], [3, '3M'], [12, '1Y'], [24, '2Y'], [36, '3Y']]
+
+  // Re-anchor a chip selection to "today" on each visit, so 1Y always means
+  // the trailing 12 months. Bootstraps the very first visit too: default
+  // activePeriod=12 → start/end snap to a 1Y window.
+  useEffect(() => {
+    if (activePeriod) {
+      const s = monthsAgoISO(activePeriod)
+      const e = todayISO
+      if (startDate !== s) setStartDate(s)
+      if (endDate   !== e) setEndDate(e)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function selectPeriod(months) {
+    setActivePeriod(months)
+    setStartDate(monthsAgoISO(months))
+    setEndDate(todayISO)
+    setPage(1)
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
@@ -467,19 +490,21 @@ export default function SignalsPage() {
             </button>
           ))}
           {search && <button onClick={() => handleSearch('')}>{t('table.clear')}</button>}
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {PERIOD_CHIPS.map(([m, label]) => (
+              <button key={m}
+                className={`period-chip${activePeriod === m ? ' active' : ''}`}
+                onClick={() => selectPeriod(m)}>
+                {label}
+              </button>
+            ))}
             <input type="date" value={startDate} max={endDate || todayISO}
-              onChange={e => { setStartDate(e.target.value); setPage(1) }}
+              onChange={e => { setStartDate(e.target.value); setActivePeriod(null); setPage(1) }}
               style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }} />
             <span style={{ fontSize: 12, color: 'var(--muted)' }}>→</span>
             <input type="date" value={endDate} min={startDate || undefined} max={todayISO}
-              onChange={e => { setEndDate(e.target.value); setPage(1) }}
+              onChange={e => { setEndDate(e.target.value); setActivePeriod(null); setPage(1) }}
               style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }} />
-            {(startDate || endDate) && (
-              <button onClick={() => { setStartDate(''); setEndDate(''); setPage(1) }}>
-                {t('table.clear')}
-              </button>
-            )}
           </span>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('table.rows')}</label>
