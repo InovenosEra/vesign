@@ -914,7 +914,7 @@ def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default
 
 
 @protected.get("/api/signals/markers")
-def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=60)):
+def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144)):
     """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay)."""
     with engine.connect() as conn:
         df = pd.read_sql(text("""

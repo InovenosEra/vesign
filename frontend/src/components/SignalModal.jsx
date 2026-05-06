@@ -53,8 +53,10 @@ export default function SignalModal({ row: rowProp, onClose }) {
     setChartEnd(today)
   }
 
-  // Fetch full 5Y history once per ticker; period switches filter client-side (no refetch)
-  const fullStart = monthsAgo(60)
+  // Fetch full history once per ticker; period switches filter client-side (no refetch).
+  // 120 months = 10 years, comfortably covers the 2020-01-01 cutoff in our DB so a
+  // user-typed start date back to Jan 2020 always has data behind it.
+  const fullStart = monthsAgo(120)
   const fetchStart = (() => { const d = new Date(fullStart); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
 
   const { data: fullHistory = [], isLoading } = useQuery({
@@ -72,7 +74,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
 
   const { data: markers = [] } = useQuery({
     queryKey: ['signal-markers', row.ticker],
-    queryFn: () => getSignalMarkers(row.ticker, 60),
+    queryFn: () => getSignalMarkers(row.ticker, 120),
     staleTime: 300_000,
   })
 

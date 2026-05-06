@@ -7,21 +7,22 @@ import {
 } from 'recharts'
 import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
 
-// ---------- helper: pull all 5Y trades for one ticker -----------------------
+// ---------- helper: pull full historical trades for one ticker --------------
 // Used by TradeModal so its chart shows the full historical trade history,
 // independent of the page-level date filter (which defaults to last 12 months
 // and would otherwise hide older closed trades from the modal chart).
-function useFiveYearTradesForTicker(ticker, market) {
-  const fiveYearsAgo = (() => {
+// 10y covers our 2020-01-02 DB cutoff with margin.
+function useFullHistoryTradesForTicker(ticker, market) {
+  const tenYearsAgo = (() => {
     const d = new Date()
-    d.setFullYear(d.getFullYear() - 5)
+    d.setFullYear(d.getFullYear() - 10)
     d.setDate(d.getDate() - 7)
     return d.toISOString().slice(0, 10)
   })()
   const todayStr = new Date().toISOString().slice(0, 10)
   return useQuery({
-    queryKey: ['trades-5y-by-ticker', ticker, market],
-    queryFn: () => getTrades({ start: fiveYearsAgo, end: todayStr, market }),
+    queryKey: ['trades-full-by-ticker', ticker, market],
+    queryFn: () => getTrades({ start: tenYearsAgo, end: todayStr, market }),
     staleTime: 5 * 60_000,
     enabled: !!ticker,
   })
@@ -142,14 +143,14 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
   // shows every closed BUY→SELL pair regardless of the page-level filter.
   // Without this, opening from the table while filtered to "last 1Y" only
   // showed trades within the last year — INDO's 2021 trades were missing.
-  const { data: fiveYearTrades } = useFiveYearTradesForTicker(rowProp.ticker, market)
+  const { data: fullTrades } = useFullHistoryTradesForTicker(rowProp.ticker, market)
   const row = useMemo(() => {
-    const all = (fiveYearTrades ?? []).find(tk => tk.ticker === rowProp.ticker)?.trades
+    const all = (fullTrades ?? []).find(tk => tk.ticker === rowProp.ticker)?.trades
     if (!all || all.length === 0) return rowProp
     // Keep the originally-clicked top-level fields (buy_date, buy_price, etc.)
     // but replace the inner trades array with the full historical set.
     return { ...rowProp, trades: all.filter(p => p.result !== 'Open') }
-  }, [rowProp, fiveYearTrades])
+  }, [rowProp, fullTrades])
 
   const [descTab, setDescTab] = useState('info')
 
@@ -165,11 +166,13 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
     setChartEnd(today)
   }
 
-  // Fetch full 5Y history once; period switches slice client-side (no refetch)
-  const fullStart5y = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+  // Fetch full history once; period switches slice client-side (no refetch).
+  // 10y covers our 2020-01-02 DB cutoff so a user-typed start date back to
+  // Jan 2020 always has data to render.
+  const fullStart = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 10); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
   const { data: fullHistory = [], isLoading } = useQuery({
     queryKey: ['price-history', row.ticker],
-    queryFn: () => getPriceHistory(row.ticker, { start: fullStart5y, end: today }),
+    queryFn: () => getPriceHistory(row.ticker, { start: fullStart, end: today }),
     staleTime: 300_000,
   })
   const history = fullHistory.filter(p => {
@@ -200,7 +203,7 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
   // Full 5Y analyst history (sliced client-side to current chart window)
   const { data: fullAnalystHistory = [] } = useQuery({
     queryKey: ['analyst-history', row.ticker],
-    queryFn: () => getAnalystHistory(row.ticker, { start: fullStart5y, end: today }),
+    queryFn: () => getAnalystHistory(row.ticker, { start: fullStart, end: today }),
     staleTime: 300_000,
   })
   const analystHistory = fullAnalystHistory.filter(a => {
