@@ -21,6 +21,7 @@ Phases:
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -29,6 +30,7 @@ from pathlib import Path
 
 PYTHON = "/opt/vesign/venv/bin/python"
 ROOT = Path("/opt/vesign")
+ENV = {**os.environ, "PYTHONPATH": str(ROOT), "VESIGN_US_ONLY": "1"}
 
 
 def log(msg: str) -> None:
@@ -40,7 +42,7 @@ def run(label: str, *args: str) -> None:
     log(f"START  : {label}")
     log(f"  cmd  : {' '.join(args)}")
     t0 = time.time()
-    proc = subprocess.run(args, cwd=str(ROOT))
+    proc = subprocess.run(args, cwd=str(ROOT), env=ENV)
     dt = time.time() - t0
     if proc.returncode != 0:
         log(f"FAIL   : {label}  (rc={proc.returncode}, {dt:.1f}s)")
