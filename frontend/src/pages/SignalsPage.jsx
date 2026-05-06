@@ -369,13 +369,17 @@ export default function SignalsPage() {
   const anchorDate = dataStatus?.latest || todayISO
 
   function periodStartISO(key, anchor) {
-    const d = new Date(anchor + 'T00:00:00')
-    if (key === '1D') {/* same day as anchor */}
-    else if (key === '1W') d.setDate(d.getDate() - 7)
-    else if (key === '1M') d.setMonth(d.getMonth() - 1)
-    else if (key === '1Y') d.setFullYear(d.getFullYear() - 1)
+    if (key === '1D') return anchor   // single trading day, start == end
+    const [y, m, d] = anchor.split('-').map(Number)
+    const dt = new Date(y, m - 1, d)  // local-time parse — avoids toISOString TZ shift
+    if      (key === '1W') dt.setDate(dt.getDate() - 6)         // 7 calendar days inclusive
+    else if (key === '1M') dt.setMonth(dt.getMonth() - 1)
+    else if (key === '1Y') dt.setFullYear(dt.getFullYear() - 1)
     else return null
-    return d.toISOString().slice(0, 10)
+    const yy = dt.getFullYear()
+    const mm = String(dt.getMonth() + 1).padStart(2, '0')
+    const dd = String(dt.getDate()).padStart(2, '0')
+    return `${yy}-${mm}-${dd}`
   }
 
   // Re-anchor whenever the latest-trading-day shifts (and bootstrap the
