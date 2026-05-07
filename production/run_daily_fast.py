@@ -11,9 +11,9 @@ from data.loaders import engine
 from features.technical import compute_and_save_features_chunked
 
 # ---------- Modeling ----------
-from models.train import train_factor_weights
 from features.forward_returns import compute_forward_returns
 from models.predict import run_prediction_engine
+from models.walk_forward import maybe_retrain_for_today
 from signals.engine import run_scoring
 
 from backtesting.engine import build_trade_log
@@ -56,12 +56,15 @@ def run_daily_fast():
     compute_and_save_features_chunked(engine, days=280, chunk_size=100)
     gc.collect()
 
-    # ── Daily ML retrain: refresh forward returns + retrain XGBoost models ─────
-    from datetime import datetime, timedelta
+    # ── Walk-forward ML: refresh forward returns, then ensure this quarter's
+    # model exists. maybe_retrain_for_today() is idempotent — it only trains
+    # at quarter boundaries (Jan/Apr/Jul/Oct 1). The pickles live at
+    # ml_models/walk/<YYYY-MM-DD>/. predict.py loads the latest dir whose
+    # cutoff <= prediction date, so today's prediction is leak-free by
+    # construction (cutoff is at most today's quarter-start).
     compute_forward_returns()
     gc.collect()
-    cutoff = (datetime.today() - timedelta(days=20)).strftime("%Y-%m-%d")
-    train_factor_weights(train_end_date=cutoff)
+    maybe_retrain_for_today()
     gc.collect()
 
     run_prediction_engine()
