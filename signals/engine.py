@@ -358,6 +358,10 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
             analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
             health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
     elif target_date:
+        # Point-in-time analyst data with 90-day staleness cutoff.
+        # Per user rule (2026-05-07): NEVER fall back to current snapshot
+        # (no forward-looking) AND ignore anchors more than 90 days stale
+        # (avoid e.g. a 2022 target on a 2025 row).
         analyst = pd.read_sql(
             """
             SELECT ticker, target_mean_price, target_high_price, target_low_price,
@@ -365,14 +369,16 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
             FROM analyst_targets_history h1
             WHERE date = (
                 SELECT MAX(date) FROM analyst_targets_history h2
-                WHERE h2.ticker = h1.ticker AND h2.date <= :td
+                WHERE h2.ticker = h1.ticker
+                  AND h2.date <= :td
+                  AND h2.date >= DATE(:td, '-90 days')
             )
             """,
             engine,
             params={"td": target_date},
         )
-        if analyst.empty:
-            analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+        # NO fallback to analyst_expectations — empty result must propagate as NaN
+        # so downstream gates evaluate honestly. (Was: engine pitfall #7.)
         health = pd.read_sql(
             """
             SELECT ticker, score AS health_score
@@ -385,8 +391,7 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
             engine,
             params={"td": target_date},
         )
-        if health.empty:
-            health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
+        # NO fallback to company_health — empty result must propagate as NaN.
     else:
         analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
         health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
