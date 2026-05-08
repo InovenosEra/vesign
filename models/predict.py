@@ -29,18 +29,23 @@ def _walk_dirs():
 
 def _models_for_date(date_str: str):
     """For a prediction date, return (dir, cutoff_str) of the latest walk-forward
-    model whose cutoff <= date_str. Falls back to legacy ML_MODELS_DIR when no
-    walk dir applies (shouldn't happen after the May 2026 walk-forward rebuild).
+    model whose cutoff <= date_str.
+
+    Returns (None, None) if no valid model exists for the date — caller should
+    SKIP rather than predict, otherwise we'd produce a leak. This case happens
+    when features extend earlier than the earliest walk-forward cutoff (e.g.
+    2018-2019 features exist as ML training warmup but the earliest walk dir
+    is 2020-01-01 — we must NOT predict 2018-2019 with a 2020 model).
+
+    Falls back to legacy ML_MODELS_DIR with empty cutoff string only when there
+    are no walk dirs at all (emergency fallback for first-run installs).
     """
     dirs = _walk_dirs()
     if not dirs:
         return Path(ML_MODELS_DIR), ""
     valid = [d for d in dirs if d.name <= date_str]
     if not valid:
-        # Date predates all walk dirs — should not happen in production. Use
-        # the earliest dir to avoid silent NULLs; verify_no_leak will catch any
-        # genuine leak (cutoff > date).
-        return dirs[0], dirs[0].name
+        return None, None
     return valid[-1], valid[-1].name
 
 
@@ -112,8 +117,13 @@ def run_prediction_engine():
         return m5, m20
 
     # ---------- Walk-forward / legacy XGBoost path ----------
+    skipped = 0
     for d in pending:
         mdir, cutoff_str = _models_for_date(d)
+        if mdir is None:
+            # Date predates the earliest walk-forward cutoff — skip to avoid leak.
+            skipped += 1
+            continue
         global_5d, global_20d = _load_models_for_dir(mdir)
         if global_5d is None or global_20d is None:
             # No XGBoost models found at all — fall through to linear weights below
@@ -154,7 +164,11 @@ def run_prediction_engine():
         del features, df
         gc.collect()
     else:
-        print(f"Predictions updated for {len(pending)} date(s) (XGBoost)")
+        n_done = len(pending) - skipped
+        msg = f"Predictions updated for {n_done} date(s) (XGBoost)"
+        if skipped:
+            msg += f" — skipped {skipped} pre-walk-forward dates (would be leaks)"
+        print(msg)
         return
 
     # ---------- Fallback: linear weights from factor_weights table ----------
