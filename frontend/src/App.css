@@ -262,10 +262,14 @@ img.logo-white-bg, img.modal-logo-white-bg {
 /* ── Up / down colouring ── */
 /* direction:ltr forces signed numbers like "+5%" / "-3%" to render correctly
    inside RTL pages — otherwise the leading sign gets pushed to the right
-   side of the number by the bidi algorithm. */
-.up   { color: var(--green); direction: ltr; unicode-bidi: embed; display: inline-block; }
-.down { color: var(--red);   direction: ltr; unicode-bidi: embed; display: inline-block; }
-/* Generic helper for signed numbers that don't use .up / .down. */
+   side of the number by the bidi algorithm. We deliberately DO NOT set
+   display: inline-block here because these classes are also applied to <td>
+   elements (SignalsPage UpsideCell / MLScoreCell), and inline-block would
+   break the table-cell layout. unicode-bidi:embed is enough to isolate the
+   directional run without touching display. */
+.up   { color: var(--green); direction: ltr; unicode-bidi: embed; }
+.down { color: var(--red);   direction: ltr; unicode-bidi: embed; }
+/* Generic helper for signed numbers in non-table contexts. */
 .num-ltr { direction: ltr; unicode-bidi: embed; display: inline-block; }
 
 /* ── Metrics row ── */
