@@ -4,13 +4,13 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from data.market_data import summarize_descriptions, update_company_health_batch
-from models.train import train_factor_weights
 from features.forward_returns import compute_forward_returns
-from datetime import datetime, timedelta
+from models.walk_forward import maybe_retrain_for_today
 
 
 def run_weekly():
-    """Weekly pipeline: ML retrain + summarize descriptions + batch health scoring."""
+    """Weekly pipeline: walk-forward retrain check + summarize descriptions
+    + batch health scoring."""
     import gc
 
     # Refresh forward returns (training labels) from latest prices
@@ -18,10 +18,11 @@ def run_weekly():
     compute_forward_returns()
     gc.collect()
 
-    # Retrain ML models with a 20-day out-of-sample guard
-    cutoff = (datetime.today() - timedelta(days=20)).strftime("%Y-%m-%d")
-    print(f"Retraining ML models (train_end_date={cutoff})...")
-    train_factor_weights(train_end_date=cutoff)
+    # Walk-forward retrain check — idempotent. Only trains a new model dir at
+    # quarter starts (Jan/Apr/Jul/Oct 1). On other weeks this is a no-op since
+    # the current quarter's dir already exists from the daily pipeline.
+    print("Walk-forward retrain check...")
+    maybe_retrain_for_today()
     gc.collect()
 
     summarize_descriptions()

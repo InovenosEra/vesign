@@ -84,7 +84,19 @@ def update_prices():
 
     print("Updating prices…")
 
-    tickers = load_universe()
+    try:
+        tickers = load_universe()
+    except RuntimeError as e:
+        # FMP transient endpoint outage (e.g. IJH/IJR ETF holdings returning 0)
+        # would otherwise fail the entire daily pipeline. Fall back to the
+        # existing companies table so prices still update for known tickers.
+        # Universe drift will get picked up the next time FMP is healthy.
+        print(f"⚠️  Universe rebuild failed ({e}); falling back to existing companies table.")
+        with engine.connect() as c:
+            tickers = [r[0] for r in c.execute(text(
+                "SELECT DISTINCT ticker FROM companies WHERE ticker NOT LIKE '%.TA' ORDER BY ticker"
+            ))]
+        print(f"Using {len(tickers)} existing US tickers from companies table.")
 
     today    = datetime.now(UTC).date()
     nyse     = xcals.get_calendar("XNYS")
