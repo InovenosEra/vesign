@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
@@ -28,13 +29,13 @@ function scoreColor(s) {
   if (s >= 31) return '#f39c12'
   return '#8b90a0'
 }
-function scoreLabel(s) {
+function scoreLabel(s, t) {
   if (s == null) return '—'
-  if (s >= 86) return 'Signal active'
-  if (s >= 71) return 'Approaching signal'
-  if (s >= 51) return 'Watching closely'
-  if (s >= 31) return 'Early watch'
-  return 'Not on radar'
+  if (s >= 86) return t('research.score.signalActive', 'Signal active')
+  if (s >= 71) return t('research.score.approaching', 'Approaching signal')
+  if (s >= 51) return t('research.score.watching', 'Watching closely')
+  if (s >= 31) return t('research.score.earlyWatch', 'Early watch')
+  return t('research.score.notOnRadar', 'Not on radar')
 }
 function sigStyle(signal) {
   const map = {
@@ -60,6 +61,7 @@ const PERIODS = [
 
 // ─── TickerSearch ─────────────────────────────────────────────────────────────
 function TickerSearch({ onSelect }) {
+  const { t } = useTranslation()
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -86,7 +88,7 @@ function TickerSearch({ onSelect }) {
     <div ref={ref} style={{ position: 'relative', maxWidth: 500 }}>
       <input
         value={q} onChange={e => setQ(e.target.value)}
-        placeholder="Search ticker or company…"
+        placeholder={t('table.searchGlobal', 'Search ticker or company…')}
         style={{
           width: '100%', padding: '11px 16px', borderRadius: 12,
           border: '1px solid var(--border)', background: 'var(--surface)',
@@ -162,8 +164,9 @@ function ScoreGauge({ score }) {
 
 // ─── Analyst Price Range Bar ──────────────────────────────────────────────────
 function AnalystRangeBar({ low, mean, high, current }) {
+  const { t } = useTranslation()
   if (!low || !high) return (
-    <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 0' }}>No analyst targets</div>
+    <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 0' }}>{t('research.analyst.noTargets', 'No analyst targets')}</div>
   )
   const minV = Math.min(low, current ?? low) * 0.96
   const maxV = Math.max(high, current ?? high) * 1.04
@@ -206,8 +209,8 @@ function AnalystRangeBar({ low, mean, high, current }) {
         )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
-        <span>Low ${fmt(low, 0)}</span>
-        <span>High ${fmt(high, 0)}</span>
+        <span>{t('research.analyst.low', 'Low')} ${fmt(low, 0)}</span>
+        <span>{t('research.analyst.high', 'High')} ${fmt(high, 0)}</span>
       </div>
     </div>
   )
@@ -227,6 +230,7 @@ function MarkerLabel({ viewBox, signal, price }) {
 
 // ─── Price Chart ──────────────────────────────────────────────────────────────
 function PriceChart({ ticker }) {
+  const { t } = useTranslation()
   const [periodIdx, setPeriodIdx] = useState(2)
   const [prices, setPrices] = useState([])
   const [markers, setMarkers] = useState([])
@@ -271,7 +275,7 @@ function PriceChart({ ticker }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-          Price Chart
+          {t('research.priceChart.title', 'Price Chart')}
         </span>
         <div style={{ display: 'flex', gap: 5 }}>
           {PERIODS.map((p, i) => (
@@ -289,7 +293,7 @@ function PriceChart({ ticker }) {
 
       {loading ? (
         <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
-          Loading chart…
+          {t('research.priceChart.loading', 'Loading chart…')}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
@@ -311,7 +315,7 @@ function PriceChart({ ticker }) {
             />
             <Tooltip
               contentStyle={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
-              formatter={v => [`$${fmt(v)}`, 'Close']}
+              formatter={v => [`$${fmt(v)}`, t('research.priceChart.close', 'Close')]}
             />
             {markers.map(m => (
               <ReferenceLine key={m.date + m.signal} x={m.date}
@@ -347,6 +351,7 @@ function MetricCard({ label, value, sub, color }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ResearchPage() {
+  const { t } = useTranslation()
   const { ticker: urlTicker } = useParams()
   const navigate = useNavigate()
 
@@ -376,7 +381,7 @@ export default function ResearchPage() {
       navigate(`/research/${ticker}`, { replace: true })
       loadTab('news', ticker)
     } catch (e) {
-      setErrR(e.message || 'Failed to load research data')
+      setErrR(e.message || t('research.loadingFailed', 'Failed to load research data'))
     } finally {
       setLoadingR(false)
     }
@@ -401,7 +406,7 @@ export default function ResearchPage() {
       const data = await generateAIReport(research.ticker, ep)
       setReport(data.report)
     } catch (e) {
-      setReport(`Error: ${e.message || 'Failed to generate report'}`)
+      setReport(`${t('research.aiReport.errorPrefix', 'Error')}: ${e.message || t('research.aiReport.failed', 'Failed to generate report')}`)
     } finally {
       setLoadingReport(false)
     }
@@ -423,7 +428,10 @@ export default function ResearchPage() {
   // Metric card computed values
   const rsi = research?.rsi
   const rsiColor = rsi == null ? '#8b90a0' : rsi < 30 ? '#2ecc71' : rsi < 50 ? '#f39c12' : '#8b90a0'
-  const rsiSub = rsi == null ? null : rsi < 30 ? 'Oversold' : rsi < 50 ? 'Neutral' : 'Overbought'
+  const rsiSub = rsi == null ? null
+    : rsi < 30 ? t('research.metric.rsiOversold', 'Oversold')
+    : rsi < 50 ? t('research.metric.rsiNeutral', 'Neutral')
+    : t('research.metric.rsiOverbought', 'Overbought')
 
   const upside = research?.fair_value_upside
   const upPct = upside != null ? `${upside >= 0 ? '+' : ''}${(upside * 100).toFixed(0)}%` : '—'
@@ -449,7 +457,7 @@ export default function ResearchPage() {
 
       {loadingR && (
         <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 60, fontSize: 15 }}>
-          Loading research…
+          {t('research.loading', 'Loading research…')}
         </div>
       )}
       {errR && (
@@ -459,7 +467,7 @@ export default function ResearchPage() {
       )}
       {!research && !loadingR && !errR && (
         <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '80px 0', fontSize: 15 }}>
-          Search for any stock to start your research.
+          {t('research.searchPrompt', 'Search for any stock to start your research.')}
         </div>
       )}
 
@@ -496,14 +504,14 @@ export default function ResearchPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1 }}>${fmt(research.close)}</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Last close</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{t('research.lastClose', 'Last close')}</div>
               </div>
               <button onClick={openModal} style={{
                 padding: '9px 18px', borderRadius: 10, cursor: 'pointer',
                 background: 'transparent', border: '1px solid var(--border)',
                 color: 'var(--accent)', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
               }}>
-                View Chart ↗
+                {t('research.viewChart', 'View Chart')} ↗
               </button>
             </div>
           </div>
@@ -522,25 +530,25 @@ export default function ResearchPage() {
               {/* 4 Metric cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                 <MetricCard
-                  label="RSI"
+                  label={t('research.metric.rsi', 'RSI')}
                   value={rsi != null ? rsi.toFixed(1) : '—'}
                   sub={rsiSub}
                   color={rsiColor}
                 />
                 <MetricCard
-                  label="Analyst Upside"
+                  label={t('research.metric.upside', 'Analyst Upside')}
                   value={upPct}
-                  sub={upside != null && research.number_of_analysts ? `${research.number_of_analysts} analysts` : null}
+                  sub={upside != null && research.number_of_analysts ? t('research.metric.analystsCount', '{{count}} analysts', { count: research.number_of_analysts }) : null}
                   color={upColor}
                 />
                 <MetricCard
-                  label="Win Rate"
+                  label={t('research.metric.winRate', 'Win Rate')}
                   value={research.trade_count > 0 ? `${winRate}%` : '—'}
-                  sub={research.trade_count > 0 ? `${research.trade_count} trades` : 'No trades'}
+                  sub={research.trade_count > 0 ? t('research.metric.tradesCount', '{{count}} trades', { count: research.trade_count }) : t('research.metric.noTrades', 'No trades')}
                   color={wrColor}
                 />
                 <MetricCard
-                  label="Avg Return"
+                  label={t('research.metric.avgReturn', 'Avg Return')}
                   value={research.trade_count > 0 && avgRet != null
                     ? `${avgRet > 0 ? '+' : ''}${avgRet}%` : '—'}
                   color={arColor}
@@ -549,10 +557,10 @@ export default function ResearchPage() {
 
               {/* AI Report */}
               <div style={panel}>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>AI Research Report</div>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>{t('research.aiReport.title', 'AI Research Report')}</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   <input
-                    type="number" placeholder="Entry price (optional)" value={entryPrice}
+                    type="number" placeholder={t('research.aiReport.entryPlaceholder', 'Entry price (optional)')} value={entryPrice}
                     onChange={e => setEntryPrice(e.target.value)}
                     style={{
                       padding: '8px 12px', borderRadius: 8, width: 200,
@@ -567,12 +575,12 @@ export default function ResearchPage() {
                     border: 'none', color: '#0b0e18', fontSize: 13, fontWeight: 700,
                     opacity: loadingReport ? 0.7 : 1,
                   }}>
-                    {loadingReport ? 'Generating…' : 'Generate AI Report ▶'}
+                    {loadingReport ? t('research.aiReport.generating', 'Generating…') : `${t('research.aiReport.generate', 'Generate AI Report')} ▶`}
                   </button>
                 </div>
                 {loadingReport && (
                   <div style={{ marginTop: 16, color: 'var(--muted)', fontSize: 13 }}>
-                    Analyzing {research.ticker}…
+                    {t('research.aiReport.analyzing', 'Analyzing {{ticker}}…', { ticker: research.ticker })}
                   </div>
                 )}
                 {report && !loadingReport && (
@@ -592,18 +600,18 @@ export default function ResearchPage() {
               {/* Vesign Score gauge */}
               <div style={{ ...panel, textAlign: 'center', paddingBottom: 14 }}>
                 <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>
-                  Vesign Score
+                  {t('research.score.title', 'Vesign Score')}
                 </div>
                 <ScoreGauge score={research.vesign_score} />
                 <div style={{ fontSize: 13, fontWeight: 700, color: scoreColor(research.vesign_score), marginTop: 6 }}>
-                  {scoreLabel(research.vesign_score)}
+                  {scoreLabel(research.vesign_score, t)}
                 </div>
               </div>
 
               {/* Analyst consensus + range bar */}
               <div style={panel}>
                 <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                  Analyst Consensus
+                  {t('research.analyst.consensus', 'Analyst Consensus')}
                 </div>
                 {research.target_mean_price ? (
                   <>
@@ -616,7 +624,9 @@ export default function ResearchPage() {
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                      Mean target{research.number_of_analysts ? ` · ${research.number_of_analysts} analysts` : ''}
+                      {research.number_of_analysts
+                        ? t('research.analyst.meanTargetWith', 'Mean target · {{count}} analysts', { count: research.number_of_analysts })
+                        : t('research.analyst.meanTarget', 'Mean target')}
                     </div>
                     <AnalystRangeBar
                       low={research.target_low_price}
@@ -626,14 +636,14 @@ export default function ResearchPage() {
                     />
                   </>
                 ) : (
-                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>No analyst targets</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>{t('research.analyst.noTargets', 'No analyst targets')}</div>
                 )}
               </div>
 
               {/* Company health */}
               <div style={panel}>
                 <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                  Company Health
+                  {t('research.health.title', 'Company Health')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
                   {[1,2,3,4,5].map(i => (
@@ -665,18 +675,18 @@ export default function ResearchPage() {
                       color: activeTab === tab ? 'var(--accent)' : 'var(--muted)',
                       borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
                     }}>
-                      {tab === 'news' ? 'News' : 'Analyst Changes'}
+                      {tab === 'news' ? t('research.tab.news', 'News') : t('research.tab.analystChanges', 'Analyst Changes')}
                     </button>
                   ))}
                 </div>
 
                 {loadingTab && (
-                  <div style={{ color: 'var(--muted)', fontSize: 12, padding: '8px 0' }}>Loading…</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 12, padding: '8px 0' }}>{t('table.loading', 'Loading…')}</div>
                 )}
 
                 {!loadingTab && activeTab === 'news' && news && (
                   news.length === 0
-                    ? <div style={{ color: 'var(--muted)', fontSize: 12 }}>No recent news.</div>
+                    ? <div style={{ color: 'var(--muted)', fontSize: 12 }}>{t('research.news.empty', 'No recent news.')}</div>
                     : news.slice(0, 8).map((item, i) => (
                       <div key={i} style={{
                         paddingBottom: 12, marginBottom: 12,
@@ -695,7 +705,7 @@ export default function ResearchPage() {
 
                 {!loadingTab && activeTab === 'analyst' && analystChanges && (
                   analystChanges.length === 0
-                    ? <div style={{ color: 'var(--muted)', fontSize: 12 }}>No recent analyst changes.</div>
+                    ? <div style={{ color: 'var(--muted)', fontSize: 12 }}>{t('research.analyst.noChanges', 'No recent analyst changes.')}</div>
                     : analystChanges.slice(0, 8).map((item, i) => (
                       <div key={i} style={{
                         paddingBottom: 10, marginBottom: 10, fontSize: 12,

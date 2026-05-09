@@ -15,6 +15,8 @@ LANGS = {
     'he': 'Hebrew',
     'es': 'Spanish',
     'fr': 'French',
+    'de': 'German',
+    'it': 'Italian',
 }
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
