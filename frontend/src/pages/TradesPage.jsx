@@ -161,8 +161,13 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
 
   function selectPeriod(months) {
     setActivePeriod(months)
-    const d = new Date(); d.setMonth(d.getMonth() - months)
-    setChartStart(d.toISOString().slice(0, 10))
+    if (months === 'ytd') {
+      const y = new Date().getFullYear()
+      setChartStart(`${y}-01-01`)
+    } else {
+      const d = new Date(); d.setMonth(d.getMonth() - months)
+      setChartStart(d.toISOString().slice(0, 10))
+    }
     setChartEnd(today)
   }
 
@@ -341,8 +346,8 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
                     [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
                     [t('modal.currentSignal'), row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
                     [t('modal.currentPrice'),  history12m.length > 0 ? fmtPrice(history12m.at(-1).close / priceScale) : '—'],
-                    [activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
-                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, windowAvgReturn != null ? <span className={windowAvgReturn >= 0 ? 'up' : 'down'}>{windowAvgReturn >= 0 ? '+' : ''}{fmt(windowAvgReturn)}%</span> : '—']] : []),
+                    [activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M','ytd':'YTD',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
+                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M','ytd':'YTD',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, windowAvgReturn != null ? <span className={windowAvgReturn >= 0 ? 'up' : 'down'}>{windowAvgReturn >= 0 ? '+' : ''}{fmt(windowAvgReturn)}%</span> : '—']] : []),
                     ...(row.unrealized_pct != null ? [[t('modal.yieldSinceBuy'), <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
@@ -415,7 +420,7 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
 
             {/* Period selector — overlaid at top of chart */}
             <div style={{ position: 'absolute', top: 8, left: 56, right: 24, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
-              {[[3, '3M'], [6, '6M'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
+              {[[3, '3M'], [6, '6M'], ['ytd', 'YTD'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
                 <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
                   onClick={() => selectPeriod(m)}
                 >{label}</button>
@@ -706,7 +711,12 @@ export default function TradesPage() {
 
   function selectPeriod(months) {
     setActivePeriod(months)
-    setStart(isoMonthsAgo(months))
+    if (months === 'ytd') {
+      const y = new Date().getFullYear()
+      setStart(`${y}-01-01`)
+    } else {
+      setStart(isoMonthsAgo(months))
+    }
     setEnd(new Date().toISOString().slice(0, 10))
   }
 
@@ -775,7 +785,7 @@ export default function TradesPage() {
         <label style={{ color: 'var(--muted)', fontSize: 13 }}>{t('trades.to')}</label>
         <input type="date" value={end} onChange={e => { setEnd(e.target.value); setActivePeriod(null) }} />
         <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {[[3, '3M'], [6, '6M'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
+          {[[3, '3M'], [6, '6M'], ['ytd', 'YTD'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
             <button
               key={m}
               className={`period-chip${activePeriod === m ? ' active' : ''}`}
