@@ -373,6 +373,18 @@ export default function ResearchPage() {
 
   useEffect(() => { if (urlTicker) loadResearch(urlTicker) }, [urlTicker])
 
+  // Re-generate the AI report when the UI language changes — but only if one
+  // already exists (don't trigger on first load, and don't trigger if the user
+  // never generated a report). The dependency on i18n.language fires the
+  // regeneration; `report` is intentionally NOT in the dep list so we don't
+  // loop when handleGenerateReport sets it.
+  useEffect(() => {
+    if (report && research && !loadingReport) {
+      handleGenerateReport()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i18n.language])
+
   async function loadResearch(ticker) {
     setLoadingR(true); setErrR(null); setResearch(null)
     setReport(null); setNews(null); setAnalystChanges(null)
