@@ -260,8 +260,13 @@ img.logo-white-bg, img.modal-logo-white-bg {
 .badge-HOLD { background: rgba(243,156,18,0.15); color: var(--yellow); }
 
 /* ── Up / down colouring ── */
-.up   { color: var(--green); }
-.down { color: var(--red);   }
+/* direction:ltr forces signed numbers like "+5%" / "-3%" to render correctly
+   inside RTL pages — otherwise the leading sign gets pushed to the right
+   side of the number by the bidi algorithm. */
+.up   { color: var(--green); direction: ltr; unicode-bidi: embed; display: inline-block; }
+.down { color: var(--red);   direction: ltr; unicode-bidi: embed; display: inline-block; }
+/* Generic helper for signed numbers that don't use .up / .down. */
+.num-ltr { direction: ltr; unicode-bidi: embed; display: inline-block; }
 
 /* ── Metrics row ── */
 .metrics {

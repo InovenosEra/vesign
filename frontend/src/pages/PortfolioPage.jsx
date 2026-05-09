@@ -32,8 +32,8 @@ function SummaryCard({ label, value, sub, color }) {
       padding: '14px 18px', minWidth: 140, flex: '1 1 140px',
     }}>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: color || 'var(--text)', whiteSpace: 'nowrap' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>}
+      <div dir="ltr" style={{ fontSize: 20, fontWeight: 700, color: color || 'var(--text)', whiteSpace: 'nowrap' }}>{value}</div>
+      {sub && <div dir="ltr" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
@@ -206,7 +206,7 @@ export default function PortfolioPage() {
                       <td style={{ paddingBottom: 4, paddingRight: 12, textAlign: 'right' }}>{fmtPrice(d.value, 0)}</td>
                       <td style={{ paddingBottom: 4, paddingRight: 12, textAlign: 'right', color: 'var(--muted)' }}>{pct.toFixed(1)}%</td>
                       {holding && (
-                        <td style={{ paddingBottom: 4, textAlign: 'right', color: holding.pnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                        <td dir="ltr" style={{ paddingBottom: 4, textAlign: 'right', color: holding.pnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
                           {holding.pnlPct != null ? `${holding.pnlPct >= 0 ? '+' : ''}${holding.pnlPct.toFixed(1)}%` : '—'}
                         </td>
                       )}
@@ -289,7 +289,7 @@ export default function PortfolioPage() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.avgReturn')}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{totalReturn > 0 ? '+' : ''}{fmt(totalReturn)}%</div>
+              <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{totalReturn > 0 ? '+' : ''}{fmt(totalReturn)}%</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.totalTrades')}</div>
@@ -298,13 +298,13 @@ export default function PortfolioPage() {
             <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.yourPortfolio')}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: totalPnlPct != null && totalPnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                <div dir="ltr" style={{ fontSize: 16, fontWeight: 700, color: totalPnlPct != null && totalPnlPct >= 0 ? 'var(--green)' : 'var(--red)' }}>
                   {totalPnlPct != null ? `${totalPnlPct >= 0 ? '+' : ''}${fmt(totalPnlPct)}%` : '—'}
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('portfolio.vesignSignals')}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--green)' }}>+{fmt(totalReturn)}%</div>
+                <div dir="ltr" style={{ fontSize: 16, fontWeight: 700, color: 'var(--green)' }}>+{fmt(totalReturn)}%</div>
               </div>
               {diff != null && (
                 <div>
