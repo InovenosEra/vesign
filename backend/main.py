@@ -2428,7 +2428,12 @@ Condition checks (7 criteria for a BUY signal):
 Write exactly 3 sections with these headings:
 **Current Situation**
 **Key Risks**
-**Recommendation** (one of: Buy / Hold / Avoid / Reduce — with a brief rationale)
+**Recommendation** — the recommendation verb MUST match the Vesign signal:
+  - Signal "BUY"  → start with "Buy."
+  - Signal "SELL" → start with "Reduce."
+  - Signal "HOLD" → start with "Hold."
+After the verb, give 2-3 sentences of rationale. You may flag concerns or
+nuances in the rationale, but DO NOT contradict the headline verb.
 
 Keep the total response under 300 words. Plain language, no jargon. Do not mention RSI, Bollinger Bands, ML scores, or any of the internal condition checks."""
 
