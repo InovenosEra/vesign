@@ -42,7 +42,9 @@ def _client_singleton() -> Anthropic:
 
 def _is_passthrough(target_lang: Optional[str]) -> bool:
     """English (or unknown lang) → return original text without API call."""
-    if not target_lang:
+    # Defensive: only proceed with actual strings. FastAPI Query() defaults
+    # passed through internal function calls land here as non-string sentinels.
+    if not target_lang or not isinstance(target_lang, str):
         return True
     code = target_lang.lower().split("-")[0]  # 'en-US' → 'en'
     name = LANG_NAMES.get(code)

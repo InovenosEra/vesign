@@ -2354,8 +2354,10 @@ def research_ai_report(ticker: str, body: AIReportBody, user=Depends(get_current
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker")
 
-    # Fetch research data
-    data = research_ticker(ticker, user=user)
+    # Fetch research data (pass lang explicitly — research_ticker's `lang`
+    # parameter has a FastAPI Query default that only resolves through the
+    # HTTP layer, not when called directly as a Python function).
+    data = research_ticker(ticker, lang=body.lang, user=user)
 
     # Fetch top 5 news headlines
     from data import fmp as _fmp
