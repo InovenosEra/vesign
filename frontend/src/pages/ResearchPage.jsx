@@ -352,7 +352,7 @@ function MetricCard({ label, value, sub, color }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ResearchPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { ticker: urlTicker } = useParams()
   const navigate = useNavigate()
 
@@ -404,7 +404,7 @@ export default function ResearchPage() {
     setLoadingReport(true); setReport(null)
     try {
       const ep = entryPrice ? parseFloat(entryPrice) : null
-      const data = await generateAIReport(research.ticker, ep)
+      const data = await generateAIReport(research.ticker, ep, i18n.language)
       setReport(data.report)
     } catch (e) {
       setReport(`${t('research.aiReport.errorPrefix', 'Error')}: ${e.message || t('research.aiReport.failed', 'Failed to generate report')}`)

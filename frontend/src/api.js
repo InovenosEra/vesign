@@ -204,8 +204,11 @@ export const getAnalystChanges = (ticker, limit = 8) =>
 export const getResearch = (ticker) =>
   get(`/research/${encodeURIComponent(ticker)}`)
 
-export const generateAIReport = (ticker, entryPrice) =>
-  post(`/research/${encodeURIComponent(ticker)}/ai-report`, { entry_price: entryPrice || null })
+export const generateAIReport = (ticker, entryPrice, lang) =>
+  post(`/research/${encodeURIComponent(ticker)}/ai-report`, {
+    entry_price: entryPrice || null,
+    lang: lang || 'en',
+  })
 
 // --- Portfolio -------------------------------------------------------------
 export const getPortfolioHoldings = (market = 'US') =>

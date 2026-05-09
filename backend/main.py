@@ -404,6 +404,7 @@ class AccessRequestBody(BaseModel):
 
 class AIReportBody(BaseModel):
     entry_price: Optional[float] = None
+    lang: Optional[str] = None  # i18n locale: en/he/es/fr/de/it. Defaults to en.
 
 
 # ---------------------------------------------------------------------------
@@ -2400,6 +2401,20 @@ Write exactly 3 sections with these headings:
 **Recommendation** (one of: Buy / Hold / Avoid / Reduce — with a brief rationale)
 
 Keep the total response under 300 words. Plain language, no jargon. Do not mention RSI, Bollinger Bands, ML scores, or any of the internal condition checks."""
+
+    # Language directive — appended last so Claude follows it for the whole response.
+    LANG_NAMES = {"en": "English", "he": "Hebrew", "es": "Spanish",
+                  "fr": "French", "de": "German", "it": "Italian"}
+    lang_code = (body.lang or "en").lower()
+    lang_name = LANG_NAMES.get(lang_code, "English")
+    if lang_code != "en":
+        prompt += (
+            f"\n\nIMPORTANT: Respond entirely in {lang_name}. "
+            f"Translate the section headings (Current Situation, Key Risks, Recommendation) "
+            f"and the recommendation verb (Buy/Hold/Avoid/Reduce) to {lang_name} as well. "
+            f"Keep the ticker symbol, currency symbols ($), numbers, and percentages in their "
+            f"original form. Use proper {lang_name} punctuation."
+        )
 
     try:
         from anthropic import Anthropic
