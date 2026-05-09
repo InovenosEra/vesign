@@ -130,12 +130,17 @@ def update_prices():
     # ── Step 2: incremental update for all tickers ────────────────────────────
     # Use MIN(MAX(date) per ticker) so that even if one ticker is slightly ahead,
     # the others still get refreshed.
+    # IMPORTANT: filter MIN(MAX) to the current universe — otherwise a delisted
+    # ticker (e.g. MODG with last close 2022-09-06) drags the floor back years
+    # and forces unnecessary re-fetch of all tickers from that point. (2026-05-09)
     try:
-        existing = pd.read_sql(
+        from sqlalchemy import bindparam
+        stmt = text(
             "SELECT MIN(max_date) as last_date FROM "
-            "(SELECT ticker, MAX(date) as max_date FROM daily_prices GROUP BY ticker)",
-            engine
-        )
+            "(SELECT ticker, MAX(date) as max_date FROM daily_prices "
+            " WHERE ticker IN :tickers GROUP BY ticker)"
+        ).bindparams(bindparam("tickers", expanding=True))
+        existing = pd.read_sql(stmt, engine, params={"tickers": tickers})
         last_date  = pd.to_datetime(existing["last_date"][0]).date()
         start_date = last_date + timedelta(days=1)
     except Exception:
