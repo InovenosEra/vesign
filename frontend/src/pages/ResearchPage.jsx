@@ -342,7 +342,8 @@ function MetricCard({ label, value, sub, color }) {
       background: 'var(--surface)', border: '1px solid var(--border)',
       borderRadius: 12, padding: '16px 12px', textAlign: 'center',
     }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: color || 'var(--text)', lineHeight: 1.1 }}>{value}</div>
+      {/* dir=ltr forces numbers like "+28%" to render as "+28%" even in RTL pages */}
+      <div dir="ltr" style={{ fontSize: 22, fontWeight: 800, color: color || 'var(--text)', lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{sub}</div>}
       <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</div>
     </div>
@@ -616,9 +617,9 @@ export default function ResearchPage() {
                 {research.target_mean_price ? (
                   <>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                      <span style={{ fontSize: 22, fontWeight: 800 }}>${fmt(research.target_mean_price, 0)}</span>
+                      <span dir="ltr" style={{ fontSize: 22, fontWeight: 800 }}>${fmt(research.target_mean_price, 0)}</span>
                       {upside != null && (
-                        <span style={{ fontSize: 14, fontWeight: 700, color: upColor }}>
+                        <span dir="ltr" style={{ fontSize: 14, fontWeight: 700, color: upColor }}>
                           {upside >= 0 ? '+' : ''}{(upside * 100).toFixed(0)}%
                         </span>
                       )}
