@@ -191,8 +191,8 @@ export const getOpenTrades = (market = 'US') =>
   get(`/trades/open?market=${market}`)
 
 // --- News & analyst changes ------------------------------------------------
-export const getNews = (ticker, limit = 5) =>
-  get(`/news?ticker=${encodeURIComponent(ticker)}&limit=${limit}`)
+export const getNews = (ticker, limit = 5, lang) =>
+  get(`/news?ticker=${encodeURIComponent(ticker)}&limit=${limit}${lang ? `&lang=${lang}` : ''}`)
 
 export const getEarnings = (ticker) =>
   get(`/earnings?ticker=${encodeURIComponent(ticker)}`)
@@ -201,8 +201,8 @@ export const getAnalystChanges = (ticker, limit = 8) =>
   get(`/analyst-changes?ticker=${encodeURIComponent(ticker)}&limit=${limit}`)
 
 // --- Research --------------------------------------------------------------
-export const getResearch = (ticker) =>
-  get(`/research/${encodeURIComponent(ticker)}`)
+export const getResearch = (ticker, lang) =>
+  get(`/research/${encodeURIComponent(ticker)}${lang ? `?lang=${lang}` : ''}`)
 
 export const generateAIReport = (ticker, entryPrice, lang) =>
   post(`/research/${encodeURIComponent(ticker)}/ai-report`, {

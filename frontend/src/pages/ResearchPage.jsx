@@ -373,13 +373,23 @@ export default function ResearchPage() {
 
   useEffect(() => { if (urlTicker) loadResearch(urlTicker) }, [urlTicker])
 
-  // Re-generate the AI report when the UI language changes — but only if one
-  // already exists (don't trigger on first load, and don't trigger if the user
-  // never generated a report). The dependency on i18n.language fires the
-  // regeneration; `report` is intentionally NOT in the dep list so we don't
-  // loop when handleGenerateReport sets it.
+  // Re-fetch language-dependent content when the UI language changes:
+  //   - research data (re-fetches translated health_reason)
+  //   - active tab content (re-fetches translated news headlines)
+  //   - AI report (re-generates in new language) if one is already shown
+  // All three skip work on first mount (research is null until loadResearch runs).
   useEffect(() => {
-    if (report && research && !loadingReport) {
+    if (!research) return
+    // Re-fetch full research (translates health_reason).
+    getResearch(research.ticker, i18n.language)
+      .then(d => setResearch(d))
+      .catch(() => {})
+    // Re-fetch the currently-active tab so news titles refresh.
+    if (activeTab === 'news') {
+      getNews(research.ticker, 10, i18n.language).then(setNews).catch(() => {})
+    }
+    // Regenerate AI report only if one was already shown.
+    if (report && !loadingReport) {
       handleGenerateReport()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,7 +399,7 @@ export default function ResearchPage() {
     setLoadingR(true); setErrR(null); setResearch(null)
     setReport(null); setNews(null); setAnalystChanges(null)
     try {
-      const data = await getResearch(ticker)
+      const data = await getResearch(ticker, i18n.language)
       setResearch(data)
       navigate(`/research/${ticker}`, { replace: true })
       loadTab('news', ticker)
@@ -401,12 +411,12 @@ export default function ResearchPage() {
   }
 
   async function loadTab(tab, tickerOverride) {
-    const t = tickerOverride || research?.ticker
-    if (!t) return
+    const tk = tickerOverride || research?.ticker
+    if (!tk) return
     setActiveTab(tab); setLoadingTab(true)
     try {
-      if (tab === 'news') setNews(await getNews(t, 10))
-      else setAnalystChanges(await getAnalystChanges(t, 10))
+      if (tab === 'news') setNews(await getNews(tk, 10, i18n.language))
+      else setAnalystChanges(await getAnalystChanges(tk, 10))
     } catch (_) {}
     setLoadingTab(false)
   }

@@ -1728,12 +1728,27 @@ def open_trades_export(market: Optional[str] = None):
 # --- News & analyst endpoints -----------------------------------------------
 
 @protected.get("/api/news")
-def stock_news_endpoint(ticker: str = Query(...), limit: int = Query(default=5, ge=1, le=20)):
+def stock_news_endpoint(
+    ticker: str = Query(...),
+    limit: int = Query(default=5, ge=1, le=20),
+    lang: Optional[str] = Query(default=None),
+):
+    """Recent news headlines for a ticker. Titles are translated to `lang`
+    (en/he/es/fr/de/it) when provided; non-en is cached after first request.
+    Sites, URLs, dates are NOT translated."""
     from data import fmp as _fmp
+    from backend.translation import translate_batch as _tx_batch
     ticker = ticker.strip().upper()
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker")
-    return _fmp.stock_news(ticker, limit)
+    items = _fmp.stock_news(ticker, limit) or []
+    if items and lang and lang.lower().split("-")[0] != "en":
+        titles = [item.get("title", "") for item in items]
+        translated = _tx_batch(titles, lang)
+        for item, t in zip(items, translated):
+            if t:
+                item["title"] = t
+    return items
 
 
 @protected.get("/api/earnings")
@@ -2211,8 +2226,16 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
 # --- Research ---------------------------------------------------------------
 
 @protected.get("/api/research/{ticker}")
-def research_ticker(ticker: str, user=Depends(get_current_user)):
-    """Aggregate all research data for a ticker including Vesign score."""
+def research_ticker(
+    ticker: str,
+    lang: Optional[str] = Query(default=None),
+    user=Depends(get_current_user),
+):
+    """Aggregate all research data for a ticker including Vesign score.
+
+    Optional `lang` (i18n locale: en/he/es/fr/de/it) translates user-facing
+    free-text fields (currently `health_reason`). Numbers and codes are kept
+    in their original form. Defaults to English (passthrough)."""
     ticker = ticker.strip().upper()
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker")
@@ -2286,6 +2309,11 @@ def research_ticker(ticker: str, user=Depends(get_current_user)):
     else:
         fair_value_upside = _v(row.get("fair_value_upside"))
 
+    # Translate the only free-text field that benefits from localization.
+    # Other fields are numbers, codes, or IDs that should not be translated.
+    from backend.translation import translate as _tx
+    health_reason_translated = _tx(_v(row.get("health_reason")) or "", lang)
+
     return {
         "ticker":              ticker,
         "company":             _v(row.get("company")),
@@ -2307,7 +2335,7 @@ def research_ticker(ticker: str, user=Depends(get_current_user)):
         "target_high_price":   _v(row.get("target_high_price")),
         "number_of_analysts":  _v(row.get("number_of_analysts")),
         "health_score":        _v(row.get("health_score")),
-        "health_reason":       _v(row.get("health_reason")),
+        "health_reason":       health_reason_translated or None,
         "trade_count":         trade_count,
         "win_rate":            win_rate,
         "avg_return":          round(float(avg_return) * 100, 2) if avg_return is not None else None,
