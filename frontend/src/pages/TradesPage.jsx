@@ -55,6 +55,14 @@ function isoMonthsAgo(n) {
   return d.toISOString().slice(0, 10)
 }
 
+// Convert a period sentinel (number of months, or 'ytd') to an ISO start date.
+// Used by both selectPeriod and the on-mount effect that restores the
+// persisted period after route changes.
+function startForPeriod(p) {
+  if (p === 'ytd') return `${new Date().getFullYear()}-01-01`
+  return isoMonthsAgo(p)
+}
+
 function countTradingDays(startStr, endStr) {
   let count = 0
   const d = new Date(startStr)
@@ -702,7 +710,7 @@ export default function TradesPage() {
   useEffect(() => {
     if (activePeriod) {
       const today = new Date().toISOString().slice(0, 10)
-      const s = isoMonthsAgo(activePeriod)
+      const s = startForPeriod(activePeriod)
       if (start !== s) setStart(s)
       if (end !== today) setEnd(today)
     }
@@ -711,12 +719,7 @@ export default function TradesPage() {
 
   function selectPeriod(months) {
     setActivePeriod(months)
-    if (months === 'ytd') {
-      const y = new Date().getFullYear()
-      setStart(`${y}-01-01`)
-    } else {
-      setStart(isoMonthsAgo(months))
-    }
+    setStart(startForPeriod(months))
     setEnd(new Date().toISOString().slice(0, 10))
   }
 
