@@ -2449,12 +2449,17 @@ Keep the total response under 300 words. Plain language, no jargon. Do not menti
     try:
         from anthropic import Anthropic
         client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        # max_tokens=1800 covers a ~300-word response even in Hebrew/Russian/etc.
+        # where each character takes 2-3x more BPE tokens than Latin scripts.
+        # English typically uses ~450 tokens, well under the cap.
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=700,
+            max_tokens=1800,
             messages=[{"role": "user", "content": prompt}],
         )
         report_text = message.content[0].text
+        if message.stop_reason == "max_tokens":
+            report_text += "\n\n[…]"  # explicit ellipsis if Claude STILL hit the cap
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"AI report generation failed: {exc}")
 
