@@ -717,7 +717,7 @@ def signals(
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, s.close, s.rsi,
                    s.fair_value_upside,
-                   COALESCE(s.target_mean_price, ae.target_mean_price) AS target_mean_price, COALESCE(s.target_low_price, ae.target_low_price) AS target_low_price, COALESCE(s.target_high_price, ae.target_high_price) AS target_high_price,
+                   s.target_mean_price, s.target_low_price, s.target_high_price,
                    s.prediction_score,
                    s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short,
                    CAST(COALESCE(
