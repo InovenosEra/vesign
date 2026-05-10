@@ -1017,12 +1017,15 @@ def analyst_history_endpoint(
     start: Optional[str] = Query(default=None),
     end:   Optional[str] = Query(default=None),
 ):
-    """Historical analyst targets (Low/Base/High) for a ticker from the signals table.
+    """Historical analyst targets (Low/Base/High) for a ticker, point-in-time.
 
-    Falls back to the current analyst_expectations snapshot when the per-date
-    historical value is NULL (e.g. for tickers without analyst_targets_history,
-    such as newly-added tickers). Same COALESCE pattern as /api/signals so the
-    chart shows consistent target lines.
+    Returns ONLY the per-date historical values stored in signals (which the
+    engine writes from analyst_targets_history with a 90-day staleness cutoff).
+    No fallback to the current analyst_expectations snapshot — that would
+    fabricate flat target lines on the chart for any ticker without historical
+    coverage (e.g. newly-added tickers). Frontend forward-fills from the first
+    real entry; dates before that get no target line, which is the correct
+    point-in-time behavior per feedback_analyst_forward_fill.md.
     """
     ticker = ticker.strip().upper()
     if not _TICKER_RE.match(ticker):
@@ -1032,13 +1035,12 @@ def analyst_history_endpoint(
     with engine.connect() as conn:
         df = pd.read_sql(text("""
             SELECT DATE(s.date) AS date,
-                   COALESCE(s.target_mean_price, ae.target_mean_price) AS target_mean_price,
-                   COALESCE(s.target_low_price,  ae.target_low_price)  AS target_low_price,
-                   COALESCE(s.target_high_price, ae.target_high_price) AS target_high_price
+                   s.target_mean_price,
+                   s.target_low_price,
+                   s.target_high_price
             FROM signals s
-            LEFT JOIN analyst_expectations ae ON ae.ticker = s.ticker
             WHERE s.ticker = :ticker
-              AND COALESCE(s.target_mean_price, ae.target_mean_price) IS NOT NULL
+              AND s.target_mean_price IS NOT NULL
               AND DATE(s.date) BETWEEN :start AND :end
             ORDER BY s.date ASC
         """), conn, params={"ticker": ticker, "start": start_date, "end": end_date})
