@@ -1528,7 +1528,18 @@ def trades_export(
                s.health_score, s.prediction_score, s.fair_value_upside,
                p.pred_5d, p.pred_20d,
                s.bb_pct_b,
-               s.vqs, s.signal, s.score, s.vesign_score
+               s.vqs, s.signal, s.score, s.vesign_score,
+               CASE
+                 WHEN s.rsi_3day_flag = 3 AND s.bb_condition = 1 AND s.analyst_condition = 1
+                      AND s.volume_flag = 1 AND s.week52_condition = 1
+                      AND s.health_condition = 1 AND s.ml_condition = 1
+                      AND s.vqs = 9 THEN 'V1+V2'
+                 WHEN s.rsi_3day_flag = 3 AND s.bb_condition = 1 AND s.analyst_condition = 1
+                      AND s.volume_flag = 1 AND s.week52_condition = 1
+                      AND s.health_condition = 1 AND s.ml_condition = 1 THEN 'V1'
+                 WHEN s.vqs = 9 THEN 'V2'
+                 ELSE NULL
+               END AS buy_path
         FROM trade_log tl
         LEFT JOIN companies c ON c.ticker = tl.ticker
         LEFT JOIN fundamentals f ON f.ticker = tl.ticker
@@ -1628,6 +1639,26 @@ def _build_open_trades(mkt: str) -> list[dict]:
             JOIN pairs ON p.ticker = pairs.t AND p.date = pairs.d
         """)).fetchall()}
 
+        # Which strategy path triggered the BUY: V1 / V2 / V1+V2 / NULL.
+        # Computed from the gate columns the engine wrote at scoring time.
+        buy_paths = {r[0]: r[1] for r in conn.execute(text(f"""
+            WITH pairs(t, d) AS (VALUES {buy_vals})
+            SELECT s.ticker,
+                   CASE
+                     WHEN s.rsi_3day_flag = 3 AND s.bb_condition = 1 AND s.analyst_condition = 1
+                          AND s.volume_flag = 1 AND s.week52_condition = 1
+                          AND s.health_condition = 1 AND s.ml_condition = 1
+                          AND s.vqs = 9 THEN 'V1+V2'
+                     WHEN s.rsi_3day_flag = 3 AND s.bb_condition = 1 AND s.analyst_condition = 1
+                          AND s.volume_flag = 1 AND s.week52_condition = 1
+                          AND s.health_condition = 1 AND s.ml_condition = 1 THEN 'V1'
+                     WHEN s.vqs = 9 THEN 'V2'
+                     ELSE NULL
+                   END AS buy_path
+            FROM signals s
+            JOIN pairs ON s.ticker = pairs.t AND s.date = pairs.d
+        """)).fetchall()}
+
         # Step 4: latest price per ticker (IN query, ticker_date index)
         latest_prices = {r[0]: r[1] for r in conn.execute(text(f"""
             SELECT dp.ticker, dp.close FROM daily_prices dp
@@ -1702,6 +1733,7 @@ def _build_open_trades(mkt: str) -> list[dict]:
             "pred_5d":           _v(float(p5))     if p5     is not None else None,
             "pred_20d":          _v(float(p20))    if p20    is not None else None,
             "prediction_score":  _v(float(pscore)) if pscore is not None else None,
+            "buy_path":          buy_paths.get(ticker),
         })
 
     result.sort(key=lambda x: x["buy_date"], reverse=True)
