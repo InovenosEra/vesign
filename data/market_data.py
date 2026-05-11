@@ -205,9 +205,21 @@ def update_vix():
         today_ts = pd.Timestamp(datetime.now(UTC).date())
         data = data[data["date"] < today_ts]
 
+        # Strict cutoff against existing rows: yfinance often returns the most
+        # recent trading day even outside the requested range (e.g. asked for
+        # Mon-only, returns Fri data because the new week hasn't traded yet).
+        # Appending without this check creates duplicate (date) rows that the
+        # signal engine then joins against, doubling every ticker's row and
+        # crashing the daily pipeline (see project_engine_pitfalls.md #2).
+        start_ts = pd.Timestamp(start_date)
+        data = data[data["date"] >= start_ts]
+
         data.drop_duplicates(subset=["date"], inplace=True)
+        if data.empty:
+            print("VIX: no new dates to insert (all fetched rows already in DB)")
+            return
         data.to_sql("vix", engine, if_exists="append", index=False)
-        print("VIX updated successfully")
+        print(f"VIX updated successfully ({len(data)} new rows)")
 
     except Exception as e:
         print(f"VIX update failed: {e}")
