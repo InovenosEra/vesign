@@ -755,7 +755,8 @@ def signals(
     }
 
 
-@protected.get("/api/signals/export.xlsx")
+@protected.get("/api/signals/export")
+@protected.get("/api/signals/export.xlsx")  # legacy alias — defaults to xlsx
 def signals_export(
     signal: Optional[str] = None,
     search: Optional[str] = None,
@@ -764,15 +765,17 @@ def signals_export(
     sort_by: str = Query(default="date"),
     sort_dir: str = Query(default="desc"),
     market: Optional[str] = None,
+    format: str = Query(default="xlsx", description="xlsx | csv | zip"),
 ):
-    """XLSX export of the Signals table — full per-ticker columns, all history.
+    """Export of the Signals table — full per-ticker columns, all history, in
+    the chosen `format` (xlsx / csv / zip-of-csv).
 
     Mirrors the signal/search/sort filters of `/api/signals` (including the
     optional `start`/`end` date range) but ignores pagination so the user
     gets every row that matches. A hard LIMIT 200000 caps the worst case so
     the server doesn't spend forever streaming HOLDs nobody reads.
     """
-    from backend.exports import cursor_to_xlsx_response
+    from backend.exports import dispatch_cursor_response
 
     EXPORT_ROW_LIMIT = 200_000
 
@@ -830,8 +833,8 @@ def signals_export(
 
     today = datetime.now(UTC).date().isoformat()
     with engine.connect() as conn:
-        return cursor_to_xlsx_response(
-            conn, sql, params,
+        return dispatch_cursor_response(
+            format, conn, sql, params,
             filename=f"signals_{today}", sheet_name="signals",
             column_formats={"date": "dd/mm/yy"},
             date_columns=("date",),
@@ -1187,10 +1190,15 @@ def get_watchlist_tickers(list_id: int, user=Depends(get_current_user)):
     return _records(df)
 
 
-@protected.get("/api/watchlists/{list_id}/export.xlsx")
-def watchlist_export(list_id: int, user=Depends(get_current_user)):
-    """XLSX of the watchlist's tickers — one row per ticker, latest signals row + company refs."""
-    from backend.exports import dataframe_to_xlsx_response
+@protected.get("/api/watchlists/{list_id}/export")
+@protected.get("/api/watchlists/{list_id}/export.xlsx")  # legacy alias
+def watchlist_export(
+    list_id: int,
+    format: str = Query(default="xlsx", description="xlsx | csv | zip"),
+    user=Depends(get_current_user),
+):
+    """Export the watchlist's tickers (xlsx/csv/zip) — one row per ticker, latest signals row + company refs."""
+    from backend.exports import dispatch_dataframe_response
     import re
 
     with engine.connect() as conn:
@@ -1223,8 +1231,8 @@ def watchlist_export(list_id: int, user=Depends(get_current_user)):
 
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", watchlist_name).strip("_") or f"list_{list_id}"
     today = datetime.now(UTC).date().isoformat()
-    return dataframe_to_xlsx_response(
-        df, filename=f"watchlist_{safe}_{today}", sheet_name="watchlist",
+    return dispatch_dataframe_response(
+        format, df, filename=f"watchlist_{safe}_{today}", sheet_name="watchlist",
     )
 
 
@@ -1474,14 +1482,16 @@ def historical_trades(
     return list(ticker_trades.values())
 
 
-@protected.get("/api/trades/export.xlsx")
+@protected.get("/api/trades/export")
+@protected.get("/api/trades/export.xlsx")  # legacy alias
 def trades_export(
     start: Optional[str] = None,
     end: Optional[str] = None,
     market: Optional[str] = None,
+    format: str = Query(default="xlsx", description="xlsx | csv | zip"),
 ):
-    """XLSX export of closed trades — one row per trade, full columns + company refs."""
-    from backend.exports import dataframe_to_xlsx_response
+    """Export of closed trades (xlsx/csv/zip) — one row per trade, full columns + company refs."""
+    from backend.exports import dispatch_dataframe_response
 
     mkt = (market or "US").upper()
     where = ["1=1"]
@@ -1516,6 +1526,7 @@ def trades_export(
                s.target_mean_price, s.target_high_price, s.target_low_price,
                s.number_of_analysts,
                s.health_score, s.prediction_score, s.fair_value_upside,
+               p.pred_5d, p.pred_20d,
                s.bb_pct_b,
                s.vqs, s.signal, s.score, s.vesign_score
         FROM trade_log tl
@@ -1523,6 +1534,8 @@ def trades_export(
         LEFT JOIN fundamentals f ON f.ticker = tl.ticker
         LEFT JOIN signals s
           ON s.ticker = tl.ticker AND DATE(s.date) = DATE(tl.buy_date)
+        LEFT JOIN predictions p
+          ON p.ticker = tl.ticker AND DATE(p.date) = DATE(tl.buy_date)
         WHERE {' AND '.join(where)}
         ORDER BY tl.sell_date DESC, tl.ticker ASC
     """
@@ -1537,8 +1550,8 @@ def trades_export(
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
     today = datetime.now(UTC).date().isoformat()
-    return dataframe_to_xlsx_response(
-        df,
+    return dispatch_dataframe_response(
+        format, df,
         filename=f"trades_closed_{today}",
         sheet_name="trades",
         column_formats={
@@ -1607,6 +1620,14 @@ def _build_open_trades(mkt: str) -> list[dict]:
             JOIN pairs ON s.ticker = pairs.t AND s.date = pairs.d
         """)).fetchall()}
 
+        # ML prediction fields at the buy date — pred_5d, pred_20d, prediction_score (blended)
+        buy_predictions = {r[0]: (r[1], r[2], r[3]) for r in conn.execute(text(f"""
+            WITH pairs(t, d) AS (VALUES {buy_vals})
+            SELECT p.ticker, p.pred_5d, p.pred_20d, p.prediction_score
+            FROM predictions p
+            JOIN pairs ON p.ticker = pairs.t AND p.date = pairs.d
+        """)).fetchall()}
+
         # Step 4: latest price per ticker (IN query, ticker_date index)
         latest_prices = {r[0]: r[1] for r in conn.execute(text(f"""
             SELECT dp.ticker, dp.close FROM daily_prices dp
@@ -1661,6 +1682,7 @@ def _build_open_trades(mkt: str) -> list[dict]:
                         if buy_price and current_price and float(buy_price) > 0 else None
         mc    = m.get("market_cap")
         score = m.get("health_score")
+        p5, p20, pscore = buy_predictions.get(ticker, (None, None, None))
         result.append({
             "ticker":            ticker,
             "company":           _v(m.get("company")),
@@ -1677,6 +1699,9 @@ def _build_open_trades(mkt: str) -> list[dict]:
             "current_signal":    cur_sig,
             "health_score":      int(float(score)) if score is not None and not (isinstance(score, float) and math.isnan(score)) else None,
             "health_reason":     _v(m.get("health_reason")),
+            "pred_5d":           _v(float(p5))     if p5     is not None else None,
+            "pred_20d":          _v(float(p20))    if p20    is not None else None,
+            "prediction_score":  _v(float(pscore)) if pscore is not None else None,
         })
 
     result.sort(key=lambda x: x["buy_date"], reverse=True)
@@ -1700,10 +1725,14 @@ def open_trades(market: Optional[str] = None):
     return _get_open_trades_cached((market or "US").upper())
 
 
-@protected.get("/api/trades/open/export.xlsx")
-def open_trades_export(market: Optional[str] = None):
-    """XLSX of currently open positions (BUY with no subsequent SELL)."""
-    from backend.exports import dataframe_to_xlsx_response
+@protected.get("/api/trades/open/export")
+@protected.get("/api/trades/open/export.xlsx")  # legacy alias
+def open_trades_export(
+    market: Optional[str] = None,
+    format: str = Query(default="xlsx", description="xlsx | csv | zip"),
+):
+    """Export of currently open positions (BUY with no subsequent SELL) — xlsx/csv/zip."""
+    from backend.exports import dispatch_dataframe_response
 
     mkt = (market or "US").upper()
 
@@ -1724,7 +1753,7 @@ def open_trades_export(market: Optional[str] = None):
         df = df.merge(extras, on="ticker", how="left")
 
     today = datetime.now(UTC).date().isoformat()
-    return dataframe_to_xlsx_response(df, filename=f"trades_open_{today}", sheet_name="open_trades")
+    return dispatch_dataframe_response(format, df, filename=f"trades_open_{today}", sheet_name="open_trades")
 
 
 # --- News & analyst endpoints -----------------------------------------------
@@ -1848,13 +1877,15 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
     return result
 
 
-@protected.get("/api/portfolio/holdings/export.xlsx")
+@protected.get("/api/portfolio/holdings/export")
+@protected.get("/api/portfolio/holdings/export.xlsx")  # legacy alias
 def portfolio_holdings_export(
     user=Depends(get_current_user),
     market: str = Query(default="US"),
+    format: str = Query(default="xlsx", description="xlsx | csv | zip"),
 ):
-    """XLSX of aggregated portfolio holdings — same shape as /api/portfolio/holdings."""
-    from backend.exports import dataframe_to_xlsx_response
+    """Export of aggregated portfolio holdings (xlsx/csv/zip) — same shape as /api/portfolio/holdings."""
+    from backend.exports import dispatch_dataframe_response
 
     rows = portfolio_holdings(user=user, market=market)   # reuse existing function
     df = pd.DataFrame(rows)
@@ -1875,8 +1906,8 @@ def portfolio_holdings_export(
         df = df.merge(wl, on="ticker", how="left")
 
     today = datetime.now(UTC).date().isoformat()
-    return dataframe_to_xlsx_response(
-        df, filename=f"portfolio_holdings_{today}", sheet_name="holdings",
+    return dispatch_dataframe_response(
+        format, df, filename=f"portfolio_holdings_{today}", sheet_name="holdings",
     )
 
 

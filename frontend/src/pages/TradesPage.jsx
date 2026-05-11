@@ -32,7 +32,7 @@ import { useLivePrices } from '../hooks/useLivePrices'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { MarketContext } from '../context/MarketContext'
 import { useCurrency } from '../context/CurrencyContext'
-import DownloadXLSXButton from '../components/DownloadXLSXButton'
+import DownloadButton from '../components/DownloadButton'
 
 function fmt(n, decimals = 2) {
   return n != null
@@ -855,8 +855,8 @@ export default function TradesPage() {
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
-            <DownloadXLSXButton
-              url={`/api/trades/export.xlsx?${new URLSearchParams({
+            <DownloadButton
+              url={`/api/trades/export?${new URLSearchParams({
                 ...(start  ? { start }  : {}),
                 ...(end    ? { end }    : {}),
                 ...(market ? { market } : {}),
@@ -970,8 +970,8 @@ export default function TradesPage() {
                   <option value={50}>50</option>
                   <option value={100}>100</option>
                 </select>
-                <DownloadXLSXButton
-                  url={`/api/trades/open/export.xlsx${market ? `?market=${encodeURIComponent(market)}` : ''}`}
+                <DownloadButton
+                  url={`/api/trades/open/export${market ? `?market=${encodeURIComponent(market)}` : ''}`}
                   filenameFallback="trades_open"
                 />
               </span>
