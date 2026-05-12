@@ -116,16 +116,66 @@ export default function SignalModal({ row: rowProp, onClose }) {
     }
   })
 
+  // Forward analyst projection: from the latest available row, extend 12mo
+  // of analyst targets to the right. The chart x-axis is widened with ghost
+  // rows so the projection cone occupies ~20% of plot width.
+  const lastActualRow = chartData.length > 0 ? chartData[chartData.length - 1] : null
+  const hasProjection = !!(lastActualRow && (
+    lastActualRow.target_high != null ||
+    lastActualRow.target_mean != null ||
+    lastActualRow.target_low  != null
+  ))
+  const projectionEnd = lastActualRow ? (() => {
+    const d = new Date(lastActualRow.date + 'T00:00:00Z')
+    d.setUTCMonth(d.getUTCMonth() + 12)
+    return d.toISOString().slice(0, 10)
+  })() : null
+  const projectionRows = []
+  if (hasProjection && projectionEnd && lastActualRow) {
+    const N = Math.max(10, Math.floor(chartData.length * 0.125))
+    const startMs = new Date(lastActualRow.date + 'T00:00:00Z').getTime()
+    const endMs   = new Date(projectionEnd     + 'T00:00:00Z').getTime()
+    for (let i = 1; i <= N; i++) {
+      const ms = startMs + ((endMs - startMs) * i) / N
+      projectionRows.push({ date: new Date(ms).toISOString().slice(0, 10), close: null })
+    }
+  }
+  const chartDataDisplay = projectionRows.length > 0 ? [...chartData, ...projectionRows] : chartData
+
+  // X-axis ticks: only show history dates (not the projection ghost rows) so the
+  // tick labels don't mislead the user about the actual data timeframe.
+  const xTicks = (() => {
+    if (chartData.length === 0) return undefined
+    if (chartData.length <= 8) return chartData.map(d => d.date)
+    const n = 8
+    return Array.from({ length: n }, (_, i) =>
+      chartData[Math.floor(i * (chartData.length - 1) / (n - 1))].date
+    )
+  })()
+
+  // When all three analyst targets collapse to the same value (single-analyst
+  // coverage), render only the Base line to avoid stacked labels.
+  const targetsCollapse = !!(
+    lastActualRow &&
+    lastActualRow.target_high != null &&
+    lastActualRow.target_mean != null &&
+    lastActualRow.target_low  != null &&
+    lastActualRow.target_high === lastActualRow.target_mean &&
+    lastActualRow.target_mean === lastActualRow.target_low
+  )
+
   const basePeriod  = chartHistory.filter(d => d.date <= chartStart).at(-1) ?? chartHistory[0]
   const yieldPeriod = basePeriod && chartHistory.length > 0
     ? ((chartHistory.at(-1).close - basePeriod.close) / basePeriod.close) * 100
     : null
 
-  const hasTargets = chartData.some(d => d.target_high != null)
   const allPrices  = [
     ...chartHistory.map(d => d.close),
-    ...(hasTargets ? chartData.filter(d => d.target_low  != null).map(d => d.target_low)  : []),
-    ...(hasTargets ? chartData.filter(d => d.target_high != null).map(d => d.target_high) : []),
+    ...(hasProjection ? [
+      lastActualRow.target_low,
+      lastActualRow.target_mean,
+      lastActualRow.target_high,
+    ].filter(x => x != null) : []),
   ]
   const minPrice = allPrices.length ? Math.min(...allPrices) * 0.97 : 0
   const maxPrice = allPrices.length ? Math.max(...allPrices) * 1.03 : 0
@@ -151,12 +201,13 @@ export default function SignalModal({ row: rowProp, onClose }) {
     return () => obs.disconnect()
   }, [isLoading])
 
+  const PLOT_RIGHT_MARGIN = 60
+  const PLOT_LEFT = 8 + 56  // chart margin.left + YAxis width
   function dateToX(dateStr) {
-    const idx = chartData.findIndex(d => d.date === dateStr)
-    if (idx < 0 || chartData.length <= 1) return null
-    const plotLeft  = 8 + 48
-    const plotWidth = wrapperWidth - plotLeft - 16
-    return plotLeft + (idx / (chartData.length - 1)) * plotWidth
+    const idx = chartDataDisplay.findIndex(d => d.date === dateStr)
+    if (idx < 0 || chartDataDisplay.length <= 1) return null
+    const plotWidth = wrapperWidth - PLOT_LEFT - PLOT_RIGHT_MARGIN
+    return PLOT_LEFT + (idx / (chartDataDisplay.length - 1)) * plotWidth
   }
 
   // Path B: collect ALL BUY lots per trade (lot 1 = original entry, 2+ = add-ons)
@@ -178,8 +229,15 @@ export default function SignalModal({ row: rowProp, onClose }) {
     ? openLots.reduce((s, l) => s + (l.close ?? 0), 0) / openLots.length
     : null
 
-  const PLOT_TOP    = 100
-  const PLOT_BOTTOM = 332
+  const PLOT_TOP        = 100
+  const PLOT_BOTTOM     = 332  // used for full-height BUY/SELL vertical lines
+  const PLOT_BOTTOM_PX  = 302  // actual Recharts plot bottom (340 chart_height - 8 margin - 30 xAxis)
+
+  function priceToY(price) {
+    if (price == null || maxPrice <= minPrice) return null
+    const ratio = (maxPrice - price) / (maxPrice - minPrice)
+    return PLOT_TOP + ratio * (PLOT_BOTTOM_PX - PLOT_TOP)
+  }
 
   function priceBox(cx, value, color, byOverride) {
     const px = 8, fs = 11
@@ -316,7 +374,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
         {isLoading ? (
           <p className="loading" style={{ padding: 40 }}>{t('modal.loadingChart')}</p>
         ) : (
-          <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden', outline: 'none' }}>
+          <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden', outline: 'none', margin: '0 -24px' }}>
 
             {/* Period selector — overlaid at top of chart, aligned with plot area */}
             <div style={{ position: 'absolute', top: 8, left: 56, right: 16, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
@@ -336,13 +394,13 @@ export default function SignalModal({ row: rowProp, onClose }) {
               </span>
             </div>
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={chartData} margin={{ top: 100, right: 16, bottom: 8, left: 8 }}>
+              <LineChart data={chartDataDisplay} margin={{ top: 100, right: PLOT_RIGHT_MARGIN, bottom: 8, left: 8 }}>
                 <XAxis
                   dataKey="date"
                   tick={{ fill: 'var(--muted)', fontSize: 11 }}
                   tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
-                  interval="preserveStartEnd"
-                  minTickGap={50}
+                  ticks={xTicks}
+                  axisLine={false}
                 />
                 <YAxis
                   domain={[minPrice, maxPrice]}
@@ -354,6 +412,8 @@ export default function SignalModal({ row: rowProp, onClose }) {
                   wrapperStyle={{ zIndex: 50 }}
                   content={({ active, payload, label }) => {
                     if (!active || !payload || !payload.length) return null
+                    // Hide tooltip in the forward projection area (past latest actual data)
+                    if (lastActualRow && label > lastActualRow.date) return null
                     const [y, m, day] = (label || '').split('-')
                     const dateStr = y ? `${day}/${m}/${y.slice(2)}` : label
                     const labels = {
@@ -384,11 +444,8 @@ export default function SignalModal({ row: rowProp, onClose }) {
                   }}
                 />
                 <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} name="close" />
-                {hasTargets && <>
-                  <Line type="stepAfter" dataKey="target_low"  stroke="#e74c3c" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_low"  connectNulls={false} />
-                  <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
-                  <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_high" connectNulls={false} />
-                </>}
+                {/* Projection lines are rendered in the SVG overlay (further down)
+                    so they layer on top of the shaded fill triangles. */}
                 {/* DCA: horizontal avg-cost line for any multi-lot trade. Only
                     rendered when at least one endpoint of the trade falls inside
                     the chart's visible window — otherwise Recharts stretches the
@@ -483,6 +540,81 @@ export default function SignalModal({ row: rowProp, onClose }) {
                   )
                 })}
 
+                {/* Custom X-axis line truncated at the last actual data date
+                    (Recharts' default axis line would span the full chart width,
+                    including the projection area where we don't want it). */}
+                {lastActualRow && (() => {
+                  const endX = dateToX(lastActualRow.date)
+                  if (endX == null) return null
+                  return (
+                    <line
+                      x1={PLOT_LEFT - 8} y1={PLOT_BOTTOM_PX}
+                      x2={endX}          y2={PLOT_BOTTOM_PX}
+                      stroke="var(--border)" strokeWidth={1}
+                    />
+                  )
+                })()}
+
+                {/* Forward analyst projection: cone of 3 lines + shaded triangles + endpoint labels.
+                    Animations: lines draw via stroke-dashoffset after the price line finishes
+                    (Recharts default ~1.5s), then triangles + labels fade in. */}
+                {hasProjection && lastActualRow && (() => {
+                  const apexX = dateToX(lastActualRow.date)
+                  const endX  = dateToX(projectionEnd)
+                  const apexY = priceToY(lastActualRow.close)
+                  const highY = priceToY(lastActualRow.target_high)
+                  const meanY = priceToY(lastActualRow.target_mean)
+                  const lowY  = priceToY(lastActualRow.target_low)
+                  if (apexX == null || endX == null || apexY == null) return null
+                  const lineLen = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1)
+                  const lenHigh = highY != null ? lineLen(apexX, apexY, endX, highY) : 0
+                  const lenMean = meanY != null ? lineLen(apexX, apexY, endX, meanY) : 0
+                  const lenLow  = lowY  != null ? lineLen(apexX, apexY, endX, lowY)  : 0
+                  const fillAnim  = { opacity: 0, animation: 'fadeInProj 0.6s ease-out 2.2s forwards' }
+                  const labelAnim = { opacity: 0, animation: 'fadeInProj 0.5s ease-out 2.5s forwards' }
+                  const lineAnim = (len) => ({
+                    strokeDasharray: len,
+                    strokeDashoffset: len,
+                    animation: 'drawProjLine 1.2s ease-out 1.5s forwards',
+                  })
+                  return (
+                    <g>
+                      {/* 1. Shaded fill triangles (drawn first, lowest layer) */}
+                      {!targetsCollapse && highY != null && meanY != null && (
+                        <polygon points={`${apexX},${apexY} ${endX},${highY} ${endX},${meanY}`}
+                          fill="#16a34a" fillOpacity={0.08} stroke="none" style={fillAnim} />
+                      )}
+                      {!targetsCollapse && meanY != null && lowY != null && (
+                        <polygon points={`${apexX},${apexY} ${endX},${meanY} ${endX},${lowY}`}
+                          fill="#dc2626" fillOpacity={0.08} stroke="none" style={fillAnim} />
+                      )}
+                      {/* 2. Projection lines (drawn on top of fills) */}
+                      {!targetsCollapse && highY != null && (
+                        <line x1={apexX} y1={apexY} x2={endX} y2={highY} stroke="#16a34a" strokeWidth={1.5} style={lineAnim(lenHigh)} />
+                      )}
+                      {meanY != null && (
+                        <line x1={apexX} y1={apexY} x2={endX} y2={meanY} stroke="#64748b" strokeWidth={1.5} style={lineAnim(lenMean)} />
+                      )}
+                      {!targetsCollapse && lowY != null && (
+                        <line x1={apexX} y1={apexY} x2={endX} y2={lowY} stroke="#dc2626" strokeWidth={1.5} style={lineAnim(lenLow)} />
+                      )}
+                      {/* 3. Endpoint labels (drawn on top of lines) */}
+                      {!targetsCollapse && highY != null && (<>
+                        <text x={endX + 6} y={highY - 4} fontSize={10} fontWeight={700} fill="#16a34a" style={labelAnim}>High</text>
+                        <text x={endX + 6} y={highY + 10} fontSize={11} fontWeight={700} fill="#16a34a" style={labelAnim}>{fmtPrice(lastActualRow.target_high, 1)}</text>
+                      </>)}
+                      {meanY != null && (<>
+                        <text x={endX + 6} y={meanY - 4} fontSize={10} fontWeight={700} fill="#64748b" style={labelAnim}>Base</text>
+                        <text x={endX + 6} y={meanY + 10} fontSize={11} fontWeight={700} fill="#64748b" style={labelAnim}>{fmtPrice(lastActualRow.target_mean, 1)}</text>
+                      </>)}
+                      {!targetsCollapse && lowY != null && (<>
+                        <text x={endX + 6} y={lowY - 4} fontSize={10} fontWeight={700} fill="#dc2626" style={labelAnim}>Low</text>
+                        <text x={endX + 6} y={lowY + 10} fontSize={11} fontWeight={700} fill="#dc2626" style={labelAnim}>{fmtPrice(lastActualRow.target_low, 1)}</text>
+                      </>)}
+                    </g>
+                  )
+                })()}
+
                 {openBuy && (() => {
                   const buyX  = dateToX(openBuy.date)
                   const lastX = dateToX(chartData.at(-1).date)
@@ -573,11 +705,6 @@ export default function SignalModal({ row: rowProp, onClose }) {
                 ...(pairs.length > 0 || openBuy ? [
                   { color: 'var(--green)', dash: false, vertical: true, label: t('modal.legendBuy') },
                   { color: 'var(--red)',   dash: false, vertical: true, label: t('modal.legendSell') },
-                ] : []),
-                ...(hasTargets ? [
-                  { color: '#2ecc71', dash: true, label: t('modal.chartTargetHigh') },
-                  { color: '#f39c12', dash: true, label: t('modal.chartTargetBase') },
-                  { color: '#e74c3c', dash: true, label: t('modal.chartTargetLow') },
                 ] : []),
               ].map(({ color, dash, vertical, label }) => (
                 <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
