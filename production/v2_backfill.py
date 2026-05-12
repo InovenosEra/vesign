@@ -71,7 +71,16 @@ def main() -> None:
                 ), {"d": d}).fetchall()
             for ticker, sig, close in new_signals:
                 if sig == "BUY":
-                    open_positions[ticker] = (float(close), d)
+                    # Path B 4-tuple: (entry_price, buy_date, last_lot_price, lot_count).
+                    # Fresh entry → all four from this BUY. Add-on → keep entry_price+buy_date,
+                    # update last_lot_price+lot_count to reflect the new lot.
+                    if ticker in open_positions:
+                        prev = open_positions[ticker]
+                        entry_p, buy_d = prev[0], prev[1]
+                        prev_count = int(prev[3]) if len(prev) > 3 else 1
+                        open_positions[ticker] = (entry_p, buy_d, float(close), prev_count + 1)
+                    else:
+                        open_positions[ticker] = (float(close), d, float(close), 1)
                 elif sig == "SELL" and ticker in open_positions:
                     del open_positions[ticker]
             # Periodic full refresh as drift insurance + to log progress.

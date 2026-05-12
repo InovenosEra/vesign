@@ -21,6 +21,7 @@ def _ensure_signals_columns():
         "vesign_score":     "REAL",
         "news_block_reason":"TEXT",
         "vqs":              "INTEGER",
+        "lot_seq":          "INTEGER",  # Path B: 1=first BUY, 2+=DCA add-on lots
     }
     inspector = inspect(engine)
     if "signals" in inspector.get_table_names():
@@ -45,7 +46,12 @@ def _ensure_signals_columns():
 
 
 def _get_open_positions(as_of_date=None):
-    """Return {ticker: entry_price} for tickers with an open BUY (no subsequent SELL).
+    """Return {ticker: (entry_price, buy_date, last_lot_price, lot_count)} for
+    tickers with an open BUY (no subsequent SELL).
+
+    Path B / DCA: every BUY row since the first-open-buy counts as a lot. The
+    engine uses last_lot_price to enforce the ≤90%-of-previous-lot rule when
+    deciding whether a new BUY signal is allowed to fire as an add-on lot.
 
     If as_of_date is provided, only considers signals strictly before that date.
     """
@@ -67,10 +73,27 @@ def _get_open_positions(as_of_date=None):
                 WHERE b.signal = 'BUY' AND b.date < :dt
                 AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
                 GROUP BY b.ticker
+            ),
+            lots_in_open AS (
+                SELECT b.ticker, b.date, b.close
+                FROM signals b
+                JOIN first_open_buy fob ON b.ticker = fob.ticker AND b.date >= fob.buy_date
+                WHERE b.signal = 'BUY' AND b.date < :dt
+            ),
+            lot_stats AS (
+                SELECT ticker, COUNT(*) AS lot_count, MAX(date) AS last_lot_date
+                FROM lots_in_open
+                GROUP BY ticker
             )
-            SELECT s.ticker, s.close AS entry_price, fob.buy_date
+            SELECT s.ticker,
+                   s.close AS entry_price,
+                   fob.buy_date AS buy_date,
+                   ls.lot_count AS lot_count,
+                   s_last.close AS last_lot_price
             FROM signals s
             JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
+            JOIN lot_stats ls ON ls.ticker = fob.ticker
+            JOIN signals s_last ON s_last.ticker = ls.ticker AND s_last.date = ls.last_lot_date
         """
         params = {"dt": str(as_of_date)}
     else:
@@ -87,16 +110,36 @@ def _get_open_positions(as_of_date=None):
                 WHERE b.signal = 'BUY'
                 AND (ls.sell_date IS NULL OR b.date > ls.sell_date)
                 GROUP BY b.ticker
+            ),
+            lots_in_open AS (
+                SELECT b.ticker, b.date, b.close
+                FROM signals b
+                JOIN first_open_buy fob ON b.ticker = fob.ticker AND b.date >= fob.buy_date
+                WHERE b.signal = 'BUY'
+            ),
+            lot_stats AS (
+                SELECT ticker, COUNT(*) AS lot_count, MAX(date) AS last_lot_date
+                FROM lots_in_open
+                GROUP BY ticker
             )
-            SELECT s.ticker, s.close AS entry_price, fob.buy_date
+            SELECT s.ticker,
+                   s.close AS entry_price,
+                   fob.buy_date AS buy_date,
+                   ls.lot_count AS lot_count,
+                   s_last.close AS last_lot_price
             FROM signals s
             JOIN first_open_buy fob ON s.ticker = fob.ticker AND s.date = fob.buy_date
+            JOIN lot_stats ls ON ls.ticker = fob.ticker
+            JOIN signals s_last ON s_last.ticker = ls.ticker AND s_last.date = ls.last_lot_date
         """
         params = {}
     try:
         df = pd.read_sql(sql, engine, params=params)
-        # Returns {ticker: (entry_price, buy_date)} — buy_date is ISO string
-        return {r["ticker"]: (r["entry_price"], r["buy_date"]) for _, r in df.iterrows()}
+        # {ticker: (entry_price, buy_date, last_lot_price, lot_count)}
+        return {
+            r["ticker"]: (r["entry_price"], r["buy_date"], r["last_lot_price"], int(r["lot_count"]))
+            for _, r in df.iterrows()
+        }
     except Exception:
         return {}
 
@@ -549,10 +592,16 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
     import numpy as np
 
     if open_positions:
-        entry_prices = {t: v[0] for t, v in open_positions.items()}
-        buy_dates    = {t: v[1] for t, v in open_positions.items()}
-        today_df["entry_price"] = today_df["ticker"].map(entry_prices)
-        today_df["buy_date"]    = today_df["ticker"].map(buy_dates)
+        # Path B: open_positions tuple is (entry_price, buy_date, last_lot_price, lot_count).
+        # Tolerate legacy 2-tuples by falling back to entry_price for last_lot_price and 1 for lot_count.
+        entry_prices    = {t: v[0]                            for t, v in open_positions.items()}
+        buy_dates       = {t: v[1]                            for t, v in open_positions.items()}
+        last_lot_prices = {t: (v[2] if len(v) > 2 else v[0]) for t, v in open_positions.items()}
+        lot_counts      = {t: (int(v[3]) if len(v) > 3 else 1) for t, v in open_positions.items()}
+        today_df["entry_price"]   = today_df["ticker"].map(entry_prices)
+        today_df["buy_date"]      = today_df["ticker"].map(buy_dates)
+        today_df["last_lot_price"]   = today_df["ticker"].map(last_lot_prices)
+        today_df["current_lot_count"] = today_df["ticker"].map(lot_counts).fillna(0).astype(int)
         stop_hit = (
             today_df["entry_price"].notna()
             & (today_df["close"] < today_df["entry_price"] * (1 - trailing_stop_pct))
@@ -565,6 +614,8 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
     else:
         stop_hit  = pd.Series(False, index=today_df.index)
         time_exit = pd.Series(False, index=today_df.index)
+        today_df["last_lot_price"]    = float("nan")
+        today_df["current_lot_count"] = 0
 
     # ---------- VQS computation (V2 quality score, used for hybrid BUY + UI) ----
     # Vectorized — sum of 9 binary contrarian conditions, 0..9.
@@ -597,10 +648,19 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
     v2_strong_buy_cond = today_df["vqs"] == 9
     buy_cond = v1_buy_cond | v2_strong_buy_cond
 
-    # Suppress BUY if already in an open position (first BUY wins until SELL)
+    # Path B: allow BUY for either fresh entries OR DCA add-on lots.
+    # An add-on lot is allowed when the ticker is already open AND today's close
+    # is ≤ 90% of the LAST lot's price (strict ≤90%-of-previous-lot rule).
+    # If neither condition holds (already open but price hasn't dropped 10% from
+    # the last lot), the BUY is suppressed → HOLD.
     if open_positions:
         already_open = today_df["ticker"].isin(open_positions.keys())
-        buy_cond = buy_cond & ~already_open
+        dca_addon = (
+            already_open
+            & today_df["last_lot_price"].notna()
+            & (today_df["close"] <= today_df["last_lot_price"] * 0.90)
+        )
+        buy_cond = buy_cond & (~already_open | dca_addon)
 
     # ---------- V1 SELL final wiring (RSI>=70 + ML negative gate, OR stop, OR 365d) ----
     ml_negative = (
@@ -614,6 +674,15 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
         ["SELL", "BUY"],
         default="HOLD"
     )
+
+    # Path B: lot_seq for BUY rows. Fresh entries get 1; add-on lots get
+    # current_lot_count + 1 (i.e. the next sequential number after existing lots).
+    today_df["lot_seq"] = pd.NA
+    buy_mask = today_df["signal"] == "BUY"
+    today_df.loc[buy_mask, "lot_seq"] = (
+        today_df.loc[buy_mask, "current_lot_count"].fillna(0).astype(int) + 1
+    )
+    today_df.drop(columns=["last_lot_price", "current_lot_count"], errors="ignore", inplace=True)
 
     # ETFs (SPY, VOO, ...) live in `companies` so the daily pipeline keeps their
     # prices/fundamentals fresh — but they should never fire BUY/SELL: the

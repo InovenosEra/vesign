@@ -624,7 +624,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
                    s.vqs,
-                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
+                   s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -719,7 +719,7 @@ def signals(
                    s.fair_value_upside,
                    s.target_mean_price, s.target_low_price, s.target_high_price,
                    s.prediction_score,
-                   s.signal, c.company, c.logo_url, c.industry, c.description, c.description_short,
+                   s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.description, c.description_short,
                    CAST(COALESCE(
                        (SELECT score FROM company_health_history
                         WHERE ticker = s.ticker AND DATE(recorded_at) <= DATE(s.date)
@@ -821,7 +821,7 @@ def signals_export(
                s.number_of_analysts,
                s.health_score, s.prediction_score, s.fair_value_upside,
                s.bb_pct_b,
-               s.vqs, s.signal, s.score, s.vesign_score,
+               s.vqs, s.signal, s.lot_seq, s.score, s.vesign_score,
                s.news_block_reason
         FROM signals s
         LEFT JOIN companies c ON c.ticker = s.ticker
@@ -922,14 +922,16 @@ def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144)):
     """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay)."""
     with engine.connect() as conn:
         df = pd.read_sql(text("""
-            SELECT DATE(date) AS date, signal, close
+            SELECT DATE(date) AS date, signal, lot_seq, close
             FROM signals
             WHERE ticker = :t
               AND signal IN ('BUY', 'SELL')
               AND DATE(date) >= DATE('now', :offset)
             ORDER BY date ASC
         """), conn, params={"t": ticker, "offset": f"-{months} months"})
-    return df.to_dict(orient="records")
+    # Use _records so NaN lot_seq (HOLD/SELL rows) becomes JSON null — raw NaN
+    # in the response breaks browser JSON.parse and silently empties the chart markers.
+    return _records(df)
 
 
 @protected.get("/api/signals/success-rate")
@@ -1327,6 +1329,7 @@ def historical_trades(
     start: Optional[str] = None,
     end: Optional[str] = None,
     market: Optional[str] = None,
+    include_lots: Optional[int] = 0,
 ):
     """BUY→SELL trade pairs from pre-built trade_log table."""
     mkt = (market or "US").upper()
@@ -1479,6 +1482,38 @@ def historical_trades(
             if t in ticker_trades:
                 ticker_trades[t]["current_signal"] = sr["current_signal"]
 
+    # DCA lots (Stage 1 / 2 — only when include_lots=1; default OFF preserves byte-for-byte response).
+    if include_lots and ticker_trades:
+        tickers_list = list(ticker_trades.keys())
+        ph = ", ".join([f":l{i}" for i in range(len(tickers_list))])
+        lp = {f"l{i}": t for i, t in enumerate(tickers_list)}
+        with engine.connect() as conn:
+            lots_df = pd.read_sql(text(f"""
+                SELECT ticker, buy_date, sell_date, lot_seq, lot_date, lot_price
+                FROM trade_lots
+                WHERE ticker IN ({ph})
+                ORDER BY ticker, buy_date, sell_date, lot_seq
+            """), conn, params=lp)
+        lots_by_key: dict = {}
+        for _, lr in lots_df.iterrows():
+            key = (lr["ticker"], str(lr["buy_date"])[:10], str(lr["sell_date"])[:10])
+            lots_by_key.setdefault(key, []).append({
+                "seq":   int(lr["lot_seq"]),
+                "date":  str(lr["lot_date"])[:10],
+                "price": round(float(lr["lot_price"]), 4),
+            })
+        for tk_data in ticker_trades.values():
+            for pair in tk_data["trades"]:
+                if pair["result"] == "Open" or not pair["buy_date"] or not pair["sell_date"]:
+                    continue
+                lots = lots_by_key.get(
+                    (tk_data["ticker"], pair["buy_date"], pair["sell_date"]), []
+                )
+                if lots:
+                    pair["lots"]     = lots
+                    pair["n_lots"]   = len(lots)
+                    pair["avg_cost"] = round(sum(l["price"] for l in lots) / len(lots), 4)
+
     return list(ticker_trades.values())
 
 
@@ -1529,6 +1564,7 @@ def trades_export(
                p.pred_5d, p.pred_20d,
                s.bb_pct_b,
                s.vqs, s.signal, s.score, s.vesign_score,
+               tlots.n_lots, tlots.avg_cost,
                CASE
                  WHEN s.rsi_3day_flag = 3 AND s.bb_condition = 1 AND s.analyst_condition = 1
                       AND s.volume_flag = 1 AND s.week52_condition = 1
@@ -1547,6 +1583,14 @@ def trades_export(
           ON s.ticker = tl.ticker AND DATE(s.date) = DATE(tl.buy_date)
         LEFT JOIN predictions p
           ON p.ticker = tl.ticker AND DATE(p.date) = DATE(tl.buy_date)
+        LEFT JOIN (
+            SELECT ticker, DATE(buy_date) AS bd, DATE(sell_date) AS sd,
+                   COUNT(*) AS n_lots, AVG(lot_price) AS avg_cost
+            FROM trade_lots
+            GROUP BY ticker, DATE(buy_date), DATE(sell_date)
+        ) tlots ON tlots.ticker = tl.ticker
+                AND tlots.bd   = DATE(tl.buy_date)
+                AND tlots.sd   = DATE(tl.sell_date)
         WHERE {' AND '.join(where)}
         ORDER BY tl.sell_date DESC, tl.ticker ASC
     """
@@ -1560,15 +1604,20 @@ def trades_export(
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
+    # DCA return: yield against avg_cost (vs return_pct which is vs first lot only)
+    if "avg_cost" in df.columns and "sell_price" in df.columns:
+        df["dca_return_pct"] = (df["sell_price"] - df["avg_cost"]) / df["avg_cost"]
+
     today = datetime.now(UTC).date().isoformat()
     return dispatch_dataframe_response(
         format, df,
         filename=f"trades_closed_{today}",
         sheet_name="trades",
         column_formats={
-            "buy_date":   "dd/mm/yy",
-            "sell_date":  "dd/mm/yy",
-            "return_pct": "0.00%",
+            "buy_date":       "dd/mm/yy",
+            "sell_date":      "dd/mm/yy",
+            "return_pct":     "0.00%",
+            "dca_return_pct": "0.00%",
         },
     )
 
@@ -1580,7 +1629,54 @@ _open_trades_cache: dict[str, dict] = {}
 _open_trades_cache_lock = threading.Lock()
 
 
-def _build_open_trades(mkt: str) -> list[dict]:
+# Strict ≤90%-of-previous-lot DCA rule, applied live for currently-open positions.
+# Mirrors the trade_lots table-builder (closed trades) but operates on
+# (buy_date → today] instead of (buy_date → sell_date].
+_DCA_V1 = ("(rsi_3day_flag = 3 AND bb_condition = 1 AND analyst_condition = 1 "
+           "AND volume_flag = 1 AND week52_condition = 1 AND health_condition = 1 "
+           "AND ml_condition = 1)")
+_DCA_V2 = "(vqs = 9)"
+
+
+def _compute_open_trade_lots(open_positions: list[dict]) -> dict[str, list[dict]]:
+    """For each currently-open position, compute DCA lots from buy_date to today.
+    Lot 1 = original BUY. Each subsequent re-fire counts only if it (a) passes
+    V1 or V2 and (b) closes ≤ 90% of the last taken lot's price."""
+    if not open_positions:
+        return {}
+    today_iso = date.today().isoformat()
+    lots_by_ticker: dict[str, list[dict]] = {}
+    sql = text(f"""
+        SELECT date, close FROM signals
+        WHERE ticker = :tk
+          AND DATE(date) > DATE(:bd)
+          AND DATE(date) <= DATE(:today)
+          AND signal != 'BUY'
+          AND ({_DCA_V1} OR {_DCA_V2})
+          AND close IS NOT NULL
+        ORDER BY date
+    """)
+    with engine.connect() as conn:
+        for pos in open_positions:
+            tk = pos["ticker"]
+            bd = pos["buy_date"]
+            bp = pos["buy_price"]
+            if bp is None:
+                continue
+            lots = [{"seq": 1, "date": bd, "price": float(bp)}]
+            last_price = float(bp)
+            seq = 1
+            for d, px in conn.execute(sql, {"tk": tk, "bd": bd, "today": today_iso}).fetchall():
+                px = float(px)
+                if px <= last_price * 0.90:
+                    seq += 1
+                    lots.append({"seq": seq, "date": str(d)[:10], "price": round(px, 4)})
+                    last_price = px
+            lots_by_ticker[tk] = lots
+    return lots_by_ticker
+
+
+def _build_open_trades(mkt: str, include_lots: bool = False) -> list[dict]:
     """Slow path — same body as the endpoint, kept here for the cache builder."""
 
     def _v(v):
@@ -1737,24 +1833,35 @@ def _build_open_trades(mkt: str) -> list[dict]:
         })
 
     result.sort(key=lambda x: x["buy_date"], reverse=True)
+
+    if include_lots:
+        lots_by_ticker = _compute_open_trade_lots(result)
+        for r in result:
+            lots = lots_by_ticker.get(r["ticker"], [])
+            if lots:
+                r["lots"]     = lots
+                r["n_lots"]   = len(lots)
+                r["avg_cost"] = round(sum(l["price"] for l in lots) / len(lots), 4)
+
     return result
 
 
-def _get_open_trades_cached(mkt: str) -> list[dict]:
+def _get_open_trades_cached(mkt: str, include_lots: bool = False) -> list[dict]:
     today_iso = date.today().isoformat()
+    cache_key = f"{mkt}:lots" if include_lots else mkt
     with _open_trades_cache_lock:
-        c = _open_trades_cache.get(mkt)
+        c = _open_trades_cache.get(cache_key)
         if c is not None and c["built_on"] == today_iso:
             return c["data"]
-        data = _build_open_trades(mkt)
-        _open_trades_cache[mkt] = {"built_on": today_iso, "data": data}
+        data = _build_open_trades(mkt, include_lots=include_lots)
+        _open_trades_cache[cache_key] = {"built_on": today_iso, "data": data}
         return data
 
 
 @protected.get("/api/trades/open")
-def open_trades(market: Optional[str] = None):
+def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0):
     """Tickers with a BUY signal and no SELL since — currently open positions."""
-    return _get_open_trades_cached((market or "US").upper())
+    return _get_open_trades_cached((market or "US").upper(), bool(include_lots))
 
 
 @protected.get("/api/trades/open/export")
@@ -1768,10 +1875,18 @@ def open_trades_export(
 
     mkt = (market or "US").upper()
 
-    rows = open_trades(market=mkt)            # returns list of dicts
+    rows = open_trades(market=mkt, include_lots=1)   # include lots so export has DCA columns
     df = pd.DataFrame(rows)
 
     if not df.empty:
+        # Drop the nested lots list (n_lots + avg_cost stay as scalar columns).
+        if "lots" in df.columns:
+            df = df.drop(columns=["lots"])
+        # DCA-aware unrealized yield (vs avg_cost rather than first lot's buy_price)
+        if "avg_cost" in df.columns and "current_price" in df.columns:
+            df["dca_unrealized_pct"] = (
+                (df["current_price"] - df["avg_cost"]) / df["avg_cost"] * 100
+            )
         # Add company / sector / market_cap by joining in pandas to avoid
         # touching the read endpoint's SQL.
         with engine.connect() as conn:

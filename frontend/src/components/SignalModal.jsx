@@ -6,7 +6,7 @@ import { MarketContext } from '../context/MarketContext'
 import { useCurrency } from '../context/CurrencyContext'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from 'recharts'
 
 function fmt(n, decimals = 2) {
@@ -159,17 +159,24 @@ export default function SignalModal({ row: rowProp, onClose }) {
     return plotLeft + (idx / (chartData.length - 1)) * plotWidth
   }
 
-  const pairs = []
-  let pendingBuy = null
+  // Path B: collect ALL BUY lots per trade (lot 1 = original entry, 2+ = add-ons)
+  // so the chart can render every lot, not just the first BUY of a streak.
+  const pairs = []      // { buy: firstLot, sell, lots: [...], avgCost }
+  let openLots = []
   for (const m of markers) {
     if (m.signal === 'BUY') {
-      if (!pendingBuy) pendingBuy = m   // keep first BUY of streak
-    } else if (m.signal === 'SELL' && pendingBuy) {
-      pairs.push({ buy: pendingBuy, sell: m })
-      pendingBuy = null
+      openLots.push(m)
+    } else if (m.signal === 'SELL' && openLots.length > 0) {
+      const avgCost = openLots.reduce((s, l) => s + (l.close ?? 0), 0) / openLots.length
+      pairs.push({ buy: openLots[0], sell: m, lots: openLots, avgCost })
+      openLots = []
     }
   }
-  const openBuy = pendingBuy
+  const openBuy = openLots.length > 0 ? openLots[0] : null
+  const openLotsAll = openLots
+  const openAvgCost = openLots.length > 0
+    ? openLots.reduce((s, l) => s + (l.close ?? 0), 0) / openLots.length
+    : null
 
   const PLOT_TOP    = 100
   const PLOT_BOTTOM = 332
@@ -231,7 +238,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
                     [t('modal.company'),       row.company ?? '—'],
                     [t('modal.industry'),      row.industry ?? '—'],
                     [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
-                    [t('col.signal'),          row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}</span> : '—'],
+                    [t('col.signal'),          row.signal ? <span className={`badge badge-${row.signal}`}>{row.signal}{row.signal === 'BUY' && row.lot_seq > 1 ? ` ×${row.lot_seq}` : ''}</span> : '—'],
                     [t('modal.price'),         row.close != null ? fmtPrice(row.close / priceScale) : '—'],
                     [t('modal.rsi'),           row.rsi != null ? row.rsi.toFixed(1) : '—'],
                     [t('modal.analystTarget'), (() => { const base = row.target_mean_price; const close = row.close; if (!base || !close) return '—'; const pct = ((base - close) / close) * 100; return <span className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span> })()],
@@ -382,6 +389,40 @@ export default function SignalModal({ row: rowProp, onClose }) {
                   <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
                   <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_high" connectNulls={false} />
                 </>}
+                {/* DCA: horizontal avg-cost line for any multi-lot trade. Only
+                    rendered when at least one endpoint of the trade falls inside
+                    the chart's visible window — otherwise Recharts stretches the
+                    segment across the whole chart. */}
+                {pairs.map((p, i) => {
+                  if (!(p.lots.length > 1 && p.avgCost && p.buy.date && p.sell.date)) return null
+                  const inWindow = (p.buy.date <= chartEnd && p.sell.date >= chartStart)
+                  if (!inWindow) return null
+                  // Clamp segment to visible window so the line doesn't render off-chart.
+                  const fromX = p.buy.date  < chartStart ? chartStart : p.buy.date
+                  const toX   = p.sell.date > chartEnd   ? chartEnd   : p.sell.date
+                  return (
+                    <ReferenceLine key={`dca-avg-closed-${i}`}
+                      segment={[
+                        { x: fromX, y: p.avgCost / priceScale },
+                        { x: toX,   y: p.avgCost / priceScale },
+                      ]}
+                      stroke="#dc2626" strokeWidth={1.5} strokeDasharray="6 4"
+                      ifOverflow="visible"
+                      label={{ value: `avg $${(p.avgCost / priceScale).toFixed(2)}`, position: 'insideTopRight', fill: '#dc2626', fontSize: 10, fontWeight: 700 }}
+                    />
+                  )
+                })}
+                {openLotsAll.length > 1 && openAvgCost && openBuy?.date && chartData.length > 0 && (
+                  <ReferenceLine
+                    segment={[
+                      { x: openBuy.date, y: openAvgCost / priceScale },
+                      { x: chartData[chartData.length - 1].date, y: openAvgCost / priceScale },
+                    ]}
+                    stroke="#dc2626" strokeWidth={1.5} strokeDasharray="6 4"
+                    ifOverflow="visible"
+                    label={{ value: `avg $${(openAvgCost / priceScale).toFixed(2)}`, position: 'insideTopRight', fill: '#dc2626', fontSize: 10, fontWeight: 700 }}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
 
@@ -391,8 +432,9 @@ export default function SignalModal({ row: rowProp, onClose }) {
                 {pairs.map((p, i) => {
                   const buyX  = dateToX(p.buy.date)
                   const sellX = dateToX(p.sell.date)
-                  const pct   = p.buy.close && p.sell.close
-                    ? ((p.sell.close - p.buy.close) / p.buy.close) * 100
+                  // Path B yield: sell vs weighted avg cost across all lots.
+                  const pct   = p.avgCost && p.sell.close
+                    ? ((p.sell.close - p.avgCost) / p.avgCost) * 100
                     : null
                   const color = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
                   const lineY = PLOT_TOP + 18
@@ -402,6 +444,20 @@ export default function SignalModal({ row: rowProp, onClose }) {
                         <line x1={buyX}  y1={PLOT_TOP} x2={buyX}  y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
                         {p.buy.close  != null && priceBox(buyX,  fmtPrice(p.buy.close  / priceScale, 1), 'var(--green)')}
                       </>}
+                      {/* Add-on lot markers (lot 2+): thinner dashed vertical line + ×N label */}
+                      {p.lots.slice(1).map((lot, k) => {
+                        const lx = dateToX(lot.date)
+                        if (lx == null) return null
+                        const seq = k + 2
+                        return (
+                          <g key={`addon-${i}-${seq}`}>
+                            <line x1={lx} y1={PLOT_TOP + 30} x2={lx} y2={PLOT_BOTTOM}
+                              style={{ stroke: 'var(--green)', strokeWidth: 1.5, strokeOpacity: 0.6, strokeDasharray: '3 3' }} />
+                            <text x={lx} y={PLOT_TOP + 26} fontSize={10} fontWeight={700}
+                              fill="var(--green)" textAnchor="middle">×{seq}</text>
+                          </g>
+                        )
+                      })}
                       {sellX != null && <>
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)',   strokeWidth: 2 }} />
                         {p.sell.close != null && priceBox(sellX, fmtPrice(p.sell.close / priceScale, 1), 'var(--red)')}
@@ -432,7 +488,9 @@ export default function SignalModal({ row: rowProp, onClose }) {
                   const lastX = dateToX(chartData.at(-1).date)
                   if (!buyX) return null
                   const currentPrice = chartData.at(-1).close
-                  const pct       = openBuy.close ? ((currentPrice - openBuy.close / priceScale) / (openBuy.close / priceScale)) * 100 : null
+                  // Path B yield: use avg of all open lots (not just first lot's price)
+                  const avgCostScaled = openAvgCost != null ? openAvgCost / priceScale : null
+                  const pct       = avgCostScaled ? ((currentPrice - avgCostScaled) / avgCostScaled) * 100 : null
                   const gainColor = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
                   const priceText = openBuy.close != null ? fmtPrice(openBuy.close / priceScale, 1) : ''
                   const yieldText = pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%` : ''
@@ -487,6 +545,20 @@ export default function SignalModal({ row: rowProp, onClose }) {
                         <line x1={buyX} y1={PLOT_TOP + 18} x2={lastX} y2={PLOT_TOP + 18}
                           style={{ stroke: gainColor, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
                       )}
+                      {/* Add-on lot markers for the open trade (lot 2+) */}
+                      {openLotsAll.slice(1).map((lot, k) => {
+                        const lx = dateToX(lot.date)
+                        if (lx == null) return null
+                        const seq = k + 2
+                        return (
+                          <g key={`open-addon-${seq}`}>
+                            <line x1={lx} y1={PLOT_TOP + 30} x2={lx} y2={PLOT_BOTTOM}
+                              style={{ stroke: 'var(--green)', strokeWidth: 1.5, strokeOpacity: 0.6, strokeDasharray: '3 3' }} />
+                            <text x={lx} y={PLOT_TOP + 26} fontSize={10} fontWeight={700}
+                              fill="var(--green)" textAnchor="middle">×{seq}</text>
+                          </g>
+                        )
+                      })}
                     </g>
                   )
                 })()}

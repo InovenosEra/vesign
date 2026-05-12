@@ -180,15 +180,19 @@ export const searchTickers = (q, limit = 10) =>
   get(`/search?q=${encodeURIComponent(q)}&limit=${limit}`)
 
 // --- Trades ----------------------------------------------------------------
-export const getTrades = ({ start, end, market = 'US' } = {}) => {
+export const getTrades = ({ start, end, market = 'US', includeLots = false } = {}) => {
   const params = new URLSearchParams({ market })
   if (start) params.set('start', start)
   if (end) params.set('end', end)
+  if (includeLots) params.set('include_lots', '1')
   return get('/trades?' + params.toString())
 }
 
-export const getOpenTrades = (market = 'US') =>
-  get(`/trades/open?market=${market}`)
+export const getOpenTrades = (market = 'US', includeLots = false) => {
+  const params = new URLSearchParams({ market })
+  if (includeLots) params.set('include_lots', '1')
+  return get('/trades/open?' + params.toString())
+}
 
 // --- News & analyst changes ------------------------------------------------
 export const getNews = (ticker, limit = 5, lang) =>

@@ -190,6 +190,14 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
                   ★
                 </span>
               )}
+              {r.signal === 'BUY' && r.lot_seq > 1 && (
+                <span
+                  title={`Add-on lot — strengthens the existing position (lot ${r.lot_seq})`}
+                  style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 999, background: '#eef2ff', color: '#4338ca', fontSize: 10, fontWeight: 700 }}
+                >
+                  ×{r.lot_seq}
+                </span>
+              )}
             </td>
             <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
             <td>{fmtMktCap(r.market_cap)}</td>
@@ -318,7 +326,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <td><strong>{displayTicker(r.ticker)}</strong></td>
                 <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
                 <td>{fmtMktCap(r.market_cap, market)}</td>
-                <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}</span> : '—'}</td>
+                <td>{r.signal ? <span className={`badge badge-${r.signal}`}>{r.signal}{r.signal === 'BUY' && r.lot_seq > 1 ? ` ×${r.lot_seq}` : ''}</span> : '—'}</td>
                 <td><PriceCell value={r.close} ticker={r.ticker} /></td>
                 <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
                 <td className="col-hide-sm"><PriceCell value={r.target_low_price} ticker={r.ticker} /></td>

@@ -135,7 +135,7 @@ export default function GlobalSearch() {
                   <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company}</div>
                 </div>
                 {r.signal && (
-                  <span className={`badge badge-${r.signal}`} style={{ flexShrink: 0, fontSize: 10 }}>{r.signal}</span>
+                  <span className={`badge badge-${r.signal}`} style={{ flexShrink: 0, fontSize: 10 }}>{r.signal}{r.signal === 'BUY' && r.lot_seq > 1 ? ` ×${r.lot_seq}` : ''}</span>
                 )}
                 {r.close != null && (
                   <span style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>{fmtPrice(r.close)}</span>

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceDot,
 } from 'recharts'
 import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
 
@@ -12,7 +12,7 @@ import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, 
 // independent of the page-level date filter (which defaults to last 12 months
 // and would otherwise hide older closed trades from the modal chart).
 // 10y covers our 2020-01-02 DB cutoff with margin.
-function useFullHistoryTradesForTicker(ticker, market) {
+function useFullHistoryTradesForTicker(ticker, market, includeLots = false) {
   const tenYearsAgo = (() => {
     const d = new Date()
     d.setFullYear(d.getFullYear() - 10)
@@ -21,8 +21,8 @@ function useFullHistoryTradesForTicker(ticker, market) {
   })()
   const todayStr = new Date().toISOString().slice(0, 10)
   return useQuery({
-    queryKey: ['trades-full-by-ticker', ticker, market],
-    queryFn: () => getTrades({ start: tenYearsAgo, end: todayStr, market }),
+    queryKey: ['trades-full-by-ticker', ticker, market, includeLots],
+    queryFn: () => getTrades({ start: tenYearsAgo, end: todayStr, market, includeLots }),
     staleTime: 5 * 60_000,
     enabled: !!ticker,
   })
@@ -140,7 +140,7 @@ function PriceBoxLabel({ viewBox, value, color }) {
 // Trade chart modal — supports multiple BUY/SELL pairs
 // ---------------------------------------------------------------------------
 
-function TradeModal({ row: rowProp, start, end, onClose }) {
+function TradeModal({ row: rowProp, start, end, dcaView = false, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const { fmtPrice } = useCurrency()
@@ -151,7 +151,7 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
   // shows every closed BUY→SELL pair regardless of the page-level filter.
   // Without this, opening from the table while filtered to "last 1Y" only
   // showed trades within the last year — INDO's 2021 trades were missing.
-  const { data: fullTrades } = useFullHistoryTradesForTicker(rowProp.ticker, market)
+  const { data: fullTrades } = useFullHistoryTradesForTicker(rowProp.ticker, market, dcaView)
   const row = useMemo(() => {
     const all = (fullTrades ?? []).find(tk => tk.ticker === rowProp.ticker)?.trades
     if (!all || all.length === 0) return rowProp
@@ -258,11 +258,26 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
       return buy >= chartStart && sell <= chartEnd
     })
     if (inWindow.length === 0) return null
-    return inWindow.reduce((s, p) => s + (p.return_pct ?? 0), 0) / inWindow.length
-  }, [row.trades, chartStart, chartEnd])
+    const sum = inWindow.reduce((s, p) => {
+      if (dcaView && p.avg_cost != null && p.sell_price != null) {
+        return s + ((p.sell_price - p.avg_cost) / p.avg_cost) * 100
+      }
+      return s + (p.return_pct ?? 0)
+    }, 0)
+    return sum / inWindow.length
+  }, [row.trades, chartStart, chartEnd, dcaView])
 
-  const minPrice = chartData.length ? Math.min(...chartData.map(d => d.close)) * 0.97 : 0
-  const maxPrice = chartData.length ? Math.max(...chartData.map(d => d.close)) * 1.03 : 0
+  // When DCA is on, expand y-axis room at the bottom so lot markers and the
+  // stepped avg-cost line don't get squished against the date axis. Lot prices
+  // are by definition near the local lows of the trade — they need padding.
+  const hasLotsInView = dcaView && (row.trades ?? []).some(p => p.lots && p.lots.length > 0)
+  // Y-axis: when DCA is on with lots, extend the bottom enough so the lowest lot
+  // (typically very close to the price line's local min) sits well above the
+  // date axis with room for the circle marker AND the stepped avg-cost line.
+  const baseMin = chartData.length ? Math.min(...chartData.map(d => d.close)) : 0
+  const baseMax = chartData.length ? Math.max(...chartData.map(d => d.close)) : 0
+  const minPrice = chartData.length ? baseMin * (hasLotsInView ? 0.75 : 0.97) : 0
+  const maxPrice = chartData.length ? baseMax * 1.03 : 0
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -497,6 +512,53 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
                   <Line type="stepAfter" dataKey="target_mean" stroke="#f39c12" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_mean" connectNulls={false} />
                   <Line type="stepAfter" dataKey="target_high" stroke="#2ecc71" strokeOpacity={0.45} dot={false} strokeWidth={1} strokeDasharray="5 3" name="target_high" connectNulls={false} />
                 </>}
+                {/* DCA: stepped avg-cost line + numbered lot markers using Recharts native primitives
+                    so positions match the chart's actual coordinate system (the SVG overlay below
+                    uses hardcoded plot bounds that don't account for the date-axis area). */}
+                {dcaView && (row.trades || []).flatMap((trade, ti) => {
+                  if (!trade.lots || trade.lots.length === 0) return []
+                  let running = 0
+                  const lotsWithAvg = trade.lots.map((lot, ix) => {
+                    running += lot.price
+                    return { ...lot, avg: running / (ix + 1) }
+                  })
+                  // For closed trades the stepped line ends at sell_date; for open
+                  // trades it extends to the latest chart point (today's close).
+                  const sellD = trade.sell_date
+                    ? trade.sell_date.slice(0, 10)
+                    : chartData[chartData.length - 1]?.date?.slice(0, 10)
+                  if (!sellD) return []
+                  const els = []
+                  for (let k = 0; k < lotsWithAvg.length; k++) {
+                    const fromD = lotsWithAvg[k].date
+                    const toD = (k + 1 < lotsWithAvg.length) ? lotsWithAvg[k+1].date : sellD
+                    const yAvg = lotsWithAvg[k].avg / priceScale
+                    const isLast = k === lotsWithAvg.length - 1
+                    els.push(
+                      <ReferenceLine key={`dca-avg-${ti}-${k}`}
+                        segment={[{ x: fromD, y: yAvg }, { x: toD, y: yAvg }]}
+                        stroke="#dc2626" strokeWidth={1.5} strokeDasharray="6 4"
+                        ifOverflow="visible"
+                        label={isLast ? { value: `avg $${yAvg.toFixed(2)}`, position: 'insideBottomRight', fill: '#dc2626', fontSize: 10, fontWeight: 700 } : undefined}
+                      />
+                    )
+                  }
+                  for (const lot of lotsWithAvg) {
+                    const seq = lot.seq
+                    els.push(
+                      <ReferenceDot key={`dca-lot-${ti}-${seq}`}
+                        x={lot.date} y={lot.price / priceScale}
+                        r={9} fill="var(--green)" stroke="#fff" strokeWidth={2}
+                        ifOverflow="visible"
+                        label={({ viewBox }) => (
+                          <text x={viewBox.cx} y={viewBox.cy} fontSize={10} fontWeight={700} fill="#fff"
+                            textAnchor="middle" dominantBaseline="central">{seq}</text>
+                        )}
+                      />
+                    )
+                  }
+                  return els
+                })}
               </LineChart>
             </ResponsiveContainer>
 
@@ -505,6 +567,12 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
                 {row.trades.map((trade, i) => {
                   const buyX  = trade.buy_date  ? dateToX(trade.buy_date.slice(0, 10))  : null
                   const sellX = trade.sell_date ? dateToX(trade.sell_date.slice(0, 10)) : null
+                  const useDcaView = dcaView && trade.lots && trade.lots.length > 0
+                  const yForPrice = price => {
+                    const range = maxPrice - minPrice
+                    if (range <= 0) return PLOT_TOP
+                    return PLOT_BOTTOM - ((price - minPrice) / range) * (PLOT_BOTTOM - PLOT_TOP)
+                  }
                   return (
                     <g key={i}>
                       {buyX != null && <>
@@ -515,8 +583,10 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
                         <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
                         {trade.sell_price != null && priceBox(sellX, fmtPrice(trade.sell_price / priceScale, 1), 'var(--red)')}
                       </>}
-                      {buyX != null && sellX != null && trade.buy_price != null && trade.sell_price != null && (() => {
-                        const pct   = ((trade.sell_price - trade.buy_price) / trade.buy_price) * 100
+                      {buyX != null && sellX != null && trade.sell_price != null && (() => {
+                        const base = useDcaView && trade.avg_cost != null ? trade.avg_cost : trade.buy_price
+                        if (base == null) return null
+                        const pct   = ((trade.sell_price - base) / base) * 100
                         const color = pct >= 0 ? 'var(--green)' : 'var(--red)'
                         const lineY = PLOT_TOP + 18
                         return <>
@@ -530,8 +600,11 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
                       {buyX != null && trade.result === 'Open' && (() => {
                         const lastX = dateToX(chartData.at(-1).date)
                         const currentPrice = chartData.at(-1).close
-                        const pct = trade.buy_price != null && currentPrice != null
-                          ? ((currentPrice - trade.buy_price / priceScale) / (trade.buy_price / priceScale)) * 100
+                        const useDcaBase = useDcaView && trade.avg_cost != null
+                        const baseRaw = useDcaBase ? trade.avg_cost : trade.buy_price
+                        const base = baseRaw != null ? baseRaw / priceScale : null
+                        const pct = base != null && currentPrice != null
+                          ? ((currentPrice - base) / base) * 100
                           : null
                         const color = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
                         const lineY = PLOT_TOP + 18
@@ -586,7 +659,7 @@ function TradeModal({ row: rowProp, start, end, onClose }) {
 // Open Trades table
 // ---------------------------------------------------------------------------
 
-function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
+function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect, dcaView = false }) {
   const { t } = useTranslation()
   const { fmtPrice } = useCurrency()
   const { sorted, sort, toggle } = useSort(data, 'buy_date', 'desc')
@@ -614,7 +687,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
               {th(t('col.company'),      'company')}
               {th(t('col.marketCap'),    'market_cap',    'col-hide-sm')}
               {th(t('col.buyDate'),      'buy_date')}
-              {th(t('col.buyPrice'),     'buy_price')}
+              {th(dcaView ? 'Avg Cost'  : t('col.buyPrice'), dcaView ? 'avg_cost' : 'buy_price')}
               {th(t('col.lastDayPrice'), 'current_price', 'col-hide-sm')}
               {th(t('col.daysHeld'),     'days_held')}
               <th>{t('col.livePrice')}</th>
@@ -635,6 +708,9 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                 const pct  = diff != null && displayClose ? (diff / displayClose) * 100 : null
                 const cls  = diff != null && diff >= 0 ? 'up' : 'down'
                 const arrow = diff != null && diff >= 0 ? '▲' : '▼'
+                const showAvg = dcaView && trade.avg_cost != null
+                const showBadge = dcaView && trade.n_lots > 1
+                const displayCost = showAvg ? trade.avg_cost : trade.buy_price
 
                 return (
                   <tr key={i} className="clickable-row" onClick={() => onSelect(trade)}>
@@ -643,7 +719,15 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     <td>{trade.company ?? '—'}</td>
                     <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{fmtDate(trade.buy_date)}</td>
-                    <td>{fmtPrice(trade.buy_price)}</td>
+                    <td>
+                      {fmtPrice(displayCost)}
+                      {showBadge && (
+                        <span
+                          title={trade.lots.map(l => `Lot ${l.seq}: ${l.date} @ ${fmtPrice(l.price)}`).join('\n')}
+                          style={{ display: 'inline-block', marginLeft: 6, padding: '1px 7px', borderRadius: 999, background: '#eef2ff', color: '#4338ca', fontSize: 10, fontWeight: 700, cursor: 'help' }}
+                        >×{trade.n_lots}</span>
+                      )}
+                    </td>
                     <td className="col-hide-sm">{fmtPrice(trade.current_price)}</td>
                     <td>{trade.days_held ?? '—'}</td>
                     <td>
@@ -661,8 +745,9 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect }) {
                     </td>
                     {(() => {
                       const priceForYield = (isOpen && displayLive != null) ? displayLive : displayClose
-                      const buyPrice = trade.buy_price != null ? (isIL ? trade.buy_price / 100 : trade.buy_price) : null
-                      const yieldPct = priceForYield != null && buyPrice ? ((priceForYield - buyPrice) / buyPrice) * 100 : null
+                      const rawBase = showAvg ? trade.avg_cost : trade.buy_price
+                      const basePrice = rawBase != null ? (isIL ? rawBase / 100 : rawBase) : null
+                      const yieldPct = priceForYield != null && basePrice ? ((priceForYield - basePrice) / basePrice) * 100 : null
                       return (
                         <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
                           {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${fmt(yieldPct)}%` : '—'}
@@ -703,6 +788,8 @@ export default function TradesPage() {
   const [search, setSearch]         = usePersistedState('trades.search', '')
   const [page, setPage]             = usePersistedState('trades.page', 1)
   const [pageSize, setPageSize]     = usePersistedState('trades.pageSize', 10)
+  // Path B: DCA view is now the default for all users — toggle removed.
+  const dcaActive = true
 
   // Re-anchor a chip selection to "today" on each visit (so 1Y always means
   // the trailing 12 months). Custom date ranges (activePeriod=null) are left
@@ -724,8 +811,8 @@ export default function TradesPage() {
   }
 
   const { data: trades, isLoading, isError } = useQuery({
-    queryKey: ['trades', start, end, market],
-    queryFn: () => getTrades({ start, end, market }),
+    queryKey: ['trades', start, end, market, dcaActive],
+    queryFn: () => getTrades({ start, end, market, includeLots: dcaActive }),
     staleTime: 300_000,
   })
 
@@ -738,16 +825,16 @@ export default function TradesPage() {
       const d = new Date(); d.setMonth(d.getMonth() - months)
       const s = d.toISOString().slice(0, 10)
       qc.prefetchQuery({
-        queryKey: ['trades', s, today, market],
-        queryFn: () => getTrades({ start: s, end: today, market }),
+        queryKey: ['trades', s, today, market, dcaActive],
+        queryFn: () => getTrades({ start: s, end: today, market, includeLots: dcaActive }),
         ...opts,
       })
     }
-  }, [market, qc])
+  }, [market, qc, dcaActive])
 
   const { data: openTrades = [], isLoading: loadingOpen, isError: errorOpen, error: openError } = useQuery({
-    queryKey: ['trades-open', market],
-    queryFn: () => getOpenTrades(market),
+    queryKey: ['trades-open', market, dcaActive],
+    queryFn: () => getOpenTrades(market, dcaActive),
   })
 
   // Flatten: one row per closed trade (unpivot multi-trade tickers)
@@ -762,15 +849,21 @@ export default function TradesPage() {
         sell_price: p.sell_price,
         return_pct: p.return_pct,
         days_held:  p.days_held,
+        lots:       p.lots,
+        avg_cost:   p.avg_cost,
+        n_lots:     p.n_lots,
       }))
   ), [trades])
 
   const { sorted, sort, toggle } = useSort(flatTrades, 'sell_date', 'desc')
 
+  const yieldOf = (t) => (dcaActive && t.avg_cost && t.sell_price)
+    ? ((t.sell_price - t.avg_cost) / t.avg_cost) * 100
+    : (t.return_pct ?? 0)
   const totalPairs = flatTrades.length
-  const wins       = flatTrades.filter(t => (t.return_pct ?? 0) > 0).length
+  const wins       = flatTrades.filter(t => yieldOf(t) > 0).length
   const avgReturn  = totalPairs > 0
-    ? flatTrades.reduce((s, t) => s + (t.return_pct ?? 0), 0) / totalPairs
+    ? flatTrades.reduce((s, t) => s + yieldOf(t), 0) / totalPairs
     : null
   const avgDays    = totalPairs > 0
     ? flatTrades.reduce((s, t) => s + (t.days_held ?? 0), 0) / totalPairs
@@ -874,7 +967,7 @@ export default function TradesPage() {
                 {th(t('col.company'),   'company')}
                 {th(t('col.marketCap'), 'market_cap', 'col-hide-sm')}
                 {th(t('col.buyDate'),   'buy_date')}
-                {th(t('col.buyPrice'),  'buy_price')}
+                {th(dcaActive ? 'Avg Cost' : t('col.buyPrice'),  dcaActive ? 'avg_cost' : 'buy_price')}
                 {th(t('col.sellDate'),  'sell_date')}
                 {th(t('col.sellPrice'), 'sell_price')}
                 {th(t('col.daysHeld'),  'days_held', 'col-hide-sm')}
@@ -884,22 +977,38 @@ export default function TradesPage() {
             <tbody>
               {paginated.length === 0
                 ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>{t('trades.noMatches')}</td></tr>
-                : paginated.map((trade, i) => (
+                : paginated.map((trade, i) => {
+                  const showAvg = dcaActive && trade.avg_cost != null
+                  const showBadge = dcaActive && trade.n_lots > 1
+                  const displayCost = showAvg ? trade.avg_cost : trade.buy_price
+                  const dcaYield = dcaActive && trade.avg_cost && trade.sell_price
+                    ? ((trade.sell_price - trade.avg_cost) / trade.avg_cost) * 100
+                    : trade.return_pct
+                  return (
                   <tr key={i} className="clickable-row" onClick={() => setSelected(trade)}>
                     <td>{trade.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(trade.ticker) ? ' logo-white-bg' : ''}`} src={trade.logo_url} alt="" /> : null}</td>
                     <td><strong>{trade.ticker}</strong></td>
                     <td>{trade.company ?? '—'}</td>
                     <td className="col-hide-sm">{trade.market_cap != null ? (trade.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</td>
                     <td>{fmtDate(trade.buy_date)}</td>
-                    <td>{fmtPrice(trade.buy_price)}</td>
+                    <td>
+                      {fmtPrice(displayCost)}
+                      {showBadge && (
+                        <span
+                          title={trade.lots.map(l => `Lot ${l.seq}: ${l.date} @ ${fmtPrice(l.price)}`).join('\n')}
+                          style={{ display: 'inline-block', marginLeft: 6, padding: '1px 7px', borderRadius: 999, background: '#eef2ff', color: '#4338ca', fontSize: 10, fontWeight: 700, cursor: 'help' }}
+                        >×{trade.n_lots}</span>
+                      )}
+                    </td>
                     <td>{fmtDate(trade.sell_date)}</td>
                     <td>{fmtPrice(trade.sell_price)}</td>
                     <td className="col-hide-sm">{trade.days_held ?? '—'}</td>
-                    <td className={trade.return_pct >= 0 ? 'up' : 'down'}>
-                      {trade.return_pct >= 0 ? '+' : ''}{fmt(trade.return_pct)}%
+                    <td className={dcaYield >= 0 ? 'up' : 'down'}>
+                      {dcaYield >= 0 ? '+' : ''}{fmt(dcaYield)}%
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
             </tbody>
           </table>
         </div>
@@ -908,12 +1017,22 @@ export default function TradesPage() {
         )
       })()}
 
-      {selected && <TradeModal row={selected} start={start} end={end} onClose={() => setSelected(null)} />}
+      {selected && <TradeModal row={selected} start={start} end={end} dcaView={dcaActive} onClose={() => setSelected(null)} />}
       {selectedOpen && (
         <TradeModal
-          row={{ ...selectedOpen, trades: [{ buy_date: selectedOpen.buy_date, sell_date: null, buy_price: selectedOpen.buy_price, sell_price: null, result: 'Open' }] }}
+          row={{ ...selectedOpen, trades: [{
+            buy_date:  selectedOpen.buy_date,
+            sell_date: null,
+            buy_price: selectedOpen.buy_price,
+            sell_price: null,
+            result:    'Open',
+            lots:      selectedOpen.lots,
+            n_lots:    selectedOpen.n_lots,
+            avg_cost:  selectedOpen.avg_cost,
+          }] }}
           start={isoMonthsAgo(12)}
           end={new Date().toISOString().slice(0, 10)}
+          dcaView={dcaActive}
           onClose={() => setSelectedOpen(null)}
         />
       )}
@@ -925,10 +1044,13 @@ export default function TradesPage() {
       {errorOpen && <p className="error">Error: {openError?.message}</p>}
       {!loadingOpen && !errorOpen && (() => {
         const filtered = openTrades
+        const openYield = (t) => (dcaActive && t.avg_cost && t.current_price)
+          ? ((t.current_price - t.avg_cost) / t.avg_cost) * 100
+          : (t.unrealized_pct ?? 0)
         const openCount  = filtered.length
-        const winCount   = filtered.filter(t => (t.unrealized_pct ?? 0) > 0).length
+        const winCount   = filtered.filter(t => openYield(t) > 0).length
         const winRate    = openCount > 0 ? (winCount / openCount) * 100 : null
-        const avgYield   = openCount > 0 ? filtered.reduce((s, t) => s + (t.unrealized_pct ?? 0), 0) / openCount : null
+        const avgYield   = openCount > 0 ? filtered.reduce((s, t) => s + openYield(t), 0) / openCount : null
         const avgDaysOpen = openCount > 0 ? filtered.reduce((s, t) => s + (t.days_held ?? 0), 0) / openCount : null
         return (
           <>
@@ -976,7 +1098,7 @@ export default function TradesPage() {
                 />
               </span>
             </div>
-            <OpenTradesTable data={filtered} search={openSearch} page={openPage} pageSize={openPageSize} setPage={setOpenPage} onSelect={setSelectedOpen} />
+            <OpenTradesTable data={filtered} search={openSearch} page={openPage} pageSize={openPageSize} setPage={setOpenPage} onSelect={setSelectedOpen} dcaView={dcaActive} />
           </>
         )
       })()}
