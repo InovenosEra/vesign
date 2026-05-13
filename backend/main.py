@@ -1883,7 +1883,7 @@ def _build_open_trades(mkt: str, include_lots: bool = False) -> list[dict]:
             if lots:
                 r["lots"]     = lots
                 r["n_lots"]   = len(lots)
-                r["avg_cost"] = round(sum(l["price"] for l in lots) / len(lots), 4)
+                r["avg_cost"] = round(avg_cost_dollar_weighted(l["price"] for l in lots), 4)
 
     return result
 
