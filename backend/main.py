@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, text, event as sa_event
 from sqlalchemy.pool import NullPool
 from backend.auth import get_current_user
+from backend.yield_calcs import avg_cost_dollar_weighted
 
 # ---------------------------------------------------------------------------
 # Config  (.env overrides defaults; .env is gitignored)
@@ -1538,7 +1539,7 @@ def historical_trades(
                 if lots:
                     pair["lots"]     = lots
                     pair["n_lots"]   = len(lots)
-                    pair["avg_cost"] = round(sum(l["price"] for l in lots) / len(lots), 4)
+                    pair["avg_cost"] = round(avg_cost_dollar_weighted(l["price"] for l in lots), 4)
 
     return list(ticker_trades.values())
 
