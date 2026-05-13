@@ -1613,7 +1613,8 @@ def trades_export(
           ON p.ticker = tl.ticker AND DATE(p.date) = DATE(tl.buy_date)
         LEFT JOIN (
             SELECT ticker, DATE(buy_date) AS bd, DATE(sell_date) AS sd,
-                   COUNT(*) AS n_lots, AVG(lot_price) AS avg_cost
+                   COUNT(*) AS n_lots,
+                   COUNT(*) * 1.0 / NULLIF(SUM(1.0 / NULLIF(lot_price, 0)), 0) AS avg_cost
             FROM trade_lots
             GROUP BY ticker, DATE(buy_date), DATE(sell_date)
         ) tlots ON tlots.ticker = tl.ticker
