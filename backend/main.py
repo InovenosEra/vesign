@@ -755,6 +755,25 @@ def signals(
     }
 
 
+# ---------------------------------------------------------------------------
+# Common export normalization
+# ---------------------------------------------------------------------------
+# UI keeps raw values (market cap in dollars, dates as ISO strings). Excel/CSV
+# exports show market cap in billions and render dates with this format.
+_EXPORT_DATE_FMT = "dd/mm/yy"
+_EXPORT_MCAP_FMT = "0.00"
+
+
+def _prepare_export_df(df: pd.DataFrame, *date_cols: str) -> pd.DataFrame:
+    """Mutates `df` in place: market_cap → billions, each date_col → datetime."""
+    if "market_cap" in df.columns:
+        df["market_cap"] = pd.to_numeric(df["market_cap"], errors="coerce") / 1e9
+    for col in date_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+    return df
+
+
 @protected.get("/api/signals/export")
 @protected.get("/api/signals/export.xlsx")  # legacy alias — defaults to xlsx
 def signals_export(
@@ -811,7 +830,7 @@ def signals_export(
     sql = text(f"""
         SELECT DATE(s.date) AS date,
                s.ticker,
-               c.company, c.sector, c.industry, f.market_cap,
+               c.company, c.sector, c.industry, (f.market_cap / 1e9) AS market_cap,
                s.open, s.high, s.low, s.close, s.volume,
                s.rsi, s.bb_high, s.bb_low, s.macd,
                s.rsi_factor, s.bb_factor, s.macd_factor, s.trend_factor,
@@ -836,7 +855,7 @@ def signals_export(
         return dispatch_cursor_response(
             format, conn, sql, params,
             filename=f"signals_{today}", sheet_name="signals",
-            column_formats={"date": "dd/mm/yy"},
+            column_formats={"date": _EXPORT_DATE_FMT, "market_cap": _EXPORT_MCAP_FMT},
             date_columns=("date",),
         )
 
@@ -1231,10 +1250,17 @@ def watchlist_export(
             conn, params={"lid": list_id},
         )
 
+    _prepare_export_df(df, "date", "last_update")
+
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", watchlist_name).strip("_") or f"list_{list_id}"
     today = datetime.now(UTC).date().isoformat()
     return dispatch_dataframe_response(
         format, df, filename=f"watchlist_{safe}_{today}", sheet_name="watchlist",
+        column_formats={
+            "date":        _EXPORT_DATE_FMT,
+            "last_update": _EXPORT_DATE_FMT,
+            "market_cap":  _EXPORT_MCAP_FMT,
+        },
     )
 
 
@@ -1565,6 +1591,7 @@ def trades_export(
                s.bb_pct_b,
                s.vqs, s.signal, s.score, s.vesign_score,
                tlots.n_lots, tlots.avg_cost,
+               tl_lot.lot_seq, tl_lot.lot_date, tl_lot.lot_price,
                CASE
                  WHEN s.rsi_3day_flag = 3 AND s.bb_condition = 1 AND s.analyst_condition = 1
                       AND s.volume_flag = 1 AND s.week52_condition = 1
@@ -1591,22 +1618,29 @@ def trades_export(
         ) tlots ON tlots.ticker = tl.ticker
                 AND tlots.bd   = DATE(tl.buy_date)
                 AND tlots.sd   = DATE(tl.sell_date)
+        -- Per-lot expansion: multi-lot trades produce one row per lot.
+        -- Trades absent from trade_lots stay as a single row with NULL lot cols.
+        LEFT JOIN trade_lots tl_lot
+               ON tl_lot.ticker = tl.ticker
+              AND DATE(tl_lot.buy_date)  = DATE(tl.buy_date)
+              AND DATE(tl_lot.sell_date) = DATE(tl.sell_date)
         WHERE {' AND '.join(where)}
-        ORDER BY tl.sell_date DESC, tl.ticker ASC
+        ORDER BY tl.sell_date DESC, tl.ticker ASC, tl_lot.lot_seq ASC
     """
 
     with engine.connect() as conn:
         df = pd.read_sql(text(sql), conn, params=params)
 
-    # Convert ISO-string dates to real datetimes so Excel applies the
-    # date number-format instead of treating them as text.
-    for col in ("buy_date", "sell_date"):
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+    # Market cap → billions, ISO-string dates → real datetimes for Excel.
+    _prepare_export_df(df, "buy_date", "sell_date", "lot_date")
 
     # DCA return: yield against avg_cost (vs return_pct which is vs first lot only)
     if "avg_cost" in df.columns and "sell_price" in df.columns:
         df["dca_return_pct"] = (df["sell_price"] - df["avg_cost"]) / df["avg_cost"]
+
+    # Per-lot return: yield of this specific lot's entry price against the sell
+    if "lot_price" in df.columns and "sell_price" in df.columns:
+        df["lot_return_pct"] = (df["sell_price"] - df["lot_price"]) / df["lot_price"]
 
     today = datetime.now(UTC).date().isoformat()
     return dispatch_dataframe_response(
@@ -1614,10 +1648,13 @@ def trades_export(
         filename=f"trades_closed_{today}",
         sheet_name="trades",
         column_formats={
-            "buy_date":       "dd/mm/yy",
-            "sell_date":      "dd/mm/yy",
+            "buy_date":       _EXPORT_DATE_FMT,
+            "sell_date":      _EXPORT_DATE_FMT,
+            "lot_date":       _EXPORT_DATE_FMT,
+            "market_cap":     _EXPORT_MCAP_FMT,
             "return_pct":     "0.00%",
             "dca_return_pct": "0.00%",
+            "lot_return_pct": "0.00%",
         },
     )
 
@@ -1883,9 +1920,6 @@ def open_trades_export(
     df = pd.DataFrame(rows)
 
     if not df.empty:
-        # Drop the nested lots list (n_lots + avg_cost stay as scalar columns).
-        if "lots" in df.columns:
-            df = df.drop(columns=["lots"])
         # DCA-aware unrealized yield (vs avg_cost rather than first lot's buy_price)
         if "avg_cost" in df.columns and "current_price" in df.columns:
             df["dca_unrealized_pct"] = (
@@ -1903,8 +1937,37 @@ def open_trades_export(
             )
         df = df.merge(extras, on="ticker", how="left")
 
+        # Per-lot expansion: multi-lot positions produce one row per lot.
+        # Positions without a lots array (rare — buy_price was missing) keep a
+        # single row with NULL lot columns.
+        if "lots" in df.columns:
+            df["lots"] = df["lots"].apply(
+                lambda x: x if isinstance(x, list) and x else [{"seq": None, "date": None, "price": None}]
+            )
+            df = df.explode("lots", ignore_index=True)
+            df["lot_seq"]   = df["lots"].apply(lambda d: d.get("seq")   if isinstance(d, dict) else None)
+            df["lot_date"]  = df["lots"].apply(lambda d: d.get("date")  if isinstance(d, dict) else None)
+            df["lot_price"] = df["lots"].apply(lambda d: d.get("price") if isinstance(d, dict) else None)
+            df = df.drop(columns=["lots"])
+            # Per-lot unrealized return vs that lot's entry price
+            if "current_price" in df.columns:
+                df["lot_unrealized_pct"] = (
+                    (df["current_price"] - df["lot_price"]) / df["lot_price"] * 100
+                )
+
+        _prepare_export_df(df, "buy_date", "lot_date")
+
     today = datetime.now(UTC).date().isoformat()
-    return dispatch_dataframe_response(format, df, filename=f"trades_open_{today}", sheet_name="open_trades")
+    return dispatch_dataframe_response(
+        format, df,
+        filename=f"trades_open_{today}",
+        sheet_name="open_trades",
+        column_formats={
+            "buy_date":   _EXPORT_DATE_FMT,
+            "lot_date":   _EXPORT_DATE_FMT,
+            "market_cap": _EXPORT_MCAP_FMT,
+        },
+    )
 
 
 # --- News & analyst endpoints -----------------------------------------------
@@ -2056,9 +2119,15 @@ def portfolio_holdings_export(
             )
         df = df.merge(wl, on="ticker", how="left")
 
+        _prepare_export_df(df, "first_buy_date")
+
     today = datetime.now(UTC).date().isoformat()
     return dispatch_dataframe_response(
         format, df, filename=f"portfolio_holdings_{today}", sheet_name="holdings",
+        column_formats={
+            "first_buy_date": _EXPORT_DATE_FMT,
+            "market_cap":     _EXPORT_MCAP_FMT,
+        },
     )
 
 
