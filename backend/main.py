@@ -2427,15 +2427,6 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
         if not holdings_rows:
             return []
 
-        # Vesign: avg of all trades that CLOSED in the last 52 weeks (= final point of green line)
-        vesign_trades_rows = conn.execute(text(f"""
-            SELECT return_pct
-            FROM trade_log
-            WHERE DATE(sell_date) >= :start
-              AND {trade_filter}
-              AND sell_date IS NOT NULL AND return_pct IS NOT NULL
-        """), {"start": start_date.isoformat()}).fetchall()
-
         # Price data only needed for user holdings
         all_tickers = list({r[2] for r in holdings_rows})
         ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
@@ -2467,12 +2458,15 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
                 return close
         return None
 
-    # Vesign bar = avg of all closed trades in window (= final point of green line)
-    vesign_val = None
-    if vesign_trades_rows:
-        returns = [float(r[0]) * 100 for r in vesign_trades_rows if r[0] is not None]
-        if returns:
-            vesign_val = round(sum(returns) / len(returns), 2)
+    # Vesign bar = bank/hand compounded yield over the same window
+    cache = _get_vesign_cache(market)
+    window_lots = [lot for lot in cache["lots"]
+                   if start_date <= lot.sell_date <= today]
+    sim = simulate_bank_hand(window_lots, cache["price_at"], [today])
+    if sim.peak_bank > 0 and sim.equity_curve:
+        vesign_val = round(((sim.equity_curve[-1][1] / sim.peak_bank) - 1) * 100, 2)
+    else:
+        vesign_val = None
 
     # Compute per-watchlist yield
     watchlist_lots = defaultdict(list)
