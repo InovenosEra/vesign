@@ -2304,18 +2304,6 @@ def portfolio_performance(
         """), {**tp, "cutoff": cutoff_buf}).fetchall()
 
     cache = _get_vesign_cache(market)
-    vesign_trades = cache["vesign_trades"]
-    sorted_prices = cache["sorted_prices"]
-
-    import bisect
-
-    def price_at(ticker, target):
-        sp = sorted_prices.get(ticker)
-        if not sp:
-            return None
-        dates, closes = sp
-        i = bisect.bisect_right(dates, target)
-        return closes[i - 1] if i > 0 else None
 
     user_price_map = defaultdict(list)
     for ticker, d_str, close in user_price_rows:
@@ -2344,37 +2332,20 @@ def portfolio_performance(
             base_p = float(buy_price)
         user_lots.append((ticker, float(qty), buy_d, base_p))
 
-    # Vesign line: progressive MTM.
-    # Universe = trades whose sell_date is inside the chart window (matches the
-    # Historical Trades card definition). Buy date can be before or inside.
-    # Each trade notional = $1000 at buy_price.
-    # Per day: contribution = $1000 × (price/buy_price) while open, $1000 × (1+ret) after sell.
-    # A trade only contributes once it has been bought (entered = buy_date ≤ target).
-    # Yield = (Σbal − Σinv) / Σinv. First point can be non-zero (reflects the MTM of
-    # legacy open positions at chart_start). Last point = mean realized = card value.
-    INVEST = 1000.0
-    universe = [t for t in vesign_trades
-                if weeks[0] <= t["sell_date"] <= weeks[-1]]
-    universe.sort(key=lambda t: t["buy_date"])
+    # Vesign line: bank/hand compounding simulation.
+    # Universe = lots whose parent trade's sell_date is inside the chart window
+    # (same filter as the Historical Trades card). Equity at each week =
+    # hand + MTM of currently-open lots.
+    window_lots = [lot for lot in cache["lots"]
+                   if weeks[0] <= lot.sell_date <= weeks[-1]]
+    sim = simulate_bank_hand(window_lots, cache["price_at"], weeks)
+    equity_by_week = {d: v for d, v in sim.equity_curve}
 
     def vesign_yield_at(target):
-        total_invested = 0.0
-        total_balance  = 0.0
-        for tr in universe:
-            if tr["buy_date"] > target:
-                break  # universe sorted by buy_date
-            total_invested += INVEST
-            if tr["sell_date"] <= target:
-                total_balance += INVEST * (1.0 + tr["return_pct"])
-            else:
-                p = price_at(tr["ticker"], target)
-                if p is not None and tr["buy_price"] > 0:
-                    total_balance += INVEST * (p / tr["buy_price"])
-                else:
-                    total_balance += INVEST  # no price data → flat
-        if total_invested <= 0:
+        eq = equity_by_week.get(target)
+        if eq is None or sim.peak_bank <= 0:
             return None
-        return (total_balance - total_invested) / total_invested
+        return (eq / sim.peak_bank) - 1
 
     result = []
     for week_date in weeks:
