@@ -160,7 +160,9 @@ export default function SignalChart({ ticker, onPeriodChange }) {
       lastActualRow.target_high,
     ].filter(x => x != null) : []),
   ]
-  const minPrice = allPrices.length ? Math.min(...allPrices) * 0.97 : 0
+  // Y-axis bottom sits 10% below the lowest visible value (close OR analyst
+  // projection target) in the selected period.
+  const minPrice = allPrices.length ? Math.min(...allPrices) * 0.90 : 0
   const maxPrice = allPrices.length ? Math.max(...allPrices) * 1.03 : 0
 
   // Path B: collect every BUY lot per trade so add-on lots render as well.
