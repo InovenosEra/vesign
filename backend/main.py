@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, text, event as sa_event
 from sqlalchemy.pool import NullPool
 from backend.auth import get_current_user
-from backend.yield_calcs import avg_cost_dollar_weighted
+from backend.yield_calcs import avg_cost_dollar_weighted, Lot, simulate_bank_hand
 
 # ---------------------------------------------------------------------------
 # Config  (.env overrides defaults; .env is gitignored)
@@ -2143,29 +2143,66 @@ _vesign_cache_lock = threading.Lock()
 
 
 def _build_vesign_cache(market: str):
-    """Load trade_log + daily_prices. Price-lookup fast-paths are precomputed.
-    Progressive-MTM curve depends on chart window and is computed per request."""
+    """Load every closed-trade lot + daily_prices for those tickers. Used by
+    /api/portfolio/performance and /api/portfolio/comparison to drive a
+    bank/hand compounding simulation. Lots missing from trade_lots fall back
+    to a synthetic single lot built from trade_log.buy_date/buy_price."""
     from datetime import date as _date
     from collections import defaultdict
 
-    trade_filter = "ticker LIKE '%.TA'" if market == "IL" else "ticker NOT LIKE '%.TA'"
+    trade_filter = "tl.ticker LIKE '%.TA'" if market == "IL" else "tl.ticker NOT LIKE '%.TA'"
 
     with engine.connect() as conn:
-        trade_log_rows = conn.execute(text(f"""
-            SELECT ticker, DATE(buy_date) AS buy_date, buy_price,
-                   DATE(sell_date) AS sell_date, sell_price, return_pct
-            FROM trade_log
-            WHERE {trade_filter}
-              AND sell_date IS NOT NULL AND return_pct IS NOT NULL
-              AND buy_price IS NOT NULL AND sell_price IS NOT NULL
-            ORDER BY buy_date
-        """)).fetchall()
+        rows = conn.execute(text(f"""
+            SELECT tl.ticker,
+                   DATE(tl.buy_date)  AS trade_buy_date,
+                   tl.buy_price,
+                   DATE(tl.sell_date) AS sell_date,
+                   tl.sell_price,
+                   DATE(l.lot_date)   AS lot_date,
+                   l.lot_price,
+                   l.lot_seq
+            FROM trade_log tl
+            LEFT JOIN trade_lots l
+              ON l.ticker    = tl.ticker
+             AND l.buy_date  = tl.buy_date
+             AND l.sell_date = tl.sell_date
+            LEFT JOIN companies c ON tl.ticker = c.ticker
+            WHERE COALESCE(c.market, 'US') = (CASE WHEN :mkt = 'IL' THEN 'IL' ELSE 'US' END)
+              AND tl.ticker NOT IN ('SPY', 'VOO')
+              AND {trade_filter}
+              AND tl.sell_date IS NOT NULL AND tl.return_pct IS NOT NULL
+              AND tl.buy_price IS NOT NULL AND tl.sell_price IS NOT NULL
+        """), {"mkt": market}).fetchall()
 
-        all_tickers = list({r[0] for r in trade_log_rows})
-        price_rows = []
-        if all_tickers:
-            ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
-            tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
+    vesign_lots: list[Lot] = []
+    tickers: set[str] = set()
+    for ticker, trade_buy_d, buy_p, sell_d, sell_p, lot_d, lot_p, _seq in rows:
+        try:
+            sell_price = float(sell_p)
+            if lot_p is not None and float(lot_p) > 0:
+                lot_price = float(lot_p)
+                lot_date  = _date.fromisoformat(str(lot_d)[:10])
+            else:
+                lot_price = float(buy_p)
+                lot_date  = _date.fromisoformat(str(trade_buy_d)[:10])
+            vesign_lots.append(Lot(
+                ticker=ticker,
+                buy_date=lot_date,
+                sell_date=_date.fromisoformat(str(sell_d)[:10]),
+                lot_price=lot_price,
+                sell_price=sell_price,
+            ))
+            tickers.add(ticker)
+        except Exception:
+            continue
+
+    # Prefetch daily prices for MTM of open lots at intermediate eval dates
+    price_rows = []
+    if tickers:
+        ph = ", ".join([f":t{i}" for i in range(len(tickers))])
+        tp = {f"t{i}": t for i, t in enumerate(tickers)}
+        with engine.connect() as conn:
             price_rows = conn.execute(text(f"""
                 SELECT ticker, DATE(date) AS d, close
                 FROM daily_prices
@@ -2173,45 +2210,33 @@ def _build_vesign_cache(market: str):
                 ORDER BY ticker, date
             """), tp).fetchall()
 
-    price_map = defaultdict(list)
+    price_map: dict[str, list[tuple[_date, float]]] = defaultdict(list)
     for ticker, d_str, close in price_rows:
         try:
-            d_obj = _date.fromisoformat(str(d_str)[:10])
-            price_map[ticker].append((d_obj, float(close)))
+            price_map[ticker].append((_date.fromisoformat(str(d_str)[:10]), float(close)))
         except Exception:
             pass
 
-    # Split into parallel arrays per ticker for O(log N) bisect lookup.
-    sorted_prices = {}
+    import bisect
+    sorted_prices: dict[str, tuple[list[_date], list[float]]] = {}
     for t, lst in price_map.items():
         dates  = [d for d, _ in lst]
         closes = [c for _, c in lst]
         sorted_prices[t] = (dates, closes)
 
-    vesign_trades = []
-    for ticker, buy_d_str, buy_price, sell_d_str, sell_price, return_pct in trade_log_rows:
-        try:
-            vesign_trades.append({
-                "ticker":     ticker,
-                "buy_date":   _date.fromisoformat(str(buy_d_str)[:10]),
-                "buy_price":  float(buy_price),
-                "sell_date":  _date.fromisoformat(str(sell_d_str)[:10]),
-                "sell_price": float(sell_price),
-                "return_pct": float(return_pct),
-            })
-        except Exception:
-            pass
-    vesign_trades.sort(key=lambda t: t["buy_date"])
-
-    # Global trading calendar: union of all price dates.
-    all_dates = sorted({d for lst in price_map.values() for d, _ in lst})
+    def price_at(ticker: str, target: _date) -> Optional[float]:
+        sp = sorted_prices.get(ticker)
+        if not sp:
+            return None
+        dates, closes = sp
+        i = bisect.bisect_right(dates, target)
+        return closes[i - 1] if i > 0 else None
 
     return {
-        "built_on":      _date.today().isoformat(),
-        "vesign_trades": vesign_trades,
-        "price_map":     price_map,
-        "sorted_prices": sorted_prices,
-        "all_dates":     all_dates,
+        "built_on":   _date.today().isoformat(),
+        "lots":       vesign_lots,
+        "price_at":   price_at,
+        "all_dates":  sorted({d for lst in price_map.values() for d, _ in lst}),
     }
 
 
