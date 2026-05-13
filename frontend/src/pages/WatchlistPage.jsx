@@ -745,6 +745,7 @@ export default function WatchlistPage() {
                         <col style={{ width: '7%' }} />   {/* current price */}
                         <col style={{ width: '8%' }} />   {/* live price */}
                         <col style={{ width: '7%' }} />   {/* investment */}
+                        <col style={{ width: '7%' }} />   {/* balance */}
                         <col style={{ width: '7%' }} />   {/* total p&l */}
                         <col style={{ width: '6%' }} />   {/* actions */}
                       </colgroup>
@@ -761,8 +762,9 @@ export default function WatchlistPage() {
                           <th>{t('col.avgPrice')}</th>
                           <Th label="Closed Price" col="close" sort={sort} onSort={toggle} />
                           <th>{t('col.livePrice')}</th>
-                          <th>Investment</th>
-                          <th>Total P&L (%)</th>
+                          <th>{t('watchlist.totalInvested')}</th>
+                          <th>{t('watchlist.currentValue')}</th>
+                          <th>Total P&L</th>
                           <th></th>
                         </tr>
                       </thead>
@@ -799,8 +801,15 @@ export default function WatchlistPage() {
                               <td>{fmtPrice(row.close)}</td>
                               <LivePriceCell ticker={row.ticker} closePrice={row.close} prices={prices} marketOpen={marketOpen} />
                               <td>{totalCost > 0 ? fmtPrice(totalCost) : '—'}</td>
+                              <td>{currentVal != null ? fmtPrice(currentVal) : '—'}</td>
                               <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>
-                                {yieldPct != null ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(2)}%` : '—'}
+                                {yieldPct != null ? (() => {
+                                  const pnlAbs = currentVal - totalCost
+                                  return (<>
+                                    <div>{pnlAbs >= 0 ? '+' : '-'}{fmtPrice(Math.abs(pnlAbs))}</div>
+                                    <div style={{ fontSize: 11 }}>{yieldPct >= 0 ? '+' : ''}{yieldPct.toFixed(2)}%</div>
+                                  </>)
+                                })() : '—'}
                               </td>
                               <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                                 <button
@@ -818,7 +827,7 @@ export default function WatchlistPage() {
 
                             isExpanded && (
                               <tr key={`${row.ticker}-lots`}>
-                                <td colSpan={14} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
+                                <td colSpan={15} style={{ padding: '0 0 0 48px', background: 'var(--bg)' }}>
                                   <div style={{ padding: '12px 16px', borderLeft: '3px solid var(--accent)' }}>
                                     {/* Existing lots */}
                                     {lots.length === 0
