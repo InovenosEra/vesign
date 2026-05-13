@@ -1646,12 +1646,16 @@ def _compute_open_trade_lots(open_positions: list[dict]) -> dict[str, list[dict]
         return {}
     today_iso = date.today().isoformat()
     lots_by_ticker: dict[str, list[dict]] = {}
+    # Under Path-B DCA the engine writes BUY (with lot_seq) for add-on lots
+    # that already passed V1/V2 + the 90% rule. Older rows in the same window
+    # may still be HOLD. We include both and exclude SELL; the 90% rule below
+    # is the actual lot-eligibility check.
     sql = text(f"""
         SELECT date, close FROM signals
         WHERE ticker = :tk
           AND DATE(date) > DATE(:bd)
           AND DATE(date) <= DATE(:today)
-          AND signal != 'BUY'
+          AND signal != 'SELL'
           AND ({_DCA_V1} OR {_DCA_V2})
           AND close IS NOT NULL
         ORDER BY date
