@@ -1,11 +1,8 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import {
-  LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceDot,
-} from 'recharts'
-import { getTrades, getOpenTrades, getPriceHistory, getAnalystHistory, getNews, WHITE_BG_LOGOS } from '../api'
+import { getTrades, getOpenTrades, getPriceHistory, getNews, WHITE_BG_LOGOS } from '../api'
+import SignalChart from '../components/SignalChart'
 
 // ---------- helper: pull full historical trades for one ticker --------------
 // Used by TradeModal so its chart shows the full historical trade history,
@@ -98,113 +95,38 @@ function Th({ label, col, sort, onSort, className }) {
 }
 
 // ---------------------------------------------------------------------------
-// Custom price label for chart reference lines
+// Trade chart modal — header/info table on top, shared SignalChart below
 // ---------------------------------------------------------------------------
 
-function PriceBoxLabel({ viewBox, value, color }) {
-  if (!value || !viewBox) return null
-  const { x, y } = viewBox
-  const px = 8, fontSize = 11
-  const boxW = value.length * 6.8 + px * 2
-  const boxH = fontSize + 10
-  const boxY = y - boxH - 4
-  return (
-    <g>
-      <rect
-        x={x - boxW / 2}
-        y={boxY}
-        width={boxW}
-        height={boxH}
-        rx={4}
-        fill="var(--surface)"
-        stroke={color}
-        strokeWidth={1.5}
-      />
-      <text
-        x={x}
-        y={boxY + boxH / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={color}
-        fontSize={fontSize}
-        fontWeight="700"
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-      >
-        {value}
-      </text>
-    </g>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Trade chart modal — supports multiple BUY/SELL pairs
-// ---------------------------------------------------------------------------
-
-function TradeModal({ row: rowProp, start, end, dcaView = false, onClose }) {
+function TradeModal({ row: rowProp, dcaView = false, onClose }) {
   const { t } = useTranslation()
   const { market } = useContext(MarketContext)
   const { fmtPrice } = useCurrency()
   const isIL      = rowProp.ticker?.endsWith('.TA') ?? market === 'IL'
   const priceScale = isIL ? 100 : 1
 
-  // Override row.trades with the full 5Y history for this ticker so the chart
-  // shows every closed BUY→SELL pair regardless of the page-level filter.
-  // Without this, opening from the table while filtered to "last 1Y" only
-  // showed trades within the last year — INDO's 2021 trades were missing.
+  // Override row.trades with the full 5Y history so the "Yield (Vesign)" calc
+  // covers every closed trade for this ticker, not just those in the
+  // page-level date filter.
   const { data: fullTrades } = useFullHistoryTradesForTicker(rowProp.ticker, market, dcaView)
   const row = useMemo(() => {
     const all = (fullTrades ?? []).find(tk => tk.ticker === rowProp.ticker)?.trades
     if (!all || all.length === 0) return rowProp
-    // Keep the originally-clicked top-level fields (buy_date, buy_price, etc.)
-    // but replace the inner trades array with the full historical set.
     return { ...rowProp, trades: all.filter(p => p.result !== 'Open') }
   }, [rowProp, fullTrades])
 
   const [descTab, setDescTab] = useState('info')
+  const [chartState, setChartState] = useState({ activePeriod: 12, chartStart: '', chartEnd: '', yieldPeriod: null })
 
+  // 12-month price history only powers the "Current Price" cell; the chart
+  // fetches its own range via SignalChart.
   const today = new Date().toISOString().slice(0, 10)
-  const [activePeriod, setActivePeriod] = useState(12)
-  const [chartStart, setChartStart]     = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 12); return d.toISOString().slice(0, 10) })
-  const [chartEnd,   setChartEnd]       = useState(today)
-
-  function selectPeriod(months) {
-    setActivePeriod(months)
-    if (months === 'ytd') {
-      const y = new Date().getFullYear()
-      setChartStart(`${y}-01-01`)
-    } else {
-      const d = new Date(); d.setMonth(d.getMonth() - months)
-      setChartStart(d.toISOString().slice(0, 10))
-    }
-    setChartEnd(today)
-  }
-
-  // Fetch full history once; period switches slice client-side (no refetch).
-  // 10y covers our 2020-01-02 DB cutoff so a user-typed start date back to
-  // Jan 2020 always has data to render.
-  const fullStart = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 10); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
-  const { data: fullHistory = [], isLoading } = useQuery({
-    queryKey: ['price-history', row.ticker],
-    queryFn: () => getPriceHistory(row.ticker, { start: fullStart, end: today }),
-    staleTime: 300_000,
-  })
-  const history = fullHistory.filter(p => {
-    const d = p.date?.slice(0, 10) || p.date
-    return d >= chartStart && d <= chartEnd
-  })
-
-  const end12m    = new Date().toISOString().slice(0, 10)
-  const target12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10) })()
-  const start12m  = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
+  const start12m = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) })()
   const { data: history12m = [] } = useQuery({
     queryKey: ['price-history-12m', row.ticker],
-    queryFn: () => getPriceHistory(row.ticker, { start: start12m, end: end12m }),
+    queryFn: () => getPriceHistory(row.ticker, { start: start12m, end: today }),
     staleTime: 300_000,
   })
-  const base12m  = history12m.filter(d => d.date <= target12m).at(-1)
-  const yield12m = base12m && history12m.length > 0
-    ? ((history12m.at(-1).close - base12m.close) / base12m.close) * 100
-    : null
 
   const { data: newsData = [], isLoading: newsLoading } = useQuery({
     queryKey: ['news', row.ticker],
@@ -213,93 +135,15 @@ function TradeModal({ row: rowProp, start, end, dcaView = false, onClose }) {
     staleTime: 300_000,
   })
 
-  // Full 5Y analyst history (sliced client-side to current chart window)
-  const { data: fullAnalystHistory = [] } = useQuery({
-    queryKey: ['analyst-history', row.ticker],
-    queryFn: () => getAnalystHistory(row.ticker, { start: fullStart, end: today }),
-    staleTime: 300_000,
-  })
-  const analystHistory = fullAnalystHistory.filter(a => {
-    const d = a.date?.slice(0, 10) || a.date
-    return d >= chartStart && d <= chartEnd
-  })
-
-  // Scale prices for IL (agorot → ₪)
-  const chartHistory = history.map(d => ({ ...d, close: d.close / priceScale }))
-
-  // Merge analyst targets into chart data (forward-fill)
-  const analystMap = Object.fromEntries(analystHistory.map(a => [a.date, a]))
-  let lastAnalyst = null
-  const chartData = chartHistory.map(d => {
-    if (analystMap[d.date]) lastAnalyst = analystMap[d.date]
-    if (!lastAnalyst) return d
-    return {
-      ...d,
-      target_low:  lastAnalyst.target_low_price  != null ? lastAnalyst.target_low_price  / priceScale : undefined,
-      target_mean: lastAnalyst.target_mean_price != null ? lastAnalyst.target_mean_price / priceScale : undefined,
-      target_high: lastAnalyst.target_high_price != null ? lastAnalyst.target_high_price / priceScale : undefined,
-    }
-  })
-  // Forward analyst projection: from the latest available row, extend 12mo
-  // of analyst targets to the right. Ghost rows widen the x-axis so the
-  // projection cone occupies ~12% of plot width.
-  const lastActualRow = chartData.length > 0 ? chartData[chartData.length - 1] : null
-  const hasProjection = !!(lastActualRow && (
-    lastActualRow.target_high != null ||
-    lastActualRow.target_mean != null ||
-    lastActualRow.target_low  != null
-  ))
-  const projectionEnd = lastActualRow ? (() => {
-    const d = new Date(lastActualRow.date + 'T00:00:00Z')
-    d.setUTCMonth(d.getUTCMonth() + 12)
-    return d.toISOString().slice(0, 10)
-  })() : null
-  const projectionRows = []
-  if (hasProjection && projectionEnd && lastActualRow) {
-    const N = Math.max(10, Math.floor(chartData.length * 0.125))
-    const startMs = new Date(lastActualRow.date + 'T00:00:00Z').getTime()
-    const endMs   = new Date(projectionEnd     + 'T00:00:00Z').getTime()
-    for (let i = 1; i <= N; i++) {
-      const ms = startMs + ((endMs - startMs) * i) / N
-      projectionRows.push({ date: new Date(ms).toISOString().slice(0, 10), close: null })
-    }
-  }
-  const chartDataDisplay = projectionRows.length > 0 ? [...chartData, ...projectionRows] : chartData
-
-  // Collapse to single Base line when all three targets equal (single-analyst coverage)
-  const targetsCollapse = !!(
-    lastActualRow &&
-    lastActualRow.target_high != null &&
-    lastActualRow.target_mean != null &&
-    lastActualRow.target_low  != null &&
-    lastActualRow.target_high === lastActualRow.target_mean &&
-    lastActualRow.target_mean === lastActualRow.target_low
-  )
-
-  // X-axis ticks: only show history dates (not projection ghost rows)
-  const xTicks = (() => {
-    if (chartData.length === 0) return undefined
-    if (chartData.length <= 8) return chartData.map(d => d.date)
-    const n = 8
-    return Array.from({ length: n }, (_, i) =>
-      chartData[Math.floor(i * (chartData.length - 1) / (n - 1))].date
-    )
-  })()
-
-  const basePeriod  = chartData.filter(d => d.date <= chartStart).at(-1) ?? chartData[0]
-  const yieldPeriod = basePeriod && chartData.length > 0
-    ? ((chartData.at(-1).close - basePeriod.close) / basePeriod.close) * 100
-    : null
-
-  // Vesign yield over the selected chart period — average return of trades
-  // whose buy and sell both fall inside [chartStart, chartEnd]. Mirrors the
-  // chart's yield labels (drawn only when both markers are visible).
+  // Vesign yield over the selected chart period — average return of closed
+  // trades whose buy and sell both fall inside [chartStart, chartEnd].
   const windowAvgReturn = useMemo(() => {
+    if (!chartState.chartStart || !chartState.chartEnd) return null
     const inWindow = (row.trades ?? []).filter(p => {
       if (p.result === 'Open' || !p.buy_date || !p.sell_date) return false
       const buy  = p.buy_date.slice(0, 10)
       const sell = p.sell_date.slice(0, 10)
-      return buy >= chartStart && sell <= chartEnd
+      return buy >= chartState.chartStart && sell <= chartState.chartEnd
     })
     if (inWindow.length === 0) return null
     const sum = inWindow.reduce((s, p) => {
@@ -309,22 +153,7 @@ function TradeModal({ row: rowProp, start, end, dcaView = false, onClose }) {
       return s + (p.return_pct ?? 0)
     }, 0)
     return sum / inWindow.length
-  }, [row.trades, chartStart, chartEnd, dcaView])
-
-  // When DCA is on, expand y-axis room at the bottom so lot markers and the
-  // stepped avg-cost line don't get squished against the date axis. Lot prices
-  // are by definition near the local lows of the trade — they need padding.
-  const hasLotsInView = dcaView && (row.trades ?? []).some(p => p.lots && p.lots.length > 0)
-  // Y-axis: when DCA is on with lots, extend the bottom enough so the lowest lot
-  // (typically very close to the price line's local min) sits well above the
-  // date axis with room for the circle marker AND the stepped avg-cost line.
-  const projTargetPrices = hasProjection ? [
-    lastActualRow.target_low, lastActualRow.target_mean, lastActualRow.target_high,
-  ].filter(x => x != null) : []
-  const baseMin = chartData.length ? Math.min(...chartData.map(d => d.close), ...projTargetPrices) : 0
-  const baseMax = chartData.length ? Math.max(...chartData.map(d => d.close), ...projTargetPrices) : 0
-  const minPrice = chartData.length ? baseMin * (hasLotsInView ? 0.75 : 0.97) : 0
-  const maxPrice = chartData.length ? baseMax * 1.03 : 0
+  }, [row.trades, chartState.chartStart, chartState.chartEnd, dcaView])
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -338,52 +167,14 @@ function TradeModal({ row: rowProp, start, end, dcaView = false, onClose }) {
     if (generalColRef.current) setGeneralColH(generalColRef.current.offsetHeight)
   })
 
-  const wrapperRef = useRef(null)
-  const [wrapperWidth, setWrapperWidth] = useState(0)
-  useEffect(() => {
-    if (!wrapperRef.current) return
-    const obs = new ResizeObserver(entries => setWrapperWidth(entries[0].contentRect.width))
-    obs.observe(wrapperRef.current)
-    return () => obs.disconnect()
-  }, [isLoading])
-
-  const PLOT_RIGHT_MARGIN = 60
-  const PLOT_LEFT = 8 + 56  // chart margin.left + YAxis width
-  function dateToX(dateStr) {
-    const idx = chartDataDisplay.findIndex(d => d.date === dateStr)
-    if (idx < 0 || chartDataDisplay.length <= 1) return null
-    const plotWidth = wrapperWidth - PLOT_LEFT - PLOT_RIGHT_MARGIN
-    return PLOT_LEFT + (idx / (chartDataDisplay.length - 1)) * plotWidth
-  }
-
-  const PLOT_TOP        = 100
-  const PLOT_BOTTOM     = 332  // full-height BUY/SELL vertical lines
-  const PLOT_BOTTOM_PX  = 302  // actual Recharts plot bottom
-
-  function priceToY(price) {
-    if (price == null || maxPrice <= minPrice) return null
-    const ratio = (maxPrice - price) / (maxPrice - minPrice)
-    return PLOT_TOP + ratio * (PLOT_BOTTOM_PX - PLOT_TOP)
-  }
-
-  function priceBox(cx, value, color) {
-    const px = 8, fs = 11
-    const bw = value.length * 6.8 + px * 2
-    const bh = fs + 10
-    const by = PLOT_TOP - bh - 4
-    return (
-      <g>
-        <rect x={cx - bw / 2} y={by} width={bw} height={bh} rx={4} style={{ fill: 'var(--surface)' }} />
-        <text x={cx} y={by + bh / 2} textAnchor="middle" dominantBaseline="central"
-          fontSize={fs} style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-          {value}
-        </text>
-      </g>
-    )
-  }
-
   const healthLabels = ['', t('health.weak'), t('health.fair'), t('health.good'), t('health.great'), t('health.excellent')]
   const healthColors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
+
+  const periodLabel = (() => {
+    const labels = { 3:'3M', 6:'6M', 'ytd':'YTD', 12:'1Y', 24:'2Y', 36:'3Y', 60:'5Y' }
+    const p = chartState.activePeriod
+    return p ? (labels[p] || `${p}M`) : null
+  })()
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -424,8 +215,8 @@ function TradeModal({ row: rowProp, start, end, dcaView = false, onClose }) {
                     [t('modal.marketCap'),     row.market_cap != null ? (row.market_cap / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'],
                     [t('modal.currentSignal'), row.current_signal ? <span className={`badge badge-${row.current_signal}`}>{row.current_signal}</span> : '—'],
                     [t('modal.currentPrice'),  history12m.length > 0 ? fmtPrice(history12m.at(-1).close / priceScale) : '—'],
-                    [activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M','ytd':'YTD',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (organic)` : `${t('modal.yieldCustom')} (organic)`, yieldPeriod != null ? <span className={yieldPeriod >= 0 ? 'up' : 'down'}>{yieldPeriod >= 0 ? '+' : ''}{fmt(yieldPeriod)}%</span> : '—'],
-                    ...(row.unrealized_pct == null ? [[activePeriod ? `${t('modal.yieldPeriod', { label: ({3:'3M',6:'6M','ytd':'YTD',12:'1Y',24:'2Y',36:'3Y',60:'5Y'}[activePeriod] || `${activePeriod}M`) })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, windowAvgReturn != null ? <span className={windowAvgReturn >= 0 ? 'up' : 'down'}>{windowAvgReturn >= 0 ? '+' : ''}{fmt(windowAvgReturn)}%</span> : '—']] : []),
+                    [periodLabel ? `${t('modal.yieldPeriod', { label: periodLabel })} (organic)` : `${t('modal.yieldCustom')} (organic)`, chartState.yieldPeriod != null ? <span className={chartState.yieldPeriod >= 0 ? 'up' : 'down'}>{chartState.yieldPeriod >= 0 ? '+' : ''}{fmt(chartState.yieldPeriod)}%</span> : '—'],
+                    ...(row.unrealized_pct == null ? [[periodLabel ? `${t('modal.yieldPeriod', { label: periodLabel })} (Vesign)` : `${t('modal.yieldCustom')} (Vesign)`, windowAvgReturn != null ? <span className={windowAvgReturn >= 0 ? 'up' : 'down'}>{windowAvgReturn >= 0 ? '+' : ''}{fmt(windowAvgReturn)}%</span> : '—']] : []),
                     ...(row.unrealized_pct != null ? [[t('modal.yieldSinceBuy'), <span className={row.unrealized_pct >= 0 ? 'up' : 'down'}>{row.unrealized_pct >= 0 ? '+' : ''}{fmt(row.unrealized_pct)}%</span>]] : []),
                   ].map(([label, value]) => (
                     <tr key={label} style={{ height: 22 }}>
@@ -491,288 +282,7 @@ function TradeModal({ row: rowProp, start, end, dcaView = false, onClose }) {
         </div>
 
         {/* Chart */}
-        {isLoading ? (
-          <p className="loading" style={{ padding: 40 }}>{t('modal.loadingChart')}</p>
-        ) : (
-          <div ref={wrapperRef} style={{ position: 'relative', overflow: 'hidden', margin: '0 -24px' }}>
-
-            {/* Period selector — overlaid at top of chart */}
-            <div style={{ position: 'absolute', top: 8, left: 56, right: 24, display: 'flex', alignItems: 'center', gap: 6, zIndex: 20, flexWrap: 'wrap' }}>
-              {[[3, '3M'], [6, '6M'], ['ytd', 'YTD'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']].map(([m, label]) => (
-                <button key={m} className={`period-chip${activePeriod === m ? ' active' : ''}`}
-                  onClick={() => selectPeriod(m)}
-                >{label}</button>
-              ))}
-              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="date" value={chartStart} max={chartEnd}
-                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
-                  onChange={e => { setChartStart(e.target.value); setActivePeriod(null) }} />
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>→</span>
-                <input type="date" value={chartEnd} min={chartStart} max={today}
-                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
-                  onChange={e => { setChartEnd(e.target.value); setActivePeriod(null) }} />
-              </span>
-            </div>
-            <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={chartDataDisplay} margin={{ top: 100, right: PLOT_RIGHT_MARGIN, bottom: 8, left: 8 }}>
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                  tickFormatter={d => { const [, m, day] = d.split('-'); return `${day}/${m}` }}
-                  ticks={xTicks}
-                  axisLine={false}
-                />
-                <YAxis
-                  domain={[minPrice, maxPrice]}
-                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
-                  tickFormatter={v => fmtPrice(v, 0)}
-                  width={56}
-                />
-                <Tooltip
-                  wrapperStyle={{ zIndex: 50 }}
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload || !payload.length) return null
-                    // Hide tooltip in the forward projection area (past latest actual data)
-                    if (lastActualRow && label > lastActualRow.date) return null
-                    const [y, m, day] = (label || '').split('-')
-                    const dateStr = y ? `${day}/${m}/${y.slice(2)}` : label
-                    const labels = {
-                      close: t('modal.chartClose'),
-                      target_low: t('modal.chartTargetLow'),
-                      target_mean: t('modal.chartTargetBase'),
-                      target_high: t('modal.chartTargetHigh'),
-                    }
-                    const order = { close: 0, target_high: 1, target_mean: 2, target_low: 3 }
-                    const sorted = [...payload].sort((a, b) =>
-                      (order[a.dataKey] ?? 99) - (order[b.dataKey] ?? 99)
-                    )
-                    return (
-                      <div style={{
-                        background: 'var(--surface)', border: '1px solid var(--border)',
-                        borderRadius: 6, fontSize: 12, padding: '8px 12px',
-                        color: 'var(--text)',
-                      }}>
-                        <div style={{ color: 'var(--muted)', marginBottom: 4 }}>{dateStr}</div>
-                        {sorted.map(p => (
-                          <div key={p.dataKey}
-                               style={{ fontWeight: p.dataKey === 'close' ? 700 : 400 }}>
-                            {labels[p.dataKey] || p.dataKey} : {p.value != null ? fmtPrice(p.value) : '—'}
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  }}
-                />
-                <Line type="monotone" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={2} name="close" />
-                {/* Projection lines are rendered in the SVG overlay (further down)
-                    so they layer on top of the shaded fill triangles. */}
-                {/* DCA: stepped avg-cost line + numbered lot markers using Recharts native primitives
-                    so positions match the chart's actual coordinate system (the SVG overlay below
-                    uses hardcoded plot bounds that don't account for the date-axis area). */}
-                {dcaView && (row.trades || []).flatMap((trade, ti) => {
-                  if (!trade.lots || trade.lots.length === 0) return []
-                  let running = 0
-                  const lotsWithAvg = trade.lots.map((lot, ix) => {
-                    running += lot.price
-                    return { ...lot, avg: running / (ix + 1) }
-                  })
-                  // For closed trades the stepped line ends at sell_date; for open
-                  // trades it extends to the latest chart point (today's close).
-                  const sellD = trade.sell_date
-                    ? trade.sell_date.slice(0, 10)
-                    : chartData[chartData.length - 1]?.date?.slice(0, 10)
-                  if (!sellD) return []
-                  const els = []
-                  for (let k = 0; k < lotsWithAvg.length; k++) {
-                    const fromD = lotsWithAvg[k].date
-                    const toD = (k + 1 < lotsWithAvg.length) ? lotsWithAvg[k+1].date : sellD
-                    const yAvg = lotsWithAvg[k].avg / priceScale
-                    const isLast = k === lotsWithAvg.length - 1
-                    els.push(
-                      <ReferenceLine key={`dca-avg-${ti}-${k}`}
-                        segment={[{ x: fromD, y: yAvg }, { x: toD, y: yAvg }]}
-                        stroke="#dc2626" strokeWidth={1.5} strokeDasharray="6 4"
-                        ifOverflow="visible"
-                        label={isLast ? { value: `avg $${yAvg.toFixed(2)}`, position: 'insideBottomRight', fill: '#dc2626', fontSize: 10, fontWeight: 700 } : undefined}
-                      />
-                    )
-                  }
-                  for (const lot of lotsWithAvg) {
-                    const seq = lot.seq
-                    els.push(
-                      <ReferenceDot key={`dca-lot-${ti}-${seq}`}
-                        x={lot.date} y={lot.price / priceScale}
-                        r={9} fill="var(--green)" stroke="#fff" strokeWidth={2}
-                        ifOverflow="visible"
-                        label={({ viewBox }) => (
-                          <text x={viewBox.cx} y={viewBox.cy} fontSize={10} fontWeight={700} fill="#fff"
-                            textAnchor="middle" dominantBaseline="central">{seq}</text>
-                        )}
-                      />
-                    )
-                  }
-                  return els
-                })}
-              </LineChart>
-            </ResponsiveContainer>
-
-            {wrapperWidth > 0 && chartData.length > 1 && (
-              <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 340, pointerEvents: 'none', overflow: 'visible' }}>
-                {/* Custom X-axis line truncated at the last actual data date */}
-                {lastActualRow && (() => {
-                  const endX = dateToX(lastActualRow.date)
-                  if (endX == null) return null
-                  return (
-                    <line
-                      x1={PLOT_LEFT - 8} y1={PLOT_BOTTOM_PX}
-                      x2={endX}          y2={PLOT_BOTTOM_PX}
-                      stroke="var(--border)" strokeWidth={1}
-                    />
-                  )
-                })()}
-
-                {/* Forward analyst projection cone: 3 lines + shaded triangles + endpoint labels.
-                    Animated after the price line finishes drawing (~1.5s). */}
-                {hasProjection && lastActualRow && (() => {
-                  const apexX = dateToX(lastActualRow.date)
-                  const endX  = dateToX(projectionEnd)
-                  const apexY = priceToY(lastActualRow.close)
-                  const highY = priceToY(lastActualRow.target_high)
-                  const meanY = priceToY(lastActualRow.target_mean)
-                  const lowY  = priceToY(lastActualRow.target_low)
-                  if (apexX == null || endX == null || apexY == null) return null
-                  const lineLen = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1)
-                  const lenHigh = highY != null ? lineLen(apexX, apexY, endX, highY) : 0
-                  const lenMean = meanY != null ? lineLen(apexX, apexY, endX, meanY) : 0
-                  const lenLow  = lowY  != null ? lineLen(apexX, apexY, endX, lowY)  : 0
-                  const fillAnim  = { opacity: 0, animation: 'fadeInProj 0.6s ease-out 2.2s forwards' }
-                  const labelAnim = { opacity: 0, animation: 'fadeInProj 0.5s ease-out 2.5s forwards' }
-                  const lineAnim = (len) => ({
-                    strokeDasharray: len,
-                    strokeDashoffset: len,
-                    animation: 'drawProjLine 1.2s ease-out 1.5s forwards',
-                  })
-                  return (
-                    <g>
-                      {!targetsCollapse && highY != null && meanY != null && (
-                        <polygon points={`${apexX},${apexY} ${endX},${highY} ${endX},${meanY}`}
-                          fill="#16a34a" fillOpacity={0.08} stroke="none" style={fillAnim} />
-                      )}
-                      {!targetsCollapse && meanY != null && lowY != null && (
-                        <polygon points={`${apexX},${apexY} ${endX},${meanY} ${endX},${lowY}`}
-                          fill="#dc2626" fillOpacity={0.08} stroke="none" style={fillAnim} />
-                      )}
-                      {!targetsCollapse && highY != null && (
-                        <line x1={apexX} y1={apexY} x2={endX} y2={highY} stroke="#16a34a" strokeWidth={1.5} style={lineAnim(lenHigh)} />
-                      )}
-                      {meanY != null && (
-                        <line x1={apexX} y1={apexY} x2={endX} y2={meanY} stroke="#64748b" strokeWidth={1.5} style={lineAnim(lenMean)} />
-                      )}
-                      {!targetsCollapse && lowY != null && (
-                        <line x1={apexX} y1={apexY} x2={endX} y2={lowY} stroke="#dc2626" strokeWidth={1.5} style={lineAnim(lenLow)} />
-                      )}
-                      {!targetsCollapse && highY != null && (<>
-                        <text x={endX + 6} y={highY - 4} fontSize={10} fontWeight={700} fill="#16a34a" style={labelAnim}>High</text>
-                        <text x={endX + 6} y={highY + 10} fontSize={11} fontWeight={700} fill="#16a34a" style={labelAnim}>{fmtPrice(lastActualRow.target_high, 1)}</text>
-                      </>)}
-                      {meanY != null && (<>
-                        <text x={endX + 6} y={meanY - 4} fontSize={10} fontWeight={700} fill="#64748b" style={labelAnim}>Base</text>
-                        <text x={endX + 6} y={meanY + 10} fontSize={11} fontWeight={700} fill="#64748b" style={labelAnim}>{fmtPrice(lastActualRow.target_mean, 1)}</text>
-                      </>)}
-                      {!targetsCollapse && lowY != null && (<>
-                        <text x={endX + 6} y={lowY - 4} fontSize={10} fontWeight={700} fill="#dc2626" style={labelAnim}>Low</text>
-                        <text x={endX + 6} y={lowY + 10} fontSize={11} fontWeight={700} fill="#dc2626" style={labelAnim}>{fmtPrice(lastActualRow.target_low, 1)}</text>
-                      </>)}
-                    </g>
-                  )
-                })()}
-
-                {row.trades.map((trade, i) => {
-                  const buyX  = trade.buy_date  ? dateToX(trade.buy_date.slice(0, 10))  : null
-                  const sellX = trade.sell_date ? dateToX(trade.sell_date.slice(0, 10)) : null
-                  const useDcaView = dcaView && trade.lots && trade.lots.length > 0
-                  const yForPrice = price => {
-                    const range = maxPrice - minPrice
-                    if (range <= 0) return PLOT_TOP
-                    return PLOT_BOTTOM - ((price - minPrice) / range) * (PLOT_BOTTOM - PLOT_TOP)
-                  }
-                  return (
-                    <g key={i}>
-                      {buyX != null && <>
-                        <line x1={buyX} y1={PLOT_TOP} x2={buyX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--green)', strokeWidth: 2 }} />
-                        {trade.buy_price != null && priceBox(buyX, fmtPrice(trade.buy_price / priceScale, 1), 'var(--green)')}
-                      </>}
-                      {sellX != null && <>
-                        <line x1={sellX} y1={PLOT_TOP} x2={sellX} y2={PLOT_BOTTOM} style={{ stroke: 'var(--red)', strokeWidth: 2 }} />
-                        {trade.sell_price != null && priceBox(sellX, fmtPrice(trade.sell_price / priceScale, 1), 'var(--red)')}
-                      </>}
-                      {buyX != null && sellX != null && trade.sell_price != null && (() => {
-                        const base = useDcaView && trade.avg_cost != null ? trade.avg_cost : trade.buy_price
-                        if (base == null) return null
-                        const pct   = ((trade.sell_price - base) / base) * 100
-                        const color = pct >= 0 ? 'var(--green)' : 'var(--red)'
-                        const lineY = PLOT_TOP + 18
-                        return <>
-                          <line x1={buyX} y1={lineY} x2={sellX} y2={lineY} style={{ stroke: color, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
-                          <text x={(buyX + sellX) / 2} y={lineY - 6} textAnchor="middle" fontSize={10}
-                            style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                            {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
-                          </text>
-                        </>
-                      })()}
-                      {buyX != null && trade.result === 'Open' && (() => {
-                        const lastX = dateToX(chartData.at(-1).date)
-                        const currentPrice = chartData.at(-1).close
-                        const useDcaBase = useDcaView && trade.avg_cost != null
-                        const baseRaw = useDcaBase ? trade.avg_cost : trade.buy_price
-                        const base = baseRaw != null ? baseRaw / priceScale : null
-                        const pct = base != null && currentPrice != null
-                          ? ((currentPrice - base) / base) * 100
-                          : null
-                        const color = pct != null && pct >= 0 ? 'var(--green)' : 'var(--red)'
-                        const lineY = PLOT_TOP + 18
-                        return <>
-                          <text x={buyX + 6} y={PLOT_TOP + 30} fontSize={10}
-                            style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                            {t('modal.open').toUpperCase()}
-                          </text>
-                          {lastX != null && pct != null && <>
-                            <line x1={buyX} y1={lineY} x2={lastX} y2={lineY} style={{ stroke: color, strokeWidth: 1.5, strokeDasharray: '4 3' }} />
-                            <text x={(buyX + lastX) / 2} y={lineY - 6} textAnchor="middle" fontSize={10}
-                              style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-                              {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
-                            </text>
-                          </>}
-                        </>
-                      })()}
-                    </g>
-                  )
-                })}
-              </svg>
-            )}
-
-            {/* Legend */}
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', padding: '6px 0 2px', fontSize: 11, color: 'var(--muted)' }}>
-              {[
-                { color: 'var(--accent)', dash: false, label: t('modal.chartClose') },
-                { color: 'var(--green)', dash: false, vertical: true, label: t('modal.legendBuy') },
-                { color: 'var(--red)',   dash: false, vertical: true, label: t('modal.legendSell') },
-              ].map(({ color, dash, vertical, label }) => (
-                <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  {vertical
-                    ? <span style={{ width: 2, height: 12, background: color, borderRadius: 1, display: 'inline-block' }} />
-                    : <svg width="24" height="10" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-                        <line x1="0" y1="5" x2="24" y2="5"
-                          stroke={color} strokeWidth="2"
-                          strokeDasharray={dash ? '5 3' : undefined} />
-                      </svg>
-                  }
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        <SignalChart ticker={row.ticker} onPeriodChange={setChartState} />
       </div>
     </div>
   )
@@ -1140,25 +650,8 @@ export default function TradesPage() {
         )
       })()}
 
-      {selected && <TradeModal row={selected} start={start} end={end} dcaView={dcaActive} onClose={() => setSelected(null)} />}
-      {selectedOpen && (
-        <TradeModal
-          row={{ ...selectedOpen, trades: [{
-            buy_date:  selectedOpen.buy_date,
-            sell_date: null,
-            buy_price: selectedOpen.buy_price,
-            sell_price: null,
-            result:    'Open',
-            lots:      selectedOpen.lots,
-            n_lots:    selectedOpen.n_lots,
-            avg_cost:  selectedOpen.avg_cost,
-          }] }}
-          start={isoMonthsAgo(12)}
-          end={new Date().toISOString().slice(0, 10)}
-          dcaView={dcaActive}
-          onClose={() => setSelectedOpen(null)}
-        />
-      )}
+      {selected && <TradeModal row={selected} dcaView={dcaActive} onClose={() => setSelected(null)} />}
+      {selectedOpen && <TradeModal row={selectedOpen} dcaView={dcaActive} onClose={() => setSelectedOpen(null)} />}
 
       {/* Open Trades */}
       <p className="page-title" style={{ marginTop: 40 }}>{t('trades.openTitle')}</p>
