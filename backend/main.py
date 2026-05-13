@@ -2383,7 +2383,6 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
     today = _date.today()
     start_date = today - timedelta(weeks=52)
     market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
-    trade_filter  = "ticker LIKE '%.TA'"    if market == "IL" else "ticker NOT LIKE '%.TA'"
 
     with engine.connect() as conn:
         # Holdings grouped by watchlist
