@@ -165,6 +165,15 @@ export default function SignalChart({ ticker, onPeriodChange }) {
   const minPrice = allPrices.length ? Math.min(...allPrices) * 0.90 : 0
   const maxPrice = allPrices.length ? Math.max(...allPrices) * 1.03 : 0
 
+  // Dollar-weighted avg cost: each lot = $1000 BUY signal → harmonic mean of
+  // lot prices, matching the backend (avg_cost_dollar_weighted). Zero/null
+  // prices are skipped to avoid div-by-zero.
+  const harmonicAvgCost = (lots) => {
+    const prices = lots.map(l => l.close).filter(p => p != null && p > 0)
+    if (prices.length === 0) return null
+    return prices.length / prices.reduce((s, p) => s + 1 / p, 0)
+  }
+
   // Path B: collect every BUY lot per trade so add-on lots render as well.
   const pairs = []
   let openLots = []
@@ -172,16 +181,14 @@ export default function SignalChart({ ticker, onPeriodChange }) {
     if (m.signal === 'BUY') {
       openLots.push(m)
     } else if (m.signal === 'SELL' && openLots.length > 0) {
-      const avgCost = openLots.reduce((s, l) => s + (l.close ?? 0), 0) / openLots.length
+      const avgCost = harmonicAvgCost(openLots)
       pairs.push({ buy: openLots[0], sell: m, lots: openLots, avgCost })
       openLots = []
     }
   }
   const openBuy = openLots.length > 0 ? openLots[0] : null
   const openLotsAll = openLots
-  const openAvgCost = openLots.length > 0
-    ? openLots.reduce((s, l) => s + (l.close ?? 0), 0) / openLots.length
-    : null
+  const openAvgCost = openLots.length > 0 ? harmonicAvgCost(openLots) : null
 
   const wrapperRef = useRef(null)
   const [wrapperWidth, setWrapperWidth] = useState(0)
