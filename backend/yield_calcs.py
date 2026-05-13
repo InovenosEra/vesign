@@ -18,3 +18,10 @@ def avg_cost_dollar_weighted(lot_prices: Iterable[float]) -> float:
     if any(p <= 0 for p in prices):
         raise ValueError("all lot prices must be positive")
     return len(prices) / sum(1.0 / p for p in prices)
+
+
+def per_trade_yield_dca(sell_price: float, lot_prices: Iterable[float]) -> float:
+    """Per-trade yield against dollar-weighted avg_cost. Returns a fraction.
+    For n=1 this collapses to return_pct."""
+    ac = avg_cost_dollar_weighted(lot_prices)
+    return (float(sell_price) - ac) / ac
