@@ -147,4 +147,52 @@ def test_empty_input_returns_zeros():
     assert r.peak_bank == 0.0
     assert r.final_hand == 0.0
     assert r.max_concurrent == 0
-    assert r.equity_curve == [(date(2026, 1, 1), 0.0)]
+    assert r.equity_curve == [(date(2026, 1, 1), 0.0, 0.0)]
+
+
+def test_bank_drawn_at_snapshot_reflects_running_state():
+    # Lot 1: BUY 2026-01-01, SELL 2026-02-01 (+20%)
+    # Lot 2: BUY 2026-03-01, SELL 2026-04-01 (+10%)
+    # Snapshots: 2026-01-15 (after lot 1 BUY, before SELL) → bank=$1000
+    #           2026-02-15 (after lot 1 SELL, before lot 2 BUY) → bank=$1000
+    #           2026-03-15 (after lot 2 BUY) → bank still $1000 (hand had $1200 from lot 1, used $1000)
+    #           2026-04-15 (after everything) → bank still $1000 == peak_bank
+    lots = [
+        _lot("AAA", "2026-01-01", "2026-02-01", 100.0, 120.0),
+        _lot("BBB", "2026-03-01", "2026-04-01", 100.0, 110.0),
+    ]
+    r = simulate_bank_hand(
+        lots,
+        price_at=lambda t, d: None,  # no MTM, lots get flat $1000 while open
+        eval_dates=[date(2026, 1, 15), date(2026, 2, 15), date(2026, 3, 15), date(2026, 4, 15)],
+    )
+    bank_by_date = {d: bd for d, _eq, bd in r.equity_curve}
+    assert bank_by_date[date(2026, 1, 15)] == pytest.approx(1000.0)
+    assert bank_by_date[date(2026, 2, 15)] == pytest.approx(1000.0)
+    assert bank_by_date[date(2026, 3, 15)] == pytest.approx(1000.0)
+    assert bank_by_date[date(2026, 4, 15)] == pytest.approx(1000.0)
+    assert r.peak_bank == pytest.approx(1000.0)
+
+
+def test_running_yield_grows_monotonically_for_pure_winners():
+    # Two non-overlapping +20% trades. Running yield = (equity - bank) / bank should
+    # start near 0% (lot 1 just bought, flat MTM), step UP at each SELL, and finish
+    # at the bar/last-point yield.
+    lots = [
+        _lot("AAA", "2026-01-01", "2026-02-01", 100.0, 120.0),
+        _lot("BBB", "2026-03-01", "2026-04-01", 100.0, 120.0),
+    ]
+    r = simulate_bank_hand(
+        lots,
+        price_at=lambda t, d: 100.0,  # flat → MTM = INVEST = $1000 per open lot
+        eval_dates=[
+            date(2026, 1, 15),  # lot 1 open at flat
+            date(2026, 2, 15),  # lot 1 closed, hand=$1200, bank=$1000 → +20%
+            date(2026, 4, 15),  # both closed, hand=$1400, bank=$1000 → +40%
+        ],
+    )
+    yields = {d: ((eq / bd) - 1) if bd > 0 else None
+              for d, eq, bd in r.equity_curve}
+    assert yields[date(2026, 1, 15)] == pytest.approx(0.0)    # flat MTM
+    assert yields[date(2026, 2, 15)] == pytest.approx(0.20)   # +20%
+    assert yields[date(2026, 4, 15)] == pytest.approx(0.40)   # +40%

@@ -2334,18 +2334,25 @@ def portfolio_performance(
 
     # Vesign line: bank/hand compounding simulation.
     # Universe = lots whose parent trade's sell_date is inside the chart window
-    # (same filter as the Historical Trades card). Equity at each week =
-    # hand + MTM of currently-open lots.
+    # (same filter as the Historical Trades card). At each week the yield is
+    # the running yield: (equity / bank_drawn_so_far) − 1. The denominator must
+    # be the cumulative draw up to that week — using the global peak would make
+    # early-window weeks look wildly negative because future draws haven't
+    # happened yet. At the last week bank_drawn_so_far == peak_bank, so the
+    # final point matches the comparison-bar value by construction.
     window_lots = [lot for lot in cache["lots"]
                    if weeks[0] <= lot.sell_date <= weeks[-1]]
     sim = simulate_bank_hand(window_lots, cache["price_at"], weeks)
-    equity_by_week = {d: v for d, v in sim.equity_curve}
+    points_by_week = {d: (eq, bd) for d, eq, bd in sim.equity_curve}
 
     def vesign_yield_at(target):
-        eq = equity_by_week.get(target)
-        if eq is None or sim.peak_bank <= 0:
+        pt = points_by_week.get(target)
+        if pt is None:
             return None
-        return (eq / sim.peak_bank) - 1
+        eq, bd = pt
+        if bd <= 0:
+            return None
+        return (eq / bd) - 1
 
     result = []
     for week_date in weeks:

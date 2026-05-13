@@ -38,7 +38,9 @@ class Lot(NamedTuple):
 class SimResult(NamedTuple):
     peak_bank:      float
     final_hand:     float
-    equity_curve:   list[tuple[date, float]]
+    # (date, equity, bank_drawn_at_that_date) — bank_drawn is the running cumulative
+    # draw at the snapshot moment, so callers can compute a "running yield" curve.
+    equity_curve:   list[tuple[date, float, float]]
     max_concurrent: int
 
 
@@ -50,14 +52,16 @@ def simulate_bank_hand(
     """Replay BUY/SELL events for every lot. $1000 per BUY signal.
     Same-day SELL processed before BUY so closed proceeds are reusable
     immediately. Equity at each eval_date = hand + MTM of open lots
-    valued via `price_at(ticker, date)`.
+    valued via `price_at(ticker, date)`. Each snapshot also captures the
+    running cumulative bank drawn so far, so callers can compute a
+    per-date "running yield" as (equity / bank_drawn) − 1.
 
     Lots with sell_date=None are treated as still-open: their BUY event
     is processed, but no SELL event ever fires. They contribute MTM to
     every eval_date >= their buy_date.
     """
     if not lots:
-        return SimResult(0.0, 0.0, [(d, 0.0) for d in sorted(eval_dates)], 0)
+        return SimResult(0.0, 0.0, [(d, 0.0, 0.0) for d in sorted(eval_dates)], 0)
 
     # Build event list. Each event: (date, order, kind, lot_index)
     # order: 0 = SELL (process first), 1 = BUY
@@ -73,7 +77,7 @@ def simulate_bank_hand(
     hand       = 0.0
     open_set: set[int] = set()
     max_open   = 0
-    eq_curve: list[tuple[date, float]] = []
+    eq_curve: list[tuple[date, float, float]] = []
     ev_idx = 0
 
     def equity_on(d: date) -> float:
@@ -88,9 +92,9 @@ def simulate_bank_hand(
         return hand + mtm
 
     for ev_date, _order, kind, idx in events:
-        # Snapshot equity at any eval_dates strictly before this event date
+        # Snapshot equity + bank_drawn at any eval_dates strictly before this event.
         while ev_idx < len(sorted_evals) and sorted_evals[ev_idx] < ev_date:
-            eq_curve.append((sorted_evals[ev_idx], equity_on(sorted_evals[ev_idx])))
+            eq_curve.append((sorted_evals[ev_idx], equity_on(sorted_evals[ev_idx]), bank_drawn))
             ev_idx += 1
         lot = lots[idx]
         if kind == "BUY":
@@ -108,9 +112,9 @@ def simulate_bank_hand(
             hand += INVEST * (1.0 + lot_yield)
             open_set.discard(idx)
 
-    # Remaining eval_dates after last event
+    # Remaining eval_dates after last event — bank_drawn at this point == peak_bank.
     while ev_idx < len(sorted_evals):
-        eq_curve.append((sorted_evals[ev_idx], equity_on(sorted_evals[ev_idx])))
+        eq_curve.append((sorted_evals[ev_idx], equity_on(sorted_evals[ev_idx]), bank_drawn))
         ev_idx += 1
 
     return SimResult(bank_drawn, hand, eq_curve, max_open)
