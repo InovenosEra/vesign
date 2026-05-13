@@ -89,7 +89,7 @@ Pre-deploy checks on the production server:
 
 1. Copy `analysis/sim_compounded_yield.py` to `/opt/vesign/analysis/`, run it, record baseline numbers.
 2. Run the endpoints after the change; numbers must match the simulator within rounding tolerance.
-3. Spot-check **FDS** modal: `avg_cost = $251.38`, `yield = −7.40%`.
+3. Spot-check **FDS** modal: `avg_cost = $251.33`, `yield = −7.40%`.
 4. Spot-check **1Y Vesign bar** on `ve-sign.com/portfolio` (signed in): must equal the simulator's bank/hand 1Y value.
 5. Spot-check **1Y "Avg Yield" chip** on TradesPage: should now read the corrected per-trade simple mean (≈ +27% — lower than today's +30.37% because per-lot DCA losers now properly weighted).
 
@@ -129,7 +129,7 @@ Revert the commit, restart uvicorn. No DB schema changes, no migrations — roll
 | $ Profit | +$112,357 (site) | +$123,809 (corrected per-lot weighting) |
 | Yield % (TradesPage chip) | +30.37% | +27.03% (simple-mean of new per-trade yields) |
 | Yield % (Vesign bar/line endpoint) | +30.37% (same calc today) | +34.68% (bank/hand compounded) |
-| FDS modal avg_cost | $261.43 | $251.38 |
+| FDS modal avg_cost | $261.43 | $251.33 |
 | FDS modal yield | −10.98% | −7.40% |
 
 The 1Y chip and the Vesign bar **diverge after this change** — they're answering different questions: chip = average per-trade outcome; bar/line = compounded capital return. That's intentional and consistent.
