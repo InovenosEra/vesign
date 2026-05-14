@@ -1886,7 +1886,7 @@ def _build_open_trades(mkt: str, include_lots: bool = False) -> list[dict]:
             JOIN (SELECT ticker, MAX(date) AS md FROM daily_prices WHERE ticker IN ({ph}) GROUP BY ticker) lp
                 ON dp.ticker = lp.ticker AND dp.date = lp.md
             LEFT JOIN extended_hours_prices eh
-                ON eh.ticker = dp.ticker AND eh.date = dp.date
+                ON eh.ticker = dp.ticker AND eh.date = DATE(dp.date)
         """), tp).fetchall()}
 
         # Step 5: company info + health + market cap (IN query, small result).
