@@ -70,6 +70,28 @@ def live_prices(tickers: list) -> dict:
     return prices
 
 
+def aftermarket_trades(tickers: list) -> dict:
+    """Latest extended-hours trade price for each ticker (pre OR post — FMP
+    returns whichever is most recent). Tickers with no extended-hours
+    activity return None."""
+    if not tickers:
+        return {}
+
+    def _trade(t):
+        data = _get("aftermarket-trade", {"symbol": t})
+        if data and isinstance(data, list) and data:
+            return t, data[0].get("price")
+        return t, None
+
+    out = {}
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(_trade, t): t for t in tickers}
+        for f in as_completed(futures):
+            t, price = f.result()
+            out[t] = price
+    return out
+
+
 def company_profile(ticker: str) -> "dict | None":
     """Company profile: companyName, sector, industry, description, image, mktCap."""
     data = _get("profile", {"symbol": ticker})
