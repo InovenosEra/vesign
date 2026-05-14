@@ -323,7 +323,11 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect, dcaV
               {th(dcaView ? 'Avg Cost'  : t('col.buyPrice'), dcaView ? 'avg_cost' : 'buy_price')}
               {th(t('col.lastDayPrice'), 'current_price', 'col-hide-sm')}
               {th(t('col.daysHeld'),     'days_held')}
-              <th>{t('col.livePrice')}</th>
+              <th>{
+                phase === 'pre'  ? t('col.preMarket')  :
+                phase === 'post' ? t('col.postMarket') :
+                                   t('col.livePrice')
+              }</th>
               <th>{t('col.yield')}</th>
             </tr>
           </thead>
@@ -366,7 +370,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect, dcaV
                     <td>
                       {phase === null
                         ? <span style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</span>
-                        : !isOpen
+                        : phase === 'idle'
                           ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</span>
                           : displayLive == null
                             ? <span style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</span>
