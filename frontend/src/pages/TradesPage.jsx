@@ -453,21 +453,7 @@ export default function TradesPage() {
     staleTime: 300_000,
   })
 
-  // Prefetch all period chips on mount so switching is instant
-  const qc = useQueryClient()
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    const opts = { staleTime: 300_000 }
-    for (const months of [3, 6, 12, 24, 36, 60]) {
-      const d = new Date(); d.setMonth(d.getMonth() - months)
-      const s = d.toISOString().slice(0, 10)
-      qc.prefetchQuery({
-        queryKey: ['trades', s, today, market, dcaActive],
-        queryFn: () => getTrades({ start: s, end: today, market, includeLots: dcaActive }),
-        ...opts,
-      })
-    }
-  }, [market, qc, dcaActive])
+  // Only the active period loads; other chips lazy-fetch on click.
 
   const { data: openTrades = [], isLoading: loadingOpen, isError: errorOpen, error: openError } = useQuery({
     queryKey: ['trades-open', market, dcaActive],
