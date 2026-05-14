@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useRef } from 'react'
+import { useState, useEffect, useContext, useRef, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
 import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
@@ -9,19 +9,28 @@ import i18n from './i18n'
 import { setTokenGetter, getMarketStatus, getSignalsToday, getTrades, getOpenTrades, getWatchlists, getPortfolioHoldings, getPortfolioPerformance, getPortfolioComparison, getDataStatus } from './api'
 import { MarketContext, MarketProvider } from './context/MarketContext'
 import { CurrencyProvider, useCurrency } from './context/CurrencyContext'
-import SignalsPage from './pages/SignalsPage'
-import WatchlistPage from './pages/WatchlistPage'
-import TradesPage from './pages/TradesPage'
-import ResearchPage from './pages/ResearchPage'
 import GlobalSearch from './components/GlobalSearch'
 import ProfilePictureModal from './components/ProfilePictureModal'
-import LoginPage from './pages/LoginPage'
-import CompleteProfilePage from './pages/CompleteProfilePage'
-import AboutPage from './pages/AboutPage'
-import ContactPage from './pages/ContactPage'
 import './App.css'
 
+const SignalsPage = lazy(() => import('./pages/SignalsPage'))
+const WatchlistPage = lazy(() => import('./pages/WatchlistPage'))
+const TradesPage = lazy(() => import('./pages/TradesPage'))
+const ResearchPage = lazy(() => import('./pages/ResearchPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const CompleteProfilePage = lazy(() => import('./pages/CompleteProfilePage'))
+const AboutPage = lazy(() => import('./pages/AboutPage'))
+const ContactPage = lazy(() => import('./pages/ContactPage'))
+
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+function PageFallback() {
+  return (
+    <div style={{ padding: '4rem 2rem', color: 'var(--muted)' }}>
+      Loading…
+    </div>
+  )
+}
 
 // gcTime must be ≥ persistOptions.maxAge so persisted entries aren't dropped
 // from memory before they can be restored on the next page load.
@@ -643,15 +652,17 @@ function AppLayout() {
           {tokenReady && (
             <>
               <main className="app-main">
-                <Routes>
-                  <Route path="/" element={<SignalsPage />} />
-                  <Route path="/portfolio" element={<WatchlistPage />} />
-                  <Route path="/trades" element={<TradesPage />} />
-                  <Route path="/research" element={<ResearchPage />} />
-                  <Route path="/research/:ticker" element={<ResearchPage />} />
-                  <Route path="/about" element={<AboutPage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                </Routes>
+                <Suspense fallback={<PageFallback />}>
+                  <Routes>
+                    <Route path="/" element={<SignalsPage />} />
+                    <Route path="/portfolio" element={<WatchlistPage />} />
+                    <Route path="/trades" element={<TradesPage />} />
+                    <Route path="/research" element={<ResearchPage />} />
+                    <Route path="/research/:ticker" element={<ResearchPage />} />
+                    <Route path="/about" element={<AboutPage />} />
+                    <Route path="/contact" element={<ContactPage />} />
+                  </Routes>
+                </Suspense>
               </main>
               <Footer />
             </>
@@ -725,10 +736,12 @@ export default function App() {
     <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/sign-in">
       <BrowserRouter>
         <ScrollToTop />
-        <Routes>
-          <Route path="/sign-in" element={<LoginPage />} />
-          <Route path="/*" element={<AppLayout />} />
-        </Routes>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/sign-in" element={<LoginPage />} />
+            <Route path="/*" element={<AppLayout />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </ClerkProvider>
   )
