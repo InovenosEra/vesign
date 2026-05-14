@@ -687,6 +687,7 @@ _MARKET_CAP_JOIN = """
             ON p1.ticker = p2.ticker AND p1.date = p2.max_date
     ) lp ON s.ticker = lp.ticker
     LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
+    LEFT JOIN extended_hours_prices eh ON eh.ticker = s.ticker AND eh.date = DATE(s.date)
 """
 
 _ANALYST_UPSIDE_SQL = """CASE WHEN COALESCE(ae.target_mean_price, s.target_mean_price) IS NOT NULL AND lp.latest_close IS NOT NULL AND lp.latest_close > 0
@@ -699,7 +700,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
     mkt = (market or "US").upper()
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, COALESCE(lp.latest_close, s.close) AS close, s.rsi,
+            SELECT s.date, s.ticker, COALESCE(eh.extended_close, lp.latest_close, s.close) AS close, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
@@ -795,7 +796,7 @@ def signals(
         total = count_row[0] if count_row else 0
 
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, s.close, s.rsi,
+            SELECT s.date, s.ticker, COALESCE(eh.extended_close, s.close) AS close, s.rsi,
                    s.fair_value_upside,
                    s.target_mean_price, s.target_low_price, s.target_high_price,
                    s.prediction_score,
@@ -812,7 +813,7 @@ def signals(
                         ORDER BY recorded_at DESC LIMIT 1),
                        h.reason
                    ) AS health_reason,
-                   (s.close * (
+                   (COALESCE(eh.extended_close, s.close) * (
                        SELECT shares_outstanding FROM market_cap_history
                        WHERE ticker = s.ticker AND date <= DATE(s.date)
                        ORDER BY date DESC LIMIT 1
@@ -821,6 +822,7 @@ def signals(
             LEFT JOIN companies c ON s.ticker = c.ticker
             LEFT JOIN company_health h ON s.ticker = h.ticker
             LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
+            LEFT JOIN extended_hours_prices eh ON eh.ticker = s.ticker AND eh.date = DATE(s.date)
             {where}
             ORDER BY {sort_col} {direction}
             LIMIT :limit OFFSET :offset
@@ -955,7 +957,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
         df = pd.read_sql(text(f"""
             SELECT s.ticker, c.company, c.logo_url, c.industry,
                    c.description, c.description_short,
-                   COALESCE(lp.latest_close, s.close) AS close, s.signal, s.vqs, s.rsi,
+                   COALESCE(eh.extended_close, lp.latest_close, s.close) AS close, s.signal, s.vqs, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
