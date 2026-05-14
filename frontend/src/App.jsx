@@ -323,7 +323,7 @@ function MarketStatus() {
   const countdown = useCountdown(data?.next_event_utc)
 
   if (!data) return null
-  return data.is_open
+  return data.phase != null && data.phase !== 'idle'
     ? (
       <span className="market-open" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
         <span><span className="dot-blink">●</span> {t('market.open')}</span>
