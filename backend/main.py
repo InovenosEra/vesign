@@ -340,6 +340,76 @@ def market_is_open() -> bool:
     return _market_info(_nyse_cal)["is_open"]
 
 
+from datetime import timedelta as _td
+
+_PRE_OFFSET  = _td(hours=-5, minutes=-30)  # pre_open  = regular_open  - 5.5h
+_POST_OFFSET = _td(hours=4)                # post_close = regular_close + 4h
+
+
+def _session_boundaries(session_date):
+    """Returns (pre_open, regular_open, regular_close, post_close) as tz-aware UTC datetimes
+    for a given NYSE session date. Returns None for non-session days."""
+    xcal = _nyse_cal._xcal
+    try:
+        if not xcal.is_session(session_date):
+            return None
+    except Exception:
+        return None
+    regular_open  = xcal.session_open(session_date).to_pydatetime()
+    regular_close = xcal.session_close(session_date).to_pydatetime()
+    return (
+        regular_open + _PRE_OFFSET,
+        regular_open,
+        regular_close,
+        regular_close + _POST_OFFSET,
+    )
+
+
+def _phase_info(now_utc=None) -> dict:
+    """Returns {phase, next_event_utc, next_event_name} for NYSE.
+    phase in {'idle','pre','regular','post'}.
+    next_event_name in {'pre_open','regular_open','regular_close','post_close'}.
+    `now_utc` defaults to current UTC time; pass explicit value for testing."""
+    if now_utc is None:
+        now_utc = datetime.now(UTC)
+    today = now_utc.date()
+
+    bounds = _session_boundaries(pd.Timestamp(today))
+    if bounds is not None:
+        pre_open, reg_open, reg_close, post_close = bounds
+        if now_utc < pre_open:
+            return _idle_until_today_pre(pre_open, today)
+        if pre_open <= now_utc < reg_open:
+            return {"phase": "pre", "next_event_name": "regular_open",
+                    "next_event_utc": reg_open.isoformat()}
+        if reg_open <= now_utc < reg_close:
+            return {"phase": "regular", "next_event_name": "regular_close",
+                    "next_event_utc": reg_close.isoformat()}
+        if reg_close <= now_utc < post_close:
+            return {"phase": "post", "next_event_name": "post_close",
+                    "next_event_utc": post_close.isoformat()}
+        # past today's post_close: idle until next session's pre_open
+        return _idle_until_next_pre(today)
+
+    # Not a session day (weekend / holiday): idle until next pre_open
+    return _idle_until_next_pre(today)
+
+
+def _idle_until_today_pre(pre_open, today):
+    return {"phase": "idle", "next_event_name": "pre_open",
+            "next_event_utc": pre_open.isoformat()}
+
+
+def _idle_until_next_pre(today):
+    for delta in range(1, 11):
+        cand = today + _td(days=delta)
+        bounds = _session_boundaries(pd.Timestamp(cand))
+        if bounds is not None:
+            return {"phase": "idle", "next_event_name": "pre_open",
+                    "next_event_utc": bounds[0].isoformat()}
+    return {"phase": "idle", "next_event_name": "pre_open", "next_event_utc": None}
+
+
 def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Series:
     """Extract a Close price Series from a yf.download result, handling MultiIndex columns."""
     if raw.empty:
