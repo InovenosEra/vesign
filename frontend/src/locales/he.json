@@ -41,6 +41,8 @@
   "col.analystTarget": "יעד אנליסטים",
   "col.mlScore": "ציון ML",
   "col.livePrice": "מחיר חי",
+  "col.preMarket": "טרום-מסחר",
+  "col.postMarket": "אחר-מסחר",
   "col.signal": "איתות",
   "col.date": "תאריך",
   "col.upside": "פוטנציאל עלייה",

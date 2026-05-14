@@ -41,6 +41,8 @@
   "col.analystTarget": "Analystenziel",
   "col.mlScore": "ML-Score",
   "col.livePrice": "Live-Kurs",
+  "col.preMarket": "Vormarkt",
+  "col.postMarket": "Nachmarkt",
   "col.signal": "Signal",
   "col.date": "Datum",
   "col.upside": "Kurspotenzial",

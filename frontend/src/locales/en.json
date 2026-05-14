@@ -46,6 +46,8 @@
   "col.analystTarget": "Analyst Target",
   "col.mlScore": "ML Score",
   "col.livePrice": "Live Price",
+  "col.preMarket": "Pre-Market",
+  "col.postMarket": "Post-Market",
   "col.signal": "Signal",
   "col.date": "Date",
   "col.upside": "Upside",
