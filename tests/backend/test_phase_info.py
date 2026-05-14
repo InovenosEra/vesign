@@ -54,3 +54,31 @@ def test_boundary_exactly_at_pre_open():
 def test_boundary_exactly_at_regular_open():
     out = _pi(datetime(2026, 5, 14, 13, 30, tzinfo=timezone.utc))
     assert out["phase"] == "regular"
+
+
+def test_market_status_endpoint_returns_phase(monkeypatch):
+    """Integration test: /api/market/status should return phase + next_event_name."""
+    from fastapi.testclient import TestClient
+    from backend import main as backend_main
+
+    # Bypass auth for this test
+    backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+
+    # Force _phase_info to return a known shape regardless of real wall clock
+    monkeypatch.setattr(backend_main, "_phase_info",
+        lambda now_utc=None: {
+            "phase": "regular",
+            "next_event_name": "regular_close",
+            "next_event_utc": "2026-05-14T20:00:00+00:00",
+        })
+
+    client = TestClient(backend_main.app)
+    r = client.get("/api/market/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["phase"] == "regular"
+    assert body["next_event_name"] == "regular_close"
+    assert body["next_event_utc"] == "2026-05-14T20:00:00+00:00"
+
+    # Cleanup auth override
+    backend_main.app.dependency_overrides.clear()

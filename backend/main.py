@@ -597,7 +597,7 @@ def health():
 
 @protected.get("/api/market/status")
 def market_status(market: Optional[str] = None):
-    return _market_info(_nyse_cal)
+    return _phase_info()
 
 
 _fx_cache = {"rates": None, "fetched_at": 0}
