@@ -1,4 +1,5 @@
 import base64
+import bisect
 import math
 import os
 import threading
@@ -1431,15 +1432,12 @@ def delete_holding(list_id: int, holding_id: int, user=Depends(get_current_user)
 
 # --- Historical trades ------------------------------------------------------
 
-@protected.get("/api/trades")
-def historical_trades(
-    start: Optional[str] = None,
-    end: Optional[str] = None,
-    market: Optional[str] = None,
-    include_lots: Optional[int] = 0,
-):
+_historical_trades_cache: dict[str, dict] = {}
+_historical_trades_cache_lock = threading.Lock()
+
+
+def _build_historical_trades(mkt: str, start, end, include_lots: bool) -> list:
     """BUY→SELL trade pairs from pre-built trade_log table."""
-    mkt = (market or "US").upper()
     conditions = [
         "COALESCE(c.market, 'US') = :market",
         "c.ticker NOT IN ('SPY', 'VOO')",
@@ -1457,21 +1455,13 @@ def historical_trades(
     def _v(v):
         return None if (isinstance(v, float) and math.isnan(v)) else v
 
+    # Run all 3 read-only queries on one connection to avoid NullPool overhead
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
             SELECT tl.ticker, tl.buy_date, tl.buy_price, tl.sell_date, tl.sell_price, tl.return_pct,
                    c.company, c.logo_url, c.industry, c.description, c.description_short,
-                   (tl.buy_price * (
-                       SELECT shares_outstanding FROM market_cap_history
-                       WHERE ticker = tl.ticker AND date <= DATE(tl.buy_date)
-                       ORDER BY date DESC LIMIT 1
-                   )) AS market_cap,
-                   CAST(COALESCE(
-                       (SELECT score FROM company_health_history
-                        WHERE ticker = tl.ticker AND DATE(recorded_at) <= DATE(tl.buy_date)
-                        ORDER BY recorded_at DESC LIMIT 1),
-                       sb.health_score, h.score
-                   ) AS INTEGER) AS health_score, h.reason AS health_reason
+                   h.score AS health_fallback, h.reason AS health_reason,
+                   sb.health_score AS health_signal
             FROM trade_log tl
             LEFT JOIN companies c ON tl.ticker = c.ticker
             LEFT JOIN company_health h ON tl.ticker = h.ticker
@@ -1480,25 +1470,82 @@ def historical_trades(
             ORDER BY tl.ticker, tl.buy_date
         """), conn, params=params)
 
+        # --- Bulk as-of lookups to replace N+1 correlated subqueries ---------
+        tickers_in_result = df["ticker"].unique().tolist()
+        if tickers_in_result:
+            ph = ",".join([f":t{i}" for i in range(len(tickers_in_result))])
+            tp = {f"t{i}": t for i, t in enumerate(tickers_in_result)}
+
+            mcap_rows = conn.execute(text(f"""
+                SELECT ticker, date, shares_outstanding
+                FROM market_cap_history
+                WHERE ticker IN ({ph}) AND shares_outstanding IS NOT NULL
+                ORDER BY ticker, date
+            """), tp).fetchall()
+
+            health_rows = conn.execute(text(f"""
+                SELECT ticker, recorded_at, score
+                FROM company_health_history
+                WHERE ticker IN ({ph}) AND score IS NOT NULL
+                ORDER BY ticker, recorded_at
+            """), tp).fetchall()
+        else:
+            mcap_rows = []
+            health_rows = []
+
+    # Build per-ticker sorted (date_str, value) pairs for bisect lookups
+    mcap_idx: dict[str, tuple] = {}
+    for ticker, d, so in mcap_rows:
+        entry = mcap_idx.setdefault(ticker, ([], []))
+        entry[0].append(str(d)[:10])
+        entry[1].append(so)
+
+    health_idx: dict[str, tuple] = {}
+    for ticker, ra, score in health_rows:
+        entry = health_idx.setdefault(ticker, ([], []))
+        entry[0].append(str(ra)[:10])
+        entry[1].append(score)
+
+    def _as_of(idx, ticker, buy_date_str):
+        """Latest value at or before buy_date_str. Returns None if no history."""
+        entry = idx.get(ticker)
+        if not entry:
+            return None
+        dates, vals = entry
+        pos = bisect.bisect_right(dates, buy_date_str)
+        return vals[pos - 1] if pos > 0 else None
+
+    # -------------------------------------------------------------------------
+
     def _num(v, decimals=2):
         """Return rounded float or None for NaN/None values."""
         if v is None or (isinstance(v, float) and math.isnan(v)):
             return None
         return round(float(v), decimals)
 
+    # Pre-compute date strings and days_held vectorised (avoids slow per-row pd.to_datetime)
+    df["buy_date_s"]  = df["buy_date"].astype(str).str[:10]
+    df["sell_date_s"] = df["sell_date"].apply(
+        lambda v: str(v)[:10] if v is not None and not (isinstance(v, float) and math.isnan(v)) else None
+    )
+    # days_held: vectorised date subtraction — far faster than row-by-row pd.to_datetime
+    _buy_dt  = pd.to_datetime(df["buy_date_s"],  errors="coerce")
+    _sell_dt = pd.to_datetime(df["sell_date_s"], errors="coerce")
+    df["days_held_v"] = (_sell_dt - _buy_dt).dt.days.where(_sell_dt.notna()).astype(object)
+    df.loc[df["days_held_v"].isna(), "days_held_v"] = None
+
     # Group by ticker
     ticker_trades: dict = {}
     for ticker, grp in df.groupby("ticker"):
         pairs = []
-        for _, row in grp.iterrows():
-            raw_ret    = row["return_pct"]
+        for row in grp.itertuples(index=False):
+            raw_ret    = row.return_pct
             ret        = _num(raw_ret * 100) if raw_ret is not None and not (isinstance(raw_ret, float) and math.isnan(raw_ret)) else None
-            buy_price  = _num(row["buy_price"])
-            sell_price = _num(row["sell_price"])
-            buy_date   = str(row["buy_date"])[:10]
-            sell_date  = str(row["sell_date"])[:10] if _v(row["sell_date"]) is not None else None
-            days_held  = int((pd.to_datetime(row["sell_date"]) - pd.to_datetime(row["buy_date"])).days) \
-                         if sell_date is not None else None
+            buy_price  = _num(row.buy_price)
+            sell_price = _num(row.sell_price)
+            buy_date   = row.buy_date_s
+            sell_date  = row.sell_date_s
+            days_held  = int(row.days_held_v) if row.days_held_v is not None else None
             pairs.append({
                 "buy_date":   buy_date,
                 "sell_date":  sell_date,
@@ -1512,8 +1559,27 @@ def historical_trades(
         closed_pairs = [p for p in pairs if p["result"] != "Open"]
         if not closed_pairs:
             continue
-        mc    = grp.iloc[0].get("market_cap")
-        score = grp.iloc[0].get("health_score")
+
+        # --- as-of market_cap and health_score using bisect ------------------
+        # Use the most recent trade's buy_date as the representative as-of date
+        # (same behaviour as the old grp.iloc[0] which took the first row)
+        first_buy_date_iso = grp.iloc[0]["buy_date_s"]
+        shares = _as_of(mcap_idx, ticker, first_buy_date_iso)
+        first_buy_price = grp.iloc[0]["buy_price"]
+        mc = (float(first_buy_price) * shares) if (shares is not None and first_buy_price is not None) else None
+
+        hs_hist = _as_of(health_idx, ticker, first_buy_date_iso)
+        signal_health = grp.iloc[0].get("health_signal")
+        fallback_health = grp.iloc[0].get("health_fallback")
+        if hs_hist is not None:
+            score = hs_hist
+        elif signal_health is not None and not (isinstance(signal_health, float) and math.isnan(signal_health)):
+            score = int(signal_health)
+        elif fallback_health is not None and not (isinstance(fallback_health, float) and math.isnan(fallback_health)):
+            score = int(fallback_health)
+        else:
+            score = None
+        # ---------------------------------------------------------------------
         wins  = sum(1 for p in closed_pairs if p["result"] == "Win")
         avg_ret  = sum(p["return_pct"] for p in closed_pairs if p["return_pct"] is not None) / len(closed_pairs)
         days_list = [p["days_held"] for p in closed_pairs if p["days_held"] is not None]
@@ -1541,87 +1607,108 @@ def historical_trades(
             "trades":            pairs,
         }
 
-    # Enrich with organic_yield over date range
-    if ticker_trades and start and end:
-        tickers = list(ticker_trades.keys())
-        placeholders = ", ".join([f":t{i}" for i in range(len(tickers))])
-        p = {f"t{i}": t for i, t in enumerate(tickers)}
-        p["start"] = start
-        p["end"]   = end
-        with engine.connect() as conn:
-            df_org = pd.read_sql(text(f"""
-                WITH bounds AS (
-                    SELECT ticker,
-                           MAX(CASE WHEN date(date) <= :start THEN date(date) END) AS fd,
-                           MAX(CASE WHEN date(date) <= :end   THEN date(date) END) AS ld
-                    FROM daily_prices
-                    WHERE date(date) >= date(:start, '-30 days')
-                      AND date(date) <= :end
-                      AND ticker IN ({placeholders})
-                    GROUP BY ticker
-                )
-                SELECT b.ticker, d1.close AS first_close, d2.close AS last_close
-                FROM bounds b
-                JOIN daily_prices d1 ON d1.ticker = b.ticker AND date(d1.date) = b.fd
-                JOIN daily_prices d2 ON d2.ticker = b.ticker AND date(d2.date) = b.ld
-            """), conn, params=p)
-        for _, org_row in df_org.iterrows():
-            t = org_row["ticker"]
-            fc, lc = org_row["first_close"], org_row["last_close"]
-            if t in ticker_trades and fc and float(fc) > 0:
-                ticker_trades[t]["organic_yield"] = round(float((lc - fc) / fc * 100), 2)
-
-    # Enrich with current signal
+    # Enrichment queries — all in one connection to avoid NullPool overhead
     if ticker_trades:
         tickers_list = list(ticker_trades.keys())
-        ph = ", ".join([f":h{i}" for i in range(len(tickers_list))])
-        hp = {f"h{i}": t for i, t in enumerate(tickers_list)}
-        with engine.connect() as conn:
+        with engine.connect() as conn_enrich:
+            # Organic yield (only when date range given)
+            if start and end:
+                placeholders = ", ".join([f":t{i}" for i in range(len(tickers_list))])
+                p_org = {f"t{i}": t for i, t in enumerate(tickers_list)}
+                p_org["start"] = start
+                p_org["end"]   = end
+                df_org = pd.read_sql(text(f"""
+                    WITH bounds AS (
+                        SELECT ticker,
+                               MAX(CASE WHEN date(date) <= :start THEN date(date) END) AS fd,
+                               MAX(CASE WHEN date(date) <= :end   THEN date(date) END) AS ld
+                        FROM daily_prices
+                        WHERE date(date) >= date(:start, '-30 days')
+                          AND date(date) <= :end
+                          AND ticker IN ({placeholders})
+                        GROUP BY ticker
+                    )
+                    SELECT b.ticker, d1.close AS first_close, d2.close AS last_close
+                    FROM bounds b
+                    JOIN daily_prices d1 ON d1.ticker = b.ticker AND date(d1.date) = b.fd
+                    JOIN daily_prices d2 ON d2.ticker = b.ticker AND date(d2.date) = b.ld
+                """), conn_enrich, params=p_org)
+                for _, org_row in df_org.iterrows():
+                    t = org_row["ticker"]
+                    fc, lc = org_row["first_close"], org_row["last_close"]
+                    if t in ticker_trades and fc and float(fc) > 0:
+                        ticker_trades[t]["organic_yield"] = round(float((lc - fc) / fc * 100), 2)
+
+            # Current signal
+            ph = ", ".join([f":h{i}" for i in range(len(tickers_list))])
+            hp = {f"h{i}": t for i, t in enumerate(tickers_list)}
             df_curr = pd.read_sql(text(f"""
                 SELECT s.ticker, s.signal AS current_signal
                 FROM signals s
                 JOIN (SELECT ticker, MAX(date) AS md FROM signals
                       WHERE ticker IN ({ph}) GROUP BY ticker) l
                   ON s.ticker = l.ticker AND s.date = l.md
-            """), conn, params=hp)
-        for _, sr in df_curr.iterrows():
-            t = sr["ticker"]
-            if t in ticker_trades:
-                ticker_trades[t]["current_signal"] = sr["current_signal"]
+            """), conn_enrich, params=hp)
+            for _, sr in df_curr.iterrows():
+                t = sr["ticker"]
+                if t in ticker_trades:
+                    ticker_trades[t]["current_signal"] = sr["current_signal"]
 
-    # DCA lots (Stage 1 / 2 — only when include_lots=1; default OFF preserves byte-for-byte response).
-    if include_lots and ticker_trades:
-        tickers_list = list(ticker_trades.keys())
-        ph = ", ".join([f":l{i}" for i in range(len(tickers_list))])
-        lp = {f"l{i}": t for i, t in enumerate(tickers_list)}
-        with engine.connect() as conn:
-            lots_df = pd.read_sql(text(f"""
-                SELECT ticker, buy_date, sell_date, lot_seq, lot_date, lot_price
-                FROM trade_lots
-                WHERE ticker IN ({ph})
-                ORDER BY ticker, buy_date, sell_date, lot_seq
-            """), conn, params=lp)
-        lots_by_key: dict = {}
-        for _, lr in lots_df.iterrows():
-            key = (lr["ticker"], str(lr["buy_date"])[:10], str(lr["sell_date"])[:10])
-            lots_by_key.setdefault(key, []).append({
-                "seq":   int(lr["lot_seq"]),
-                "date":  str(lr["lot_date"])[:10],
-                "price": round(float(lr["lot_price"]), 4),
-            })
-        for tk_data in ticker_trades.values():
-            for pair in tk_data["trades"]:
-                if pair["result"] == "Open" or not pair["buy_date"] or not pair["sell_date"]:
-                    continue
-                lots = lots_by_key.get(
-                    (tk_data["ticker"], pair["buy_date"], pair["sell_date"]), []
-                )
-                if lots:
-                    pair["lots"]     = lots
-                    pair["n_lots"]   = len(lots)
-                    pair["avg_cost"] = round(avg_cost_dollar_weighted(l["price"] for l in lots), 4)
+            # DCA lots (only when include_lots=1)
+            if include_lots:
+                ph_l = ", ".join([f":l{i}" for i in range(len(tickers_list))])
+                lp = {f"l{i}": t for i, t in enumerate(tickers_list)}
+                lots_df = pd.read_sql(text(f"""
+                    SELECT ticker, buy_date, sell_date, lot_seq, lot_date, lot_price
+                    FROM trade_lots
+                    WHERE ticker IN ({ph_l})
+                    ORDER BY ticker, buy_date, sell_date, lot_seq
+                """), conn_enrich, params=lp)
+                lots_by_key: dict = {}
+                for _, lr in lots_df.iterrows():
+                    key = (lr["ticker"], str(lr["buy_date"])[:10], str(lr["sell_date"])[:10])
+                    lots_by_key.setdefault(key, []).append({
+                        "seq":   int(lr["lot_seq"]),
+                        "date":  str(lr["lot_date"])[:10],
+                        "price": round(float(lr["lot_price"]), 4),
+                    })
+                for tk_data in ticker_trades.values():
+                    for pair in tk_data["trades"]:
+                        if pair["result"] == "Open" or not pair["buy_date"] or not pair["sell_date"]:
+                            continue
+                        lots = lots_by_key.get(
+                            (tk_data["ticker"], pair["buy_date"], pair["sell_date"]), []
+                        )
+                        if lots:
+                            pair["lots"]     = lots
+                            pair["n_lots"]   = len(lots)
+                            pair["avg_cost"] = round(avg_cost_dollar_weighted(l["price"] for l in lots), 4)
 
     return list(ticker_trades.values())
+
+
+def _get_historical_trades_cached(mkt: str, start, end, include_lots: bool) -> list:
+    cache_key = f"{mkt}|{start or ''}|{end or ''}|{int(bool(include_lots))}"
+    today_iso = date.today().isoformat()
+    with _historical_trades_cache_lock:
+        c = _historical_trades_cache.get(cache_key)
+        if c is not None and c["built_on"] == today_iso:
+            return c["data"]
+        data = _build_historical_trades(mkt, start, end, include_lots)
+        _historical_trades_cache[cache_key] = {"built_on": today_iso, "data": data}
+        return data
+
+
+@protected.get("/api/trades")
+def historical_trades(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    market: Optional[str] = None,
+    include_lots: Optional[int] = 0,
+):
+    """BUY→SELL trade pairs from pre-built trade_log table."""
+    mkt = (market or "US").upper()
+    return _get_historical_trades_cached(mkt, start, end, bool(include_lots))
 
 
 @protected.get("/api/trades/export")
@@ -2875,6 +2962,21 @@ def _warm_open_trades_cache_bg():
         pass
 
 threading.Thread(target=_warm_open_trades_cache_bg, daemon=True).start()
+
+
+def _warm_historical_trades_cache_bg():
+    """Warm the default 1Y view that most users land on."""
+    try:
+        from datetime import timedelta
+        today = date.today()
+        start = (today - timedelta(days=365)).isoformat()
+        end = today.isoformat()
+        _get_historical_trades_cached("US", start, end, False)
+        _get_historical_trades_cached("US", None, None, False)  # also warm "all time"
+    except Exception:
+        pass
+
+threading.Thread(target=_warm_historical_trades_cache_bg, daemon=True).start()
 
 # ---------------------------------------------------------------------------
 # SPA static file serving (production)
