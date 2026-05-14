@@ -88,18 +88,18 @@ function MLScoreCell({ score, className }) {
   return <td className={`${cls} ${pct >= 0 ? 'up' : 'down'}`}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
 }
 
-function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
+function LivePriceCell({ ticker, closePrice, prices, phase }) {
   const { t } = useTranslation()
   const { fmtPrice } = useCurrency()
   const style = { whiteSpace: 'nowrap' }
   const scale = isILTicker(ticker) ? 100 : 1
   // While live prices are still loading on first paint, fall back to the
   // close price so the table is visually complete instead of showing "—".
-  if (marketOpen === null) {
+  if (phase === null) {
     const displayClose = closePrice != null ? closePrice / scale : null
     return <td style={{ ...style, color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</td>
   }
-  if (!marketOpen) return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</td>
+  if (phase === 'idle') return <td style={{ ...style, color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</td>
   const live = prices[ticker]
   if (live == null) {
     const displayClose = closePrice != null ? closePrice / scale : null
@@ -153,7 +153,7 @@ function Pagination({ page, pages, onChange }) {
 // Columns: logo, ticker, company, mktcap, price, rsi, low, base, high, health, analyst target, ml score, live
 const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '75px', '85px', '75px', '100px']
 
-function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
+function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
   const { t } = useTranslation()
   return (
     <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1024 }}>
@@ -209,7 +209,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
             <HealthCell score={r.health_score} />
             <UpsideCell targetMean={r.target_mean_price} close={r.close} />
             <MLScoreCell score={r.prediction_score} className="col-hide-sm" />
-            <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
+            <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} phase={phase} />
           </tr>
         ))}
       </tbody>
@@ -217,7 +217,7 @@ function TodayTableBody({ rows, prices, marketOpen, onRowClick, market }) {
   )
 }
 
-function TodayTable({ rows, prices, marketOpen, onRowClick, market }) {
+function TodayTable({ rows, prices, phase, onRowClick, market }) {
   const { t } = useTranslation()
   const { sorted } = useSort(rows, 'market_cap', 'desc')
 
@@ -225,12 +225,12 @@ function TodayTable({ rows, prices, marketOpen, onRowClick, market }) {
 
   return (
     <div className="data-table-wrap">
-      <TodayTableBody rows={sorted} prices={prices} marketOpen={marketOpen} onRowClick={onRowClick} market={market} />
+      <TodayTableBody rows={sorted} prices={prices} phase={phase} onRowClick={onRowClick} market={market} />
     </div>
   )
 }
 
-function TodaySellTable({ rows, prices, marketOpen, onRowClick, market }) {
+function TodaySellTable({ rows, prices, phase, onRowClick, market }) {
   const { t } = useTranslation()
   const { sorted } = useSort(rows, 'market_cap', 'desc')
   const [page, setPage]         = useState(1)
@@ -273,7 +273,7 @@ function TodaySellTable({ rows, prices, marketOpen, onRowClick, market }) {
         </span>
       </div>
       <div className="data-table-wrap">
-        <TodayTableBody rows={paginated} prices={prices} marketOpen={marketOpen} onRowClick={onRowClick} market={market} />
+        <TodayTableBody rows={paginated} prices={prices} phase={phase} onRowClick={onRowClick} market={market} />
       </div>
       <Pagination page={page} pages={pages} onChange={setPage} />
     </>
@@ -284,7 +284,7 @@ function TodaySellTable({ rows, prices, marketOpen, onRowClick, market }) {
 // All-signals table — server-side sort + pagination
 // ---------------------------------------------------------------------------
 
-function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowClick, prices, marketOpen, market }) {
+function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowClick, prices, phase, market }) {
   const { t } = useTranslation()
   if (!result) return null
   const { data: rows, pages } = result
@@ -335,7 +335,7 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
                 <HealthCell score={r.health_score} />
                 <UpsideCell targetMean={r.target_mean_price} close={r.close} />
                 <MLScoreCell score={r.prediction_score} className="col-hide-sm" />
-                <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} marketOpen={marketOpen} />
+                <LivePriceCell ticker={r.ticker} closePrice={r.close} prices={prices} phase={phase} />
               </tr>
             ))}
           </tbody>
@@ -492,7 +492,7 @@ export default function SignalsPage() {
     [...new Set((allResult?.data ?? []).map(r => r.ticker).filter(Boolean))]
   , [allResult])
 
-  const { prices: todayPrices, marketOpen } = useLivePrices(todayTickers)
+  const { prices: todayPrices, phase } = useLivePrices(todayTickers)
   const { prices: allPrices }               = useLivePrices(allResultTickers)
 
   // Merge: today's prices take precedence
@@ -506,7 +506,7 @@ export default function SignalsPage() {
         </p>
         {loadingBuy
           ? <p className="loading">{t('table.loading')}</p>
-          : <TodayTable rows={todayBuy} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} market={market} />}
+          : <TodayTable rows={todayBuy} prices={prices} phase={phase} onRowClick={setSelected} market={market} />}
       </div>
 
       <div className="section">
@@ -515,7 +515,7 @@ export default function SignalsPage() {
         </p>
         {loadingSell
           ? <p className="loading">{t('table.loading')}</p>
-          : <TodaySellTable rows={todaySell} prices={prices} marketOpen={marketOpen} onRowClick={setSelected} market={market} />}
+          : <TodaySellTable rows={todaySell} prices={prices} phase={phase} onRowClick={setSelected} market={market} />}
       </div>
 
       <div className="section">
@@ -576,7 +576,7 @@ export default function SignalsPage() {
               onPage={setPage}
               onRowClick={setSelected}
               prices={prices}
-              marketOpen={marketOpen}
+              phase={phase}
               market={market}
             />}
       </div>

@@ -99,15 +99,13 @@ function UpsideCell({ targetMean, close, prices, ticker }) {
   return <td className={pct >= 0 ? 'up' : 'down'}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</td>
 }
 
-function LivePriceCell({ ticker, closePrice, prices, marketOpen }) {
+function LivePriceCell({ ticker, closePrice, prices, phase }) {
   const { t } = useTranslation()
   const { fmtPrice } = useCurrency()
   const isIL = tickerMarket(ticker) === 'IL'
-  const isOpen = isIL
-    ? (marketOpen !== false)   // TASE: open unless explicitly false
-    : marketOpen
+  const isOpen = phase != null && phase !== 'idle'
   // Show close as fallback during initial loading so the table renders complete.
-  if (isOpen === null) {
+  if (phase === null) {
     const displayClose = closePrice != null ? (isIL ? closePrice / 100 : closePrice) : null
     return <td style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</td>
   }
@@ -178,7 +176,7 @@ export default function WatchlistPage() {
     return tickers.map(t => ({ ...t, ...(sigMap[t.ticker] ?? {}) }))
   }, [tickers, signalData])
 
-  const { prices, marketOpen } = useLivePrices(tickerSymbols)
+  const { prices, phase } = useLivePrices(tickerSymbols)
   const { sorted, sort, toggle } = useSort(merged, 'ticker', 'asc')
 
   const [expandedTickers, setExpandedTickers] = useState({})
@@ -245,7 +243,7 @@ export default function WatchlistPage() {
     }
   }, [market, qc])
   const portfolioTickers = useMemo(() => portfolioHoldings.map(h => h.ticker), [portfolioHoldings])
-  const { prices: portPrices, marketOpen: portMarketOpen } = useLivePrices(portfolioTickers)
+  const { prices: portPrices, phase: portPhase } = useLivePrices(portfolioTickers)
 
   const portEnriched = useMemo(() => portfolioHoldings.map(h => {
     const livePrice = portPrices[h.ticker]
@@ -253,14 +251,15 @@ export default function WatchlistPage() {
     const currentVal = currentPrice != null ? currentPrice * h.total_qty : null
     const pnlPct = currentVal != null && h.total_cost ? ((currentVal - h.total_cost) / h.total_cost) * 100 : null
     // Daily P&L: if market open + live price → change vs last close; else last close vs prev close
-    const dailyPnlAbs = portMarketOpen && livePrice != null && h.latest_close != null
+    const portIsOpen = portPhase != null && portPhase !== 'idle'
+    const dailyPnlAbs = portIsOpen && livePrice != null && h.latest_close != null
       ? (livePrice - h.latest_close) * h.total_qty
       : (h.latest_close != null && h.prev_close != null
           ? (h.latest_close - h.prev_close) * h.total_qty
           : null)
-    const dailyBase = portMarketOpen && livePrice != null ? h.latest_close : h.prev_close
+    const dailyBase = portIsOpen && livePrice != null ? h.latest_close : h.prev_close
     return { ...h, livePrice, currentVal, pnlPct, dailyPnlAbs, dailyBase }
-  }), [portfolioHoldings, portPrices, portMarketOpen])
+  }), [portfolioHoldings, portPrices, portPhase])
 
   const portTotalInvested = portEnriched.reduce((s, h) => s + (h.total_cost || 0), 0)
   const portTotalValue    = portEnriched.reduce((s, h) => s + (h.currentVal ?? h.total_cost ?? 0), 0)
@@ -636,7 +635,7 @@ export default function WatchlistPage() {
           </div>
         ))}
 
-        {marketOpen && tickerSymbols.length > 0 && (
+        {(phase != null && phase !== 'idle') && tickerSymbols.length > 0 && (
           <span style={{ color: 'var(--green)', fontSize: 12 }}>● live</span>
         )}
       </div>
@@ -799,7 +798,7 @@ export default function WatchlistPage() {
                               <td>{totalQty > 0 ? totalQty : '—'}</td>
                               <td>{fmtPrice(avgPrice)}</td>
                               <td>{fmtPrice(row.close)}</td>
-                              <LivePriceCell ticker={row.ticker} closePrice={row.close} prices={prices} marketOpen={marketOpen} />
+                              <LivePriceCell ticker={row.ticker} closePrice={row.close} prices={prices} phase={phase} />
                               <td>{totalCost > 0 ? fmtPrice(totalCost) : '—'}</td>
                               <td>{currentVal != null ? fmtPrice(currentVal) : '—'}</td>
                               <td className={yieldPct != null ? (yieldPct >= 0 ? 'up' : 'down') : ''}>

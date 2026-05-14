@@ -307,7 +307,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect, dcaV
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   const tickers = data.map(t => t.ticker)
-  const { prices, marketOpen } = useLivePrices(tickers)
+  const { prices, phase } = useLivePrices(tickers)
 
   return (
     <>
@@ -332,7 +332,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect, dcaV
               ? <tr><td colSpan={10} className="empty" style={{ textAlign: 'center' }}>{t('trades.noOpen')}</td></tr>
               : paginated.map((trade, i) => {
                 const isIL = trade.ticker?.endsWith('.TA')
-                const isOpen = isIL ? (marketOpen !== false) : marketOpen
+                const isOpen = phase != null && phase !== 'idle'
                 const live = prices[trade.ticker]
                 const closePrice = trade.current_price
                 const displayLive  = live != null ? (isIL ? live / 100 : live) : null
@@ -364,7 +364,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect, dcaV
                     <td className="col-hide-sm">{fmtPrice(trade.current_price)}</td>
                     <td>{trade.days_held ?? '—'}</td>
                     <td>
-                      {marketOpen === null
+                      {phase === null
                         ? <span style={{ color: 'var(--muted)' }}>{displayClose != null ? fmtPrice(displayClose) : '—'}</span>
                         : !isOpen
                           ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</span>

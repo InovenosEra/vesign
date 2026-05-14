@@ -3,8 +3,8 @@ import { getLivePrices } from '../api'
 
 /**
  * Polls /api/prices/live every 5 s for the given tickers.
- * Returns { prices: { TICKER: number|null }, marketOpen: bool }.
- * Does nothing if tickers is empty.
+ * Returns { prices: { TICKER: number|null }, phase: 'idle'|'pre'|'regular'|'post'|null }.
+ * phase === null while still loading.
  */
 export function useLivePrices(tickers) {
   const key = [...tickers].sort().join(',')
@@ -20,7 +20,6 @@ export function useLivePrices(tickers) {
 
   return {
     prices: data?.prices ?? {},
-    // null = still loading (no data yet); false = confirmed closed; true = confirmed open
-    marketOpen: data == null ? null : data.market_open,
+    phase: data == null ? null : data.phase,
   }
 }
