@@ -2130,17 +2130,19 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         meta = {r[0]: r for r in conn.execute(text(f"""
             SELECT c.ticker, c.company, c.logo_url, c.industry,
                    f.market_cap,
-                   lp.latest_close,
+                   COALESCE(eh.extended_close, lp.latest_close) AS latest_close,
                    pp.prev_close
             FROM companies c
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
                 ON c.ticker = f.ticker
             LEFT JOIN (
-                SELECT p1.ticker, p1.close AS latest_close
+                SELECT p1.ticker, p1.close AS latest_close, p2.max_date
                 FROM daily_prices p1
                 INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
                     ON p1.ticker = p2.ticker AND p1.date = p2.max_date
             ) lp ON c.ticker = lp.ticker
+            LEFT JOIN extended_hours_prices eh
+                ON eh.ticker = lp.ticker AND eh.date = DATE(lp.max_date)
             LEFT JOIN (
                 SELECT ticker, close AS prev_close
                 FROM (
