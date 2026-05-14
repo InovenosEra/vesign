@@ -82,3 +82,102 @@ def test_market_status_endpoint_returns_phase(monkeypatch):
 
     # Cleanup auth override
     backend_main.app.dependency_overrides.clear()
+
+
+def test_prices_live_returns_phase_field(monkeypatch):
+    """Idle phase: endpoint returns phase='idle' with all prices None."""
+    from fastapi.testclient import TestClient
+    from backend import main as backend_main
+    backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+
+    monkeypatch.setattr(backend_main, "_phase_info",
+        lambda now_utc=None: {"phase": "idle", "next_event_name": "pre_open",
+                              "next_event_utc": "2026-05-14T08:00:00+00:00"})
+
+    client = TestClient(backend_main.app)
+    r = client.get("/api/prices/live?tickers=AAPL,MSFT")
+    body = r.json()
+    assert body["phase"] == "idle"
+    assert body["prices"] == {"AAPL": None, "MSFT": None}
+
+    backend_main.app.dependency_overrides.clear()
+
+
+def test_prices_live_uses_aftermarket_in_pre_phase(monkeypatch):
+    """Pre phase: endpoint fetches via fetch_aftermarket_trades, not fetch_live_prices."""
+    from fastapi.testclient import TestClient
+    from backend import main as backend_main
+    backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+
+    monkeypatch.setattr(backend_main, "_phase_info",
+        lambda now_utc=None: {"phase": "pre", "next_event_name": "regular_open",
+                              "next_event_utc": "2026-05-14T13:30:00+00:00"})
+    monkeypatch.setattr(backend_main, "fetch_aftermarket_trades",
+        lambda tickers: {"AAPL": 297.55})
+    # Clear cache so the test doesn't pick up stale values from prior calls
+    backend_main._live_price_cache.clear()
+    backend_main._live_price_cache_phase = None
+
+    client = TestClient(backend_main.app)
+    r = client.get("/api/prices/live?tickers=AAPL")
+    body = r.json()
+    assert body["phase"] == "pre"
+    assert body["prices"]["AAPL"] == 297.55
+
+    backend_main.app.dependency_overrides.clear()
+
+
+def test_prices_live_uses_quote_in_regular_phase(monkeypatch):
+    """Regular phase: endpoint fetches via fetch_live_prices."""
+    from fastapi.testclient import TestClient
+    from backend import main as backend_main
+    backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+
+    monkeypatch.setattr(backend_main, "_phase_info",
+        lambda now_utc=None: {"phase": "regular", "next_event_name": "regular_close",
+                              "next_event_utc": "2026-05-14T20:00:00+00:00"})
+    monkeypatch.setattr(backend_main, "fetch_live_prices",
+        lambda tickers: {"AAPL": 298.99})
+    backend_main._live_price_cache.clear()
+    backend_main._live_price_cache_phase = None
+
+    client = TestClient(backend_main.app)
+    r = client.get("/api/prices/live?tickers=AAPL")
+    body = r.json()
+    assert body["phase"] == "regular"
+    assert body["prices"]["AAPL"] == 298.99
+
+    backend_main.app.dependency_overrides.clear()
+
+
+def test_prices_live_flushes_cache_on_phase_change(monkeypatch):
+    """When phase changes between consecutive calls, cache should flush so stale prices don't leak."""
+    from fastapi.testclient import TestClient
+    from backend import main as backend_main
+    backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+
+    # Reset cache before test
+    backend_main._live_price_cache.clear()
+    backend_main._live_price_cache_phase = None
+
+    # First call: regular phase
+    monkeypatch.setattr(backend_main, "_phase_info",
+        lambda now_utc=None: {"phase": "regular", "next_event_name": "regular_close",
+                              "next_event_utc": "2026-05-14T20:00:00+00:00"})
+    monkeypatch.setattr(backend_main, "fetch_live_prices",
+        lambda tickers: {"AAPL": 100.0})
+    client = TestClient(backend_main.app)
+    r1 = client.get("/api/prices/live?tickers=AAPL").json()
+    assert r1["prices"]["AAPL"] == 100.0
+
+    # Second call: post phase — aftermarket should be called even though AAPL is in cache
+    monkeypatch.setattr(backend_main, "_phase_info",
+        lambda now_utc=None: {"phase": "post", "next_event_name": "post_close",
+                              "next_event_utc": "2026-05-15T00:00:00+00:00"})
+    monkeypatch.setattr(backend_main, "fetch_aftermarket_trades",
+        lambda tickers: {"AAPL": 200.0})
+    r2 = client.get("/api/prices/live?tickers=AAPL").json()
+    assert r2["phase"] == "post"
+    assert r2["prices"]["AAPL"] == 200.0, "Cache should flush on phase change"
+
+    backend_main.app.dependency_overrides.clear()

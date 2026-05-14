@@ -431,6 +431,7 @@ def _extract_close_series(raw: pd.DataFrame, ticker: str | None = None) -> pd.Se
 
 _live_price_cache: dict = {}      # ticker -> price
 _live_price_cache_ts: float = 0.0 # last fetch timestamp
+_live_price_cache_phase = None    # tracks which phase the cache was populated under
 _LIVE_CACHE_TTL = 5               # seconds — matches frontend polling cadence
 
 
@@ -441,6 +442,14 @@ def fetch_live_prices(tickers: list[str]) -> dict:
     if not tickers:
         return {}
     return _fmp.live_prices(tickers)
+
+
+def fetch_aftermarket_trades(tickers: list[str]) -> dict:
+    """Wraps data.fmp.aftermarket_trades for testability."""
+    from data.fmp import aftermarket_trades as _amt
+    if not tickers:
+        return {}
+    return _amt(tickers)
 
 
 # ---------------------------------------------------------------------------
@@ -1144,37 +1153,36 @@ def analyst_history_endpoint(
 
 @protected.get("/api/prices/live")
 def live_prices(tickers: str = Query(..., description="Comma-separated ticker symbols")):
-    """Fetch real-time prices when the US market is open."""
+    """Fetch real-time prices, phase-aware (regular vs extended hours)."""
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="No tickers provided")
 
-    us_open = market_is_open()
+    info = _phase_info()
+    phase = info["phase"]
 
-    active = []
-    result_prices: dict = {}
-    for t in ticker_list:
-        if us_open:
-            active.append(t)
-        else:
-            result_prices[t] = None
+    if phase == "idle":
+        return {"phase": "idle", "prices": {t: None for t in ticker_list}}
 
-    if active:
-        global _live_price_cache, _live_price_cache_ts
-        now = time.time()
-        cached    = {t: _live_price_cache[t] for t in active if t in _live_price_cache}
-        stale     = [t for t in active if t not in _live_price_cache or now - _live_price_cache_ts > _LIVE_CACHE_TTL]
-        if stale:
+    global _live_price_cache, _live_price_cache_ts, _live_price_cache_phase
+    now = time.time()
+    if _live_price_cache_phase != phase:
+        # phase changed → flush cache to avoid stale prices from prior phase
+        _live_price_cache.clear()
+        _live_price_cache_phase = phase
+
+    cached = {t: _live_price_cache[t] for t in ticker_list if t in _live_price_cache}
+    stale  = [t for t in ticker_list if t not in _live_price_cache or now - _live_price_cache_ts > _LIVE_CACHE_TTL]
+    if stale:
+        if phase == "regular":
             fresh = fetch_live_prices(stale)
-            _live_price_cache.update(fresh)
-            _live_price_cache_ts = now
-            cached.update(fresh)
-        result_prices.update(cached)
+        else:  # 'pre' or 'post'
+            fresh = fetch_aftermarket_trades(stale)
+        _live_price_cache.update(fresh)
+        _live_price_cache_ts = now
+        cached.update(fresh)
 
-    # market_open reflects the market relevant to the majority of requested tickers
-    il_count = sum(1 for t in ticker_list if t.endswith('.TA'))
-    market_open = il_open if il_count > len(ticker_list) / 2 else us_open
-    return {"market_open": market_open, "prices": result_prices}
+    return {"phase": phase, "prices": cached}
 
 
 # --- Watchlists -------------------------------------------------------------
