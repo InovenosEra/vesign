@@ -1877,10 +1877,14 @@ def _build_open_trades(mkt: str, include_lots: bool = False) -> list[dict]:
         """)).fetchall()}
 
         # Step 4: latest price per ticker (IN query, ticker_date index)
+        # Prefer extended-hours close (post-market snapshot) when available.
         latest_prices = {r[0]: r[1] for r in conn.execute(text(f"""
-            SELECT dp.ticker, dp.close FROM daily_prices dp
+            SELECT dp.ticker, COALESCE(eh.extended_close, dp.close) AS current_price
+            FROM daily_prices dp
             JOIN (SELECT ticker, MAX(date) AS md FROM daily_prices WHERE ticker IN ({ph}) GROUP BY ticker) lp
                 ON dp.ticker = lp.ticker AND dp.date = lp.md
+            LEFT JOIN extended_hours_prices eh
+                ON eh.ticker = dp.ticker AND eh.date = dp.date
         """), tp).fetchall()}
 
         # Step 5: company info + health + market cap (IN query, small result).
