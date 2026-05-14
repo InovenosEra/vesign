@@ -172,7 +172,11 @@ function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
           <th>{t('col.healthScore')}</th>
           <th>{t('col.analystTarget')}</th>
           <th className="col-hide-sm">{t('col.mlScore')}</th>
-          <th>{t('col.livePrice')}</th>
+          <th>{
+            phase === 'pre'  ? t('col.preMarket')  :
+            phase === 'post' ? t('col.postMarket') :
+                               t('col.livePrice')
+          }</th>
         </tr>
       </thead>
       <tbody>
@@ -315,7 +319,11 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               <th>{t('col.healthScore')}</th>
               <th>{t('col.analystTarget')}</th>
               <th className="col-hide-sm">{t('col.mlScore')}</th>
-              <th>{t('col.livePrice')}</th>
+              <th>{
+                phase === 'pre'  ? t('col.preMarket')  :
+                phase === 'post' ? t('col.postMarket') :
+                                   t('col.livePrice')
+              }</th>
             </tr>
           </thead>
           <tbody>

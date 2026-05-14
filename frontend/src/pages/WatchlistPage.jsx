@@ -760,7 +760,11 @@ export default function WatchlistPage() {
                           <th>Amount</th>
                           <th>{t('col.avgPrice')}</th>
                           <Th label="Closed Price" col="close" sort={sort} onSort={toggle} />
-                          <th>{t('col.livePrice')}</th>
+                          <th>{
+                            phase === 'pre'  ? t('col.preMarket')  :
+                            phase === 'post' ? t('col.postMarket') :
+                                               t('col.livePrice')
+                          }</th>
                           <th>{t('watchlist.totalInvested')}</th>
                           <th>{t('watchlist.currentValue')}</th>
                           <th>Total P&L</th>

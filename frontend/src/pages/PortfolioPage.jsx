@@ -57,7 +57,7 @@ export default function PortfolioPage() {
   })
 
   const tickers = useMemo(() => holdings.map(h => h.ticker), [holdings])
-  const { prices } = useLivePrices(tickers)
+  const { prices, phase } = useLivePrices(tickers)
 
   // Enrich holdings with live prices
   const enriched = useMemo(() => holdings.map(h => {
@@ -240,7 +240,11 @@ export default function PortfolioPage() {
               <th style={{ textAlign: 'right' }}>{t('col.qty')}</th>
               <th style={{ textAlign: 'right' }}>{t('col.avgPrice')}</th>
               <th style={{ textAlign: 'right' }}>{t('col.invested')}</th>
-              <th style={{ textAlign: 'right' }}>{t('col.livePrice')}</th>
+              <th style={{ textAlign: 'right' }}>{
+                phase === 'pre'  ? t('col.preMarket')  :
+                phase === 'post' ? t('col.postMarket') :
+                                   t('col.livePrice')
+              }</th>
               <th style={{ textAlign: 'right' }}>{t('watchlist.currentValue')}</th>
               <th style={{ textAlign: 'right' }}>{t('col.yield')}</th>
             </tr>
@@ -261,7 +265,25 @@ export default function PortfolioPage() {
                 <td style={{ textAlign: 'right' }}>{fmtPrice(h.avg_price)}</td>
                 <td style={{ textAlign: 'right' }}>{fmtPrice(h.total_cost)}</td>
                 <td style={{ textAlign: 'right' }}>
-                  {h.livePrice != null ? fmtPrice(h.livePrice) : <span style={{ color: 'var(--muted)', fontSize: 11 }}>—</span>}
+                  {phase === null
+                    ? <span style={{ color: 'var(--muted)' }}>{h.latest_close != null ? fmtPrice(h.latest_close) : '—'}</span>
+                    : phase === 'idle'
+                      ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{t('market.closedShort')}</span>
+                      : h.livePrice == null
+                        ? <span style={{ color: 'var(--muted)' }}>{h.latest_close != null ? fmtPrice(h.latest_close) : '—'}</span>
+                        : (() => {
+                            const diff = h.latest_close != null ? h.livePrice - h.latest_close : null
+                            const pct  = diff != null && h.latest_close ? (diff / h.latest_close) * 100 : null
+                            const cls  = diff != null && diff >= 0 ? 'up' : 'down'
+                            const arrow = diff != null && diff >= 0 ? '▲' : '▼'
+                            return (
+                              <div>
+                                <div>{fmtPrice(h.livePrice)}</div>
+                                {diff != null && <div className={cls} style={{ fontSize: 11 }}>{arrow} {fmtPrice(Math.abs(diff))} ({Math.abs(pct).toFixed(2)}%)</div>}
+                              </div>
+                            )
+                          })()
+                  }
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   {h.currentValue != null ? fmtPrice(h.currentValue) : '—'}
