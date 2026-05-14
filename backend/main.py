@@ -378,7 +378,7 @@ def _phase_info(now_utc=None) -> dict:
     if bounds is not None:
         pre_open, reg_open, reg_close, post_close = bounds
         if now_utc < pre_open:
-            return _idle_until_today_pre(pre_open, today)
+            return _idle_until_today_pre(pre_open)
         if pre_open <= now_utc < reg_open:
             return {"phase": "pre", "next_event_name": "regular_open",
                     "next_event_utc": reg_open.isoformat()}
@@ -395,7 +395,7 @@ def _phase_info(now_utc=None) -> dict:
     return _idle_until_next_pre(today)
 
 
-def _idle_until_today_pre(pre_open, today):
+def _idle_until_today_pre(pre_open):
     return {"phase": "idle", "next_event_name": "pre_open",
             "next_event_utc": pre_open.isoformat()}
 
