@@ -306,7 +306,7 @@ function OpenTradesTable({ data, search, page, pageSize, setPage, onSelect, dcaV
   const pages     = Math.max(1, Math.ceil(filtered.length / pageSize))
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
 
-  const tickers = data.map(t => t.ticker)
+  const tickers = paginated.map(t => t.ticker)
   const { prices, phase } = useLivePrices(tickers)
 
   return (

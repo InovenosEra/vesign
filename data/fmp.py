@@ -51,23 +51,31 @@ def historical_prices(ticker: str, start, end) -> "pd.DataFrame | None":
 
 
 def live_prices(tickers: list) -> dict:
-    """Real-time prices via parallel single-symbol quote calls (batch requires premium)."""
+    """Real-time regular-session prices via FMP's true batch endpoint.
+    Chunks of 100 tickers per call, multiple chunks in parallel."""
     if not tickers:
         return {}
 
-    def _quote(t):
-        data = _get("quote", {"symbol": t})
-        if data and isinstance(data, list) and data:
-            return t, data[0].get("price")
-        return t, None
+    CHUNK = 100
+    chunks = [tickers[i:i + CHUNK] for i in range(0, len(tickers), CHUNK)]
 
-    prices = {}
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = {ex.submit(_quote, t): t for t in tickers}
+    def _batch(chunk):
+        # /stable/batch-quote returns a list of quote dicts when given symbols=A,B,C
+        data = _get("batch-quote", {"symbols": ",".join(chunk)})
+        if not isinstance(data, list):
+            return {}
+        return {row["symbol"]: row.get("price") for row in data if row.get("symbol")}
+
+    out = {}
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        futures = [ex.submit(_batch, c) for c in chunks]
         for f in as_completed(futures):
-            t, price = f.result()
-            prices[t] = price
-    return prices
+            out.update(f.result())
+
+    # Ensure every requested ticker has an entry (None if missing from response)
+    for t in tickers:
+        out.setdefault(t, None)
+    return out
 
 
 def aftermarket_trades(tickers: list) -> dict:
