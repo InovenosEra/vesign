@@ -2957,7 +2957,8 @@ threading.Thread(target=_warm_vesign_cache_bg, daemon=True).start()
 # slowest user-facing endpoint without warming.
 def _warm_open_trades_cache_bg():
     try:
-        _get_open_trades_cached("US")
+        _get_open_trades_cached("US", include_lots=False)
+        _get_open_trades_cached("US", include_lots=True)
     except Exception:
         pass
 
@@ -2971,8 +2972,9 @@ def _warm_historical_trades_cache_bg():
         today = date.today()
         start = (today - timedelta(days=365)).isoformat()
         end = today.isoformat()
-        _get_historical_trades_cached("US", start, end, False)
-        _get_historical_trades_cached("US", None, None, False)  # also warm "all time"
+        for include_lots in (False, True):
+            _get_historical_trades_cached("US", start, end, include_lots)
+            _get_historical_trades_cached("US", None, None, include_lots)  # all time
     except Exception:
         pass
 
