@@ -695,10 +695,11 @@ _ANALYST_UPSIDE_SQL = """CASE WHEN COALESCE(ae.target_mean_price, s.target_mean_
                     THEN (COALESCE(ae.target_mean_price, s.target_mean_price) - lp.latest_close) / lp.latest_close
                     ELSE s.fair_value_upside END AS fair_value_upside"""
 
-@protected.get("/api/signals/today")
-def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
-    """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD&market=US|IL filter."""
-    mkt = (market or "US").upper()
+_signals_today_cache: dict[str, dict] = {}
+_signals_today_cache_lock = threading.Lock()
+
+
+def _build_signals_today(mkt: str) -> list[dict]:
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
             SELECT s.date, s.ticker, COALESCE(eh.extended_close, lp.latest_close, s.close) AS close, s.rsi,
@@ -721,11 +722,29 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
                   AND c2.ticker NOT IN ('SPY', 'VOO')
             )
         """), conn, params={"market": mkt})
-
-    if signal:
-        df = df[df["signal"] == signal.upper()]
-
     return _records(df)
+
+
+def _get_signals_today_cached(mkt: str) -> list[dict]:
+    today_iso = datetime.now(UTC).date().isoformat()
+    with _signals_today_cache_lock:
+        c = _signals_today_cache.get(mkt)
+        if c is not None and c["built_on"] == today_iso:
+            return c["data"]
+        data = _build_signals_today(mkt)
+        _signals_today_cache[mkt] = {"built_on": today_iso, "data": data}
+        return data
+
+
+@protected.get("/api/signals/today")
+def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
+    """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD&market=US|IL filter."""
+    mkt = (market or "US").upper()
+    rows = _get_signals_today_cached(mkt)
+    if signal:
+        wanted = signal.upper()
+        rows = [r for r in rows if r.get("signal") == wanted]
+    return rows
 
 
 _SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap", "prediction_score"}
@@ -2979,6 +2998,15 @@ def _warm_historical_trades_cache_bg():
         pass
 
 threading.Thread(target=_warm_historical_trades_cache_bg, daemon=True).start()
+
+
+def _warm_signals_today_cache_bg():
+    try:
+        _get_signals_today_cached("US")
+    except Exception:
+        pass
+
+threading.Thread(target=_warm_signals_today_cache_bg, daemon=True).start()
 
 # ---------------------------------------------------------------------------
 # SPA static file serving (production)
