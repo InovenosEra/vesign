@@ -1630,33 +1630,45 @@ def _build_historical_trades(mkt: str, start, end, include_lots: bool) -> list:
     if ticker_trades:
         tickers_list = list(ticker_trades.keys())
         with engine.connect() as conn_enrich:
-            # Organic yield (only when date range given)
+            # Organic yield (only when date range given) — bulk fetch + bisect
+            # as-of, same idiom as market_cap/health above. Replaces a
+            # WITH-bounds CTE + double daily_prices JOIN that scaled poorly
+            # for wide date ranges.
             if start and end:
                 placeholders = ", ".join([f":t{i}" for i in range(len(tickers_list))])
                 p_org = {f"t{i}": t for i, t in enumerate(tickers_list)}
                 p_org["start"] = start
                 p_org["end"]   = end
-                df_org = pd.read_sql(text(f"""
-                    WITH bounds AS (
-                        SELECT ticker,
-                               MAX(CASE WHEN date(date) <= :start THEN date(date) END) AS fd,
-                               MAX(CASE WHEN date(date) <= :end   THEN date(date) END) AS ld
-                        FROM daily_prices
-                        WHERE date(date) >= date(:start, '-30 days')
-                          AND date(date) <= :end
-                          AND ticker IN ({placeholders})
-                        GROUP BY ticker
-                    )
-                    SELECT b.ticker, d1.close AS first_close, d2.close AS last_close
-                    FROM bounds b
-                    JOIN daily_prices d1 ON d1.ticker = b.ticker AND date(d1.date) = b.fd
-                    JOIN daily_prices d2 ON d2.ticker = b.ticker AND date(d2.date) = b.ld
-                """), conn_enrich, params=p_org)
-                for _, org_row in df_org.iterrows():
-                    t = org_row["ticker"]
-                    fc, lc = org_row["first_close"], org_row["last_close"]
-                    if t in ticker_trades and fc and float(fc) > 0:
-                        ticker_trades[t]["organic_yield"] = round(float((lc - fc) / fc * 100), 2)
+                price_rows = conn_enrich.execute(text(f"""
+                    SELECT ticker, date, close
+                    FROM daily_prices
+                    WHERE date(date) >= date(:start, '-30 days')
+                      AND date(date) <= :end
+                      AND ticker IN ({placeholders})
+                    ORDER BY ticker, date
+                """), p_org).fetchall()
+
+                price_idx: dict[str, tuple] = {}
+                for ticker, d, close in price_rows:
+                    entry = price_idx.setdefault(ticker, ([], []))
+                    entry[0].append(str(d)[:10])
+                    entry[1].append(close)
+
+                for ticker, (dates, closes) in price_idx.items():
+                    if ticker not in ticker_trades:
+                        continue
+                    # bisect_right gives the position after the latest entry
+                    # whose key <= start/end. pos==0 means no prices at or
+                    # before start/end → match the original CTE which dropped
+                    # the row via inner JOIN on a NULL MAX(date).
+                    pos_s = bisect.bisect_right(dates, start)
+                    pos_e = bisect.bisect_right(dates, end)
+                    if pos_s == 0 or pos_e == 0:
+                        continue
+                    fc = closes[pos_s - 1]
+                    lc = closes[pos_e - 1]
+                    if fc and float(fc) > 0:
+                        ticker_trades[ticker]["organic_yield"] = round(float((lc - fc) / fc * 100), 2)
 
             # Current signal
             ph = ", ".join([f":h{i}" for i in range(len(tickers_list))])
@@ -2984,15 +2996,35 @@ def _warm_open_trades_cache_bg():
 threading.Thread(target=_warm_open_trades_cache_bg, daemon=True).start()
 
 
+def _chip_months_ago(d: date, n: int) -> date:
+    """today - n calendar months, mirroring JS Date.setMonth() in TradesPage —
+    overflow days roll forward (May 31 - 3mo = Mar 3, not Feb 28). Matching JS
+    is what keeps the warmer's cache keys aligned with the frontend's chip URLs."""
+    from calendar import monthrange
+    m_total = d.month - 1 - n
+    new_year = d.year + m_total // 12
+    new_month = m_total % 12 + 1
+    last_day = monthrange(new_year, new_month)[1]
+    if d.day <= last_day:
+        return d.replace(year=new_year, month=new_month)
+    excess = d.day - last_day
+    next_month = new_month + 1 if new_month < 12 else 1
+    next_year = new_year + 1 if new_month == 12 else new_year
+    return date(next_year, next_month, excess)
+
+
 def _warm_historical_trades_cache_bg():
-    """Warm the default 1Y view that most users land on."""
+    """Warm every chip the UI exposes — 3M / 6M / YTD / 1Y / 2Y / 3Y / 5Y +
+    all-time — for both include_lots variants. Without this, first click on
+    any chip other than 1Y/all-time pays a 3–9 s cold rebuild."""
     try:
-        from datetime import timedelta
         today = date.today()
-        start = (today - timedelta(days=365)).isoformat()
         end = today.isoformat()
+        starts = [_chip_months_ago(today, m).isoformat() for m in (3, 6, 12, 24, 36, 60)]
+        starts.append(f"{today.year}-01-01")  # YTD
         for include_lots in (False, True):
-            _get_historical_trades_cached("US", start, end, include_lots)
+            for s in starts:
+                _get_historical_trades_cached("US", s, end, include_lots)
             _get_historical_trades_cached("US", None, None, include_lots)  # all time
     except Exception:
         pass
