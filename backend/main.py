@@ -1462,12 +1462,16 @@ def _build_historical_trades(mkt: str, start, end, include_lots: bool) -> list:
         "c.ticker NOT IN ('SPY', 'VOO')",
     ]
     params: dict = {"market": mkt}
+    # Use string compare (not DATE()) so trade_log.sell_date can be filtered
+    # without wrapping the column. End is converted to exclusive end+1 day so
+    # rows whose stored timestamp is "YYYY-MM-DD 00:00:00.000000" still match.
     if start:
-        conditions.append("DATE(tl.sell_date) >= :start")
+        conditions.append("tl.sell_date >= :start")
         params["start"] = start
     if end:
-        conditions.append("DATE(tl.sell_date) <= :end")
-        params["end"] = end
+        from datetime import datetime as _dt, timedelta as _td
+        conditions.append("tl.sell_date < :end_p1")
+        params["end_p1"] = (_dt.strptime(end, "%Y-%m-%d") + _td(days=1)).strftime("%Y-%m-%d")
 
     where = "WHERE " + " AND ".join(conditions)
 
@@ -1484,7 +1488,10 @@ def _build_historical_trades(mkt: str, start, end, include_lots: bool) -> list:
             FROM trade_log tl
             LEFT JOIN companies c ON tl.ticker = c.ticker
             LEFT JOIN company_health h ON tl.ticker = h.ticker
-            LEFT JOIN signals sb ON sb.ticker = tl.ticker AND DATE(sb.date) = DATE(tl.buy_date)
+            -- String-equality JOIN uses idx_signals_unique_ticker_date for the
+            -- full composite key (ticker, date). DATE()=DATE() degraded the
+            -- planner to a ticker-only index probe (~200x slower for 5Y).
+            LEFT JOIN signals sb ON sb.ticker = tl.ticker AND sb.date = tl.buy_date
             {where}
             ORDER BY tl.ticker, tl.buy_date
         """), conn, params=params)
