@@ -178,21 +178,16 @@ def _repair_market_caps():
 
 
 def _repair_analyst_targets():
-    """yfinance fallback for tickers FMP missed during today's run.
+    """Fill gaps in analyst_expectations after the primary daily pass.
 
-    Targeted scope: only fetches tickers with NULL target_mean_price in
-    analyst_expectations (typically 50-150 tickers after FMP completes).
-    Single-threaded with sleeps — avoids the OOM that bulk concurrent
-    yfinance caused on 2026-04-22/24/25. Hard cap at 300 tickers and a
-    consecutive-failure circuit breaker as additional safety nets.
-
-    Updates analyst_expectations and re-stamps today's analyst_targets_history
-    snapshot so downstream signals join the recovered values.
+    Targets only tickers with NULL target_mean_price. Uses the standard
+    yfinance-primary + FMP-fallback orchestrator so the source column is
+    populated truthfully. Re-stamps today's analyst_targets_history row to
+    match.
     """
-    import time
     import sqlalchemy as sa
-    import yfinance as yf
     from datetime import datetime, timezone
+    from data.analyst_targets import fetch_with_fallback
 
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     with engine.begin() as conn:
@@ -202,59 +197,43 @@ def _repair_analyst_targets():
             "LIMIT 300"
         )).fetchall()
     tickers = [r[0] for r in rows]
-
     if not tickers:
         print("Analyst target refresh: no gaps to repair.")
         return
 
-    print(f"Analyst target refresh (yfinance, gap-only): {len(tickers)} tickers")
-
-    fixed = 0
-    no_data = 0
-    consec_fail = 0
+    print(f"Analyst target refresh (orchestrator, gap-only): {len(tickers)} tickers")
+    out = fetch_with_fallback(tickers)
     now = datetime.now(timezone.utc)
-
-    for i, t in enumerate(tickers, 1):
-        try:
-            info = yf.Ticker(t).info or {}
-            mean = info.get("targetMeanPrice")
-            if not mean:
-                no_data += 1
-                consec_fail += 1
-                if consec_fail >= 30:
-                    print(f"  yfinance appears blocked ({consec_fail} consecutive misses) — aborting at {i}/{len(tickers)}")
-                    break
-                time.sleep(0.4)
-                continue
-            consec_fail = 0
-            low = info.get("targetLowPrice")
-            high = info.get("targetHighPrice")
-            n = info.get("numberOfAnalystOpinions")
-            with engine.begin() as conn:
-                conn.execute(sa.text(
-                    "UPDATE analyst_expectations SET "
-                    "target_mean_price=:m, target_low_price=:l, target_high_price=:h, "
-                    "number_of_analysts=:n, last_update=:ts WHERE ticker=:t"
-                ), {"m": mean, "l": low, "h": high, "n": n, "ts": now, "t": t})
-                conn.execute(sa.text(
-                    "DELETE FROM analyst_targets_history WHERE date=:d AND ticker=:t"
-                ), {"d": today_str, "t": t})
-                conn.execute(sa.text(
-                    "INSERT INTO analyst_targets_history "
-                    "(date, ticker, target_mean_price, target_high_price, target_low_price, number_of_analysts) "
-                    "VALUES (:d, :t, :m, :h, :l, :n)"
-                ), {"d": today_str, "t": t, "m": mean, "h": high, "l": low, "n": n})
-            fixed += 1
-        except Exception as e:
-            consec_fail += 1
-            if consec_fail >= 30:
-                print(f"  yfinance errors ({consec_fail} consecutive) — aborting at {i}/{len(tickers)}: {e}")
-                break
-        time.sleep(0.4)
-        if i % 25 == 0:
-            print(f"  yfinance: {i}/{len(tickers)} done, fixed={fixed}, no_data={no_data}")
-
-    print(f"Analyst target refresh done: {fixed}/{len(tickers)} recovered, {no_data} no data.")
+    fixed = 0
+    for t, row in out.items():
+        if row["source"] == "none":
+            continue
+        with engine.begin() as conn:
+            conn.execute(sa.text("""
+                UPDATE analyst_expectations SET
+                    target_mean_price=:m, target_low_price=:l, target_high_price=:h,
+                    number_of_analysts=:n, last_update=:ts, source=:src
+                WHERE ticker=:t
+            """), {
+                "m": row["target_mean_price"], "l": row["target_low_price"],
+                "h": row["target_high_price"], "n": row["number_of_analysts"],
+                "ts": now, "src": row["source"], "t": t,
+            })
+            conn.execute(sa.text(
+                "DELETE FROM analyst_targets_history WHERE date=:d AND ticker=:t"
+            ), {"d": today_str, "t": t})
+            conn.execute(sa.text("""
+                INSERT INTO analyst_targets_history
+                    (date, ticker, target_mean_price, target_high_price,
+                     target_low_price, number_of_analysts, source)
+                VALUES (:d, :t, :m, :h, :l, :n, :src)
+            """), {
+                "d": today_str, "t": t, "m": row["target_mean_price"],
+                "h": row["target_high_price"], "l": row["target_low_price"],
+                "n": row["number_of_analysts"], "src": row["source"],
+            })
+        fixed += 1
+    print(f"Analyst target refresh done: {fixed}/{len(tickers)} recovered.")
 
 
 # ────────────────────────────────────────────────────────────────────────────
