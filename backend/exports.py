@@ -51,9 +51,29 @@ def _cell_value(v):
     return v
 
 
-def _new_workbook(columns, sheet_name):
+def _new_workbook(columns, sheet_name, column_widths: dict | None = None):
+    """Create a write-only workbook with header row + frozen panes.
+
+    `column_widths` optionally maps a column name to a width override (in Excel
+    character units). Unset columns default to max(12, len(header)+2).
+
+    NOTE: openpyxl write-only mode requires column dimensions to be set
+    BEFORE the first ws.append() call — otherwise they silently reset to the
+    default. A previous version of this code set them after the header row
+    and got default widths everywhere.
+    """
     wb = Workbook(write_only=True)
     ws = wb.create_sheet(title=sheet_name[:31])
+
+    # Set column widths FIRST, before any append.
+    widths = column_widths or {}
+    for col_idx, col_name in enumerate(columns, start=1):
+        w = widths.get(col_name)
+        if w is None:
+            w = max(12, len(str(col_name)) + 2)
+        ws.column_dimensions[get_column_letter(col_idx)].width = w
+
+    # Now the header row + freeze.
     bold = Font(bold=True)
     header = []
     for col_name in columns:
@@ -62,9 +82,40 @@ def _new_workbook(columns, sheet_name):
         header.append(c)
     ws.append(header)
     ws.freeze_panes = "A2"
-    for col_idx, col_name in enumerate(columns, start=1):
-        ws.column_dimensions[get_column_letter(col_idx)].width = max(12, len(str(col_name)) + 2)
     return wb, ws
+
+
+def _autosize_width(header: str, sample_values, fmt: str | None) -> float:
+    """Estimate column width for auto-size mode.
+
+    Width = max char-length across the header and every sample value's formatted
+    display, padded by 2 for header bold + 1 for safety. Bounded to [10, 60].
+    Format strings that add characters (percent, signed-percent, parens) are
+    accounted for via a small fudge factor.
+    """
+    def _fmt_len(v) -> int:
+        if v is None:
+            return 0
+        if isinstance(v, float):
+            if v != v:  # NaN
+                return 0
+            # heuristic: assume 2-decimal printing covers most format strings
+            s = f"{v:,.2f}"
+        else:
+            s = str(v)
+        return len(s)
+
+    longest_value = max((_fmt_len(v) for v in sample_values), default=0)
+    fudge = 0
+    if fmt:
+        if "%" in fmt:
+            fudge += 2   # % sign
+        if "+" in fmt or "(" in fmt:
+            fudge += 2   # sign / parens
+        if "Red" in fmt:
+            fudge += 1
+    width = max(len(str(header)) + 2, longest_value + fudge + 2)
+    return min(60.0, max(10.0, float(width)))
 
 
 def _save_and_stream(wb, filename: str) -> StreamingResponse:
@@ -143,6 +194,7 @@ def cursor_to_xlsx_response(
     sheet_name: str = "Sheet1",
     column_formats: dict | None = None,
     date_columns: tuple = (),
+    auto_size: bool = False,
 ) -> StreamingResponse:
     """Stream SQL rows directly into an XLSX, bypassing pandas.
 
@@ -154,12 +206,15 @@ def cursor_to_xlsx_response(
     whose string values (`YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS...`) should be
     parsed into Python `date` objects before write so Excel renders them as
     real dates.
+
+    When `auto_size=True`, the cursor is fully materialized into memory first
+    so per-column widths can be computed from actual data values. Safe for
+    exports with a hard row cap (e.g. 200k); avoid for unbounded queries.
     """
     from datetime import date, datetime
 
     result = conn.execute(sql, params)
     columns = list(result.keys())
-    wb, ws = _new_workbook(columns, sheet_name)
 
     formats = column_formats or {}
     col_fmts = [formats.get(name) for name in columns]
@@ -174,6 +229,34 @@ def cursor_to_xlsx_response(
         except ValueError:
             return v
 
+    # Auto-size path: materialize all rows, compute widths, then write.
+    if auto_size:
+        rows = list(result)
+        column_widths = {}
+        for i, name in enumerate(columns):
+            samples = [r[i] for r in rows]
+            column_widths[name] = _autosize_width(name, samples, col_fmts[i])
+        wb, ws = _new_workbook(columns, sheet_name, column_widths=column_widths)
+
+        has_formatting = any(col_fmts) or any(is_date)
+        for row in rows:
+            if not has_formatting:
+                ws.append([_cell_value(v) for v in row])
+                continue
+            cells = []
+            for fmt, dt, raw in zip(col_fmts, is_date, row):
+                value = _parse_date(raw) if dt else _cell_value(raw)
+                if fmt:
+                    cell = WriteOnlyCell(ws, value=value)
+                    cell.number_format = fmt
+                    cells.append(cell)
+                else:
+                    cells.append(value)
+            ws.append(cells)
+        return _save_and_stream(wb, filename)
+
+    # Streaming path (default): no auto-size, write rows as they arrive.
+    wb, ws = _new_workbook(columns, sheet_name)
     has_formatting = any(col_fmts) or any(is_date)
 
     for row in result:
@@ -326,17 +409,22 @@ def dispatch_cursor_response(
     sheet_name: str = "Sheet1",
     column_formats: dict | None = None,
     date_columns: tuple = (),
+    auto_size: bool = False,
 ) -> StreamingResponse:
     """Pick the right cursor-based responder for `fmt` (xlsx/csv/zip).
 
     XLSX uses formats + date parsing; CSV/ZIP write raw values (Excel/sheets
     interpret YYYY-MM-DD strings as dates anyway, and number formatting is
-    lost in CSV by definition)."""
+    lost in CSV by definition).
+
+    `auto_size` only applies to XLSX — CSV/ZIP have no column-width concept.
+    """
     fmt = normalize_format(fmt)
     if fmt == "xlsx":
         return cursor_to_xlsx_response(
             conn, sql, params, filename,
             sheet_name=sheet_name, column_formats=column_formats, date_columns=date_columns,
+            auto_size=auto_size,
         )
     if fmt == "csv":
         return cursor_to_csv_response(conn, sql, params, filename)
