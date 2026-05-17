@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import create_engine, text, inspect, event as sa_event
 import pandas as pd
 import yaml
 import os
@@ -17,6 +17,20 @@ DB_NAME = config["database"]["name"]
 DB_PATH = os.path.join(BASE_DIR, DB_NAME)
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
+
+
+@sa_event.listens_for(engine, "connect")
+def _set_sqlite_pragmas(dbapi_conn, _):
+    """Match backend/main.py's WAL + busy_timeout settings on every connection.
+    Without this, scripts importing `from data.loaders import engine` (e.g.
+    production backfills, signals/engine.py, backtesting/engine.py) wrote in
+    DELETE journal mode while WAL files from concurrent vesign sessions sat on
+    disk — the mismatch caused a "database disk image is malformed" corruption
+    during the 2026-05-16 trailing-stop backfill at date 2020-04-14."""
+    cur = dbapi_conn.cursor()
+    cur.execute("PRAGMA journal_mode=WAL")
+    cur.execute("PRAGMA busy_timeout=30000")
+    cur.close()
 
 # -------------------------
 # Data functions
