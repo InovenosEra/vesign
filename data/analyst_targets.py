@@ -37,6 +37,9 @@ def fetch_with_fallback(tickers: list[str]) -> dict[str, dict]:
       3. Tickers neither source covered get a 'none' row with all fields NULL
 
     Source column always reflects actual provenance — never lies.
+    Other write paths in the codebase may use additional source values
+    (e.g. 'events_synthetic' from fill_analyst_consensus_from_events);
+    source is never NULL on any new write.
     """
     yf_out = yfinance_analyst.get_targets_batch(tickers)
 

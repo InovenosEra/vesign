@@ -311,6 +311,7 @@ def update_company_info():
     # ── Analyst targets: routed through orchestrator (yfinance|fmp via ANALYST_SOURCE env)
     if needs_analyst:
         from data.analyst_targets import fetch_analyst_targets_routed
+        from collections import Counter
         fetched_tickers = [r["ticker"] for r in rows]
         analyst_rows = fetch_analyst_targets_routed(fetched_tickers)
         by_ticker = {r["ticker"]: r for r in rows}
@@ -321,6 +322,8 @@ def update_company_info():
                 by_ticker[t]["target_low_price"]   = a["target_low_price"]
                 by_ticker[t]["number_of_analysts"] = a["number_of_analysts"]
                 by_ticker[t]["source"]             = a["source"]
+        src_counts = Counter(a["source"] for a in analyst_rows.values())
+        print(f"  analyst: " + " | ".join(f"{n} {s}" for s, n in src_counts.most_common()))
 
     if not rows:
         print("No company info downloaded")
@@ -474,10 +477,12 @@ def fill_analyst_consensus_from_events(window_days: int = 365) -> int:
                     target_high_price = :high,
                     target_low_price  = :low,
                     number_of_analysts = :n,
-                    last_update       = :upd
+                    last_update       = :upd,
+                    source            = :src
                 WHERE ticker = :t AND target_mean_price IS NULL
             """), {"t": r["ticker"], "mean": r["mean"], "high": r["high"],
-                   "low": r["low"], "n": r["n"], "upd": r["upd"]})
+                   "low": r["low"], "n": r["n"], "upd": r["upd"],
+                   "src": "events_synthetic"})
             filled += res.rowcount or 0
     print(f"Consensus-from-events: filled {filled} ticker(s) from analyst_target_changes")
     return filled
