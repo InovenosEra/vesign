@@ -95,5 +95,35 @@ def _ensure_analyst_source_column():
         pass
 
 
+def _ensure_analyst_targets_history_unique_index():
+    """Idempotently ensure UNIQUE(ticker, date) on analyst_targets_history.
+
+    Without this, INSERT OR REPLACE in snapshot_analyst_targets behaves as
+    plain INSERT (no conflict to detect → duplicates accumulate if the daily
+    pipeline ever runs twice in a day). The `should_run("analyst_update", 24)`
+    throttle has prevented dupes in practice, but the schema-level constraint
+    is the proper safety net.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    try:
+        with engine.begin() as conn:
+            indexes = {r[0] for r in conn.execute(text(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='analyst_targets_history'"
+            ))}
+            if "idx_ath_unique" not in indexes:
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX idx_ath_unique ON analyst_targets_history(ticker, date)"
+                ))
+            if "idx_ath" in indexes:
+                # Old non-unique index is redundant once the unique one exists
+                conn.execute(text("DROP INDEX idx_ath"))
+    except OperationalError:
+        # Table doesn't exist yet or duplicates would block the unique index;
+        # will be retried next startup once the data is consistent
+        pass
+
+
 # Run migrations on module load
 _ensure_analyst_source_column()
+_ensure_analyst_targets_history_unique_index()
