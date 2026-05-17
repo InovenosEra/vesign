@@ -228,7 +228,9 @@ def update_vix():
 def snapshot_analyst_targets(date_str: str) -> None:
     """Copy current analyst_expectations into analyst_targets_history for date_str.
 
-    Idempotent (INSERT OR IGNORE). Only rows with a non-NULL target_mean_price
+    Persists the `source` column so the chart can attribute each historical
+    row to its origin (yfinance / fmp / none / NULL=legacy).
+    Idempotent (INSERT OR REPLACE). Only rows with a non-NULL target_mean_price
     are snapshotted.
     """
     with engine.begin() as conn:
@@ -240,15 +242,16 @@ def snapshot_analyst_targets(date_str: str) -> None:
                 target_high_price  REAL,
                 target_low_price   REAL,
                 number_of_analysts REAL,
+                source             TEXT,
                 PRIMARY KEY (date, ticker)
             )
         """))
         result = conn.execute(text("""
             INSERT OR REPLACE INTO analyst_targets_history
                 (date, ticker, target_mean_price, target_high_price,
-                 target_low_price, number_of_analysts)
+                 target_low_price, number_of_analysts, source)
             SELECT :date, ticker, target_mean_price, target_high_price,
-                   target_low_price, number_of_analysts
+                   target_low_price, number_of_analysts, source
             FROM analyst_expectations
             WHERE target_mean_price IS NOT NULL
         """), {"date": date_str})

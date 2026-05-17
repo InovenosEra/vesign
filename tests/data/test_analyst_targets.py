@@ -136,3 +136,33 @@ def test_update_company_info_writes_source_column(monkeypatch):
 
     src = eng.connect().execute(text("SELECT source FROM analyst_expectations WHERE ticker='AAPL'")).fetchone()
     assert src is not None and src[0] == "yfinance"
+
+
+def test_snapshot_carries_source_to_history(monkeypatch):
+    """snapshot_analyst_targets() persists the source column to analyst_targets_history."""
+    from sqlalchemy import create_engine, text
+    eng = create_engine("sqlite://")
+    with eng.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE analyst_expectations (
+                ticker TEXT PRIMARY KEY, target_mean_price REAL,
+                target_high_price REAL, target_low_price REAL,
+                number_of_analysts REAL, last_update TEXT, source TEXT
+            )
+        """))
+        conn.execute(text("""
+            INSERT INTO analyst_expectations VALUES
+              ('AAPL', 250, 290, 210, 35, '2026-05-18', 'yfinance'),
+              ('NGG',  92,  105, 78, 8,  '2026-05-18', 'yfinance')
+        """))
+
+    import data.market_data as md, data.loaders as loaders
+    monkeypatch.setattr(loaders, "engine", eng)
+    monkeypatch.setattr(md, "engine", eng)
+
+    md.snapshot_analyst_targets("2026-05-18")
+
+    rows = eng.connect().execute(text(
+        "SELECT ticker, source FROM analyst_targets_history WHERE date='2026-05-18'"
+    )).fetchall()
+    assert {(r[0], r[1]) for r in rows} == {("AAPL", "yfinance"), ("NGG", "yfinance")}
