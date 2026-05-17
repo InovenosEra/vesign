@@ -1,0 +1,56 @@
+"""Tests for data.analyst_targets — yfinance + FMP fallback orchestrator."""
+from unittest.mock import patch
+from data import analyst_targets
+
+
+def test_yfinance_success_no_fallback_call():
+    """When yfinance returns data, FMP is NOT called for that ticker."""
+    yfinance_out = {"AAPL": {"target_mean_price": 250.0, "target_high_price": 290.0,
+                              "target_low_price": 210.0, "number_of_analysts": 35}}
+    fmp_called = []
+
+    def fake_fmp(t):
+        fmp_called.append(t)
+        return {"targetConsensus": 999.0, "targetHigh": 1000.0,
+                "targetLow": 1.0, "numberOfAnalysts": 1}
+
+    with patch("data.analyst_targets.yfinance_analyst.get_targets_batch",
+               return_value=yfinance_out), \
+         patch("data.analyst_targets.fmp.price_target_consensus",
+               side_effect=fake_fmp):
+        out = analyst_targets.fetch_with_fallback(["AAPL"])
+
+    assert out["AAPL"]["source"] == "yfinance"
+    assert out["AAPL"]["target_mean_price"] == 250.0
+    assert fmp_called == []  # FMP not called
+
+
+def test_yfinance_empty_falls_back_to_fmp():
+    """When yfinance returns None for a ticker, FMP fills in."""
+    yfinance_out = {"NGG": None}
+    fmp_data = {"targetConsensus": 92.4, "targetHigh": 105.2,
+                "targetLow": 78.0, "numberOfAnalysts": 8}
+
+    with patch("data.analyst_targets.yfinance_analyst.get_targets_batch",
+               return_value=yfinance_out), \
+         patch("data.analyst_targets.fmp.price_target_consensus",
+               return_value=fmp_data):
+        out = analyst_targets.fetch_with_fallback(["NGG"])
+
+    assert out["NGG"]["source"] == "fmp"
+    assert out["NGG"]["target_mean_price"] == 92.4
+    assert out["NGG"]["target_high_price"] == 105.2
+    assert out["NGG"]["target_low_price"]  == 78.0
+
+
+def test_both_empty_returns_source_none():
+    """When yfinance AND FMP both return empty, source='none' with NULL values."""
+    with patch("data.analyst_targets.yfinance_analyst.get_targets_batch",
+               return_value={"WEIRD": None}), \
+         patch("data.analyst_targets.fmp.price_target_consensus",
+               return_value=None):
+        out = analyst_targets.fetch_with_fallback(["WEIRD"])
+
+    assert out["WEIRD"]["source"] == "none"
+    assert out["WEIRD"]["target_mean_price"] is None
+    assert out["WEIRD"]["number_of_analysts"] is None
