@@ -103,3 +103,36 @@ def test_env_flag_fmp_uses_legacy_path(monkeypatch):
     assert called["orchestrator"] == 0
     assert called["raw_fmp"] == 2
     assert rows["AAPL"]["source"] == "fmp"
+
+
+def test_update_company_info_writes_source_column(monkeypatch):
+    """When ANALYST_SOURCE=yfinance, the source column is populated on write."""
+    monkeypatch.setenv("ANALYST_SOURCE", "yfinance")
+    from sqlalchemy import create_engine, text
+    eng = create_engine("sqlite://")
+    with eng.begin() as conn:
+        conn.execute(text("""CREATE TABLE companies (ticker TEXT, industry TEXT, description TEXT)"""))
+        conn.execute(text("""CREATE TABLE fundamentals (ticker TEXT, market_cap REAL)"""))
+        conn.execute(text("""CREATE TABLE pipeline_control (
+            step_name TEXT PRIMARY KEY, last_run TEXT
+        )"""))
+        conn.execute(text("INSERT INTO companies (ticker) VALUES ('AAPL')"))
+
+    import data.market_data as md, data.loaders as loaders, data.analyst_targets as at
+    monkeypatch.setattr(loaders, "engine", eng)
+    monkeypatch.setattr(md, "engine", eng)
+    loaders._ensure_analyst_source_column()
+
+    def fake_routed(tickers):
+        return {t: {"target_mean_price": 250.0, "target_high_price": 290.0,
+                    "target_low_price": 210.0, "number_of_analysts": 5,
+                    "source": "yfinance"} for t in tickers}
+
+    monkeypatch.setattr(at, "fetch_analyst_targets_routed", fake_routed)
+    monkeypatch.setattr(md, "should_run", lambda *a, **k: True)
+    monkeypatch.setattr(md.fmp, "company_profile", lambda t: {"marketCap": 1e12})
+
+    md.update_company_info()
+
+    src = eng.connect().execute(text("SELECT source FROM analyst_expectations WHERE ticker='AAPL'")).fetchone()
+    assert src is not None and src[0] == "yfinance"

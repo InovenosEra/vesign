@@ -276,12 +276,8 @@ def update_company_info():
             profile = fmp.company_profile(t) if needs_fundamentals else {}
             profile = profile or {}
 
+            # Analyst fetch moved to fetch_analyst_targets_routed (after the parallel loop)
             target_mean = target_high = target_low = n_analysts = None
-            if needs_analyst:
-                consensus = fmp.price_target_consensus(t) or {}
-                target_mean = consensus.get("targetConsensus") or None
-                target_high = consensus.get("targetHigh") or None
-                target_low  = consensus.get("targetLow") or None
 
             return {
                 "ticker":             t,
@@ -292,6 +288,7 @@ def update_company_info():
                 "target_high_price":  target_high,
                 "target_low_price":   target_low,
                 "number_of_analysts": n_analysts,
+                "source":             None,
                 "last_update":        now,
             }
         except Exception:
@@ -307,6 +304,20 @@ def update_company_info():
                 rows.append(result)
             if done % 200 == 0:
                 print(f"  FMP: {done}/{len(tickers)} done, {len(rows)} fetched")
+
+    # ── Analyst targets: routed through orchestrator (yfinance|fmp via ANALYST_SOURCE env)
+    if needs_analyst:
+        from data.analyst_targets import fetch_analyst_targets_routed
+        fetched_tickers = [r["ticker"] for r in rows]
+        analyst_rows = fetch_analyst_targets_routed(fetched_tickers)
+        by_ticker = {r["ticker"]: r for r in rows}
+        for t, a in analyst_rows.items():
+            if t in by_ticker:
+                by_ticker[t]["target_mean_price"]  = a["target_mean_price"]
+                by_ticker[t]["target_high_price"]  = a["target_high_price"]
+                by_ticker[t]["target_low_price"]   = a["target_low_price"]
+                by_ticker[t]["number_of_analysts"] = a["number_of_analysts"]
+                by_ticker[t]["source"]             = a["source"]
 
     if not rows:
         print("No company info downloaded")
@@ -343,7 +354,7 @@ def update_company_info():
 
     if needs_analyst:
         analyst_df = df[["ticker", "target_mean_price", "target_high_price",
-                          "target_low_price", "number_of_analysts", "last_update"]]
+                          "target_low_price", "number_of_analysts", "last_update", "source"]]
         with engine.begin() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS analyst_expectations (
@@ -352,24 +363,27 @@ def update_company_info():
                     target_high_price  REAL,
                     target_low_price   REAL,
                     number_of_analysts REAL,
-                    last_update        TEXT
+                    last_update        TEXT,
+                    source             TEXT
                 )
             """))
             for _, row in analyst_df.iterrows():
                 conn.execute(text("""
                     INSERT INTO analyst_expectations
                         (ticker, target_mean_price, target_high_price, target_low_price,
-                         number_of_analysts, last_update)
-                    VALUES (:ticker, :mean, :high, :low, :n, :upd)
+                         number_of_analysts, last_update, source)
+                    VALUES (:ticker, :mean, :high, :low, :n, :upd, :src)
                     ON CONFLICT(ticker) DO UPDATE SET
                         target_mean_price  = excluded.target_mean_price,
                         target_high_price  = excluded.target_high_price,
                         target_low_price   = excluded.target_low_price,
                         number_of_analysts = excluded.number_of_analysts,
-                        last_update        = excluded.last_update
+                        last_update        = excluded.last_update,
+                        source             = excluded.source
                 """), {"ticker": row["ticker"], "mean": row["target_mean_price"],
                        "high": row["target_high_price"], "low": row["target_low_price"],
-                       "n": row["number_of_analysts"], "upd": str(row["last_update"])})
+                       "n": row["number_of_analysts"], "upd": str(row["last_update"]),
+                       "src": row.get("source") or "fmp"})
         mark_run("analyst_update")
         today_str = datetime.now(UTC).strftime("%Y-%m-%d")
         snapshot_analyst_targets(today_str)
