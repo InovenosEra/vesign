@@ -139,6 +139,22 @@ def price_target_consensus(ticker: str) -> "dict | None":
     return data[0] if data else None
 
 
+def price_target_summary(ticker: str) -> "dict | None":
+    """Analyst price-target activity summary — returns counts and averages over
+    multiple time windows. Keys we use:
+      lastMonthCount, lastMonthAvgPriceTarget,
+      lastQuarterCount, lastQuarterAvgPriceTarget,
+      lastYearCount, lastYearAvgPriceTarget,
+      allTimeCount, allTimeAvgPriceTarget,
+      publishers (JSON list).
+
+    The `/price-target-consensus` endpoint we also call returns the consensus
+    price but not the analyst COUNT — this is where the count lives.
+    """
+    data = _get("price-target-summary", {"symbol": ticker})
+    return data[0] if data else None
+
+
 def income_statement(ticker: str, limit: int = 2) -> list:
     """Last N annual income statements (for YoY comparison)."""
     data = _get("income-statement", {"symbol": ticker, "period": "annual", "limit": limit})
