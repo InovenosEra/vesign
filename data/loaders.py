@@ -71,3 +71,29 @@ def save_features(df: pd.DataFrame):
             )
 
     df.to_sql("features", engine, if_exists="append", index=False)
+
+
+def _ensure_analyst_source_column():
+    """Idempotently add `source` column to analyst_targets_history and
+    analyst_expectations. Safe to call on every uvicorn startup.
+
+    Legacy rows (pre-migration) get source=NULL. Interpretation: unknown
+    provenance / assume FMP since that was our only source before this column
+    was added. New rows must always set source explicitly to 'yfinance',
+    'fmp', or 'none'.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    try:
+        with engine.begin() as conn:
+            for tbl in ("analyst_targets_history", "analyst_expectations"):
+                cols = {r[1] for r in conn.execute(text(f"PRAGMA table_info({tbl})"))}
+                if "source" not in cols:
+                    conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN source TEXT"))
+    except OperationalError:
+        # Tables don't exist yet; will be created lazily by data/market_data.py
+        pass
+
+
+# Run migrations on module load
+_ensure_analyst_source_column()
