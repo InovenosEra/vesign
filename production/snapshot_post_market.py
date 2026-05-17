@@ -1,8 +1,19 @@
-"""Daily post-market snapshot. Runs at 03:05 IDT via cron.
+"""Daily post-market snapshot. Chained after the morning pipeline (07:00 IDT
+Mon-Sat) via crontab — see /tmp/crontab.bak_2026-05-17 on the prod server for
+the previous standalone schedule.
 
 Fetches FMP's /aftermarket-trade for every ticker in yesterday's signals
 and writes the result to extended_hours_prices, which the UI consumes
-via COALESCE(extended_close, close)."""
+via COALESCE(extended_close, close).
+
+History: This used to run at 03:05 IDT (cron `5 3 * * *`) directly after the
+NYSE post-market window ended. But the pipeline that writes signals for the
+just-closed session runs at 07:00 IDT — 4 hours LATER. So at 03:05 IDT the
+signals didn't exist yet and snapshot logged "No tickers found, skipping"
+silently every day from 2026-05-14 (when it was first scheduled) through
+2026-05-17 (when this comment was added). The cron was changed to chain
+snapshot after pipeline in the same cron line so signals exist by the time
+snapshot needs them."""
 
 import os
 import sqlite3
