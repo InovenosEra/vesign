@@ -1,4 +1,5 @@
 """Tests for data.analyst_targets — yfinance + FMP fallback orchestrator."""
+import os
 from unittest.mock import patch
 from data import analyst_targets
 
@@ -54,3 +55,51 @@ def test_both_empty_returns_source_none():
     assert out["WEIRD"]["source"] == "none"
     assert out["WEIRD"]["target_mean_price"] is None
     assert out["WEIRD"]["number_of_analysts"] is None
+
+
+def test_env_flag_yfinance_calls_orchestrator(monkeypatch):
+    """When ANALYST_SOURCE=yfinance, the analyst routing path calls our
+    orchestrator (not raw FMP)."""
+    monkeypatch.setenv("ANALYST_SOURCE", "yfinance")
+    called = {"orchestrator": 0, "raw_fmp": 0}
+
+    def fake_orch(tickers):
+        called["orchestrator"] += 1
+        return {t: {"target_mean_price": 100, "target_high_price": 110,
+                    "target_low_price": 90, "number_of_analysts": 5,
+                    "source": "yfinance"} for t in tickers}
+
+    def fake_fmp_consensus(t):
+        called["raw_fmp"] += 1
+        return {"targetConsensus": 50}
+
+    with patch("data.analyst_targets.fetch_with_fallback", side_effect=fake_orch), \
+         patch("data.analyst_targets.fmp.price_target_consensus", side_effect=fake_fmp_consensus):
+        rows = analyst_targets.fetch_analyst_targets_routed(["AAPL", "MSFT"])
+
+    assert called["orchestrator"] == 1
+    assert called["raw_fmp"] == 0
+    assert rows["AAPL"]["source"] == "yfinance"
+
+
+def test_env_flag_fmp_uses_legacy_path(monkeypatch):
+    """When ANALYST_SOURCE=fmp (or unset), the raw-FMP path is used."""
+    monkeypatch.setenv("ANALYST_SOURCE", "fmp")
+    called = {"orchestrator": 0, "raw_fmp": 0}
+
+    def fake_orch(tickers):
+        called["orchestrator"] += 1
+        return {}
+
+    def fake_fmp_consensus(t):
+        called["raw_fmp"] += 1
+        return {"targetConsensus": 100, "targetHigh": 110, "targetLow": 90,
+                "numberOfAnalysts": 3}
+
+    with patch("data.analyst_targets.fetch_with_fallback", side_effect=fake_orch), \
+         patch("data.analyst_targets.fmp.price_target_consensus", side_effect=fake_fmp_consensus):
+        rows = analyst_targets.fetch_analyst_targets_routed(["AAPL", "MSFT"])
+
+    assert called["orchestrator"] == 0
+    assert called["raw_fmp"] == 2
+    assert rows["AAPL"]["source"] == "fmp"

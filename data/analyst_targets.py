@@ -5,6 +5,7 @@ Single entry point for the live pipeline. Never raises — per-ticker failures
 isolate so one bad ticker doesn't break the run.
 """
 from __future__ import annotations
+import os
 import logging
 from data import yfinance_analyst, fmp
 
@@ -65,3 +66,32 @@ def fetch_with_fallback(tickers: list[str]) -> dict[str, dict]:
                 "source": "none",
             }
     return results
+
+
+def fetch_analyst_targets_routed(tickers: list[str]) -> dict[str, dict]:
+    """Public API for the daily pipeline. Routes based on ANALYST_SOURCE env var.
+
+    'yfinance' (preferred): yfinance primary + FMP fallback via orchestrator
+    'fmp' or unset       : legacy FMP-only path
+
+    The 'fmp' path is preserved for instant rollback — flipping the env var
+    + restarting vesign switches behavior without code changes.
+    """
+    source = os.environ.get("ANALYST_SOURCE", "fmp").lower()
+    if source == "yfinance":
+        return fetch_with_fallback(tickers)
+
+    # Legacy FMP-only path
+    out: dict[str, dict] = {}
+    for t in tickers:
+        try:
+            c = fmp.price_target_consensus(t)
+        except Exception as e:
+            log.debug("FMP raised for %s: %s", t, e)
+            c = None
+        row = _from_fmp_consensus(c)
+        if row is None:
+            row = {"target_mean_price": None, "target_high_price": None,
+                   "target_low_price": None, "number_of_analysts": None}
+        out[t] = {**row, "source": "fmp"}
+    return out
