@@ -47,3 +47,18 @@ def test_idempotent_no_duplicate_alter(monkeypatch):
 
     cols = {r[1] for r in eng.connect().execute(text("PRAGMA table_info(analyst_expectations)"))}
     assert "source" in cols
+
+
+def test_handles_missing_tables_gracefully(monkeypatch):
+    """Verify OperationalError is caught when tables don't exist (fresh DB).
+
+    Module load runs the migration before market_data.py has had a chance to
+    create the tables. The function must not raise.
+    """
+    from sqlalchemy import create_engine
+    eng = create_engine("sqlite://")  # empty in-memory, no tables
+    import data.loaders
+    monkeypatch.setattr(data.loaders, "engine", eng)
+
+    # Should not raise even though tables don't exist
+    data.loaders._ensure_analyst_source_column()
