@@ -12,6 +12,25 @@ from data import yfinance_analyst, fmp
 log = logging.getLogger(__name__)
 
 
+def _fmp_analyst_count(ticker: str) -> int | None:
+    """Fetch analyst count via /price-target-summary.
+
+    Prefers most recent non-zero window: lastQuarterCount → lastMonthCount →
+    lastYearCount → allTimeCount. Returns None if none of those keys have a
+    positive value or if the call fails.
+    """
+    try:
+        summary = fmp.price_target_summary(ticker) or {}
+    except Exception as e:
+        log.debug("price_target_summary failed for %s: %s", ticker, e)
+        return None
+    for k in ("lastQuarterCount", "lastMonthCount", "lastYearCount", "allTimeCount"):
+        v = summary.get(k)
+        if v:
+            return int(v)
+    return None
+
+
 def _from_fmp_consensus(c: dict | None) -> dict | None:
     """Map FMP price_target_consensus shape to our schema."""
     if not c:
@@ -59,6 +78,9 @@ def fetch_with_fallback(tickers: list[str]) -> dict[str, dict]:
 
         fmp_row = _from_fmp_consensus(fmp_consensus)
         if fmp_row is not None:
+            # Consensus endpoint doesn't include analyst count; fetch from summary.
+            if fmp_row["number_of_analysts"] is None:
+                fmp_row["number_of_analysts"] = _fmp_analyst_count(t)
             results[t] = {**fmp_row, "source": "fmp"}
         else:
             results[t] = {

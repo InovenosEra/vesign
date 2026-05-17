@@ -166,3 +166,22 @@ def test_snapshot_carries_source_to_history(monkeypatch):
         "SELECT ticker, source FROM analyst_targets_history WHERE date='2026-05-18'"
     )).fetchall()
     assert {(r[0], r[1]) for r in rows} == {("AAPL", "yfinance"), ("NGG", "yfinance")}
+
+
+def test_fmp_fallback_pulls_analyst_count_from_summary():
+    """In FMP fallback path, _fmp_analyst_count fills the analyst count
+    from price_target_summary (consensus doesn't have it)."""
+    fmp_consensus = {"targetConsensus": 100.0, "targetHigh": 110.0, "targetLow": 90.0}
+    fmp_summary = {"lastQuarterCount": 5, "lastMonthCount": 3, "lastYearCount": 12}
+
+    with patch("data.analyst_targets.yfinance_analyst.get_targets_batch",
+               return_value={"X": None}), \
+         patch("data.analyst_targets.fmp.price_target_consensus",
+               return_value=fmp_consensus), \
+         patch("data.analyst_targets.fmp.price_target_summary",
+               return_value=fmp_summary):
+        out = analyst_targets.fetch_with_fallback(["X"])
+
+    assert out["X"]["source"] == "fmp"
+    assert out["X"]["target_mean_price"] == 100.0
+    assert out["X"]["number_of_analysts"] == 5  # lastQuarterCount preferred
