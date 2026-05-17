@@ -932,15 +932,19 @@ def signals_export(
     sql = text(f"""
         SELECT DATE(s.date) AS date,
                s.ticker,
-               c.company, c.sector, c.industry, (f.market_cap / 1e9) AS market_cap,
-               s.open, s.high, s.low, s.close, s.volume,
+               c.company, c.sector, c.industry,
+               (f.market_cap / 1.0e9) AS "market_cap(b)",
+               s.open, s.high, s.low, s.close,
+               (s.volume / 1.0e6) AS "volume(m)",
                s.rsi, s.bb_high, s.bb_low, s.macd,
                s.rsi_factor, s.bb_factor, s.macd_factor, s.trend_factor,
-               s.volume_sma_20, s.volume_ratio,
+               (s.volume_sma_20 / 1.0e6) AS "volume_sma_20(m)",
+               s.volume_ratio,
                s.week52_high, s.pct_from_52w_high,
                s.target_mean_price, s.target_high_price, s.target_low_price,
                s.number_of_analysts,
-               s.health_score, s.prediction_score, s.fair_value_upside,
+               CAST(s.health_score AS REAL) AS health_score,
+               s.prediction_score, s.fair_value_upside,
                s.bb_pct_b,
                s.vqs, s.signal, s.lot_seq, s.score, s.vesign_score,
                s.news_block_reason
@@ -952,13 +956,41 @@ def signals_export(
         LIMIT {EXPORT_ROW_LIMIT}
     """)
 
+    # Excel number formats — see column spec on /api/signals/export.
+    _SIGNED_PCT = '+0.00%;[Red](0.00%);-'
+    column_formats = {
+        "date":              _EXPORT_DATE_FMT,
+        "market_cap(b)":     _EXPORT_MCAP_FMT,
+        "volume(m)":         "0.00",
+        "volume_sma_20(m)":  "0.00",
+        "rsi":               "0.00",
+        "bb_high":           "0.00",
+        "bb_low":            "0.00",
+        "macd":              "0.00",
+        "rsi_factor":        "0.00",
+        "bb_factor":         "0.00",
+        "macd_factor":       "0.00",
+        "trend_factor":      "0.00",
+        "score":             "0.00",
+        "volume_ratio":      "0.00%",
+        "pct_from_52w_high": "0.00%",
+        "target_mean_price": "0.0",
+        "target_high_price": "0.0",
+        "target_low_price":  "0.0",
+        "health_score":      "0",
+        "prediction_score":  _SIGNED_PCT,
+        "fair_value_upside": _SIGNED_PCT,
+        "bb_pct_b":          _SIGNED_PCT,
+    }
+
     today = datetime.now(UTC).date().isoformat()
     with engine.connect() as conn:
         return dispatch_cursor_response(
             format, conn, sql, params,
             filename=f"signals_{today}", sheet_name="signals",
-            column_formats={"date": _EXPORT_DATE_FMT, "market_cap": _EXPORT_MCAP_FMT},
+            column_formats=column_formats,
             date_columns=("date",),
+            auto_size=True,
         )
 
 
