@@ -51,7 +51,11 @@ def backfill_signals():
     print(f"Loaded {len(features):,} feature rows")
 
     # ---------- Merge analyst data (use current targets as best approximation) ----------
-    analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+    analyst = pd.read_sql(
+        "SELECT ticker, target_mean_price, target_high_price, "
+        "target_low_price, number_of_analysts FROM analyst_expectations",
+        engine,
+    )
     df = features.merge(analyst, on="ticker", how="left")
 
     # ---------- Compute all derived columns ----------
