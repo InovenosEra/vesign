@@ -61,7 +61,19 @@ export default function SignalModal({ row: rowProp, onClose }) {
         <div className="modal-header" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             {row.logo_url
-              ? <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+              ? (() => {
+                  const onErr = (e) => {
+                    // Hide the broken img (or its anchor wrapper) and reveal the placeholder.
+                    const wrap = e.target.parentNode?.tagName === 'A' ? e.target.parentNode : e.target
+                    wrap.style.display = 'none'
+                    if (wrap.nextSibling) wrap.nextSibling.style.display = 'flex'
+                  }
+                  const img = <img src={row.logo_url} alt="" className="modal-logo" style={{ width: 96, height: 96, borderRadius: 10, objectFit: 'contain', flexShrink: 0, ...(WHITE_BG_LOGOS.has(row.ticker) ? { background: '#fff', padding: 6 } : {}) }} onError={onErr} />
+                  const href = row.domain ? `https://${row.domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}` : null
+                  return href
+                    ? <a href={href} target="_blank" rel="noopener noreferrer" title={href} style={{ lineHeight: 0, cursor: 'pointer' }}>{img}</a>
+                    : img
+                })()
               : null}
             <div className="modal-logo-placeholder" style={{
               width: 96, height: 96, flexShrink: 0, borderRadius: 10,

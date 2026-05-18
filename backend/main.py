@@ -1042,7 +1042,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
     placeholders = "','".join(ticker_list)
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.ticker, c.company, c.logo_url, c.industry,
+            SELECT s.ticker, c.company, c.logo_url, c.industry, c.domain,
                    c.description, c.description_short,
                    COALESCE(eh.extended_close, lp.latest_close, s.close) AS close, s.signal, s.vqs, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
@@ -2780,7 +2780,7 @@ def research_ticker(
                    COALESCE(ae.target_low_price,  s.target_low_price)  AS target_low_price,
                    COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    ae.number_of_analysts,
-                   c.company, c.logo_url, c.industry, c.sector, c.market,
+                   c.company, c.logo_url, c.industry, c.sector, c.market, c.domain,
                    c.description, c.description_short,
                    f.market_cap,
                    CAST(COALESCE(s.health_score, ch.score) AS INTEGER) AS health_score,
@@ -2850,6 +2850,7 @@ def research_ticker(
         "industry":            _v(row.get("industry")),
         "sector":              _v(row.get("sector")),
         "market":              _v(row.get("market")),
+        "domain":              _v(row.get("domain")),
         "description":         _v(row.get("description")),
         "description_short":   _v(row.get("description_short")),
         "market_cap":          int(row["market_cap"]) if row.get("market_cap") is not None and not (isinstance(row["market_cap"], float) and math.isnan(row["market_cap"])) else None,

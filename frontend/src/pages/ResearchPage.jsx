@@ -444,7 +444,7 @@ export default function ResearchPage() {
       target_mean_price: research.target_mean_price, target_low_price: research.target_low_price,
       target_high_price: research.target_high_price, health_score: research.health_score,
       health_reason: research.health_reason, market_cap: research.market_cap,
-      prediction_score: research.prediction_score,
+      prediction_score: research.prediction_score, domain: research.domain,
     })
   }
 
