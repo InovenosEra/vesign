@@ -742,7 +742,7 @@ def _build_signals_today(mkt: str) -> list[dict]:
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
                    s.vqs,
-                   s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
+                   s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.domain, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
@@ -855,7 +855,7 @@ def signals(
                    s.fair_value_upside,
                    s.target_mean_price, s.target_low_price, s.target_high_price,
                    s.prediction_score,
-                   s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.description, c.description_short,
+                   s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.domain, c.description, c.description_short,
                    CAST(COALESCE(
                        (SELECT score FROM company_health_history
                         WHERE ticker = s.ticker AND DATE(recorded_at) <= DATE(s.date)
@@ -1071,7 +1071,7 @@ def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default
     pattern = f"%{q.strip()}%"
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT c.ticker, c.company, c.logo_url, c.industry,
+            SELECT c.ticker, c.company, c.logo_url, c.industry, c.domain,
                    c.description, c.description_short,
                    s.signal, s.close, s.rsi,
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
@@ -1129,7 +1129,7 @@ def signals_success_rate(months: int = Query(default=12, ge=1, le=120)):
         df = pd.read_sql(text(f"""
             SELECT tl.ticker, tl.buy_date, tl.sell_date,
                    tl.buy_price, tl.sell_price, tl.return_pct,
-                   c.company, c.logo_url, f.market_cap
+                   c.company, c.logo_url, c.domain, f.market_cap
             FROM trade_log tl
             LEFT JOIN companies c ON tl.ticker = c.ticker
             LEFT JOIN (
@@ -1406,7 +1406,7 @@ def watchlist_export(
                     WHERE ticker NOT LIKE '%.TA'
                     GROUP BY ticker
                 )
-                SELECT s.*, c.company, c.sector, c.industry, c.logo_url, f.market_cap
+                SELECT s.*, c.company, c.sector, c.industry, c.logo_url, c.domain, f.market_cap
                 FROM watchlist w
                 JOIN latest    ON latest.ticker = w.ticker
                 JOIN signals s ON s.ticker = latest.ticker AND s.date = latest.d
@@ -1549,7 +1549,7 @@ def _build_historical_trades(mkt: str, start, end, include_lots: bool) -> list:
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
             SELECT tl.ticker, tl.buy_date, tl.buy_price, tl.sell_date, tl.sell_price, tl.return_pct,
-                   c.company, c.logo_url, c.industry, c.description, c.description_short,
+                   c.company, c.logo_url, c.industry, c.domain, c.description, c.description_short,
                    h.score AS health_fallback, h.reason AS health_reason,
                    sb.health_score AS health_signal
             FROM trade_log tl
@@ -2085,7 +2085,7 @@ def _build_open_trades(mkt: str, include_lots: bool = False) -> list[dict]:
         # Prefer latest company_health_history row over company_health so tickers
         # without a current snapshot still show health (MLKN etc.).
         df_meta = pd.read_sql(text(f"""
-            SELECT c.ticker, c.company, c.logo_url, c.industry, c.market,
+            SELECT c.ticker, c.company, c.logo_url, c.industry, c.market, c.domain,
                    c.description, c.description_short, f.market_cap,
                    CAST(COALESCE(
                        (SELECT score FROM company_health_history
@@ -2320,7 +2320,7 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         tp = {f"t{i}": t for i, t in enumerate(tickers)}
 
         meta = {r[0]: r for r in conn.execute(text(f"""
-            SELECT c.ticker, c.company, c.logo_url, c.industry,
+            SELECT c.ticker, c.company, c.logo_url, c.industry, c.domain,
                    f.market_cap,
                    COALESCE(eh.extended_close, lp.latest_close) AS latest_close,
                    pp.prev_close
