@@ -440,7 +440,11 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
         )
         # NO fallback to company_health — empty result must propagate as NaN.
     else:
-        analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+        analyst = pd.read_sql(
+            "SELECT ticker, target_mean_price, target_high_price, "
+            "target_low_price, number_of_analysts FROM analyst_expectations",
+            engine,
+        )
         health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
 
     df = features.merge(analyst, on="ticker", how="left")
