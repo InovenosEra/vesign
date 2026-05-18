@@ -398,7 +398,11 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
             health["health_score"] = pd.to_numeric(health["health_score"], errors="coerce")
         else:
             # First-time backfill of this date — fall back to current snapshot.
-            analyst = pd.read_sql("SELECT * FROM analyst_expectations", engine)
+            analyst = pd.read_sql(
+                "SELECT ticker, target_mean_price, target_high_price, "
+                "target_low_price, number_of_analysts FROM analyst_expectations",
+                engine,
+            )
             health = pd.read_sql("SELECT ticker, score AS health_score FROM company_health", engine)
     elif target_date:
         # Point-in-time analyst data with 90-day staleness cutoff.
