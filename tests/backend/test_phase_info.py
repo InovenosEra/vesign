@@ -18,18 +18,41 @@ def test_regular_session_midday():
     assert out["phase"] == "regular"
     assert out["next_event_name"] == "regular_close"
     assert out["next_event_utc"] == "2026-05-14T20:00:00+00:00"
+    # next_regular_event should be the regular_close
+    assert out["next_regular_event_name"] == "regular_close"
+    assert out["next_regular_event_utc"] == "2026-05-14T20:00:00+00:00"
 
 def test_pre_market():
     out = _pi(datetime(2026, 5, 14, 10, 0, tzinfo=timezone.utc))  # 06:00 ET
     assert out["phase"] == "pre"
     assert out["next_event_name"] == "regular_open"
     assert out["next_event_utc"] == "2026-05-14T13:30:00+00:00"
+    # next_regular_event should be today's regular_open
+    assert out["next_regular_event_name"] == "regular_open"
+    assert out["next_regular_event_utc"] == "2026-05-14T13:30:00+00:00"
 
 def test_post_market():
     out = _pi(datetime(2026, 5, 14, 22, 0, tzinfo=timezone.utc))  # 18:00 ET
     assert out["phase"] == "post"
     assert out["next_event_name"] == "post_close"
     assert out["next_event_utc"] == "2026-05-15T00:00:00+00:00"
+    # next_regular_event must be NEXT trading day's regular_open (Friday 5/15)
+    assert out["next_regular_event_name"] == "regular_open"
+    assert out["next_regular_event_utc"].startswith("2026-05-15T13:30:00")
+
+def test_idle_overnight_next_regular_event_is_today_open():
+    """Idle BEFORE today's pre-market — next regular event is today's regular_open."""
+    out = _pi(datetime(2026, 5, 14, 3, 0, tzinfo=timezone.utc))
+    assert out["phase"] == "idle"
+    assert out["next_regular_event_name"] == "regular_open"
+    assert out["next_regular_event_utc"] == "2026-05-14T13:30:00+00:00"
+
+def test_idle_weekend_next_regular_event_is_monday_open():
+    """Idle Saturday — next regular event is Monday's regular_open."""
+    out = _pi(datetime(2026, 5, 16, 12, 0, tzinfo=timezone.utc))
+    assert out["phase"] == "idle"
+    assert out["next_regular_event_name"] == "regular_open"
+    assert out["next_regular_event_utc"].startswith("2026-05-18T13:30:00")
 
 def test_idle_overnight_before_next_pre():
     # 03:00 UTC Thu 2026-05-14 → already past Wed's post_close (24:00 UTC = 2026-05-14T00:00:00),

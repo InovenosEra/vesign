@@ -329,22 +329,36 @@ function MarketStatus() {
     queryFn: () => getMarketStatus(market),
     refetchInterval: 60_000,
   })
-  const countdown = useCountdown(data?.next_event_utc)
+  // Countdown always tracks the next REGULAR trading boundary (open/close),
+  // never pre/post-market boundaries — matches the user's mental model.
+  const countdown = useCountdown(data?.next_regular_event_utc || data?.next_event_utc)
 
   if (!data) return null
-  return data.phase != null && data.phase !== 'idle'
-    ? (
+  const phase = data.phase
+
+  if (phase === 'regular') {
+    return (
       <span className="market-open" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
         <span><span className="dot-blink">●</span> {t('market.open')}</span>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>{t('market.closesIn', { countdown })}</span>
       </span>
     )
-    : (
-      <span className="market-closed" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-        <span>● {t('market.closed')}</span>
+  }
+  if (phase === 'pre' || phase === 'post') {
+    return (
+      <span className="market-extended" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+        <span>● {phase === 'pre' ? t('market.preMarket') : t('market.postMarket')}</span>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>{t('market.opensIn', { countdown })}</span>
       </span>
     )
+  }
+  // idle / closed
+  return (
+    <span className="market-closed" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+      <span>● {t('market.closed')}</span>
+      <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#cccccc', fontWeight: 'normal' }}>{t('market.opensIn', { countdown })}</span>
+    </span>
+  )
 }
 
 // ---------------------------------------------------------------------------

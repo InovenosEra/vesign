@@ -367,9 +367,17 @@ def _session_boundaries(session_date):
 
 
 def _phase_info(now_utc=None) -> dict:
-    """Returns {phase, next_event_utc, next_event_name} for NYSE.
+    """Returns {phase, next_event_utc, next_event_name,
+                next_regular_event_utc, next_regular_event_name} for NYSE.
+
     phase in {'idle','pre','regular','post'}.
     next_event_name in {'pre_open','regular_open','regular_close','post_close'}.
+
+    next_regular_event_* always points to the next REGULAR-hours boundary
+    (regular_open or regular_close), independent of pre/post-market sessions.
+    The frontend uses this for the "Opens in / Closes in" countdown so the
+    countdown always references regular trading hours.
+
     `now_utc` defaults to current UTC time; pass explicit value for testing."""
     if now_utc is None:
         now_utc = datetime.now(UTC)
@@ -379,21 +387,48 @@ def _phase_info(now_utc=None) -> dict:
     if bounds is not None:
         pre_open, reg_open, reg_close, post_close = bounds
         if now_utc < pre_open:
-            return _idle_until_today_pre(pre_open)
+            # idle before today's pre-market — next regular open is today's reg_open
+            return _add_regular(_idle_until_today_pre(pre_open), reg_open, "regular_open")
         if pre_open <= now_utc < reg_open:
-            return {"phase": "pre", "next_event_name": "regular_open",
-                    "next_event_utc": reg_open.isoformat()}
+            return _add_regular({"phase": "pre", "next_event_name": "regular_open",
+                                  "next_event_utc": reg_open.isoformat()},
+                                 reg_open, "regular_open")
         if reg_open <= now_utc < reg_close:
-            return {"phase": "regular", "next_event_name": "regular_close",
-                    "next_event_utc": reg_close.isoformat()}
+            return _add_regular({"phase": "regular", "next_event_name": "regular_close",
+                                  "next_event_utc": reg_close.isoformat()},
+                                 reg_close, "regular_close")
         if reg_close <= now_utc < post_close:
-            return {"phase": "post", "next_event_name": "post_close",
-                    "next_event_utc": post_close.isoformat()}
-        # past today's post_close: idle until next session's pre_open
-        return _idle_until_next_pre(today)
+            # post-market: next regular event is the NEXT session's regular_open
+            return _add_next_regular_open(
+                {"phase": "post", "next_event_name": "post_close",
+                 "next_event_utc": post_close.isoformat()},
+                today)
+        # past today's post_close: idle until next session
+        return _add_next_regular_open(_idle_until_next_pre(today), today)
 
-    # Not a session day (weekend / holiday): idle until next pre_open
-    return _idle_until_next_pre(today)
+    # Not a session day (weekend / holiday): idle until next session
+    return _add_next_regular_open(_idle_until_next_pre(today), today)
+
+
+def _add_regular(d: dict, regular_dt, name: str) -> dict:
+    """Attach next_regular_event_* fields pointing to a known regular boundary."""
+    d["next_regular_event_utc"] = regular_dt.isoformat()
+    d["next_regular_event_name"] = name
+    return d
+
+
+def _add_next_regular_open(d: dict, today) -> dict:
+    """Find the next session's regular_open after `today` and attach to dict."""
+    for delta in range(1, 11):
+        cand = today + _td(days=delta)
+        b = _session_boundaries(pd.Timestamp(cand))
+        if b is not None:
+            d["next_regular_event_utc"] = b[1].isoformat()
+            d["next_regular_event_name"] = "regular_open"
+            return d
+    d["next_regular_event_utc"] = None
+    d["next_regular_event_name"] = "regular_open"
+    return d
 
 
 def _idle_until_today_pre(pre_open):

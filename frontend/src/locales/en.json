@@ -6,6 +6,8 @@
 
   "market.open": "Market Open",
   "market.closed": "Market Closed",
+  "market.preMarket": "Pre-market",
+  "market.postMarket": "Post-market",
   "market.closedShort": "Closed",
   "market.closesIn": "Closes in {{countdown}}",
   "market.opensIn": "Opens in {{countdown}}",
