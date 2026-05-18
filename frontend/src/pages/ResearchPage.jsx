@@ -504,13 +504,24 @@ export default function ResearchPage() {
             background: 'linear-gradient(135deg, var(--surface) 0%, rgba(63,176,222,0.05) 100%)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              {research.logo_url && (
-                <img src={research.logo_url} alt=""
-                  className={WHITE_BG_LOGOS.has(research.ticker) ? 'logo logo-white-bg' : 'logo'}
-                  style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 14, flexShrink: 0 }}
-                  onError={e => e.target.style.display = 'none'}
-                />
-              )}
+              {research.logo_url && (() => {
+                const img = (
+                  <img src={research.logo_url} alt=""
+                    className={WHITE_BG_LOGOS.has(research.ticker) ? 'logo logo-white-bg' : 'logo'}
+                    style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 14, flexShrink: 0 }}
+                    onError={e => {
+                      const wrap = e.target.parentNode?.tagName === 'A' ? e.target.parentNode : e.target
+                      wrap.style.display = 'none'
+                    }}
+                  />
+                )
+                const href = research.domain
+                  ? `https://${research.domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+                  : null
+                return href
+                  ? <a href={href} target="_blank" rel="noopener noreferrer" title={href} style={{ lineHeight: 0, cursor: 'pointer' }}>{img}</a>
+                  : img
+              })()}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>{research.ticker}</span>
