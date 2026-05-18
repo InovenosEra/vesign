@@ -1,6 +1,6 @@
 const BASE = '/api'
 
-export const WHITE_BG_LOGOS = new Set(['CTVA', 'SNX', 'ZBH', 'PCTY', 'PENG', 'SM', 'SSTK', 'HWKN', 'CTS', 'PM', 'CGNX', 'UE', 'MS', 'H', 'EVR', 'PNFP', 'WH', 'APO', 'SPG', 'AKR', 'ST', 'KKR', 'TCBI', 'BGC', 'CATY', 'XEL', 'XRAY'])
+export const WHITE_BG_LOGOS = new Set(['CTVA', 'SNX', 'ZBH', 'PCTY', 'PENG', 'SM', 'SSTK', 'HWKN', 'CTS', 'PM', 'CGNX', 'UE', 'MS', 'H', 'EVR', 'PNFP', 'WH', 'APO', 'SPG', 'AKR', 'ST', 'KKR', 'TCBI', 'BGC', 'CATY', 'XEL', 'XRAY', 'OUST', 'CHKP'])
 
 export const COMPANY_NAME_OVERRIDES = {
   PM: 'Philip Morris',
