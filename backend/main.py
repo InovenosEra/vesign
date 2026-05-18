@@ -2868,11 +2868,12 @@ def research_ticker(
         "trade_count":         trade_count,
         "win_rate":            win_rate,
         "avg_return":          round(float(avg_return) * 100, 2) if avg_return is not None else None,
+        # ML score is a public field used by the modal "ML Score" row.
+        "prediction_score":    _v(row.get("prediction_score")),
         # Internal condition flags (used by AI report, not exposed as documented API)
         "_rsi_3day_flag":      _v(row.get("rsi_3day_flag")),
         "_volume_flag":        _v(row.get("volume_flag")),
         "_week52_condition":   _v(row.get("week52_condition")),
-        "_prediction_score":   _v(row.get("prediction_score")),
     }
 
 
@@ -2905,7 +2906,7 @@ def research_ai_report(ticker: str, body: AIReportBody, user=Depends(get_current
     upside = data.get("fair_value_upside") or 0
     vf = data.get("_volume_flag")
     w52 = data.get("_week52_condition")
-    ml = data.get("_prediction_score")
+    ml = data.get("prediction_score")
     health = data.get("health_score") or 0
 
     conditions = {
