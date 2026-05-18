@@ -2352,14 +2352,16 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         ticker, total_qty, total_cost, first_buy_date = r
         avg_price = (total_cost / total_qty) if total_qty else None
         m = meta.get(ticker)
-        mc = m[4] if m else None
-        latest_close = m[5] if m else None
-        prev_close = m[6] if m else None
+        # Column order: ticker, company, logo_url, industry, domain, market_cap, latest_close, prev_close
+        mc = m[5] if m else None
+        latest_close = m[6] if m else None
+        prev_close = m[7] if m else None
         result.append({
             "ticker": ticker,
             "company": m[1] if m else None,
             "logo_url": m[2] if m else None,
             "industry": m[3] if m else None,
+            "domain": m[4] if m else None,
             "market_cap": int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
             "total_qty": total_qty,
             "total_cost": round(total_cost, 2) if total_cost is not None else None,
