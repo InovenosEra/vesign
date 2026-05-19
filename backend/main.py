@@ -723,7 +723,6 @@ _MARKET_CAP_JOIN = """
             ON p1.ticker = p2.ticker AND p1.date = p2.max_date
     ) lp ON s.ticker = lp.ticker
     LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
-    LEFT JOIN extended_hours_prices eh ON eh.ticker = s.ticker AND eh.date = DATE(s.date)
 """
 
 _ANALYST_UPSIDE_SQL = """CASE WHEN COALESCE(ae.target_mean_price, s.target_mean_price) IS NOT NULL AND lp.latest_close IS NOT NULL AND lp.latest_close > 0
@@ -737,7 +736,7 @@ _signals_today_cache_lock = threading.Lock()
 def _build_signals_today(mkt: str) -> list[dict]:
     with engine.connect() as conn:
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, COALESCE(eh.extended_close, lp.latest_close, s.close) AS close, s.rsi,
+            SELECT s.date, s.ticker, COALESCE(lp.latest_close, s.close) AS close, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
@@ -851,7 +850,7 @@ def signals(
         total = count_row[0] if count_row else 0
 
         df = pd.read_sql(text(f"""
-            SELECT s.date, s.ticker, COALESCE(eh.extended_close, s.close) AS close, s.rsi,
+            SELECT s.date, s.ticker, s.close, s.rsi,
                    s.fair_value_upside,
                    s.target_mean_price, s.target_low_price, s.target_high_price,
                    s.prediction_score,
@@ -868,7 +867,7 @@ def signals(
                         ORDER BY recorded_at DESC LIMIT 1),
                        h.reason
                    ) AS health_reason,
-                   (COALESCE(eh.extended_close, s.close) * (
+                   (s.close * (
                        SELECT shares_outstanding FROM market_cap_history
                        WHERE ticker = s.ticker AND date <= DATE(s.date)
                        ORDER BY date DESC LIMIT 1
@@ -877,7 +876,6 @@ def signals(
             LEFT JOIN companies c ON s.ticker = c.ticker
             LEFT JOIN company_health h ON s.ticker = h.ticker
             LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
-            LEFT JOIN extended_hours_prices eh ON eh.ticker = s.ticker AND eh.date = DATE(s.date)
             {where}
             ORDER BY {sort_col} {direction}
             LIMIT :limit OFFSET :offset
@@ -1044,7 +1042,7 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
         df = pd.read_sql(text(f"""
             SELECT s.ticker, c.company, c.logo_url, c.industry, c.domain,
                    c.description, c.description_short,
-                   COALESCE(eh.extended_close, lp.latest_close, s.close) AS close, s.signal, s.vqs, s.rsi,
+                   COALESCE(lp.latest_close, s.close) AS close, s.signal, s.vqs, s.rsi,
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
@@ -2072,14 +2070,11 @@ def _build_open_trades(mkt: str, include_lots: bool = False) -> list[dict]:
         """)).fetchall()}
 
         # Step 4: latest price per ticker (IN query, ticker_date index)
-        # Prefer extended-hours close (post-market snapshot) when available.
         latest_prices = {r[0]: r[1] for r in conn.execute(text(f"""
-            SELECT dp.ticker, COALESCE(eh.extended_close, dp.close) AS current_price
+            SELECT dp.ticker, dp.close AS current_price
             FROM daily_prices dp
             JOIN (SELECT ticker, MAX(date) AS md FROM daily_prices WHERE ticker IN ({ph}) GROUP BY ticker) lp
                 ON dp.ticker = lp.ticker AND dp.date = lp.md
-            LEFT JOIN extended_hours_prices eh
-                ON eh.ticker = dp.ticker AND eh.date = DATE(dp.date)
         """), tp).fetchall()}
 
         # Step 5: company info + health + market cap (IN query, small result).
@@ -2324,7 +2319,7 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         meta = {r[0]: r for r in conn.execute(text(f"""
             SELECT c.ticker, c.company, c.logo_url, c.industry, c.domain,
                    f.market_cap,
-                   COALESCE(eh.extended_close, lp.latest_close) AS latest_close,
+                   lp.latest_close,
                    pp.prev_close
             FROM companies c
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
@@ -2335,8 +2330,6 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
                 INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
                     ON p1.ticker = p2.ticker AND p1.date = p2.max_date
             ) lp ON c.ticker = lp.ticker
-            LEFT JOIN extended_hours_prices eh
-                ON eh.ticker = lp.ticker AND eh.date = DATE(lp.max_date)
             LEFT JOIN (
                 SELECT ticker, close AS prev_close
                 FROM (
