@@ -52,6 +52,10 @@ def from_override(ticker: str, _domain: Optional[str]) -> Optional[bytes]:
     return _fetch(url) if url else None
 
 
+def from_fmp(ticker: str, _domain: Optional[str]) -> Optional[bytes]:
+    return _fetch(f"https://images.financialmodelingprep.com/symbol/{ticker}.png")
+
+
 def from_parqet(ticker: str, _domain: Optional[str]) -> Optional[bytes]:
     return _fetch(f"https://assets.parqet.com/logos/symbol/{ticker}?format=png")
 
@@ -69,6 +73,7 @@ def from_google_favicon(_ticker: str, domain: Optional[str]) -> Optional[bytes]:
 
 SOURCES: list[Callable[[str, Optional[str]], Optional[bytes]]] = [
     from_override,
+    from_fmp,
     from_parqet,
     from_logo_dev,
     from_google_favicon,
