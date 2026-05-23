@@ -3114,6 +3114,46 @@ def _warm_signals_today_cache_bg():
 threading.Thread(target=_warm_signals_today_cache_bg, daemon=True).start()
 
 # ---------------------------------------------------------------------------
+# Spotlight — daily "watch this" ticker for the Market page.
+# Computes the engine's best non-BUY non-SELL near-miss on demand. No schema
+# changes; see docs/superpowers/specs/2026-05-23-daily-spotlight-design.md
+# ---------------------------------------------------------------------------
+
+_spotlight_cache: dict[str, dict] = {}
+_spotlight_cache_lock = threading.Lock()
+
+
+def _build_spotlight_today() -> dict | None:
+    """Return the spotlight payload for the latest signals date, or None."""
+    return None  # stub — Task 2 wires the real query
+
+
+def _get_spotlight_today_cached() -> dict | None:
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT MAX(date) FROM signals")).fetchone()
+    max_date = row[0] if row else None
+    if max_date is None:
+        return None
+    today_iso = datetime.now(UTC).date().isoformat()
+    key = f"{today_iso}|{max_date}"
+    with _spotlight_cache_lock:
+        c = _spotlight_cache.get("v")
+        if c is not None and c["key"] == key:
+            return c["data"]
+        data = _build_spotlight_today()
+        _spotlight_cache["v"] = {"key": key, "data": data}
+        return data
+
+
+@app.get("/api/spotlight/today")
+def spotlight_today():
+    """Today's Spotlight ticker — engine's best non-BUY/non-SELL near-miss.
+
+    Public (no auth). Returns 200 + null body when no signals exist for today.
+    """
+    return _get_spotlight_today_cached()
+
+# ---------------------------------------------------------------------------
 # SPA static file serving (production)
 # Serve React build from FastAPI so only one process is needed.
 # API routes defined above take precedence; this catches everything else.
