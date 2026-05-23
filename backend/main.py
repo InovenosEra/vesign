@@ -3129,6 +3129,7 @@ def _build_spotlight_today() -> dict | None:
 
 
 def _get_spotlight_today_cached() -> dict | None:
+    # Always fetch MAX(date) so the cache auto-invalidates on the next pipeline write.
     with engine.connect() as conn:
         row = conn.execute(text("SELECT MAX(date) FROM signals")).fetchone()
     max_date = row[0] if row else None
@@ -3137,11 +3138,11 @@ def _get_spotlight_today_cached() -> dict | None:
     today_iso = datetime.now(UTC).date().isoformat()
     key = f"{today_iso}|{max_date}"
     with _spotlight_cache_lock:
-        c = _spotlight_cache.get("v")
+        c = _spotlight_cache.get("today")
         if c is not None and c["key"] == key:
             return c["data"]
         data = _build_spotlight_today()
-        _spotlight_cache["v"] = {"key": key, "data": data}
+        _spotlight_cache["today"] = {"key": key, "data": data}
         return data
 
 
