@@ -243,3 +243,25 @@ def test_day_change_pct_is_null_with_no_prior_row(spotlight_app):
     body = client.get("/api/spotlight/today").json()
     assert body["ticker"] == "NEW"
     assert body["day_change_pct"] is None
+
+
+def test_cache_invalidates_on_new_signals_date(spotlight_app):
+    bm, client = spotlight_app
+    _insert_company(bm, "OLD", "Old Picker")
+    _insert_company(bm, "NEW", "New Picker")
+    # Round 1: only OLD exists for May 22.
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="OLD",
+                   bb_condition=1, analyst_condition=1, volume_flag=1)
+
+    first = client.get("/api/spotlight/today").json()
+    assert first["ticker"] == "OLD"
+
+    # Round 2: pipeline writes May 23 with NEW as the new winner.
+    _insert_signal(bm, date="2026-05-23 00:00:00", ticker="NEW",
+                   bb_condition=1, analyst_condition=1, volume_flag=1,
+                   week52_condition=1, health_condition=1)
+
+    second = client.get("/api/spotlight/today").json()
+    assert second["ticker"] == "NEW", (
+        "Cache should have invalidated when signals max date moved to 2026-05-23"
+    )
