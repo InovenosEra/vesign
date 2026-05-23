@@ -128,8 +128,14 @@ _bearer = HTTPBearer(auto_error=False)
 
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)):
     # Dev-only bypass for local UI/UX mockup work. Never set on prod.
+    # BYPASS_USER_ID lets local dev impersonate a real Clerk account so the
+    # portfolio/watchlist endpoints return real seeded data; defaults to a
+    # synthetic id when unset.
     if os.getenv("BYPASS_AUTH") == "1":
-        return {"id": "dev-bypass", "email": "laufer.israel@gmail.com"}
+        return {
+            "id": os.getenv("BYPASS_USER_ID", "dev-bypass"),
+            "email": "laufer.israel@gmail.com",
+        }
 
     if credentials is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing token")
