@@ -638,6 +638,38 @@ def health():
     return {"status": "ok", "db_exists": os.path.exists(DB_PATH)}
 
 
+@app.get("/api/stats")
+def public_stats():
+    """Public marketing stats — closed-trade aggregates + universe size.
+
+    Unauthenticated by design: drives the logged-out landing / login /
+    request-access pages. US-only (excludes .TA tickers). return_pct is a
+    fraction in trade_log, so yields are ×100 here.
+    """
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT
+                COUNT(*) AS n,
+                AVG(CASE WHEN return_pct > 0 THEN 1.0 ELSE 0.0 END) AS win_frac,
+                AVG(return_pct) AS avg_ret,
+                AVG(julianday(sell_date) - julianday(buy_date)) AS avg_days
+            FROM trade_log
+            WHERE ticker NOT LIKE '%.TA'
+        """)).mappings().fetchone()
+        tickers = conn.execute(text("""
+            SELECT COUNT(*) FROM companies WHERE COALESCE(market, 'US') = 'US'
+        """)).scalar()
+
+    n = int(row["n"] or 0)
+    return {
+        "closed_trades": n,
+        "win_rate": round(row["win_frac"] * 100, 1) if row["win_frac"] is not None else None,
+        "avg_yield": round(row["avg_ret"] * 100, 1) if row["avg_ret"] is not None else None,
+        "avg_hold_days": round(row["avg_days"]) if row["avg_days"] is not None else None,
+        "tickers_tracked": int(tickers or 0),
+    }
+
+
 # --- Market status ----------------------------------------------------------
 
 @protected.get("/api/market/status")
