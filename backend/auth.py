@@ -123,10 +123,17 @@ def _verify_token(token: str) -> dict:
 # FastAPI dependency
 # ---------------------------------------------------------------------------
 
-_bearer = HTTPBearer()
+_bearer = HTTPBearer(auto_error=False)
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer)):
+def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)):
+    # Dev-only bypass for local UI/UX mockup work. Never set on prod.
+    if os.getenv("BYPASS_AUTH") == "1":
+        return {"id": "dev-bypass", "email": "laufer.israel@gmail.com"}
+
+    if credentials is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing token")
+
     try:
         payload = _verify_token(credentials.credentials)
         user_id: str = payload.get("sub")
