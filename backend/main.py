@@ -3922,6 +3922,61 @@ def market_earnings_week():
     return _get_market_earnings_week_cached()
 
 
+_IMPACT_TO_IMPORTANCE = {"low": 1, "medium": 2, "high": 3}
+
+
+def _fetch_economic_calendar(start: str, end: str) -> list | None:
+    from data import fmp as _fmp
+    try:
+        items = _fmp._get("economic-calendar", {"from": start, "to": end}) or []
+    except Exception:
+        return None
+    if not isinstance(items, list):
+        return None
+    return items
+
+
+def _build_market_economic_calendar(days: int) -> dict:
+    today = datetime.now(UTC).date()
+    end = today + _td(days=days)
+    items = _fetch_economic_calendar(today.isoformat(), end.isoformat()) or []
+    events = []
+    for it in items:
+        if (it.get("country") or "").upper() != "US":
+            continue
+        importance = _IMPACT_TO_IMPORTANCE.get(
+            (it.get("impact") or "").strip().lower()
+        )
+        events.append({
+            "date": it.get("date") or None,
+            "event": it.get("event") or "",
+            "country": "US",
+            "importance": importance,
+            "estimate": it.get("estimate"),
+            "prior": it.get("previous"),
+            "actual": it.get("actual"),
+        })
+    return {"events": events}
+
+
+def _get_market_economic_calendar_cached(days: int) -> dict:
+    key = f"econ:{days}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _CALENDAR_CACHE_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_economic_calendar(days)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/economic-calendar")
+def market_economic_calendar(days: int = 7):
+    """US macro events for the next `days` days (FMP). Importance ∈ {1,2,3}."""
+    return _get_market_economic_calendar_cached(days)
+
+
 app.include_router(protected)
 
 
