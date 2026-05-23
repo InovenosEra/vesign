@@ -3043,9 +3043,6 @@ def pipeline_status():
     return {"status": "success" if ret == 0 else "error", "exit_code": ret, "log": log_tail}
 
 
-app.include_router(protected)
-
-
 # Warm the Vesign performance cache in a background thread so the first request
 # of the day doesn't pay the ~4s build cost.
 def _warm_vesign_cache_bg():
@@ -3236,13 +3233,17 @@ def _get_spotlight_today_cached() -> dict | None:
         return data
 
 
-@app.get("/api/spotlight/today")
+@protected.get("/api/spotlight/today")
 def spotlight_today():
     """Today's Spotlight ticker — engine's best non-BUY/non-SELL near-miss.
 
-    Public (no auth). Returns 200 + null body when no signals exist for today.
+    Requires authentication. Returns 200 + null body when no signals exist for today.
     """
     return _get_spotlight_today_cached()
+
+
+app.include_router(protected)
+
 
 # ---------------------------------------------------------------------------
 # SPA static file serving (production)

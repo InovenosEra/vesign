@@ -15,6 +15,7 @@ def spotlight_app():
     tmpdir = tempfile.mkdtemp()
     db_path = os.path.join(tmpdir, "test_spotlight.db")
     os.environ["DB_PATH"] = db_path
+    os.environ["BYPASS_AUTH"] = "1"
 
     # Create tables BEFORE importing backend.main (which calls _ensure_indexes at module load)
     from sqlalchemy import create_engine, text
