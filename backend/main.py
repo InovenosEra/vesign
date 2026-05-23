@@ -3545,6 +3545,54 @@ def market_sectors():
     return _get_market_sectors_cached()
 
 
+_TAPE_TICKERS = [
+    "SPY", "QQQ", "DIA", "IWM", "VIX",
+    "NVDA", "MSFT", "AAPL", "META", "TSLA",
+    "AMZN", "GOOGL", "MU", "PM", "MTD", "JPM",
+]
+
+
+def _build_market_tape() -> dict:
+    """One-roundtrip payload for the 32px tape ticker: 16 tickers × {close, change_pct}."""
+    out = []
+    with engine.connect() as conn:
+        for ticker in _TAPE_TICKERS:
+            if ticker == "VIX":
+                rows = conn.execute(
+                    text("SELECT close FROM vix ORDER BY date DESC LIMIT 2")
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    text("SELECT close FROM daily_prices "
+                         "WHERE ticker = :t ORDER BY date DESC LIMIT 2"),
+                    {"t": ticker},
+                ).fetchall()
+            closes = [r[0] for r in rows]  # newest, prev
+            close = closes[0] if closes else None
+            change_pct = None
+            if len(closes) >= 2 and closes[1] not in (None, 0) and close is not None:
+                change_pct = round((close - closes[1]) / closes[1] * 100, 4)
+            out.append({"ticker": ticker, "close": close, "change_pct": change_pct})
+    return {"tape": out}
+
+
+def _get_market_tape_cached() -> dict:
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get("tape")
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_tape()
+        _market_cache["tape"] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/tape")
+def market_tape():
+    """16-ticker tape strip — single roundtrip for the looped marquee at the top of /market."""
+    return _get_market_tape_cached()
+
+
 app.include_router(protected)
 
 
