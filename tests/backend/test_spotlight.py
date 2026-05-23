@@ -192,3 +192,27 @@ def test_tiebreak_falls_through_to_ticker_when_all_equal(spotlight_app):
 
     resp = client.get("/api/spotlight/today")
     assert resp.json()["ticker"] == "AAA"  # alphabetical fallback
+
+
+def test_response_includes_seven_reasons_with_correct_met_flags(spotlight_app):
+    bm, client = spotlight_app
+    _insert_company(bm, "INTU", "Intuit", domain="intuit.com")
+    # 6 of 7 gates met; rsi_3day_flag=1 (needs 3) is the only "not met"
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="INTU",
+                   rsi_3day_flag=1,
+                   bb_condition=1, analyst_condition=1, volume_flag=1,
+                   week52_condition=1, health_condition=1, ml_condition=1,
+                   close=612.34)
+
+    body = client.get("/api/spotlight/today").json()
+    assert body["ticker"] == "INTU"
+    reasons = body["reasons"]
+    assert len(reasons) == 7
+    by_gate = {r["gate"]: r for r in reasons}
+    assert by_gate["rsi_3day_flag"]["met"] is False
+    assert by_gate["rsi_3day_flag"]["value"] == 1
+    assert by_gate["rsi_3day_flag"]["needed"] == 3
+    assert by_gate["rsi_3day_flag"]["label"] == "RSI<30 for 3 consecutive days"
+    for g in ("bb_condition", "analyst_condition", "volume_flag",
+              "week52_condition", "health_condition", "ml_condition"):
+        assert by_gate[g]["met"] is True, f"{g} should be met"
