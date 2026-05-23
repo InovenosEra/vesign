@@ -11,7 +11,7 @@ import sys
 import tempfile
 from datetime import datetime, UTC, date
 from fpdf import FPDF
-from typing import Optional
+from typing import Literal, Optional
 
 import pandas as pd
 import exchange_calendars as xcals
@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import create_engine, text, event as sa_event
+from sqlalchemy import bindparam, create_engine, text, event as sa_event
 from sqlalchemy.pool import NullPool
 from backend.auth import get_current_user
 from backend.yield_calcs import avg_cost_dollar_weighted, Lot, simulate_bank_hand
@@ -3313,6 +3313,77 @@ def _get_market_indices_cached() -> dict:
 def market_indices():
     """5 headline indices (SPY/QQQ/DIA/IWM/VIX) with 30-day sparkline."""
     return _get_market_indices_cached()
+
+
+_MOVERS_EXCLUDE = ("SPY", "VOO")  # ETFs/funds shouldn't crowd the top movers panel
+
+
+def _build_market_movers(mover_type: str, limit: int) -> dict:
+    """Top N US tickers ranked by 1-day change % (gainers/losers) or volume (active)."""
+    sort_clause = {
+        "gainers": "change_pct DESC NULLS LAST",
+        "losers":  "change_pct ASC NULLS LAST",
+        "active":  "today.volume DESC NULLS LAST",
+    }[mover_type]
+    sql = text(f"""
+        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
+        prev_bounds AS (
+            SELECT MAX(dp.date) AS prev
+            FROM daily_prices dp, bounds b
+            WHERE dp.date < b.today
+        )
+        SELECT
+            today.ticker, c.company, today.close, today.volume,
+            CASE
+              WHEN prev.close IS NULL OR prev.close = 0 THEN NULL
+              ELSE ROUND((today.close - prev.close) / prev.close * 100.0, 4)
+            END AS change_pct
+        FROM daily_prices today
+        JOIN bounds b ON today.date = b.today
+        LEFT JOIN daily_prices prev
+          ON prev.ticker = today.ticker
+         AND prev.date = (SELECT prev FROM prev_bounds)
+        JOIN companies c ON c.ticker = today.ticker
+        WHERE COALESCE(c.market, 'US') = 'US'
+          AND today.ticker NOT IN :exclude
+        ORDER BY {sort_clause}
+        LIMIT :limit
+    """).bindparams(bindparam("exclude", expanding=True))
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"exclude": list(_MOVERS_EXCLUDE), "limit": limit}).mappings().all()
+    return {
+        "movers": [
+            {
+                "ticker": r["ticker"],
+                "company": r["company"],
+                "close": r["close"],
+                "volume": r["volume"],
+                "change_pct": r["change_pct"],
+            }
+            for r in rows
+        ]
+    }
+
+
+def _get_market_movers_cached(mover_type: str, limit: int) -> dict:
+    key = f"movers:{mover_type}:{limit}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_movers(mover_type, limit)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/movers")
+def market_movers(
+    type: Literal["gainers", "losers", "active"] = "gainers",
+    limit: int = 5,
+):
+    """Top US gainers / losers / most-active tickers vs. prior trading day."""
+    return _get_market_movers_cached(type, limit)
 
 
 app.include_router(protected)
