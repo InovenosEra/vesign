@@ -158,3 +158,37 @@ def test_excludes_buy_and_sell_tickers(spotlight_app):
     body = resp.json()
     assert body["ticker"] == "XXX"
     assert body["gates_met"] == 5
+
+
+def test_tiebreak_vqs_then_pred_then_ticker(spotlight_app):
+    bm, client = spotlight_app
+    # Three tickers at 5/7 gates each; differentiate via vqs/pred/ticker.
+    _insert_company(bm, "AAA", "Alpha")
+    _insert_company(bm, "BBB", "Beta")
+    _insert_company(bm, "CCC", "Gamma")
+    # All have the same 5 gates; only vqs/pred/ticker differ.
+    common = dict(bb_condition=1, analyst_condition=1, volume_flag=1,
+                  week52_condition=1, health_condition=1)
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="AAA",
+                   vqs=3, pred_5d=0.01, prediction_score=0.5, **common)
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="BBB",
+                   vqs=5, pred_5d=0.01, prediction_score=0.2, **common)  # vqs winner
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="CCC",
+                   vqs=3, pred_5d=0.02, prediction_score=0.9, **common)
+
+    resp = client.get("/api/spotlight/today")
+    assert resp.json()["ticker"] == "BBB"
+
+
+def test_tiebreak_falls_through_to_ticker_when_all_equal(spotlight_app):
+    bm, client = spotlight_app
+    _insert_company(bm, "BBB", "Beta")
+    _insert_company(bm, "AAA", "Alpha")  # inserted second to confirm order is alphabetical, not insertion
+    common = dict(bb_condition=1, analyst_condition=1, volume_flag=1,
+                  week52_condition=1, health_condition=1,
+                  vqs=2, pred_5d=0.01, prediction_score=0.5)
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="BBB", **common)
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="AAA", **common)
+
+    resp = client.get("/api/spotlight/today")
+    assert resp.json()["ticker"] == "AAA"  # alphabetical fallback
