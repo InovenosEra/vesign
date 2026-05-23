@@ -3134,7 +3134,7 @@ def _build_spotlight_today() -> dict | None:
         SELECT
             s.date AS signal_date,
             s.ticker, c.company, c.domain,
-            s.close, s.pred_5d, s.prediction_score, s.vqs,
+            s.close, p.pred_5d, s.prediction_score, s.vqs,
             s.rsi_3day_flag, s.bb_condition, s.analyst_condition,
             s.volume_flag, s.week52_condition, s.health_condition, s.ml_condition,
             prev.close AS prev_close,
@@ -3147,6 +3147,9 @@ def _build_spotlight_today() -> dict | None:
              + COALESCE(s.ml_condition, 0)) AS gates_met
         FROM signals s
         LEFT JOIN companies c ON c.ticker = s.ticker
+        LEFT JOIN predictions p
+          ON p.ticker = s.ticker
+          AND p.date = s.date
         LEFT JOIN signals prev
           ON prev.ticker = s.ticker
           AND prev.date = (

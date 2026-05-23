@@ -27,7 +27,7 @@ def spotlight_app():
                 bb_condition INTEGER, analyst_condition INTEGER,
                 volume_flag INTEGER, week52_condition INTEGER,
                 health_condition INTEGER, ml_condition INTEGER,
-                vqs INTEGER, pred_5d REAL, prediction_score REAL,
+                vqs INTEGER, prediction_score REAL,
                 lot_seq INTEGER, fair_value_upside REAL,
                 target_mean_price REAL, target_low_price REAL, target_high_price REAL,
                 health_score INTEGER
@@ -43,6 +43,13 @@ def spotlight_app():
         conn.execute(text("""
             CREATE TABLE company_health_history (
                 ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE predictions (
+                date TEXT, ticker TEXT,
+                pred_5d REAL, pred_20d REAL, prediction_score REAL,
+                model_cutoff TEXT
             )
         """))
     temp_engine.dispose()
@@ -93,21 +100,25 @@ def _insert_signal(bm, *, date, ticker, signal="HOLD", close=100.0,
                 date, ticker, signal, close,
                 rsi_3day_flag, bb_condition, analyst_condition,
                 volume_flag, week52_condition, health_condition, ml_condition,
-                vqs, pred_5d, prediction_score
+                vqs, prediction_score
             ) VALUES (
                 :date, :ticker, :signal, :close,
                 :rsi_3day_flag, :bb_condition, :analyst_condition,
                 :volume_flag, :week52_condition, :health_condition, :ml_condition,
-                :vqs, :pred_5d, :prediction_score
+                :vqs, :prediction_score
             )
         """), dict(
             date=date, ticker=ticker, signal=signal, close=close,
             rsi_3day_flag=rsi_3day_flag, bb_condition=bb_condition,
             analyst_condition=analyst_condition, volume_flag=volume_flag,
             week52_condition=week52_condition, health_condition=health_condition,
-            ml_condition=ml_condition, vqs=vqs, pred_5d=pred_5d,
+            ml_condition=ml_condition, vqs=vqs,
             prediction_score=prediction_score,
         ))
+        conn.execute(text("""
+            INSERT INTO predictions (date, ticker, pred_5d, pred_20d, prediction_score)
+            VALUES (:date, :ticker, :pred_5d, NULL, :prediction_score)
+        """), dict(date=date, ticker=ticker, pred_5d=pred_5d, prediction_score=prediction_score))
 
 
 def test_picks_ticker_with_most_v1_gates(spotlight_app):
