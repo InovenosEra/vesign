@@ -3593,6 +3593,102 @@ def market_tape():
     return _get_market_tape_cached()
 
 
+_ANALYST_CACHE_TTL_SECONDS = 5 * 60  # spec §2: news + analyst use a 5-min cache
+
+
+def _build_market_analyst_changes(days: int, limit: int) -> dict:
+    """Top US tickers ranked by |Δ target_mean_price| over the last `days` days.
+
+    Classification:
+      INITIATE  — ticker has today's row but none on the comparison date
+      RAISE-TP  — target_mean_price went up
+      LOWER-TP  — target_mean_price went down
+    No-change tickers are excluded (per "top changes" framing). UPGRADE /
+    DOWNGRADE are not produced — analyst_targets_history has no rating data,
+    only consensus TP.
+    """
+    sql = text("""
+        WITH latest AS (
+            SELECT MAX(date) AS d FROM analyst_targets_history
+        ),
+        today AS (
+            SELECT h.ticker, h.target_mean_price, h.source, h.date
+            FROM analyst_targets_history h, latest l
+            WHERE h.date = l.d AND h.target_mean_price IS NOT NULL
+        ),
+        prev AS (
+            SELECT h.ticker, h.target_mean_price
+            FROM analyst_targets_history h, latest l
+            WHERE h.date = date(l.d, '-' || :days || ' days')
+              AND h.target_mean_price IS NOT NULL
+        )
+        SELECT
+            t.ticker, c.company, t.target_mean_price AS tp_now,
+            p.target_mean_price AS tp_prev, t.source, t.date AS as_of
+        FROM today t
+        LEFT JOIN companies c ON c.ticker = t.ticker
+        LEFT JOIN prev p ON p.ticker = t.ticker
+        WHERE COALESCE(c.market, 'US') = 'US'
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"days": days}).mappings().all()
+
+    classified = []
+    for r in rows:
+        tp_now = r["tp_now"]
+        tp_prev = r["tp_prev"]
+        if tp_prev is None:
+            classified.append({
+                "ticker": r["ticker"],
+                "company": r["company"],
+                "kind": "INITIATE",
+                "target_mean_price": tp_now,
+                "prev_target_mean_price": None,
+                "change_pct": None,
+                "abs_change_pct": 0.0,  # initiates float to the end of the sort
+                "date": r["as_of"],
+                "source": r["source"],
+            })
+            continue
+        if tp_prev == 0 or tp_now == tp_prev:
+            continue  # excluded: flat or undefined
+        change_pct = (tp_now - tp_prev) / tp_prev * 100.0
+        classified.append({
+            "ticker": r["ticker"],
+            "company": r["company"],
+            "kind": "RAISE-TP" if change_pct > 0 else "LOWER-TP",
+            "target_mean_price": tp_now,
+            "prev_target_mean_price": tp_prev,
+            "change_pct": round(change_pct, 4),
+            "abs_change_pct": abs(change_pct),
+            "date": r["as_of"],
+            "source": r["source"],
+        })
+
+    classified.sort(key=lambda x: x["abs_change_pct"], reverse=True)
+    for x in classified:
+        del x["abs_change_pct"]
+    return {"changes": classified[:limit]}
+
+
+def _get_market_analyst_changes_cached(days: int, limit: int) -> dict:
+    key = f"analyst-changes:{days}:{limit}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _ANALYST_CACHE_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_analyst_changes(days, limit)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/analyst-changes/top")
+def market_analyst_changes_top(days: int = 1, limit: int = 5):
+    """Top |Δ TP| moves over the trailing `days` days, ranked, classified."""
+    return _get_market_analyst_changes_cached(days, limit)
+
+
 app.include_router(protected)
 
 
