@@ -3124,8 +3124,95 @@ _spotlight_cache_lock = threading.Lock()
 
 
 def _build_spotlight_today() -> dict | None:
-    """Return the spotlight payload for the latest signals date, or None."""
-    return None  # stub — Task 2 wires the real query
+    """Compute today's Spotlight ticker, or None if no qualifying row exists.
+
+    Ranking: highest V1 gates met, tiebreak by vqs DESC, prediction_score DESC,
+    ticker ASC (deterministic). Excludes today's BUY and SELL tickers so the
+    Spotlight never collides with the canonical signals. US-only.
+    """
+    sql = text("""
+        SELECT
+            s.date AS signal_date,
+            s.ticker, c.company, c.domain,
+            s.close, s.pred_5d, s.prediction_score, s.vqs,
+            s.rsi_3day_flag, s.bb_condition, s.analyst_condition,
+            s.volume_flag, s.week52_condition, s.health_condition, s.ml_condition,
+            prev.close AS prev_close,
+            (CASE WHEN s.rsi_3day_flag = 3 THEN 1 ELSE 0 END
+             + COALESCE(s.bb_condition, 0)
+             + COALESCE(s.analyst_condition, 0)
+             + COALESCE(s.volume_flag, 0)
+             + COALESCE(s.week52_condition, 0)
+             + COALESCE(s.health_condition, 0)
+             + COALESCE(s.ml_condition, 0)) AS gates_met
+        FROM signals s
+        LEFT JOIN companies c ON c.ticker = s.ticker
+        LEFT JOIN signals prev
+          ON prev.ticker = s.ticker
+          AND prev.date = (
+            SELECT MAX(date) FROM signals
+            WHERE ticker = s.ticker AND date < s.date
+          )
+        WHERE s.date = (SELECT MAX(date) FROM signals)
+          AND s.signal NOT IN ('BUY', 'SELL')
+          AND COALESCE(c.market, 'US') = 'US'
+        ORDER BY gates_met DESC,
+                 s.vqs DESC,
+                 s.prediction_score DESC,
+                 s.ticker ASC
+        LIMIT 1
+    """)
+    with engine.connect() as conn:
+        row = conn.execute(sql).mappings().fetchone()
+    if row is None:
+        return None
+
+    close = row["close"]
+    prev_close = row["prev_close"]
+    day_change_pct = (
+        round((close - prev_close) / prev_close * 100, 4)
+        if prev_close not in (None, 0) and close is not None
+        else None
+    )
+
+    gate_labels = {
+        "rsi_3day_flag":    "RSI<30 for 3 consecutive days",
+        "bb_condition":     "Bollinger oversold",
+        "analyst_condition":"Analyst target upside",
+        "volume_flag":      "Volume confirmation",
+        "week52_condition": "Near 52-week low",
+        "health_condition": "Company health pass",
+        "ml_condition":     "ML model positive",
+    }
+    reasons = []
+    for gate, label in gate_labels.items():
+        if gate == "rsi_3day_flag":
+            val = row["rsi_3day_flag"]
+            met = val == 3
+            reasons.append({
+                "gate": gate, "met": met, "label": label,
+                "value": val, "needed": 3,
+            })
+        else:
+            met = bool(row[gate]) if row[gate] is not None else False
+            reasons.append({"gate": gate, "met": met, "label": label})
+
+    signal_date = row["signal_date"]
+    date_str = str(signal_date).split(" ")[0] if signal_date else None
+
+    return {
+        "date": date_str,
+        "ticker": row["ticker"],
+        "company": row["company"],
+        "domain": row["domain"],
+        "close": close,
+        "day_change_pct": day_change_pct,
+        "gates_met": int(row["gates_met"]),
+        "gates_total": 7,
+        "vqs": int(row["vqs"]) if row["vqs"] is not None else 0,
+        "ml_pred_5d": row["pred_5d"],
+        "reasons": reasons,
+    }
 
 
 def _get_spotlight_today_cached() -> dict | None:
