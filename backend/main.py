@@ -3689,6 +3689,94 @@ def market_analyst_changes_top(days: int = 1, limit: int = 5):
     return _get_market_analyst_changes_cached(days, limit)
 
 
+_CROSS_TICKERS = [
+    ("DX-Y.NYB", "USD Index"),
+    ("^TNX",     "10Y Yield"),
+    ("GC=F",     "Gold"),
+    ("CL=F",     "Crude Oil"),
+    ("BTC-USD",  "Bitcoin"),
+    ("EURUSD=X", "EUR / USD"),
+]
+
+
+def _fetch_cross_quotes() -> dict | None:
+    """Pull current + prior close for the cross-market tickers from yfinance.
+
+    Returns {ticker: {price, prev_close}} on success, or None on hard failure
+    (the caller then falls back to the last cached value with stale=true).
+    FMP does not cover these symbols (currency/yield/futures), so there is no
+    second-source fallback inside this helper.
+    """
+    try:
+        tickers = [t for t, _ in _CROSS_TICKERS]
+        raw = yf.download(
+            " ".join(tickers), period="5d", auto_adjust=False, progress=False
+        )
+        if raw is None or raw.empty:
+            return None
+    except Exception:
+        return None
+    out: dict = {}
+    for ticker, _ in _CROSS_TICKERS:
+        try:
+            closes = _extract_close_series(raw, ticker)
+            if len(closes) >= 2:
+                out[ticker] = {"price": float(closes.iloc[-1]),
+                               "prev_close": float(closes.iloc[-2])}
+            elif len(closes) == 1:
+                out[ticker] = {"price": float(closes.iloc[-1]), "prev_close": None}
+        except Exception:
+            continue
+    return out or None
+
+
+def _build_market_cross() -> dict:
+    """Compose the cross-market strip. On fetch failure, fall back to cached + stale."""
+    raw = _fetch_cross_quotes()
+    if raw:
+        rows = []
+        for ticker, label in _CROSS_TICKERS:
+            q = raw.get(ticker)
+            if not q:
+                continue
+            price = q.get("price")
+            prev = q.get("prev_close")
+            change_pct = None
+            if price is not None and prev not in (None, 0):
+                change_pct = round((price - prev) / prev * 100, 4)
+            rows.append({
+                "ticker": ticker, "label": label,
+                "price": price, "change_pct": change_pct, "stale": False,
+            })
+        return {"cross": rows}
+
+    # Hard failure: serve last fresh response with stale=true.
+    cached = _market_cache.get("cross_last_good")
+    if cached is None:
+        return {"cross": []}
+    return {"cross": [{**r, "stale": True} for r in cached["data"]["cross"]]}
+
+
+def _get_market_cross_cached() -> dict:
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get("cross")
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_cross()
+        _market_cache["cross"] = {"t": now, "data": data}
+        # Preserve the last fresh (non-stale) snapshot for future fallback use.
+        if data["cross"] and not any(r.get("stale") for r in data["cross"]):
+            _market_cache["cross_last_good"] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/cross")
+def market_cross():
+    """USD/10Y/Gold/Oil/BTC/EURUSD strip via yfinance; stale=true on fetch failure."""
+    return _get_market_cross_cached()
+
+
 app.include_router(protected)
 
 
