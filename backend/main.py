@@ -3472,6 +3472,79 @@ def market_breadth():
     return _get_market_breadth_cached()
 
 
+def _build_market_sectors() -> dict:
+    """Per-sector market-cap-weighted % change + top-3 movers by absolute change."""
+    sql = text("""
+        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
+        prev_bounds AS (
+            SELECT MAX(dp.date) AS prev
+            FROM daily_prices dp, bounds b WHERE dp.date < b.today
+        ),
+        ticker_change AS (
+            SELECT
+                c.ticker, c.sector, f.market_cap,
+                ((t.close - p.close) / p.close * 100.0) AS change_pct
+            FROM companies c
+            JOIN daily_prices t
+              ON t.ticker = c.ticker AND t.date = (SELECT today FROM bounds)
+            JOIN daily_prices p
+              ON p.ticker = c.ticker AND p.date = (SELECT prev FROM prev_bounds)
+            JOIN fundamentals f ON f.ticker = c.ticker
+            WHERE COALESCE(c.market, 'US') = 'US'
+              AND c.sector IS NOT NULL
+              AND f.market_cap IS NOT NULL
+              AND f.market_cap > 0
+              AND p.close IS NOT NULL AND p.close <> 0
+        )
+        SELECT ticker, sector, market_cap, change_pct
+        FROM ticker_change
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(sql).mappings().all()
+
+    by_sector: dict[str, list[dict]] = {}
+    for r in rows:
+        by_sector.setdefault(r["sector"], []).append({
+            "ticker": r["ticker"],
+            "market_cap": r["market_cap"],
+            "change_pct": r["change_pct"],
+        })
+
+    sectors_out = []
+    for sector_name, items in by_sector.items():
+        total_mc = sum(x["market_cap"] for x in items)
+        weighted = sum(x["market_cap"] * x["change_pct"] for x in items) / total_mc
+        top_movers = sorted(items, key=lambda x: abs(x["change_pct"]), reverse=True)[:3]
+        sectors_out.append({
+            "sector": sector_name,
+            "change_pct": round(weighted, 4),
+            "top_movers": [
+                {"ticker": m["ticker"], "change_pct": round(m["change_pct"], 4)}
+                for m in top_movers
+            ],
+        })
+
+    sectors_out.sort(key=lambda s: s["change_pct"], reverse=True)
+    return {"sectors": sectors_out}
+
+
+def _get_market_sectors_cached() -> dict:
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get("sectors")
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_sectors()
+        _market_cache["sectors"] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/sectors")
+def market_sectors():
+    """US sectors: market-cap-weighted % change + top-3 movers by absolute %."""
+    return _get_market_sectors_cached()
+
+
 app.include_router(protected)
 
 

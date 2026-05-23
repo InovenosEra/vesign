@@ -1,0 +1,162 @@
+"""Tests for GET /api/market/sectors — market-cap-weighted sector heatmap."""
+import os
+import tempfile
+import pytest
+from fastapi.testclient import TestClient
+
+
+@pytest.fixture
+def sectors_app():
+    tmpdir = tempfile.mkdtemp()
+    db_path = os.path.join(tmpdir, "test_market_sectors.db")
+    os.environ["DB_PATH"] = db_path
+    os.environ["BYPASS_AUTH"] = "1"
+
+    from sqlalchemy import create_engine, text
+    temp_engine = create_engine(f"sqlite:///{db_path}", poolclass=None)
+    with temp_engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE daily_prices (
+                date DATETIME, ticker TEXT,
+                open FLOAT, high FLOAT, low FLOAT, close FLOAT,
+                volume BIGINT
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE companies (
+                ticker TEXT PRIMARY KEY, company TEXT, sector TEXT, market TEXT,
+                industry TEXT, description TEXT, description_short TEXT,
+                logo_url TEXT, domain TEXT
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE fundamentals (ticker TEXT, market_cap REAL)
+        """))
+        conn.execute(text("""
+            CREATE TABLE company_health_history (
+                ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT
+            )
+        """))
+    temp_engine.dispose()
+
+    import importlib
+    import backend.main as bm
+    importlib.reload(bm)
+    yield bm, TestClient(bm.app)
+
+    for fname in os.listdir(tmpdir):
+        try:
+            os.remove(os.path.join(tmpdir, fname))
+        except OSError:
+            pass
+    try:
+        os.rmdir(tmpdir)
+    except OSError:
+        pass
+
+
+def _insert_company(bm, ticker, sector, market="US"):
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO companies (ticker, company, sector, market)
+            VALUES (:t, :t, :s, :m)
+        """), {"t": ticker, "s": sector, "m": market})
+
+
+def _insert_mc(bm, ticker, market_cap):
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO fundamentals (ticker, market_cap) VALUES (:t, :mc)
+        """), {"t": ticker, "mc": market_cap})
+
+
+def _insert_two_day(bm, ticker, prev, today):
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        for d, c in [("2026-05-21 00:00:00", prev), ("2026-05-22 00:00:00", today)]:
+            conn.execute(text("""
+                INSERT INTO daily_prices (date, ticker, open, high, low, close, volume)
+                VALUES (:d, :t, :c, :c, :c, :c, 0)
+            """), {"d": d, "t": ticker, "c": c})
+
+
+def test_returns_one_row_per_sector_with_weighted_change_and_top_movers(sectors_app):
+    bm, client = sectors_app
+    # Tech: NVDA (huge cap, +2%), MSFT (mid cap, -1%), AAPL (mid cap, +0.5%)
+    for t, mc, prev, today in [
+        ("NVDA", 5_000_000_000_000, 100.0, 102.0),  # +2.0%
+        ("MSFT", 3_000_000_000_000, 100.0,  99.0),  # -1.0%
+        ("AAPL", 4_000_000_000_000, 100.0, 100.5),  # +0.5%
+    ]:
+        _insert_company(bm, t, "Information Technology")
+        _insert_mc(bm, t, mc)
+        _insert_two_day(bm, t, prev, today)
+    # Energy: XOM (big cap, -0.3%), CVX (mid cap, -0.5%)
+    for t, mc, prev, today in [
+        ("XOM", 500_000_000_000, 100.0,  99.7),
+        ("CVX", 300_000_000_000, 100.0,  99.5),
+    ]:
+        _insert_company(bm, t, "Energy")
+        _insert_mc(bm, t, mc)
+        _insert_two_day(bm, t, prev, today)
+
+    body = client.get("/api/market/sectors").json()
+    by_sector = {row["sector"]: row for row in body["sectors"]}
+    assert set(by_sector.keys()) == {"Information Technology", "Energy"}
+
+    # Tech weighted: (5T*2 + 3T*-1 + 4T*0.5) / 12T = (10 - 3 + 2) / 12 = 9/12 = 0.75
+    assert by_sector["Information Technology"]["change_pct"] == pytest.approx(0.75, abs=1e-3)
+    # Energy weighted: (500B*-0.3 + 300B*-0.5)/800B = (-150 - 150)/800 = -0.375
+    assert by_sector["Energy"]["change_pct"] == pytest.approx(-0.375, abs=1e-3)
+
+    # Top movers in Tech ranked by absolute change: NVDA(2.0), MSFT(1.0), AAPL(0.5)
+    tech_movers = by_sector["Information Technology"]["top_movers"]
+    assert [m["ticker"] for m in tech_movers] == ["NVDA", "MSFT", "AAPL"]
+    assert tech_movers[0]["change_pct"] == pytest.approx(2.0, abs=1e-3)
+
+
+def test_top_movers_capped_at_three(sectors_app):
+    bm, client = sectors_app
+    for t, ch in [("A", 5.0), ("B", 4.0), ("C", 3.0), ("D", 2.0), ("E", 1.0)]:
+        _insert_company(bm, t, "Industrials")
+        _insert_mc(bm, t, 100_000_000)
+        _insert_two_day(bm, t, 100.0, 100.0 * (1 + ch / 100))
+
+    body = client.get("/api/market/sectors").json()
+    movers = body["sectors"][0]["top_movers"]
+    assert len(movers) == 3
+    assert [m["ticker"] for m in movers] == ["A", "B", "C"]
+
+
+def test_excludes_non_us_market(sectors_app):
+    bm, client = sectors_app
+    _insert_company(bm, "TEVA.TA", "Health Care", market="TASE")
+    _insert_mc(bm, "TEVA.TA", 100_000_000)
+    _insert_two_day(bm, "TEVA.TA", 100.0, 110.0)
+    _insert_company(bm, "JNJ", "Health Care", market="US")
+    _insert_mc(bm, "JNJ", 1_000_000_000)
+    _insert_two_day(bm, "JNJ", 100.0, 101.0)
+
+    body = client.get("/api/market/sectors").json()
+    hc = next(row for row in body["sectors"] if row["sector"] == "Health Care")
+    assert hc["change_pct"] == pytest.approx(1.0, abs=1e-3)  # JNJ alone, TEVA.TA excluded
+    movers = [m["ticker"] for m in hc["top_movers"]]
+    assert "TEVA.TA" not in movers
+
+
+def test_skips_sectors_with_null_label(sectors_app):
+    """Companies whose sector is NULL shouldn't create a 'None' bucket."""
+    bm, client = sectors_app
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO companies (ticker, company, sector, market)
+            VALUES ('UNK', 'Unknown', NULL, 'US')
+        """))
+    _insert_mc(bm, "UNK", 100_000_000)
+    _insert_two_day(bm, "UNK", 100.0, 110.0)
+
+    body = client.get("/api/market/sectors").json()
+    assert body["sectors"] == []
