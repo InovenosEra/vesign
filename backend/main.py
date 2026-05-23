@@ -3242,6 +3242,79 @@ def spotlight_today():
     return _get_spotlight_today_cached()
 
 
+# ---------------------------------------------------------------------------
+# Market page — Phase 1 endpoints
+# See docs/superpowers/specs/2026-05-23-market-page-live-data-design.md
+# ---------------------------------------------------------------------------
+
+_INDICES_TICKERS = ["SPY", "QQQ", "DIA", "IWM"]  # VIX is sourced separately
+
+_market_cache: dict[str, dict] = {}
+_market_cache_lock = threading.Lock()
+_MARKET_TTL_SECONDS = 60
+
+
+def _build_market_indices() -> dict:
+    """Return {indices: [...]} for the 5 headline cards.
+
+    SPY/QQQ/DIA/IWM read from daily_prices; VIX from the vix table (yfinance path).
+    Each entry: {ticker, close, change_pct, sparkline} where sparkline is up to
+    the last 30 closes oldest→newest. close=None when the ticker has no data.
+    """
+    out = []
+    with engine.connect() as conn:
+        for ticker in _INDICES_TICKERS:
+            rows = conn.execute(
+                text(
+                    "SELECT close FROM daily_prices "
+                    "WHERE ticker = :t ORDER BY date DESC LIMIT 30"
+                ),
+                {"t": ticker},
+            ).fetchall()
+            closes = [r[0] for r in rows][::-1]  # oldest → newest
+            out.append(_index_entry(ticker, closes))
+
+        vix_rows = conn.execute(
+            text("SELECT close FROM vix ORDER BY date DESC LIMIT 30")
+        ).fetchall()
+        vix_closes = [r[0] for r in vix_rows][::-1]
+        out.append(_index_entry("VIX", vix_closes))
+
+    return {"indices": out}
+
+
+def _index_entry(ticker: str, closes: list[float]) -> dict:
+    if not closes:
+        return {"ticker": ticker, "close": None, "change_pct": None, "sparkline": []}
+    close = closes[-1]
+    change_pct = None
+    if len(closes) >= 2 and closes[-2] not in (None, 0) and close is not None:
+        change_pct = round((close - closes[-2]) / closes[-2] * 100, 4)
+    return {
+        "ticker": ticker,
+        "close": close,
+        "change_pct": change_pct,
+        "sparkline": closes,
+    }
+
+
+def _get_market_indices_cached() -> dict:
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get("indices")
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_indices()
+        _market_cache["indices"] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/indices")
+def market_indices():
+    """5 headline indices (SPY/QQQ/DIA/IWM/VIX) with 30-day sparkline."""
+    return _get_market_indices_cached()
+
+
 app.include_router(protected)
 
 
