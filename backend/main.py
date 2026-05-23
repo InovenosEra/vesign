@@ -9,7 +9,7 @@ import requests
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, UTC, date
+from datetime import datetime, UTC, date, timezone
 from fpdf import FPDF
 from typing import Literal, Optional
 
@@ -3775,6 +3775,72 @@ def _get_market_cross_cached() -> dict:
 def market_cross():
     """USD/10Y/Gold/Oil/BTC/EURUSD strip via yfinance; stale=true on fetch failure."""
     return _get_market_cross_cached()
+
+
+_NEWS_CACHE_TTL_SECONDS = 5 * 60
+
+
+def _fetch_top_news(limit: int) -> list | None:
+    """Most-recent market news from FMP. Returns the raw item list or None on failure."""
+    from data import fmp as _fmp
+    try:
+        items = _fmp._get("news/stock", {"limit": limit}) or []
+    except Exception:
+        return None
+    if not isinstance(items, list):
+        return None
+    return items
+
+
+def _build_market_news(limit: int) -> dict:
+    items = _fetch_top_news(limit) or []
+    out = []
+    now = datetime.now(timezone.utc)
+    for it in items:
+        published_raw = it.get("publishedDate") or it.get("published_at") or ""
+        published_dt = _parse_iso8601(published_raw)
+        age_minutes = None
+        if published_dt is not None:
+            age_minutes = max(0, int((now - published_dt).total_seconds() // 60))
+        symbol = it.get("symbol") or it.get("ticker") or None
+        out.append({
+            "title": it.get("title") or "",
+            "source": it.get("site") or it.get("publisher") or "",
+            "url": it.get("url") or "",
+            "ticker": symbol if symbol else None,
+            "published_at": published_raw or None,
+            "age_minutes": age_minutes,
+        })
+    return {"news": out}
+
+
+def _parse_iso8601(s: str) -> datetime | None:
+    if not s:
+        return None
+    # FMP returns "2026-05-22 14:30:00" or ISO8601; Python's fromisoformat handles both with a Z swap.
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00").replace(" ", "T"))\
+            .astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _get_market_news_cached(limit: int) -> dict:
+    key = f"news:{limit}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _NEWS_CACHE_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_news(limit)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/news/top")
+def market_news_top(limit: int = 5):
+    """Latest market news headlines via FMP."""
+    return _get_market_news_cached(limit)
 
 
 app.include_router(protected)
