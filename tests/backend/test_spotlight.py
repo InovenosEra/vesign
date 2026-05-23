@@ -216,3 +216,30 @@ def test_response_includes_seven_reasons_with_correct_met_flags(spotlight_app):
     for g in ("bb_condition", "analyst_condition", "volume_flag",
               "week52_condition", "health_condition", "ml_condition"):
         assert by_gate[g]["met"] is True, f"{g} should be met"
+
+
+def test_day_change_pct_from_prior_close(spotlight_app):
+    bm, client = spotlight_app
+    _insert_company(bm, "ABC", "Acme")
+    # Prior day row, close=100
+    _insert_signal(bm, date="2026-05-21 00:00:00", ticker="ABC",
+                   close=100.0, bb_condition=1, analyst_condition=1, volume_flag=1)
+    # Today row, close=102 → +2.00%
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="ABC",
+                   close=102.0, bb_condition=1, analyst_condition=1, volume_flag=1)
+
+    body = client.get("/api/spotlight/today").json()
+    assert body["ticker"] == "ABC"
+    assert body["close"] == 102.0
+    assert body["day_change_pct"] == pytest.approx(2.0, rel=1e-6)
+
+
+def test_day_change_pct_is_null_with_no_prior_row(spotlight_app):
+    bm, client = spotlight_app
+    _insert_company(bm, "NEW", "Newly Listed")
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="NEW",
+                   close=50.0, bb_condition=1, analyst_condition=1, volume_flag=1)
+
+    body = client.get("/api/spotlight/today").json()
+    assert body["ticker"] == "NEW"
+    assert body["day_change_pct"] is None
