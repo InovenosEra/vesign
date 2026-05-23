@@ -643,18 +643,45 @@ def public_stats():
     """Public marketing stats — closed-trade aggregates + universe size.
 
     Unauthenticated by design: drives the logged-out landing / login /
-    request-access pages. US-only (excludes .TA tickers). return_pct is a
-    fraction in trade_log, so yields are ×100 here.
+    request-access pages. US-only (excludes .TA tickers).
+
+    Yield matches the site's canonical per-trade calc: DCA trades yield
+    against the dollar-weighted (harmonic-mean) avg_cost from trade_lots,
+    falling back to trade_log.return_pct for single-lot trades. See
+    backend/yield_calcs.py. All fractions ×100 for display.
     """
     with engine.connect() as conn:
         row = conn.execute(text("""
+            WITH lots AS (
+                SELECT ticker, DATE(buy_date) AS bd, DATE(sell_date) AS sd,
+                       COUNT(*) * 1.0 / NULLIF(SUM(1.0 / NULLIF(lot_price, 0)), 0) AS avg_cost
+                FROM trade_lots
+                GROUP BY ticker, DATE(buy_date), DATE(sell_date)
+            ),
+            yields AS (
+                SELECT
+                    CASE
+                        WHEN l.avg_cost IS NOT NULL AND l.avg_cost > 0
+                            THEN (tl.sell_price - l.avg_cost) / l.avg_cost
+                        ELSE tl.return_pct
+                    END AS yield_frac,
+                    tl.return_pct AS return_pct,
+                    julianday(tl.sell_date) - julianday(tl.buy_date) AS held_days
+                FROM trade_log tl
+                LEFT JOIN lots l
+                  ON l.ticker = tl.ticker
+                 AND l.bd = DATE(tl.buy_date)
+                 AND l.sd = DATE(tl.sell_date)
+                WHERE tl.ticker NOT LIKE '%.TA'
+            )
             SELECT
                 COUNT(*) AS n,
+                -- Win rate is canonically return_pct-based (matches /api/trades).
                 AVG(CASE WHEN return_pct > 0 THEN 1.0 ELSE 0.0 END) AS win_frac,
-                AVG(return_pct) AS avg_ret,
-                AVG(julianday(sell_date) - julianday(buy_date)) AS avg_days
-            FROM trade_log
-            WHERE ticker NOT LIKE '%.TA'
+                -- Avg yield is the DCA-aware per-trade yield (matches TradesPage).
+                AVG(yield_frac) AS avg_ret,
+                AVG(held_days) AS avg_days
+            FROM yields
         """)).mappings().fetchone()
         tickers = conn.execute(text("""
             SELECT COUNT(*) FROM companies WHERE COALESCE(market, 'US') = 'US'

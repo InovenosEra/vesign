@@ -23,6 +23,12 @@ def stats_app():
             )
         """))
         conn.execute(text("""
+            CREATE TABLE trade_lots (
+                ticker TEXT, buy_date TEXT, sell_date TEXT,
+                lot_seq INTEGER, lot_date TEXT, lot_price REAL
+            )
+        """))
+        conn.execute(text("""
             CREATE TABLE companies (
                 ticker TEXT PRIMARY KEY, company TEXT, sector TEXT, market TEXT,
                 industry TEXT, description TEXT, description_short TEXT,
@@ -69,6 +75,16 @@ def _insert_company(bm, ticker, market="US"):
                      {"t": ticker, "m": market})
 
 
+def _insert_lots(bm, *, ticker, buy_date, sell_date, lot_prices):
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        for i, lp in enumerate(lot_prices):
+            conn.execute(text("""
+                INSERT INTO trade_lots (ticker, buy_date, sell_date, lot_seq, lot_date, lot_price)
+                VALUES (:t, :bd, :sd, :seq, :bd, :lp)
+            """), {"t": ticker, "bd": buy_date, "sd": sell_date, "seq": i, "lp": lp})
+
+
 def test_stats_is_public_and_aggregates(stats_app):
     bm, client = stats_app
     # 4 trades: 3 wins, 1 loss → win_rate 75%
@@ -89,6 +105,29 @@ def test_stats_is_public_and_aggregates(stats_app):
     # avg hold = (10+20+30+20)/4 = 20 days
     assert d["avg_hold_days"] == pytest.approx(20, abs=0.5)
     assert d["tickers_tracked"] == 5
+
+
+def test_avg_yield_uses_dca_avg_cost_not_return_pct(stats_app):
+    """Multi-lot (DCA) trades must yield against the harmonic-mean avg_cost,
+    matching backend.yield_calcs, NOT trade_log.return_pct (which is vs the
+    first lot only)."""
+    bm, client = stats_app
+    _insert_company(bm, "DCA")
+    # Two lots at 100 and 50 → avg_cost = 2 / (1/100 + 1/50) = 66.667.
+    # Sell at 120 → DCA yield = (120-66.667)/66.667 = 80.0%.
+    # trade_log.return_pct is vs first lot (100): (120-100)/100 = 20% — the WRONG number.
+    _insert_trade(bm, ticker="DCA", buy_date="2025-01-01 00:00:00",
+                  sell_date="2025-01-11 00:00:00", return_pct=0.20)
+    _insert_lots(bm, ticker="DCA", buy_date="2025-01-01 00:00:00",
+                 sell_date="2025-01-11 00:00:00", lot_prices=[100.0, 50.0])
+    # Override sell_price to exactly 120 for a clean assertion.
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("UPDATE trade_log SET sell_price = 120.0 WHERE ticker = 'DCA'"))
+
+    d = client.get("/api/stats").json()
+    assert d["closed_trades"] == 1
+    assert d["avg_yield"] == pytest.approx(80.0, abs=0.1)   # DCA, not 20%
 
 
 def test_tickers_tracked_excludes_non_us(stats_app):
