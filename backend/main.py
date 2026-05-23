@@ -3386,6 +3386,92 @@ def market_movers(
     return _get_market_movers_cached(type, limit)
 
 
+def _build_market_breadth() -> dict:
+    """Market internals across US tickers: advance/decline, 52w hi/lo, %>50d MA."""
+    sql = text("""
+        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
+        prev_bounds AS (
+            SELECT MAX(dp.date) AS prev
+            FROM daily_prices dp, bounds b
+            WHERE dp.date < b.today
+        ),
+        us_tickers AS (
+            SELECT ticker FROM companies WHERE COALESCE(market, 'US') = 'US'
+        ),
+        today_px AS (
+            SELECT dp.ticker, dp.close
+            FROM daily_prices dp, bounds b
+            WHERE dp.date = b.today AND dp.ticker IN (SELECT ticker FROM us_tickers)
+        ),
+        prev_px AS (
+            SELECT dp.ticker, dp.close
+            FROM daily_prices dp, prev_bounds pb
+            WHERE dp.date = pb.prev AND dp.ticker IN (SELECT ticker FROM us_tickers)
+        ),
+        year_window AS (
+            SELECT dp.ticker, MAX(dp.close) AS hi52, MIN(dp.close) AS lo52
+            FROM daily_prices dp, bounds b
+            WHERE dp.ticker IN (SELECT ticker FROM us_tickers)
+              AND dp.date > date(b.today, '-365 days')
+            GROUP BY dp.ticker
+        ),
+        last50 AS (
+            SELECT ticker, close,
+                   ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+            FROM daily_prices
+            WHERE ticker IN (SELECT ticker FROM us_tickers)
+        ),
+        ma50 AS (
+            SELECT ticker, AVG(close) AS ma
+            FROM last50
+            WHERE rn <= 50
+            GROUP BY ticker
+        )
+        SELECT
+            SUM(CASE WHEN p.close IS NOT NULL AND t.close > p.close THEN 1 ELSE 0 END) AS advancers,
+            SUM(CASE WHEN p.close IS NOT NULL AND t.close < p.close THEN 1 ELSE 0 END) AS decliners,
+            SUM(CASE WHEN yw.hi52 IS NOT NULL AND t.close >= yw.hi52 THEN 1 ELSE 0 END) AS week52_highs,
+            SUM(CASE WHEN yw.lo52 IS NOT NULL AND t.close <= yw.lo52 THEN 1 ELSE 0 END) AS week52_lows,
+            SUM(CASE WHEN ma50.ma IS NOT NULL AND t.close > ma50.ma THEN 1.0 ELSE 0.0 END)
+              / NULLIF(SUM(CASE WHEN ma50.ma IS NOT NULL THEN 1.0 ELSE 0.0 END), 0)
+              AS above_50d_ma_pct
+        FROM today_px t
+        LEFT JOIN prev_px p ON p.ticker = t.ticker
+        LEFT JOIN year_window yw ON yw.ticker = t.ticker
+        LEFT JOIN ma50 ON ma50.ticker = t.ticker
+    """)
+    with engine.connect() as conn:
+        row = conn.execute(sql).mappings().fetchone()
+    if row is None:
+        return {"advancers": 0, "decliners": 0, "week52_highs": 0,
+                "week52_lows": 0, "above_50d_ma_pct": None}
+    return {
+        "advancers": int(row["advancers"] or 0),
+        "decliners": int(row["decliners"] or 0),
+        "week52_highs": int(row["week52_highs"] or 0),
+        "week52_lows": int(row["week52_lows"] or 0),
+        "above_50d_ma_pct": round(row["above_50d_ma_pct"], 6)
+            if row["above_50d_ma_pct"] is not None else None,
+    }
+
+
+def _get_market_breadth_cached() -> dict:
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get("breadth")
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_breadth()
+        _market_cache["breadth"] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/breadth")
+def market_breadth():
+    """US-wide breadth snapshot: advancers, decliners, 52w hi/lo, %>50d MA."""
+    return _get_market_breadth_cached()
+
+
 app.include_router(protected)
 
 
