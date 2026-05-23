@@ -3843,6 +3843,85 @@ def market_news_top(limit: int = 5):
     return _get_market_news_cached(limit)
 
 
+_CALENDAR_CACHE_TTL_SECONDS = 60 * 60
+_DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+              "Saturday", "Sunday"]
+
+
+def _fetch_earnings_week(start: str, end: str) -> list | None:
+    """FMP earnings calendar between two ISO dates. None on failure."""
+    from data import fmp as _fmp
+    try:
+        items = _fmp._get("earnings-calendar", {"from": start, "to": end}) or []
+    except Exception:
+        return None
+    if not isinstance(items, list):
+        return None
+    return items
+
+
+def _current_week_mon_fri(today: date | None = None) -> tuple[str, str]:
+    today = today or datetime.now(UTC).date()
+    monday = today - _td(days=today.weekday())
+    friday = monday + _td(days=4)
+    return monday.isoformat(), friday.isoformat()
+
+
+def _build_market_earnings_week() -> dict:
+    start, end = _current_week_mon_fri()
+    items = _fetch_earnings_week(start, end) or []
+    if not items:
+        return {"earnings": []}
+
+    # Single companies lookup for the ticker set in the FMP response.
+    tickers = sorted({(i.get("symbol") or "").upper() for i in items if i.get("symbol")})
+    company_by_ticker: dict[str, str] = {}
+    if tickers:
+        sql = text("SELECT ticker, company FROM companies WHERE ticker IN :tt")\
+            .bindparams(bindparam("tt", expanding=True))
+        with engine.connect() as conn:
+            for row in conn.execute(sql, {"tt": tickers}).mappings():
+                company_by_ticker[row["ticker"]] = row["company"]
+
+    out = []
+    for it in items:
+        ticker = (it.get("symbol") or "").upper()
+        d_str = it.get("date") or ""
+        day_of_week = None
+        try:
+            day_of_week = _DAY_NAMES[date.fromisoformat(d_str).weekday()]
+        except ValueError:
+            pass
+        raw_time = (it.get("time") or "").strip().lower()
+        time_norm = {"bmo": "BMO", "amc": "AMC", "dmh": "DMH"}.get(raw_time)
+        out.append({
+            "date": d_str or None,
+            "day_of_week": day_of_week,
+            "ticker": ticker or None,
+            "company": company_by_ticker.get(ticker),
+            "eps_estimated": it.get("epsEstimated"),
+            "time": time_norm,
+        })
+    return {"earnings": out}
+
+
+def _get_market_earnings_week_cached() -> dict:
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get("earnings_week")
+        if c is not None and now - c["t"] < _CALENDAR_CACHE_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_earnings_week()
+        _market_cache["earnings_week"] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/earnings/week")
+def market_earnings_week():
+    """Earnings calendar for Mon–Fri of the current week (FMP)."""
+    return _get_market_earnings_week_cached()
+
+
 app.include_router(protected)
 
 
