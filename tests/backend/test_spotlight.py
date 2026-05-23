@@ -133,3 +133,28 @@ def test_picks_ticker_with_most_v1_gates(spotlight_app):
     assert body["ticker"] == "BBB"
     assert body["gates_met"] == 6
     assert body["gates_total"] == 7
+
+
+def test_excludes_buy_and_sell_tickers(spotlight_app):
+    bm, client = spotlight_app
+    _insert_company(bm, "ZZZ", "Best Score But A BUY")
+    _insert_company(bm, "YYY", "Second Best But A SELL")
+    _insert_company(bm, "XXX", "Third Best HOLD — should win")
+    # ZZZ: 7 gates met but signal=BUY (canonical signal handles it)
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="ZZZ", signal="BUY",
+                   rsi_3day_flag=3, bb_condition=1, analyst_condition=1,
+                   volume_flag=1, week52_condition=1, health_condition=1, ml_condition=1)
+    # YYY: 6 gates met but signal=SELL
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="YYY", signal="SELL",
+                   bb_condition=1, analyst_condition=1, volume_flag=1,
+                   week52_condition=1, health_condition=1, ml_condition=1)
+    # XXX: 5 gates met, signal=HOLD
+    _insert_signal(bm, date="2026-05-22 00:00:00", ticker="XXX", signal="HOLD",
+                   bb_condition=1, analyst_condition=1, volume_flag=1,
+                   week52_condition=1, health_condition=1)
+
+    resp = client.get("/api/spotlight/today")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ticker"] == "XXX"
+    assert body["gates_met"] == 5
