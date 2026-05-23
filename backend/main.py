@@ -3695,7 +3695,7 @@ _CROSS_TICKERS = [
     ("GC=F",     "Gold"),
     ("CL=F",     "Crude Oil"),
     ("BTC-USD",  "Bitcoin"),
-    ("EURUSD=X", "EUR / USD"),
+    ("USDILS=X", "USD / ILS"),
 ]
 
 
@@ -3773,7 +3773,7 @@ def _get_market_cross_cached() -> dict:
 
 @protected.get("/api/market/cross")
 def market_cross():
-    """USD/10Y/Gold/Oil/BTC/EURUSD strip via yfinance; stale=true on fetch failure."""
+    """USD/10Y/Gold/Oil/BTC/USDILS strip via yfinance; stale=true on fetch failure."""
     return _get_market_cross_cached()
 
 

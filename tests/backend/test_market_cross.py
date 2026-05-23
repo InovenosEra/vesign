@@ -1,4 +1,4 @@
-"""Tests for GET /api/market/cross — cross-asset strip (USD/yields/gold/oil/BTC/EURUSD)."""
+"""Tests for GET /api/market/cross — cross-asset strip (USD/yields/gold/oil/BTC/USDILS)."""
 import os
 import tempfile
 from unittest.mock import patch
@@ -52,7 +52,7 @@ CROSS_FIXTURE = {
     "GC=F":     {"price": 2350.0, "prev_close": 2340.0},   # +0.4274%
     "CL=F":     {"price": 78.50,  "prev_close": 80.00},    # -1.875%
     "BTC-USD":  {"price": 69000,  "prev_close": 68000},    # +1.4706%
-    "EURUSD=X": {"price": 1.08,   "prev_close": 1.0805},   # ~-0.0463%
+    "USDILS=X": {"price": 3.65,   "prev_close": 3.66},     # ~-0.2732%
 }
 
 
