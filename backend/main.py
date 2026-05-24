@@ -3329,6 +3329,64 @@ def market_movers(
     return _get_market_movers_cached(type, limit)
 
 
+def _build_market_valuation(limit: int = 6) -> dict:
+    """Most under/overvalued US names vs the mean analyst target.
+
+    upside = (mean_target - close) / close. Undervalued = highest upside,
+    overvalued = most negative. Requires >=3 analysts so a single stale target
+    on a thin name can't dominate the list.
+    """
+    sql = text("""
+        WITH lp AS (
+            SELECT p1.ticker, p1.close
+            FROM daily_prices p1
+            JOIN (SELECT ticker, MAX(date) AS md FROM daily_prices GROUP BY ticker) p2
+              ON p1.ticker = p2.ticker AND p1.date = p2.md
+        )
+        SELECT c.ticker, c.company, c.logo_url, lp.close,
+               ae.target_mean_price AS target, ae.number_of_analysts AS analysts,
+               (ae.target_mean_price - lp.close) / lp.close * 100.0 AS upside
+        FROM companies c
+        JOIN lp ON lp.ticker = c.ticker
+        JOIN analyst_expectations ae ON ae.ticker = c.ticker
+        WHERE COALESCE(c.market, 'US') = 'US'
+          AND ae.target_mean_price IS NOT NULL
+          AND lp.close > 0
+          AND COALESCE(ae.number_of_analysts, 0) >= 3
+    """)
+    with engine.connect() as conn:
+        rows = [dict(r._mapping) for r in conn.execute(sql)]
+
+    def _slim(r):
+        return {
+            "ticker": r["ticker"], "company": r["company"], "logo_url": r["logo_url"],
+            "close": r["close"], "target": round(r["target"], 2),
+            "upside": round(r["upside"], 2), "analysts": int(r["analysts"]),
+        }
+    by_upside = sorted(rows, key=lambda r: r["upside"], reverse=True)
+    undervalued = [_slim(r) for r in by_upside if r["upside"] > 0][:limit]
+    overvalued  = [_slim(r) for r in sorted(rows, key=lambda r: r["upside"]) if r["upside"] < 0][:limit]
+    return {"undervalued": undervalued, "overvalued": overvalued}
+
+
+def _get_market_valuation_cached(limit: int) -> dict:
+    key = f"valuation:{limit}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_valuation(limit)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/valuation")
+def market_valuation(limit: int = 6):
+    """Most under/overvalued US names vs mean analyst target (>=3 analysts)."""
+    return _get_market_valuation_cached(limit)
+
+
 def _build_market_breadth() -> dict:
     """Market internals across US tickers: advance/decline, 52w hi/lo, %>50d MA."""
     sql = text("""
@@ -3462,6 +3520,7 @@ def _build_market_sectors() -> dict:
         sdf = pd.read_sql(spark_sql, conn)
 
     spark_by_sector: dict[str, list[float]] = {}
+    spark_eq_by_sector: dict[str, list[float]] = {}
     if not sdf.empty:
         sdf["date"] = pd.to_datetime(sdf["date"])
         for sector_name, g in sdf.groupby("sector"):
@@ -3471,8 +3530,11 @@ def _build_market_sectors() -> dict:
                 continue
             mc = g.groupby("ticker")["market_cap"].first().reindex(piv.columns)
             w = mc / mc.sum()
-            idx = (piv.divide(piv.iloc[0]) * w).sum(axis=1)   # cap-weighted, base=1.0
-            spark_by_sector[sector_name] = [round(float(v), 5) for v in idx.tolist()]
+            norm = piv.divide(piv.iloc[0])                    # each ticker base=1.0
+            idx_cap = (norm * w).sum(axis=1)                  # cap-weighted index
+            idx_eq = norm.mean(axis=1)                        # equal-weighted index
+            spark_by_sector[sector_name] = [round(float(v), 5) for v in idx_cap.tolist()]
+            spark_eq_by_sector[sector_name] = [round(float(v), 5) for v in idx_eq.tolist()]
 
     by_sector: dict[str, list[dict]] = {}
     for r in rows:
@@ -3489,6 +3551,8 @@ def _build_market_sectors() -> dict:
     for sector_name, items in by_sector.items():
         total_mc = sum(x["market_cap"] for x in items)
         weighted = sum(x["market_cap"] * x["change_pct"] for x in items) / total_mc
+        eq_vals = [x["change_pct"] for x in items if x["change_pct"] is not None]
+        equal = sum(eq_vals) / len(eq_vals) if eq_vals else None
         top_movers = sorted(items, key=lambda x: abs(x["change_pct"]), reverse=True)[:3]
         gainers = sorted((x for x in items if x["change_pct"] > 0),
                          key=lambda x: x["change_pct"], reverse=True)[:3]
@@ -3497,10 +3561,12 @@ def _build_market_sectors() -> dict:
         sectors_out.append({
             "sector": sector_name,
             "change_pct": round(weighted, 4),
+            "change_pct_equal": round(equal, 4) if equal is not None else None,
             "top_movers": _slim(top_movers),   # kept for back-compat
             "gainers": _slim(gainers),
             "losers": _slim(losers),
             "sparkline": spark_by_sector.get(sector_name, []),
+            "sparkline_equal": spark_eq_by_sector.get(sector_name, []),
         })
 
     sectors_out.sort(key=lambda s: s["change_pct"], reverse=True)
