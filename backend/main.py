@@ -771,7 +771,7 @@ def data_status():
 
 _MARKET_CAP_JOIN = """
     LEFT JOIN (
-        SELECT ticker, MAX(market_cap) AS market_cap
+        SELECT ticker, MAX(market_cap) AS market_cap, MAX(pe_ttm) AS pe_ttm
         FROM fundamentals GROUP BY ticker
     ) f ON s.ticker = f.ticker
     LEFT JOIN company_health h ON s.ticker = h.ticker
@@ -801,7 +801,7 @@ def _build_signals_today(mkt: str) -> list[dict]:
                    s.prediction_score,
                    s.vqs,
                    s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.domain, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
-                   f.market_cap
+                   f.market_cap, f.pe_ttm
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
             {_MARKET_CAP_JOIN}
@@ -2838,7 +2838,8 @@ def research_ticker(
                    ae.number_of_analysts,
                    c.company, c.logo_url, c.industry, c.sector, c.market, c.domain,
                    c.description, c.description_short,
-                   f.market_cap,
+                   f.market_cap, f.pe_ttm, f.eps_ttm, f.revenue_ttm, f.revenue_growth,
+                   f.gross_margin, f.op_margin, f.net_margin, f.roe, f.de_ratio,
                    CAST(COALESCE(s.health_score, ch.score) AS INTEGER) AS health_score,
                    ch.reason AS health_reason
             FROM signals s
@@ -2847,7 +2848,12 @@ def research_ticker(
             ) latest ON s.date = latest.max_date AND s.ticker = :t
             LEFT JOIN companies c ON s.ticker = c.ticker
             LEFT JOIN (
-                SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker
+                SELECT ticker, MAX(market_cap) AS market_cap,
+                       MAX(pe_ttm) AS pe_ttm, MAX(eps_ttm) AS eps_ttm,
+                       MAX(revenue_ttm) AS revenue_ttm, MAX(revenue_growth) AS revenue_growth,
+                       MAX(gross_margin) AS gross_margin, MAX(op_margin) AS op_margin,
+                       MAX(net_margin) AS net_margin, MAX(roe) AS roe, MAX(de_ratio) AS de_ratio
+                FROM fundamentals GROUP BY ticker
             ) f ON s.ticker = f.ticker
             LEFT JOIN analyst_expectations ae ON s.ticker = ae.ticker
             LEFT JOIN company_health ch ON s.ticker = ch.ticker
@@ -2910,6 +2916,16 @@ def research_ticker(
         "description":         _v(row.get("description")),
         "description_short":   _v(row.get("description_short")),
         "market_cap":          int(row["market_cap"]) if row.get("market_cap") is not None and not (isinstance(row["market_cap"], float) and math.isnan(row["market_cap"])) else None,
+        # TTM fundamentals (margins / ROE / revenue_growth are raw fractions; UI formats as %)
+        "pe_ttm":              _v(row.get("pe_ttm")),
+        "eps_ttm":             _v(row.get("eps_ttm")),
+        "revenue_ttm":         _v(row.get("revenue_ttm")),
+        "revenue_growth":      _v(row.get("revenue_growth")),
+        "gross_margin":        _v(row.get("gross_margin")),
+        "op_margin":           _v(row.get("op_margin")),
+        "net_margin":          _v(row.get("net_margin")),
+        "roe":                 _v(row.get("roe")),
+        "de_ratio":            _v(row.get("de_ratio")),
         "signal":              _v(row.get("signal")),
         "close":               _v(close),
         "vesign_score":        int(row["vesign_score"]) if row.get("vesign_score") is not None else None,

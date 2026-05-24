@@ -177,6 +177,48 @@ def _repair_market_caps():
     print(f"Market cap repair done: {stage1 + stage2}/{len(tickers)} fixed.")
 
 
+def _repair_fundamentals(limit=200):
+    """Fill/refresh TTM fundamentals (P/E, EPS, revenue, margins, ROE, D/E).
+
+    Targets never-populated rows (pe_ttm IS NULL) first, then the stalest
+    (fundamentals_updated older than ~80 days — TTM fundamentals only change
+    quarterly). Capped per run so FMP usage stays bounded; the universe cycles
+    through over several days. Backfilled via production/backfill_fundamentals.py.
+    """
+    import pandas as pd
+    from sqlalchemy import text
+    from data import fundamentals as _fund
+
+    df = pd.read_sql(text("""
+        SELECT f.ticker
+        FROM fundamentals f
+        LEFT JOIN companies c ON c.ticker = f.ticker
+        WHERE COALESCE(c.market, 'US') = 'US'
+          AND (c.sector IS NULL OR c.sector != 'ETF')
+          AND (f.pe_ttm IS NULL
+               OR f.fundamentals_updated IS NULL
+               OR DATE(f.fundamentals_updated) < DATE('now', '-80 days'))
+        ORDER BY (f.pe_ttm IS NOT NULL),      -- never-populated first
+                 f.fundamentals_updated ASC    -- then stalest
+        LIMIT :lim
+    """), engine, params={"lim": limit})
+    tickers = df["ticker"].tolist()
+    if not tickers:
+        print("Fundamentals repair: none needed.")
+        return
+    print(f"Fundamentals repair: refreshing {len(tickers)} tickers…")
+    filled = 0
+    for t in tickers:
+        try:
+            fund = _fund.fetch_fundamentals(t)
+            _fund.store_fundamentals(t, fund, engine)
+            if fund.get("pe_ttm") is not None or fund.get("net_margin") is not None:
+                filled += 1
+        except Exception:
+            pass
+    print(f"Fundamentals repair done: {filled}/{len(tickers)} populated.")
+
+
 def _repair_analyst_targets():
     """Fill gaps in analyst_expectations after the primary daily pass.
 
@@ -397,6 +439,7 @@ def run_daily():
 
     # ── Remaining self-healing repairs ───────────────────────────────────────
     _repair_market_caps()
+    _repair_fundamentals()
     _download_missing_logos()
 
 

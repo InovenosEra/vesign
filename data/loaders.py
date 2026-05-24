@@ -124,6 +124,32 @@ def _ensure_analyst_targets_history_unique_index():
         pass
 
 
+def _ensure_fundamentals_columns():
+    """Idempotently add the TTM fundamentals columns to the `fundamentals`
+    table (which historically held only ticker + market_cap). Safe to call on
+    every uvicorn startup. Legacy rows get NULL until the backfill/pipeline
+    populates them. See data/fundamentals.py for the writer.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    cols_to_add = (
+        "pe_ttm", "eps_ttm", "revenue_ttm", "revenue_growth",
+        "gross_margin", "op_margin", "net_margin", "roe", "de_ratio",
+        "fundamentals_updated",  # ISO date of last refresh — drives staleness repair
+    )
+    try:
+        with engine.begin() as conn:
+            cols = {r[1] for r in conn.execute(text("PRAGMA table_info(fundamentals)"))}
+            for c in cols_to_add:
+                if c not in cols:
+                    typ = "TEXT" if c == "fundamentals_updated" else "FLOAT"
+                    conn.execute(text(f"ALTER TABLE fundamentals ADD COLUMN {c} {typ}"))
+    except OperationalError:
+        # Table doesn't exist yet; created lazily elsewhere
+        pass
+
+
 # Run migrations on module load
 _ensure_analyst_source_column()
+_ensure_fundamentals_columns()
 _ensure_analyst_targets_history_unique_index()
