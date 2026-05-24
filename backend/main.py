@@ -3442,8 +3442,37 @@ def _build_market_sectors() -> dict:
         SELECT ticker, sector, market_cap, change_pct
         FROM ticker_change
     """)
+    # ~30-day cap-weighted normalized index per sector, for the tile sparkline.
+    spark_sql = text("""
+        WITH last_dates AS (
+            SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT 30
+        )
+        SELECT c.sector, dp.date, dp.ticker, dp.close, f.market_cap
+        FROM daily_prices dp
+        JOIN companies c   ON c.ticker = dp.ticker
+        JOIN fundamentals f ON f.ticker = dp.ticker
+        WHERE dp.date IN (SELECT date FROM last_dates)
+          AND COALESCE(c.market, 'US') = 'US'
+          AND c.sector IS NOT NULL
+          AND f.market_cap > 0
+          AND dp.close IS NOT NULL
+    """)
     with engine.connect() as conn:
         rows = conn.execute(sql).mappings().all()
+        sdf = pd.read_sql(spark_sql, conn)
+
+    spark_by_sector: dict[str, list[float]] = {}
+    if not sdf.empty:
+        sdf["date"] = pd.to_datetime(sdf["date"])
+        for sector_name, g in sdf.groupby("sector"):
+            piv = g.pivot_table(index="date", columns="ticker", values="close").sort_index()
+            piv = piv.ffill().bfill()
+            if piv.empty or len(piv) < 2:
+                continue
+            mc = g.groupby("ticker")["market_cap"].first().reindex(piv.columns)
+            w = mc / mc.sum()
+            idx = (piv.divide(piv.iloc[0]) * w).sum(axis=1)   # cap-weighted, base=1.0
+            spark_by_sector[sector_name] = [round(float(v), 5) for v in idx.tolist()]
 
     by_sector: dict[str, list[dict]] = {}
     for r in rows:
@@ -3453,18 +3482,25 @@ def _build_market_sectors() -> dict:
             "change_pct": r["change_pct"],
         })
 
+    def _slim(rows):
+        return [{"ticker": m["ticker"], "change_pct": round(m["change_pct"], 4)} for m in rows]
+
     sectors_out = []
     for sector_name, items in by_sector.items():
         total_mc = sum(x["market_cap"] for x in items)
         weighted = sum(x["market_cap"] * x["change_pct"] for x in items) / total_mc
         top_movers = sorted(items, key=lambda x: abs(x["change_pct"]), reverse=True)[:3]
+        gainers = sorted((x for x in items if x["change_pct"] > 0),
+                         key=lambda x: x["change_pct"], reverse=True)[:3]
+        losers = sorted((x for x in items if x["change_pct"] < 0),
+                        key=lambda x: x["change_pct"])[:3]
         sectors_out.append({
             "sector": sector_name,
             "change_pct": round(weighted, 4),
-            "top_movers": [
-                {"ticker": m["ticker"], "change_pct": round(m["change_pct"], 4)}
-                for m in top_movers
-            ],
+            "top_movers": _slim(top_movers),   # kept for back-compat
+            "gainers": _slim(gainers),
+            "losers": _slim(losers),
+            "sparkline": spark_by_sector.get(sector_name, []),
         })
 
     sectors_out.sort(key=lambda s: s["change_pct"], reverse=True)
@@ -3486,6 +3522,109 @@ def _get_market_sectors_cached() -> dict:
 def market_sectors():
     """US sectors: market-cap-weighted % change + top-3 movers by absolute %."""
     return _get_market_sectors_cached()
+
+
+def _build_market_sector_detail(sector: str) -> dict:
+    """Drill-down for one GICS sector: cap-weighted move, 30d trend, in-sector
+    breadth, median P/E, best/worst, and the full constituent list."""
+    detail_sql = text("""
+        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
+        prev_bounds AS (
+            SELECT MAX(dp.date) AS prev FROM daily_prices dp, bounds b WHERE dp.date < b.today
+        ),
+        latest_sig AS (SELECT DATE(MAX(date)) AS d FROM signals)
+        SELECT c.ticker, c.company, c.logo_url, f.market_cap, f.pe_ttm,
+               t.close AS close,
+               ((t.close - p.close) / p.close * 100.0) AS change_pct,
+               s.signal, s.vqs,
+               CAST(COALESCE(s.health_score, h.score) AS INTEGER) AS health_score
+        FROM companies c
+        JOIN daily_prices t ON t.ticker = c.ticker AND t.date = (SELECT today FROM bounds)
+        JOIN daily_prices p ON p.ticker = c.ticker AND p.date = (SELECT prev FROM prev_bounds)
+        LEFT JOIN fundamentals f ON f.ticker = c.ticker
+        LEFT JOIN signals s ON s.ticker = c.ticker AND DATE(s.date) = (SELECT d FROM latest_sig)
+        LEFT JOIN company_health h ON h.ticker = c.ticker
+        WHERE c.sector = :sector
+          AND COALESCE(c.market, 'US') = 'US'
+          AND p.close IS NOT NULL AND p.close <> 0
+    """)
+    spark_sql = text("""
+        WITH last_dates AS (SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT 30)
+        SELECT dp.date, dp.ticker, dp.close, f.market_cap
+        FROM daily_prices dp
+        JOIN companies c ON c.ticker = dp.ticker
+        JOIN fundamentals f ON f.ticker = dp.ticker
+        WHERE dp.date IN (SELECT date FROM last_dates)
+          AND c.sector = :sector AND COALESCE(c.market, 'US') = 'US'
+          AND f.market_cap > 0 AND dp.close IS NOT NULL
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(detail_sql, {"sector": sector}).mappings().all()
+        sdf = pd.read_sql(spark_sql, conn, params={"sector": sector})
+
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"No data for sector {sector}")
+
+    consts = []
+    total_mc = 0.0
+    wsum = 0.0
+    adv = dec = 0
+    pes = []
+    for r in rows:
+        mc = r["market_cap"] or 0
+        cp = r["change_pct"]
+        if mc > 0 and cp is not None:
+            total_mc += mc
+            wsum += mc * cp
+        if cp is not None:
+            adv += 1 if cp > 0 else 0
+            dec += 1 if cp < 0 else 0
+        if r["pe_ttm"] is not None and r["pe_ttm"] > 0:
+            pes.append(r["pe_ttm"])
+        consts.append({
+            "ticker": r["ticker"], "company": r["company"], "logo_url": r["logo_url"],
+            "close": r["close"], "change_pct": round(cp, 4) if cp is not None else None,
+            "market_cap": mc or None, "pe_ttm": round(r["pe_ttm"], 2) if r["pe_ttm"] is not None else None,
+            "signal": r["signal"], "vqs": r["vqs"], "health_score": r["health_score"],
+        })
+    consts.sort(key=lambda x: x["market_cap"] or 0, reverse=True)
+
+    # 30d cap-weighted normalized index
+    sparkline, return_30d = [], None
+    if not sdf.empty:
+        sdf["date"] = pd.to_datetime(sdf["date"])
+        piv = sdf.pivot_table(index="date", columns="ticker", values="close").sort_index().ffill().bfill()
+        if len(piv) >= 2:
+            mc = sdf.groupby("ticker")["market_cap"].first().reindex(piv.columns)
+            w = mc / mc.sum()
+            idx = (piv.divide(piv.iloc[0]) * w).sum(axis=1)
+            sparkline = [round(float(v), 5) for v in idx.tolist()]
+            return_30d = round((sparkline[-1] / sparkline[0] - 1) * 100, 2)
+
+    median_pe = round(float(pd.Series(pes).median()), 2) if pes else None
+    best = max((c for c in consts if c["change_pct"] is not None), key=lambda x: x["change_pct"], default=None)
+    worst = min((c for c in consts if c["change_pct"] is not None), key=lambda x: x["change_pct"], default=None)
+
+    return {
+        "sector": sector,
+        "change_pct": round(wsum / total_mc, 4) if total_mc else None,
+        "return_30d": return_30d,
+        "sparkline": sparkline,
+        "count": len(consts),
+        "total_market_cap": total_mc or None,
+        "advancers": adv,
+        "decliners": dec,
+        "median_pe": median_pe,
+        "best": {"ticker": best["ticker"], "change_pct": best["change_pct"]} if best else None,
+        "worst": {"ticker": worst["ticker"], "change_pct": worst["change_pct"]} if worst else None,
+        "constituents": consts,
+    }
+
+
+@protected.get("/api/market/sector/{sector}")
+def market_sector_detail(sector: str):
+    """Drill-down detail for one sector (constituents + aggregates + 30d trend)."""
+    return _build_market_sector_detail(sector.strip())
 
 
 _TAPE_TICKERS = [
