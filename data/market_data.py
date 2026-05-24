@@ -269,6 +269,8 @@ def update_company_info():
 
     print("Updating company info (fundamentals + analyst)...")
 
+    from utils.sectors import normalize_sector
+
     tickers = pd.read_sql("SELECT ticker FROM companies", engine)["ticker"].tolist()
     now     = datetime.now(UTC)
 
@@ -286,6 +288,7 @@ def update_company_info():
                 "ticker":             t,
                 "market_cap":         profile.get("marketCap"),
                 "industry":           profile.get("industry"),
+                "sector":             normalize_sector(profile.get("sector")),  # FMP→GICS
                 "description":        profile.get("description"),
                 "target_mean_price":  target_mean,
                 "target_high_price":  target_high,
@@ -348,14 +351,17 @@ def update_company_info():
         # here, or every pipeline run would clobber the self-hosted /logos/{T}.png
         # path back to the deprecated FMP CDN URL from profile["image"].
         with engine.begin() as conn:
-            for _, row in df[["ticker", "industry", "description"]].iterrows():
-                if row["industry"] or row["description"]:
+            for _, row in df[["ticker", "industry", "sector", "description"]].iterrows():
+                if row["industry"] or row["description"] or row["sector"]:
+                    # COALESCE on sector: never clobber an existing sector with a blank fetch.
                     conn.execute(text(
                         "UPDATE companies SET "
                         "industry = :ind, "
+                        "sector = COALESCE(:sec, sector), "
                         "description = :desc "
                         "WHERE ticker = :t"
-                    ), {"ind": row["industry"], "desc": row["description"], "t": row["ticker"]})
+                    ), {"ind": row["industry"], "sec": row["sector"],
+                        "desc": row["description"], "t": row["ticker"]})
         mark_run("fundamentals_update")
 
     if needs_analyst:
