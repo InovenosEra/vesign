@@ -11,7 +11,7 @@ export default function Commodities() {
   return (
     <>
       <div className="section-h"><h2>Commodities</h2><span className="sub">Futures · last close</span></div>
-      <div className="cross-market">
+      <div className="cross-market" style={{ gridTemplateColumns: `repeat(${rows.length}, 1fr)` }}>
         {rows.map((r, i) => (
           <div className="cm-cell" key={i}>
             <div className="lbl">{r.label}{r.stale && <span style={{ opacity: 0.6, fontSize: 9 }}> stale</span>}</div>

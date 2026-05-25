@@ -8,7 +8,7 @@ export default function CrossMarket() {
   const cross = data?.cross || []
   if (!cross.length) return null
   return (
-    <div className="cross-market">
+    <div className="cross-market" style={{ gridTemplateColumns: `repeat(${cross.length}, 1fr)` }}>
       {cross.map((r, i) => (
         <div className="cm-cell" key={i}>
           <div className="lbl">{r.label}{r.stale && <span style={{ opacity: 0.6, fontSize: 9 }}> stale</span>}</div>
