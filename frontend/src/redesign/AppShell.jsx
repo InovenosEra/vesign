@@ -123,7 +123,7 @@ function CcySelect() {
   return (
     <HdrSelect items={CCYS} current={currency} onPick={setCurrency}
       renderBtn={c => <><span className="hs-sym">{c.sym}</span><span className="hs-lbl">{c.code}</span></>}
-      renderRow={i => <><span className="hs-sym">{i.sym}</span><span className="hs-name">{i.code} — {i.name}</span></>} />
+      renderRow={i => <><span className="hs-sym">{i.sym}</span><span className="hs-name">{i.code}</span></>} />
   )
 }
 
