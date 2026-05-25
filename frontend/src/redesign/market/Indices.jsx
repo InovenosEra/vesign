@@ -12,6 +12,8 @@ export default function Indices() {
   const { prices } = useLivePrices(rows.map(r => r.ticker))
 
   return (
+    <>
+    <div className="section-h"><h2>Indices</h2><span className="sub">Major US benchmarks · last close</span></div>
     <div className="indices">
       {rows.map((row, i) => {
         const { price, change } = overlayLive(row.close, row.change_pct, prices[row.ticker])
@@ -46,5 +48,6 @@ export default function Indices() {
         )
       })}
     </div>
+    </>
   )
 }
