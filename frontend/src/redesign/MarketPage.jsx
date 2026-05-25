@@ -27,8 +27,8 @@ export default function MarketPage() {
             <Commodities />
             <Currencies />
             <Movers />
-            <SectorHeatmap onOpenSector={setSector} />
             <Breadth />
+            <SectorHeatmap onOpenSector={setSector} />
           </>
         )}
         {tab === 'news' && (
