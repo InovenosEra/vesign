@@ -3,7 +3,6 @@
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'news', label: 'News' },
-  { id: 'calendar', label: 'Calendar' },
 ]
 
 export default function PageHead({ tab, setTab }) {

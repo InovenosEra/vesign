@@ -29,18 +29,16 @@ export default function MarketPage() {
             <Movers />
             <Breadth />
             <SectorHeatmap onOpenSector={setSector} />
+            <div className="two-col-2">
+              <EarningsWeek />
+              <EconomicCalendar />
+            </div>
           </>
         )}
         {tab === 'news' && (
           <div className="two-col-2">
             <TopNews />
             <AnalystChanges />
-          </div>
-        )}
-        {tab === 'calendar' && (
-          <div className="two-col-2">
-            <EarningsWeek />
-            <EconomicCalendar />
           </div>
         )}
       </div>
