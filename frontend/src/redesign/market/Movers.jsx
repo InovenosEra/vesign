@@ -24,7 +24,7 @@ function MoverRow({ r, kind, live }) {
 }
 
 function Panel({ title, pill, type }) {
-  const { data } = useQuery({ queryKey: ['market-movers', type], queryFn: () => getMovers(type, 5), refetchInterval: 60_000 })
+  const { data } = useQuery({ queryKey: ['market-movers', type], queryFn: () => getMovers(type, 10), refetchInterval: 60_000 })
   const rows = data?.movers || []
   const { prices } = useLivePrices(rows.map(r => r.ticker))
   return (
@@ -37,7 +37,7 @@ function Panel({ title, pill, type }) {
 
 function HighLowPanel() {
   const [hl, setHl] = useState('high')
-  const { data } = useQuery({ queryKey: ['market-highs-lows', hl], queryFn: () => getHighsLows(hl, 5), refetchInterval: 60_000 })
+  const { data } = useQuery({ queryKey: ['market-highs-lows', hl], queryFn: () => getHighsLows(hl, 10), refetchInterval: 60_000 })
   const rows = data?.movers || []
   const { prices } = useLivePrices(rows.map(r => r.ticker))
   return (
@@ -57,7 +57,7 @@ function HighLowPanel() {
 
 function ValuationPanel() {
   const [dir, setDir] = useState('under')
-  const { data } = useQuery({ queryKey: ['market-valuation'], queryFn: () => getValuation(5), refetchInterval: 300_000 })
+  const { data } = useQuery({ queryKey: ['market-valuation'], queryFn: () => getValuation(10), refetchInterval: 300_000 })
   const rows = (dir === 'under' ? data?.undervalued : data?.overvalued) || []
   const { prices } = useLivePrices(rows.map(r => r.ticker))
   return (
