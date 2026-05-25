@@ -3482,7 +3482,7 @@ def _build_market_breadth() -> dict:
             SELECT ticker FROM companies WHERE COALESCE(market, 'US') = 'US'
         ),
         today_px AS (
-            SELECT dp.ticker, dp.close
+            SELECT dp.ticker, dp.close, dp.volume
             FROM daily_prices dp, bounds b
             WHERE dp.date = b.today AND dp.ticker IN (SELECT ticker FROM us_tickers)
         ),
@@ -3519,6 +3519,8 @@ def _build_market_breadth() -> dict:
         SELECT
             SUM(CASE WHEN p.close IS NOT NULL AND t.close > p.close THEN 1 ELSE 0 END) AS advancers,
             SUM(CASE WHEN p.close IS NOT NULL AND t.close < p.close THEN 1 ELSE 0 END) AS decliners,
+            SUM(CASE WHEN p.close IS NOT NULL AND t.close > p.close THEN COALESCE(t.volume, 0) ELSE 0 END) AS up_volume,
+            SUM(CASE WHEN p.close IS NOT NULL AND t.close < p.close THEN COALESCE(t.volume, 0) ELSE 0 END) AS down_volume,
             SUM(CASE WHEN yw.hi52 IS NOT NULL AND t.close >= yw.hi52 THEN 1 ELSE 0 END) AS week52_highs,
             SUM(CASE WHEN yw.lo52 IS NOT NULL AND t.close <= yw.lo52 THEN 1 ELSE 0 END) AS week52_lows,
             SUM(CASE WHEN ma50.ma IS NOT NULL AND t.close > ma50.ma THEN 1.0 ELSE 0.0 END)
@@ -3536,11 +3538,14 @@ def _build_market_breadth() -> dict:
     with engine.connect() as conn:
         row = conn.execute(sql).mappings().fetchone()
     if row is None:
-        return {"advancers": 0, "decliners": 0, "week52_highs": 0,
-                "week52_lows": 0, "above_50d_ma_pct": None, "above_200d_ma_pct": None}
+        return {"advancers": 0, "decliners": 0, "up_volume": 0, "down_volume": 0,
+                "week52_highs": 0, "week52_lows": 0,
+                "above_50d_ma_pct": None, "above_200d_ma_pct": None}
     return {
         "advancers": int(row["advancers"] or 0),
         "decliners": int(row["decliners"] or 0),
+        "up_volume": int(row["up_volume"] or 0),
+        "down_volume": int(row["down_volume"] or 0),
         "week52_highs": int(row["week52_highs"] or 0),
         "week52_lows": int(row["week52_lows"] or 0),
         "above_50d_ma_pct": round(row["above_50d_ma_pct"], 6)
