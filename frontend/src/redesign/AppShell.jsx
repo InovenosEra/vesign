@@ -58,7 +58,8 @@ function MarketChip() {
     queryFn: () => getMarketStatus('US'),
     refetchInterval: 60_000,
   })
-  const open = data ? data.is_open : null
+  // Backend returns `phase` (regular | pre | post | idle), not is_open.
+  const open = data?.phase ? data.phase === 'regular' : null
   const cd = useCountdown(data?.next_regular_event_utc || data?.next_event_utc)
   return (
     <div className={'status' + (open === false ? ' closed' : '')}>
