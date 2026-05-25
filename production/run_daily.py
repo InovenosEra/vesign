@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------- Data pipelines ----------
-from data.market_data import update_prices, update_vix, update_company_info, summarize_descriptions, update_company_health, _download_and_save, fill_analyst_consensus_from_events
+from data.market_data import update_prices, update_vix, update_indices, update_company_info, summarize_descriptions, update_company_health, _download_and_save, fill_analyst_consensus_from_events
 
 # ---------- Feature engineering ----------
 from data.loaders import load_prices, save_features, engine
@@ -386,6 +386,9 @@ def run_daily():
     gc.collect()
 
     update_vix()
+    gc.collect()
+
+    update_indices()
     gc.collect()
 
     update_company_info()

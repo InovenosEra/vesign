@@ -225,6 +225,62 @@ def update_vix():
         print(f"VIX update failed: {e}")
 
 
+# Real index levels (not the SPY/QQQ/DIA/IWM ETF proxies). yfinance symbols:
+#   ^GSPC = S&P 500, ^NDX = Nasdaq-100, ^DJI = Dow Jones, ^RUT = Russell 2000.
+INDEX_SYMBOLS = ["^GSPC", "^NDX", "^DJI", "^RUT"]
+
+
+def update_indices():
+    """Fetch real index levels into the index_prices table — mirrors update_vix().
+    The market page shows these instead of the ETF proxies so 'S&P 500' reads
+    ~5,900 (the index) rather than ~745 (the SPY ETF)."""
+    print("Updating index levels incrementally...")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS index_prices (date DATETIME, ticker TEXT, close FLOAT)"
+        ))
+
+    try:
+        existing = pd.read_sql("SELECT MAX(date) as last_date FROM index_prices", engine)
+        last = existing["last_date"][0]
+        start_date = (pd.to_datetime(last).date() + timedelta(days=1)) if last is not None \
+            else datetime.now(UTC).date() - timedelta(days=3 * 365)
+    except Exception:
+        start_date = datetime.now(UTC).date() - timedelta(days=3 * 365)
+
+    today = datetime.now(UTC).date()
+    if start_date >= today:
+        print("Index levels already up to date")
+        return
+
+    print(f"Downloading index levels from {start_date} to {today}")
+    try:
+        data = yf.download(INDEX_SYMBOLS, start=start_date, end=today, auto_adjust=False, progress=False)
+        if data is None or data.empty:
+            print("Index date-range download empty, trying period fallback...")
+            data = yf.download(INDEX_SYMBOLS, period="5d", auto_adjust=False, progress=False)
+        if data is None or data.empty:
+            print("Index download returned empty data")
+            return
+
+        # Multi-ticker download → columns are a (field, ticker) MultiIndex.
+        close = data["Close"].reset_index().rename(columns={"Date": "date"})
+        long = close.melt(id_vars=["date"], var_name="ticker", value_name="close").dropna()
+
+        today_ts = pd.Timestamp(datetime.now(UTC).date())
+        start_ts = pd.Timestamp(start_date)
+        long = long[(long["date"] < today_ts) & (long["date"] >= start_ts)]
+        long.drop_duplicates(subset=["date", "ticker"], inplace=True)
+        if long.empty:
+            print("Index levels: no new rows to insert")
+            return
+        long[["date", "ticker", "close"]].to_sql("index_prices", engine, if_exists="append", index=False)
+        print(f"Index levels updated successfully ({len(long)} new rows)")
+
+    except Exception as e:
+        print(f"Index update failed: {e}")
+
+
 def snapshot_analyst_targets(date_str: str) -> None:
     """Copy current analyst_expectations into analyst_targets_history for date_str.
 

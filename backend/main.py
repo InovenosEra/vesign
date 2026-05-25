@@ -3190,7 +3190,7 @@ threading.Thread(target=_warm_signals_today_cache_bg, daemon=True).start()
 # See docs/superpowers/specs/2026-05-23-market-page-live-data-design.md
 # ---------------------------------------------------------------------------
 
-_INDICES_TICKERS = ["SPY", "QQQ", "DIA", "IWM"]  # VIX is sourced separately
+_INDICES_TICKERS = ["^GSPC", "^NDX", "^DJI", "^RUT"]  # real index levels; VIX sourced separately
 
 _market_cache: dict[str, dict] = {}
 _market_cache_lock = threading.Lock()
@@ -3200,7 +3200,8 @@ _MARKET_TTL_SECONDS = 60
 def _build_market_indices() -> dict:
     """Return {indices: [...]} for the 5 headline cards.
 
-    SPY/QQQ/DIA/IWM read from daily_prices; VIX from the vix table (yfinance path).
+    ^GSPC/^NDX/^DJI/^RUT (real index levels) read from index_prices; VIX from the
+    vix table. Both come from yfinance via market_data.update_indices/update_vix.
     Each entry: {ticker, close, change_pct, sparkline} where sparkline is up to
     the last 30 closes oldest→newest. close=None when the ticker has no data.
     """
@@ -3209,7 +3210,7 @@ def _build_market_indices() -> dict:
         for ticker in _INDICES_TICKERS:
             rows = conn.execute(
                 text(
-                    "SELECT close FROM daily_prices "
+                    "SELECT close FROM index_prices "
                     "WHERE ticker = :t ORDER BY date DESC LIMIT 30"
                 ),
                 {"t": ticker},

@@ -22,9 +22,9 @@ function StatRow() {
   const { data: breadth } = useQuery({ queryKey: ['market-breadth'], queryFn: getBreadth, refetchInterval: 60_000 })
   const { data: idx } = useQuery({ queryKey: ['market-indices'], queryFn: getIndices, refetchInterval: 60_000 })
   const by = Object.fromEntries((idx?.indices || []).map(r => [r.ticker, r]))
-  const spy = by.SPY, vix = by.VIX
-  const { prices } = useLivePrices(['SPY', 'VIX'])
-  const spyO = overlayLive(spy?.close, spy?.change_pct, prices.SPY)
+  const spy = by['^GSPC'], vix = by.VIX
+  const { prices } = useLivePrices(['^GSPC', 'VIX'])
+  const spyO = overlayLive(spy?.close, spy?.change_pct, prices['^GSPC'])
   const vixO = overlayLive(vix?.close, vix?.change_pct, prices.VIX)
   return (
     <div className="mt-stats">
