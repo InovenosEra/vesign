@@ -11,8 +11,6 @@ export default function ResearchHead({ tab, setTab, count }) {
         <div className="ph-context">
           <span className="day">{day}</span>
           <span className="sep">·</span>
-          <span className="status-open">NYSE</span>
-          <span className="sep">·</span>
           <span>Universe</span>
         </div>
       </div>

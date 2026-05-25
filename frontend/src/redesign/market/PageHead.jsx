@@ -14,8 +14,6 @@ export default function PageHead({ tab, setTab }) {
       <div className="ph-top">
         <div className="ph-context">
           <span className="day">{day}</span>
-          <span className="sep">·</span>
-          <span className="status-open">NYSE</span>
         </div>
       </div>
       <div className="ph-tabs">
