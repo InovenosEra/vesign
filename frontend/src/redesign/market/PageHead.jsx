@@ -12,7 +12,7 @@ export default function PageHead() {
   const day = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 
   return (
-    <div className="page-head">
+    <div className="page-head phm">
       <div className="ph-left">
         <span className="day">{day}</span>
         <span className="sep">·</span>
