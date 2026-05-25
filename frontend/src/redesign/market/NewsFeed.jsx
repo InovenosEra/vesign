@@ -17,7 +17,13 @@ export default function NewsFeed() {
   const trackRef = useRef(null)
   if (!news.length) return null
   const [hero, ...rest] = news
-  const scroll = (dir) => trackRef.current?.scrollBy({ left: dir * trackRef.current.clientWidth * 0.85, behavior: 'smooth' })
+  const scroll = (dir) => {
+    const track = trackRef.current
+    if (!track) return
+    const card = track.querySelector('.news-card')
+    const step = card ? card.offsetWidth + 16 : track.clientWidth  // card width + gap
+    track.scrollBy({ left: dir * step * 4, behavior: 'smooth' })   // advance a full page of 4
+  }
 
   return (
     <div className="news-feed">
