@@ -307,6 +307,8 @@
   .rd .cal-row .imp { display: inline-flex; gap: 2px; }
   .rd .cal-row .imp .d { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); }
   .rd .cal-row .imp .d.off { background: var(--bg-3); }
+  .rd .cal-row.holiday { background: rgba(245,158,11,0.04); }
+  .rd .hol-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); background: rgba(245,158,11,0.13); border: 1px solid rgba(245,158,11,0.3); padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 
   .rd .earn-row { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 10px; padding: 11px 16px 11px 14px; border-bottom: 1px solid var(--line); align-items: center; cursor: pointer; position: relative; transition: background .15s ease, padding .15s ease; }
   .rd .earn-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: transparent; transition: background .15s ease; }

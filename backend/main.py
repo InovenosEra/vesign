@@ -4295,7 +4295,17 @@ def _build_market_economic_calendar(days: int) -> dict:
             "prior": it.get("previous"),
             "actual": it.get("actual"),
         })
-    return {"events": events}
+    return {"events": events, "holidays": _upcoming_market_holidays(today, end)}
+
+
+def _upcoming_market_holidays(start, end) -> list:
+    """Upcoming NYSE market holidays in [start, end] as [{date, name}] (named via
+    exchange_calendars). Empty list on any failure."""
+    try:
+        hols = _nyse_cal._xcal.regular_holidays.holidays(start, end, return_name=True)
+        return [{"date": d.strftime("%Y-%m-%d"), "name": str(name)} for d, name in hols.items()]
+    except Exception:
+        return []
 
 
 def _get_market_economic_calendar_cached(days: int) -> dict:

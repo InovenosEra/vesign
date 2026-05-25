@@ -88,4 +88,4 @@ def test_empty_when_fetch_returns_none(econ_app):
     bm, client = econ_app
     with patch.object(bm, "_fetch_economic_calendar", return_value=None):
         body = client.get("/api/market/economic-calendar?days=7").json()
-    assert body == {"events": []}
+    assert body["events"] == []  # holidays may still be present (separate key)
