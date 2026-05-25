@@ -13,6 +13,8 @@ import GlobalSearch from './components/GlobalSearch'
 import ProfilePictureModal from './components/ProfilePictureModal'
 import './App.css'
 
+const MarketPage = lazy(() => import('./redesign/MarketPage'))
+const AppShell = lazy(() => import('./redesign/AppShell'))
 const SignalsPage = lazy(() => import('./pages/SignalsPage'))
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'))
 const TradesPage = lazy(() => import('./pages/TradesPage'))
@@ -636,6 +638,7 @@ function AppLayout() {
   const { isLoaded, userId } = useAuth()
   const { user } = useUser()
   const location = useLocation()
+  const isRedesignRoute = location.pathname.startsWith('/market')
   const [tokenReady, setTokenReady] = useState(false)
   const [disabledReason, setDisabledReason] = useState(null)
 
@@ -661,13 +664,15 @@ function AppLayout() {
         <CurrencyProvider>
           <TokenSync onReady={() => setTokenReady(true)} />
           {tokenReady && <Prefetcher />}
-          {tokenReady && <Header />}
+          {/* Redesigned routes (under .rd) bring their own AppShell header. */}
+          {tokenReady && !isRedesignRoute && <Header />}
           {tokenReady && <StaleDataBanner />}
           {tokenReady && (
             <>
               <main className="app-main">
                 <Suspense fallback={<PageFallback />}>
                   <Routes>
+                    <Route path="/market" element={<AppShell><MarketPage /></AppShell>} />
                     <Route path="/" element={<SignalsPage />} />
                     <Route path="/portfolio" element={<WatchlistPage />} />
                     <Route path="/trades" element={<TradesPage />} />
