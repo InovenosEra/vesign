@@ -353,6 +353,9 @@
   .rd .cm-cell .delta.up { color: var(--green); }
   .rd .cm-cell .delta.down { color: var(--red); }
   .rd .cm-cell .delta .abs { color: var(--ink-3); font-weight: 400; margin-left: 6px; }
+  /* Currencies base picker (right-aligned in the section header) */
+  .rd .fx-base { margin-left: auto; height: 28px; padding: 0 8px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; color: var(--ink); font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  .rd .fx-base:focus { outline: none; border-color: var(--blue); }
 
   /* NEWS + ANALYST CHANGES */
   .rd .news-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }

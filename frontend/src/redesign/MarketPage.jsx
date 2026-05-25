@@ -4,7 +4,7 @@ import { useState } from 'react'
 import PageHead from './market/PageHead'
 import Indices from './market/Indices'
 import Commodities from './market/Commodities'
-import CrossMarket from './market/CrossMarket'
+import Currencies from './market/Currencies'
 import Movers from './market/Movers'
 import SectorHeatmap from './market/SectorHeatmap'
 import SectorModal from './market/SectorModal'
@@ -25,7 +25,7 @@ export default function MarketPage() {
           <>
             <Indices />
             <Commodities />
-            <CrossMarket />
+            <Currencies />
             <Movers />
             <SectorHeatmap onOpenSector={setSector} />
           </>

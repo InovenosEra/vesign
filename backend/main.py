@@ -4053,6 +4053,52 @@ def market_commodities():
     return _get_yf_strip_cached(_COMMODITY_TICKERS, "commodities")
 
 
+# Currencies strip: user picks a base; we show the key world currencies' rate to it.
+_FX_KEY = ["USD", "EUR", "GBP", "JPY", "CHF", "CNY", "AUD", "CAD"]  # priority order
+_FX_BASES = ["ILS", "USD", "EUR", "GBP", "JPY", "CHF", "CNY", "AUD", "CAD"]  # selectable bases
+
+
+def _build_market_currencies(base: str) -> dict:
+    """5 key currencies' rate per 1 unit in `base` (e.g. base=ILS → USD/ILS, EUR/ILS …).
+    Fetches the full key list (minus the base) and keeps the first 5 with data, so a
+    missing cross (e.g. CNYILS=X) just falls through to the next currency."""
+    base = (base or "ILS").upper()
+    if base not in _FX_BASES:
+        base = "ILS"
+    pairs = [(f"{c}{base}=X", f"{c} / {base}") for c in _FX_KEY if c != base]
+    raw = _fetch_yf_quotes(pairs) or {}
+    cards = []
+    for ticker, label in pairs:
+        q = raw.get(ticker)
+        if not q or q.get("price") is None:
+            continue
+        price = q["price"]
+        prev = q.get("prev_close")
+        change_pct = round((price - prev) / prev * 100, 4) if prev not in (None, 0) else None
+        cards.append({"ticker": ticker, "label": label, "price": price, "change_pct": change_pct})
+        if len(cards) >= 5:
+            break
+    return {"base": base, "bases": _FX_BASES, "currencies": cards}
+
+
+def _get_market_currencies_cached(base: str) -> dict:
+    key = f"currencies:{(base or 'ILS').upper()}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_currencies(base)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/currencies")
+def market_currencies(base: str = "ILS"):
+    """Key world currencies' rate to a user-selected base currency (via yfinance)."""
+    return _get_market_currencies_cached(base)
+
+
 _NEWS_CACHE_TTL_SECONDS = 5 * 60
 
 
