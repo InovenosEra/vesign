@@ -8,7 +8,6 @@ import Currencies from './market/Currencies'
 import Movers from './market/Movers'
 import SectorHeatmap from './market/SectorHeatmap'
 import SectorModal from './market/SectorModal'
-import MarketTrend from './market/MarketTrend'
 import TopNews from './market/TopNews'
 import AnalystChanges from './market/AnalystChanges'
 import EarningsWeek from './market/EarningsWeek'
@@ -30,7 +29,6 @@ export default function MarketPage() {
             <SectorHeatmap onOpenSector={setSector} />
           </>
         )}
-        {tab === 'trend' && <MarketTrend />}
         {tab === 'news' && (
           <div className="two-col-2">
             <TopNews />

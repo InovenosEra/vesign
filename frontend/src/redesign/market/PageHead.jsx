@@ -2,7 +2,6 @@
  * Calendar). Same structure/height as the other pages' page-heads. */
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'trend', label: 'Market Trend' },
   { id: 'news', label: 'News' },
   { id: 'calendar', label: 'Calendar' },
 ]
