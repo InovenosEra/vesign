@@ -353,20 +353,18 @@
   .rd .cm-cell .delta.up { color: var(--green); }
   .rd .cm-cell .delta.down { color: var(--red); }
   .rd .cm-cell .delta .abs { color: var(--ink-3); font-weight: 400; margin-left: 6px; }
-  /* Currencies base picker — matches the .wt-toggle pill look (dark rounded
-     pill, mono 11px, custom caret). */
+  /* Currencies base picker — compact inline pill trigger that opens the same
+     styled .hs-menu as the header currency selector. */
+  .rd .fx-picker { display: inline-block; vertical-align: middle; margin-left: 2px; }
   .rd .fx-base {
-    vertical-align: middle; margin-left: 2px;
+    display: inline-flex; align-items: center; gap: 4px;
     font-family: var(--mono); font-size: 11px; font-weight: 600;
-    color: var(--ink); background-color: var(--bg-2);
+    color: var(--ink); background: var(--bg-2);
     border: 1px solid var(--line); border-radius: 5px;
-    padding: 2px 20px 2px 8px; cursor: pointer;
-    appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'><polyline points='6 9 12 15 18 9'/></svg>");
-    background-repeat: no-repeat; background-position: right 6px center;
+    padding: 3px 8px; cursor: pointer;
   }
   .rd .fx-base:hover { border-color: var(--line-2); }
-  .rd .fx-base:focus { outline: none; border-color: var(--line-2); }
+  .rd .fx-base .hs-caret { color: var(--ink-3); }
 
   /* NEWS + ANALYST CHANGES */
   .rd .news-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
