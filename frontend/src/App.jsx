@@ -669,7 +669,7 @@ function AppLayout() {
           {tokenReady && <StaleDataBanner />}
           {tokenReady && (
             <>
-              <main className="app-main">
+              <main className={isRedesignRoute ? undefined : 'app-main'}>
                 <Suspense fallback={<PageFallback />}>
                   <Routes>
                     <Route path="/market" element={<AppShell><MarketPage /></AppShell>} />
@@ -683,7 +683,7 @@ function AppLayout() {
                   </Routes>
                 </Suspense>
               </main>
-              <Footer />
+              {!isRedesignRoute && <Footer />}
             </>
           )}
         </CurrencyProvider>
