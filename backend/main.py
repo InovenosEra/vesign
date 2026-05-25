@@ -3693,28 +3693,53 @@ def market_sector_detail(sector: str):
     return _build_market_sector_detail(sector.strip())
 
 
-_TAPE_TICKERS = [
-    "SPY", "QQQ", "DIA", "IWM", "VIX",
-    "NVDA", "MSFT", "AAPL", "META", "TSLA",
-    "AMZN", "GOOGL", "MU", "PM", "MTD", "JPM",
-]
+_TAPE_LIMIT = 20  # top-N US stocks by market cap shown on the tape (ETFs excluded)
 
 
 def _build_market_tape() -> dict:
-    """One-roundtrip payload for the 32px tape ticker: 16 tickers × {close, change_pct}."""
+    """One-roundtrip payload for the 32px tape ticker.
+
+    Tail is dynamic: the top `_TAPE_LIMIT` US stocks by market cap, ordered
+    cap-descending. ETFs (sector='ETF', e.g. SPY/QQQ/VOO) are excluded so the
+    tape shows companies, not index proxies. Dual-class listings (e.g. GOOGL +
+    GOOG, both "Alphabet Inc. (Class …)") collapse to the higher-cap class so a
+    company appears once.
+    """
     out = []
     with engine.connect() as conn:
-        for ticker in _TAPE_TICKERS:
-            if ticker == "VIX":
-                rows = conn.execute(
-                    text("SELECT close FROM vix ORDER BY date DESC LIMIT 2")
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    text("SELECT close FROM daily_prices "
-                         "WHERE ticker = :t ORDER BY date DESC LIMIT 2"),
-                    {"t": ticker},
-                ).fetchall()
+        ranked = conn.execute(
+            text("""
+                SELECT f.ticker, c.company
+                FROM (
+                    SELECT ticker, MAX(market_cap) AS market_cap
+                    FROM fundamentals GROUP BY ticker
+                ) f
+                JOIN companies c ON c.ticker = f.ticker
+                WHERE f.market_cap IS NOT NULL
+                  AND c.market = 'US'
+                  AND COALESCE(c.sector, '') != 'ETF'
+                ORDER BY f.market_cap DESC
+            """)
+        ).fetchall()
+
+        # Walk cap-descending, keeping one ticker per company (the first seen =
+        # highest cap), until we have _TAPE_LIMIT distinct companies.
+        tickers, seen = [], set()
+        for ticker, company in ranked:
+            key = re.sub(r"\s*\(Class [^)]*\)\s*$", "", company or ticker).strip()
+            if key in seen:
+                continue
+            seen.add(key)
+            tickers.append(ticker)
+            if len(tickers) >= _TAPE_LIMIT:
+                break
+
+        for ticker in tickers:
+            rows = conn.execute(
+                text("SELECT close FROM daily_prices "
+                     "WHERE ticker = :t ORDER BY date DESC LIMIT 2"),
+                {"t": ticker},
+            ).fetchall()
             closes = [r[0] for r in rows]  # newest, prev
             close = closes[0] if closes else None
             change_pct = None
