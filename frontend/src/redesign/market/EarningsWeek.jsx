@@ -14,7 +14,7 @@ export default function EarningsWeek() {
   const range = all.length ? `${dateFmt(all[0].date)} – ${dateFmt(all[all.length - 1].date)}` : ''
   return (
     <div className="cal-panel">
-      <div className="cal-head"><h3>Earnings this week</h3><span className="day">{range}</span></div>
+      <div className="cal-head"><h3>Earnings</h3><span className="day">{range}</span></div>
       <div className="cal-list">
         {rows.map((r, i) => {
           const when = `${r.time || ''}${r.time && r.day_of_week ? ' · ' : ''}${DAY_ABBR[r.day_of_week] || ''}`

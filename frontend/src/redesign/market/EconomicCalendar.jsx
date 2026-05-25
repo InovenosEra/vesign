@@ -12,7 +12,7 @@ export default function EconomicCalendar() {
   const events = (data?.events || []).slice(0, 8)
   return (
     <div className="cal-panel">
-      <div className="cal-head"><h3>Economic events</h3><span className="day">Next 7 days</span></div>
+      <div className="cal-head"><h3>Economic</h3></div>
       <div className="cal-list">
         {events.map((e, i) => {
           const dt = new Date((e.date || '').replace(' ', 'T') + 'Z')
