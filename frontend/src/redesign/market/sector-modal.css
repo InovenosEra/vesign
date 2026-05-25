@@ -1,0 +1,53 @@
+/* Sector drill-down modal styles — ported from sector-modal.js, scoped to .rd. */
+.rd .sm-overlay { position: fixed; inset: 0; z-index: 950; display: none;
+  background: rgba(3,6,12,0.6); backdrop-filter: blur(3px);
+  align-items: center; justify-content: center; padding: 24px; }
+.rd .sm-overlay.open { display: flex; }
+.rd .sm-box { width: min(820px, 100%); max-height: 88vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: 14px; overflow: hidden; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7); }
+.rd .sm-head { padding: 18px 22px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: flex-start; gap: 20px; }
+.rd .sm-head .l { flex: 1; min-width: 0; }
+.rd .sm-sector { font-size: 19px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.rd .sm-moves { margin-top: 6px; font-family: var(--mono); font-size: 13px; display: flex; gap: 16px; align-items: baseline; }
+.rd .sm-moves .big { font-size: 22px; }
+.rd .sm-moves .lbl { color: var(--ink-3); font-size: 11px; }
+.rd .sm-moves .up { color: var(--green); } .rd .sm-moves .down { color: var(--red); }
+.rd .sm-spark { width: 200px; height: 56px; flex-shrink: 0; }
+.rd .sm-spark svg { width: 100%; height: 100%; display: block; }
+.rd .sm-x { background: none; border: none; color: var(--ink-3); cursor: pointer; font-size: 22px; line-height: 1; padding: 0 4px; }
+.rd .sm-x:hover { color: var(--ink); }
+.rd .sm-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+  background: var(--line); border-bottom: 1px solid var(--line); }
+.rd .sm-stat { background: var(--panel); padding: 12px 16px; }
+.rd .sm-stat .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); font-weight: 600; }
+.rd .sm-stat .v { margin-top: 4px; font-family: var(--mono); font-size: 15px; color: var(--ink); }
+.rd .sm-stat .v.up { color: var(--green); } .rd .sm-stat .v.down { color: var(--red); }
+.rd .sm-stat .v small { font-size: 11px; color: var(--ink-3); }
+.rd .sm-breadth { padding: 14px 22px; border-bottom: 1px solid var(--line); }
+.rd .sm-breadth .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; margin-bottom: 6px; }
+.rd .sm-bar { height: 9px; border-radius: 3px; overflow: hidden; display: flex; background: var(--bg-3); }
+.rd .sm-bar .a { background: var(--green); } .rd .sm-bar .d { background: var(--red); }
+.rd .sm-bar-nums { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; margin-top: 5px; }
+.rd .sm-bar-nums .up { color: var(--green); } .rd .sm-bar-nums .down { color: var(--red); }
+.rd .sm-tbl-wrap { overflow-y: auto; }
+.rd .sm-tbl { width: 100%; border-collapse: collapse; }
+.rd .sm-tbl thead th { position: sticky; top: 0; background: var(--bg-2); z-index: 1;
+  text-align: right; font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--ink-3); padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rd .sm-tbl thead th.l { text-align: left; }
+.rd .sm-tbl tbody tr { border-bottom: 1px solid var(--line); cursor: pointer; }
+.rd .sm-tbl tbody tr:hover { background: var(--bg-2); }
+.rd .sm-tbl td { padding: 9px 14px; font-family: var(--mono); font-size: 12px; text-align: right; color: var(--ink-2); white-space: nowrap; }
+.rd .sm-tbl td.l { text-align: left; }
+.rd .sm-tk-cell { display: flex; align-items: center; gap: 9px; }
+.rd .sm-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; flex-shrink: 0; }
+.rd .sm-logo.white-bg { background: #fff; padding: 2px; }
+.rd .sm-tk { color: var(--ink); font-weight: 600; }
+.rd .sm-co { font-family: var(--sans); color: var(--ink-3); font-size: 11.5px; }
+.rd .sm-tbl .up { color: var(--green); } .rd .sm-tbl .down { color: var(--red); }
+.rd .sm-sig { padding: 1px 7px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+.rd .sm-sig.buy { background: rgba(0,217,126,0.13); color: var(--green); }
+.rd .sm-sig.sell { background: rgba(255,77,92,0.13); color: var(--red); }
+.rd .sm-sig.hold { background: rgba(255,255,255,0.06); color: var(--ink-3); }
