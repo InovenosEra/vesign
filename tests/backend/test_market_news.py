@@ -98,3 +98,52 @@ def test_empty_when_fetch_returns_none(news_app):
     with patch.object(bm, "_fetch_top_news", return_value=None):
         body = client.get("/api/market/news/top").json()
     assert body == {"news": []}
+
+
+def test_blends_macro_and_stock_feeds(news_app):
+    # The feed must surface broad economy/market news, not only single-ticker
+    # stories. We blend FMP's general (macro) + stock feeds and interleave them
+    # with macro leading, so economy news is always present and fronts the hero
+    # even when a single-name story happens to be a few minutes newer.
+    bm, client = news_app
+    import data.fmp as fmp
+
+    def fake_get(ep, params):
+        if "general" in ep:
+            return [
+                {"title": "Jobs report beats forecasts", "site": "WSJ", "url": "g1",
+                 "symbol": "", "publishedDate": _ago(30)},
+                {"title": "Oil slides on demand fears",   "site": "Reuters", "url": "g2",
+                 "symbol": "", "publishedDate": _ago(50)},
+            ]
+        if "stock" in ep:
+            return [{"title": "AAPL upgraded", "site": "Zacks", "url": "s1",
+                     "symbol": "AAPL", "publishedDate": _ago(10)}]
+        return []
+
+    with patch.object(fmp, "_get", side_effect=fake_get):
+        rows = client.get("/api/market/news/top?limit=10").json()["news"]
+
+    titles = [r["title"] for r in rows]
+    # All three present — macro stories are not dropped in favour of tickers.
+    assert "Jobs report beats forecasts" in titles
+    assert "Oil slides on demand fears" in titles
+    assert "AAPL upgraded" in titles
+    # Macro leads the feed (hero), then we interleave the stock story.
+    assert titles[0] == "Jobs report beats forecasts"
+    assert titles[1] == "AAPL upgraded"
+
+
+def test_dedupes_by_url(news_app):
+    # Blending two feeds can surface the same article twice; keep one per URL.
+    bm, client = news_app
+    fixture = [
+        {"title": "a",      "site": "X", "url": "dup",   "symbol": "", "publishedDate": _ago(5)},
+        {"title": "a copy", "site": "Y", "url": "dup",   "symbol": "", "publishedDate": _ago(6)},
+        {"title": "b",      "site": "Z", "url": "other", "symbol": "", "publishedDate": _ago(7)},
+    ]
+    with patch.object(bm, "_fetch_top_news", return_value=fixture):
+        rows = client.get("/api/market/news/top?limit=10").json()["news"]
+    urls = [r["url"] for r in rows]
+    assert urls.count("dup") == 1
+    assert "other" in urls

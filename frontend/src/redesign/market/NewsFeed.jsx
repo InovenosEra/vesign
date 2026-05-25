@@ -20,9 +20,7 @@ export default function NewsFeed() {
   const scroll = (dir) => {
     const track = trackRef.current
     if (!track) return
-    const card = track.querySelector('.news-card')
-    const step = card ? card.offsetWidth + 16 : track.clientWidth  // card width + gap
-    track.scrollBy({ left: dir * step * 4, behavior: 'smooth' })   // advance a full page of 4
+    track.scrollBy({ left: dir * track.clientWidth, behavior: 'smooth' })  // advance one full page; snap aligns to a card
   }
 
   return (

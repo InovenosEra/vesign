@@ -4119,23 +4119,54 @@ def market_currencies(base: str = "ILS"):
 _NEWS_CACHE_TTL_SECONDS = 5 * 60
 
 
+# FMP news feeds, in display priority. `news/stock` (no symbols) returns an
+# unsorted default set that can be ~11h stale and is single-name only; the
+# *-latest feeds are sorted newest-first. We lead with general (macro/economy:
+# jobs reports, oil, rates, geopolitics) then blend in stock so the feed isn't
+# just ticker chatter. Each feed is interleaved round-robin so neither category
+# is buried by the other's recency.
+_NEWS_FEEDS = ("news/general-latest", "news/stock-latest")
+
+
 def _fetch_top_news(limit: int) -> list | None:
-    """Most-recent market news from FMP. Returns the raw item list or None on failure."""
+    """Blend FMP news feeds, round-robin interleaved (macro first).
+
+    Each feed arrives newest-first from FMP; interleaving keeps both macro and
+    single-name stories visible instead of letting one category's recency push
+    the other off the list. Returns the interleaved list, or None if every feed
+    fails."""
     from data import fmp as _fmp
-    try:
-        items = _fmp._get("news/stock", {"limit": limit}) or []
-    except Exception:
+    from itertools import zip_longest
+    feeds: list[list] = []
+    any_ok = False
+    for ep in _NEWS_FEEDS:
+        try:
+            items = _fmp._get(ep, {"limit": limit}) or []
+        except Exception:
+            continue
+        if isinstance(items, list):
+            any_ok = True
+            feeds.append(items)
+    if not any_ok:
         return None
-    if not isinstance(items, list):
-        return None
-    return items
+    # g0, s0, g1, s1, … — preserves each feed's newest-first order, macro leads.
+    interleaved: list = []
+    for group in zip_longest(*feeds):
+        interleaved.extend(it for it in group if it is not None)
+    return interleaved
 
 
 def _build_market_news(limit: int) -> dict:
     items = _fetch_top_news(limit) or []
     out = []
     now = datetime.now(timezone.utc)
+    seen_urls = set()
     for it in items:
+        url = it.get("url") or ""
+        if url and url in seen_urls:
+            continue
+        if url:
+            seen_urls.add(url)
         published_raw = it.get("publishedDate") or it.get("published_at") or ""
         published_dt = _parse_iso8601(published_raw)
         age_minutes = None
@@ -4145,14 +4176,15 @@ def _build_market_news(limit: int) -> dict:
         out.append({
             "title": it.get("title") or "",
             "source": it.get("site") or it.get("publisher") or "",
-            "url": it.get("url") or "",
+            "url": url,
             "ticker": symbol if symbol else None,
             "image": it.get("image") or None,
             "summary": it.get("text") or None,
             "published_at": published_raw or None,
             "age_minutes": age_minutes,
         })
-    return {"news": out}
+    # Keep the blended interleave order (macro-first); just clip to limit.
+    return {"news": out[:limit]}
 
 
 def _parse_iso8601(s: str) -> datetime | None:
