@@ -117,6 +117,20 @@ export const getMarketStatus = (market = 'US') =>
 export const getDataStatus = () => get('/data/status')
 export const getFxRates    = () => get('/fx/rates')
 
+// Redesign Market page — sector/movers/valuation/tape/calendar widgets.
+export const getIndices      = ()            => get('/market/indices')
+export const getCrossMarket  = ()            => get('/market/cross')
+export const getMovers       = (type, n = 5) => get(`/market/movers?type=${encodeURIComponent(type)}&limit=${n}`)
+export const getBreadth      = ()            => get('/market/breadth')
+export const getValuation    = (n = 6)       => get(`/market/valuation?limit=${n}`)
+export const getSectors      = ()            => get('/market/sectors')
+export const getSectorDetail = (name)        => get(`/market/sector/${encodeURIComponent(name)}`)
+export const getTape         = ()            => get('/market/tape')
+export const getTopNews      = (n = 5)       => get(`/market/news/top?limit=${n}`)
+export const getTopAnalyst   = (days = 1, n = 5) => get(`/market/analyst-changes/top?days=${days}&limit=${n}`)
+export const getEarningsWeek = ()            => get('/market/earnings/week')
+export const getEconomicCal  = (days = 7)    => get(`/market/economic-calendar?days=${days}`)
+
 // --- Signals ---------------------------------------------------------------
 export const getSignalsToday = (signal, market = 'US') => {
   const params = new URLSearchParams({ market })
