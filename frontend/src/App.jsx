@@ -88,6 +88,9 @@ const persistOptions = {
   dehydrateOptions: {
     shouldDehydrateQuery: (q) => {
       const key = q.queryKey?.[0]
+      // Redesign live market/price data must always be fetched fresh, never
+      // served stale from localStorage on reload (it changes intraday).
+      if (typeof key === 'string' && (key.startsWith('market-') || key === 'idx-hist' || key === 'price-history')) return false
       return !USER_SCOPED_QUERY_KEYS.has(key) && !NO_PERSIST_QUERY_KEYS.has(key)
     },
   },
