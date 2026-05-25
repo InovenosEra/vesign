@@ -3866,18 +3866,27 @@ def market_analyst_changes_top(days: int = 1, limit: int = 5):
     return _get_market_analyst_changes_cached(days, limit)
 
 
+# Macro strip (cross-market): currency / yield / crypto. Commodities live in
+# their own strip below (so Gold/Oil aren't duplicated here).
 _CROSS_TICKERS = [
     ("DX-Y.NYB", "USD Index"),
     ("^TNX",     "10Y Yield"),
-    ("GC=F",     "Gold"),
-    ("CL=F",     "Crude Oil"),
     ("BTC-USD",  "Bitcoin"),
     ("USDILS=X", "USD / ILS"),
 ]
 
+_COMMODITY_TICKERS = [
+    ("GC=F", "Gold"),
+    ("SI=F", "Silver"),
+    ("CL=F", "WTI Crude"),
+    ("BZ=F", "Brent"),
+    ("NG=F", "Nat Gas"),
+    ("HG=F", "Copper"),
+]
 
-def _fetch_cross_quotes() -> dict | None:
-    """Pull current + prior close for the cross-market tickers from yfinance.
+
+def _fetch_yf_quotes(pairs: list[tuple[str, str]]) -> dict | None:
+    """Pull current + prior close for a list of (ticker, label) from yfinance.
 
     Returns {ticker: {price, prev_close}} on success, or None on hard failure
     (the caller then falls back to the last cached value with stale=true).
@@ -3885,16 +3894,15 @@ def _fetch_cross_quotes() -> dict | None:
     second-source fallback inside this helper.
     """
     try:
-        tickers = [t for t, _ in _CROSS_TICKERS]
         raw = yf.download(
-            " ".join(tickers), period="5d", auto_adjust=False, progress=False
+            " ".join(t for t, _ in pairs), period="5d", auto_adjust=False, progress=False
         )
         if raw is None or raw.empty:
             return None
     except Exception:
         return None
     out: dict = {}
-    for ticker, _ in _CROSS_TICKERS:
+    for ticker, _ in pairs:
         try:
             closes = _extract_close_series(raw, ticker)
             if len(closes) >= 2:
@@ -3907,12 +3915,17 @@ def _fetch_cross_quotes() -> dict | None:
     return out or None
 
 
-def _build_market_cross() -> dict:
-    """Compose the cross-market strip. On fetch failure, fall back to cached + stale."""
-    raw = _fetch_cross_quotes()
+# Back-compat alias — test_market_cross patches this name.
+def _fetch_cross_quotes() -> dict | None:
+    return _fetch_yf_quotes(_CROSS_TICKERS)
+
+
+def _build_yf_strip(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
+    """Compose a {key: [rows]} strip from yfinance quotes; stale fallback on failure."""
+    raw = fetch(pairs) if fetch else _fetch_yf_quotes(pairs)
     if raw:
         rows = []
-        for ticker, label in _CROSS_TICKERS:
+        for ticker, label in pairs:
             q = raw.get(ticker)
             if not q:
                 continue
@@ -3925,33 +3938,37 @@ def _build_market_cross() -> dict:
                 "ticker": ticker, "label": label,
                 "price": price, "change_pct": change_pct, "stale": False,
             })
-        return {"cross": rows}
+        return {key: rows}
 
-    # Hard failure: serve last fresh response with stale=true.
-    cached = _market_cache.get("cross_last_good")
+    cached = _market_cache.get(key + "_last_good")
     if cached is None:
-        return {"cross": []}
-    return {"cross": [{**r, "stale": True} for r in cached["data"]["cross"]]}
+        return {key: []}
+    return {key: [{**r, "stale": True} for r in cached["data"][key]]}
 
 
-def _get_market_cross_cached() -> dict:
+def _get_yf_strip_cached(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
     now = time.time()
     with _market_cache_lock:
-        c = _market_cache.get("cross")
+        c = _market_cache.get(key)
         if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
             return c["data"]
-        data = _build_market_cross()
-        _market_cache["cross"] = {"t": now, "data": data}
-        # Preserve the last fresh (non-stale) snapshot for future fallback use.
-        if data["cross"] and not any(r.get("stale") for r in data["cross"]):
-            _market_cache["cross_last_good"] = {"t": now, "data": data}
+        data = _build_yf_strip(pairs, key, fetch=fetch)
+        _market_cache[key] = {"t": now, "data": data}
+        if data[key] and not any(r.get("stale") for r in data[key]):
+            _market_cache[key + "_last_good"] = {"t": now, "data": data}
         return data
 
 
 @protected.get("/api/market/cross")
 def market_cross():
-    """USD/10Y/Gold/Oil/BTC/USDILS strip via yfinance; stale=true on fetch failure."""
-    return _get_market_cross_cached()
+    """USD/10Y/BTC/USD-ILS macro strip via yfinance; stale=true on fetch failure."""
+    return _get_yf_strip_cached(_CROSS_TICKERS, "cross", fetch=lambda p: _fetch_cross_quotes())
+
+
+@protected.get("/api/market/commodities")
+def market_commodities():
+    """Gold/Silver/WTI/Brent/NatGas/Copper via yfinance; stale=true on fetch failure."""
+    return _get_yf_strip_cached(_COMMODITY_TICKERS, "commodities")
 
 
 _NEWS_CACHE_TTL_SECONDS = 5 * 60

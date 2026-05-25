@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import PageHead from './market/PageHead'
 import Indices from './market/Indices'
+import Commodities from './market/Commodities'
 import CrossMarket from './market/CrossMarket'
 import Movers from './market/Movers'
 import SectorHeatmap from './market/SectorHeatmap'
@@ -23,6 +24,7 @@ export default function MarketPage() {
         {tab === 'overview' && (
           <>
             <Indices />
+            <Commodities />
             <CrossMarket />
             <Movers />
             <SectorHeatmap onOpenSector={setSector} />

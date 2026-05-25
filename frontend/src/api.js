@@ -120,6 +120,7 @@ export const getFxRates    = () => get('/fx/rates')
 // Redesign Market page — sector/movers/valuation/tape/calendar widgets.
 export const getIndices      = ()            => get('/market/indices')
 export const getCrossMarket  = ()            => get('/market/cross')
+export const getCommodities  = ()            => get('/market/commodities')
 export const getMovers       = (type, n = 5) => get(`/market/movers?type=${encodeURIComponent(type)}&limit=${n}`)
 export const getBreadth      = ()            => get('/market/breadth')
 export const getValuation    = (n = 6)       => get(`/market/valuation?limit=${n}`)
