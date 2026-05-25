@@ -3338,10 +3338,11 @@ def _build_market_valuation(limit: int = 6) -> dict:
     """
     sql = text("""
         WITH lp AS (
+            -- Anchor to the global last-close date so a stale ticker (no row on
+            -- the latest date) is excluded rather than valued off an old price.
             SELECT p1.ticker, p1.close
             FROM daily_prices p1
-            JOIN (SELECT ticker, MAX(date) AS md FROM daily_prices GROUP BY ticker) p2
-              ON p1.ticker = p2.ticker AND p1.date = p2.md
+            WHERE p1.date = (SELECT MAX(date) FROM daily_prices)
         )
         SELECT c.ticker, c.company, c.logo_url, lp.close,
                ae.target_mean_price AS target, ae.number_of_analysts AS analysts,
@@ -3704,17 +3705,29 @@ def _build_market_tape() -> dict:
     tape shows companies, not index proxies. Dual-class listings (e.g. GOOGL +
     GOOG, both "Alphabet Inc. (Class …)") collapse to the higher-cap class so a
     company appears once.
+
+    Anchored to the global last-close date: a ticker the pipeline missed (no row
+    on the latest date) is EXCLUDED rather than shown with a stale price — the
+    next company by market cap fills its slot. close/change are the last-close
+    and prior-close on the global trading dates.
     """
     out = []
     with engine.connect() as conn:
         ranked = conn.execute(
             text("""
-                SELECT f.ticker, c.company
+                WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
+                prev_bounds AS (
+                    SELECT MAX(d.date) AS prev FROM daily_prices d, bounds b
+                    WHERE d.date < b.today
+                )
+                SELECT f.ticker, c.company, t.close AS close, pv.close AS prev_close
                 FROM (
                     SELECT ticker, MAX(market_cap) AS market_cap
                     FROM fundamentals GROUP BY ticker
                 ) f
                 JOIN companies c ON c.ticker = f.ticker
+                JOIN daily_prices t ON t.ticker = f.ticker AND t.date = (SELECT today FROM bounds)
+                LEFT JOIN daily_prices pv ON pv.ticker = f.ticker AND pv.date = (SELECT prev FROM prev_bounds)
                 WHERE f.market_cap IS NOT NULL
                   AND c.market = 'US'
                   AND COALESCE(c.sector, '') != 'ETF'
@@ -3722,30 +3735,20 @@ def _build_market_tape() -> dict:
             """)
         ).fetchall()
 
-        # Walk cap-descending, keeping one ticker per company (the first seen =
-        # highest cap), until we have _TAPE_LIMIT distinct companies.
-        tickers, seen = [], set()
-        for ticker, company in ranked:
+        # Walk cap-descending, keeping one ticker per company (first seen = highest
+        # cap), until we have _TAPE_LIMIT distinct companies.
+        seen = set()
+        for ticker, company, close, prev_close in ranked:
             key = re.sub(r"\s*\(Class [^)]*\)\s*$", "", company or ticker).strip()
             if key in seen:
                 continue
             seen.add(key)
-            tickers.append(ticker)
-            if len(tickers) >= _TAPE_LIMIT:
-                break
-
-        for ticker in tickers:
-            rows = conn.execute(
-                text("SELECT close FROM daily_prices "
-                     "WHERE ticker = :t ORDER BY date DESC LIMIT 2"),
-                {"t": ticker},
-            ).fetchall()
-            closes = [r[0] for r in rows]  # newest, prev
-            close = closes[0] if closes else None
             change_pct = None
-            if len(closes) >= 2 and closes[1] not in (None, 0) and close is not None:
-                change_pct = round((close - closes[1]) / closes[1] * 100, 4)
+            if prev_close not in (None, 0) and close is not None:
+                change_pct = round((close - prev_close) / prev_close * 100, 4)
             out.append({"ticker": ticker, "close": close, "change_pct": change_pct})
+            if len(out) >= _TAPE_LIMIT:
+                break
     return {"tape": out}
 
 

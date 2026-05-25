@@ -135,16 +135,36 @@ def test_tape_caps_at_twenty_tickers(tape_app):
     assert items[-1]["ticker"] == "T19"  # 20th largest; T20..T24 dropped
 
 
-def test_stock_without_prices_still_listed_with_null_close(tape_app):
+def test_stock_without_prices_is_excluded(tape_app):
+    # Anchored to the last close: a top-cap ticker with no daily_prices row is
+    # excluded (not shown with a null/stale price); the next company fills in.
     bm, client = tape_app
     _insert_company(bm, ticker="NODATA", market_cap=5_000e9)  # top cap, no prices
     _insert_company(bm, ticker="HASDATA", market_cap=1_000e9)
     _insert_two_day(bm, ticker="HASDATA", prev=100.0, today=105.0)
 
-    by = {r["ticker"]: r for r in client.get("/api/market/tape").json()["tape"]}
-    assert by["NODATA"]["close"] is None
-    assert by["NODATA"]["change_pct"] is None
-    assert by["HASDATA"]["close"] == pytest.approx(105.0)
+    tickers = [r["ticker"] for r in client.get("/api/market/tape").json()["tape"]]
+    assert "NODATA" not in tickers
+    assert tickers == ["HASDATA"]
+    assert {r["ticker"]: r for r in client.get("/api/market/tape").json()["tape"]}["HASDATA"]["close"] == pytest.approx(105.0)
+
+
+def test_stale_ticker_excluded_from_tape(tape_app):
+    # A higher-cap ticker whose latest row is OLDER than the global last close is
+    # excluded — it must never show a stale price — and the fresh ticker is kept.
+    bm, client = tape_app
+    _insert_company(bm, ticker="STALE", market_cap=9_000e9)  # bigger cap, but stale
+    _insert_company(bm, ticker="FRESH", market_cap=1_000e9)
+    _insert_two_day(bm, ticker="FRESH", prev=100.0, today=101.0)  # defines last close = 05-22
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        for d, c in [("2026-05-19 00:00:00", 50.0), ("2026-05-20 00:00:00", 51.0)]:
+            conn.execute(text("""INSERT INTO daily_prices (date, ticker, open, high, low, close, volume)
+                                 VALUES (:d, :t, :c, :c, :c, :c, 0)"""), {"d": d, "t": "STALE", "c": c})
+
+    tickers = [r["ticker"] for r in client.get("/api/market/tape").json()["tape"]]
+    assert "STALE" not in tickers
+    assert tickers == ["FRESH"]
 
 
 def test_dual_class_shares_collapse_to_higher_cap(tape_app):
