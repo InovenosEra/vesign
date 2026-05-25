@@ -353,8 +353,19 @@
   .rd .cm-cell .delta.up { color: var(--green); }
   .rd .cm-cell .delta.down { color: var(--red); }
   .rd .cm-cell .delta .abs { color: var(--ink-3); font-weight: 400; margin-left: 6px; }
-  /* Currencies base picker (right-aligned in the section header) */
-  .rd .fx-base { margin-left: auto; height: 28px; padding: 0 8px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; color: var(--ink); font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  /* Currencies base picker — matches the .wt-toggle pill look (dark rounded
+     pill, mono 11px, custom caret). */
+  .rd .fx-base {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    color: var(--ink); background-color: var(--bg-2);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 24px 5px 11px; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right 8px center;
+  }
+  .rd .fx-base:hover { border-color: var(--line-2); }
   .rd .fx-base:focus { outline: none; border-color: var(--blue); }
 
   /* NEWS + ANALYST CHANGES */
