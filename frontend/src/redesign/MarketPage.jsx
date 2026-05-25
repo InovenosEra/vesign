@@ -5,6 +5,7 @@ import PageHead from './market/PageHead'
 import Indices from './market/Indices'
 import Commodities from './market/Commodities'
 import Currencies from './market/Currencies'
+import Breadth from './market/Breadth'
 import Movers from './market/Movers'
 import SectorHeatmap from './market/SectorHeatmap'
 import SectorModal from './market/SectorModal'
@@ -25,6 +26,7 @@ export default function MarketPage() {
             <Indices />
             <Commodities />
             <Currencies />
+            <Breadth />
             <Movers />
             <SectorHeatmap onOpenSector={setSector} />
           </>
