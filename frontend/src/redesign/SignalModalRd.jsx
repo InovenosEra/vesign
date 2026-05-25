@@ -7,7 +7,7 @@
  *
  * Data mirrors research/DeepDive.jsx: getResearch (primary), getPriceHistory
  * (chart), getSignalMarkers (Signal history tab), getNews (News tab). */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getResearch, getPriceHistory, getSignalMarkers, getNews, WHITE_BG_LOGOS } from '../api'
 import { num, pct, dateFmt, ago, dirClass, LOGO } from './fmt'
@@ -86,8 +86,12 @@ export default function SignalModalRd({ row, onClose }) {
   const [range, setRange] = useState('1Y')
   const months = CHART_RANGES.find(([l]) => l === range)?.[1] || 12
 
-  // Escape to close.
-  const onKeyDown = (e) => { if (e.key === 'Escape') onClose?.() }
+  // Escape to close — document listener (no focusable overlay → no focus ring).
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') onClose?.() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onClose])
 
   // Overview/Financials/strip — primary data source.
   const { data: r } = useQuery({
@@ -124,8 +128,7 @@ export default function SignalModalRd({ row, onClose }) {
   const sector = [r?.sector, r?.industry].filter(Boolean).join(' · ') || '—'
 
   return (
-    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
-      onKeyDown={onKeyDown} tabIndex={-1} ref={(el) => el && el.focus()}>
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
       <div className="modal" role="dialog" aria-modal="true">
 
         {/* HEAD */}
