@@ -19,10 +19,11 @@ export default function Currencies() {
     <>
       <div className="section-h">
         <h2>Currencies</h2>
-        <span className="sub">Rate per 1 unit · vs {base}</span>
-        <select className="fx-base" value={base} onChange={(e) => pickBase(e.target.value)} aria-label="Base currency">
-          {BASES.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
+        <span className="sub">Rate per 1 unit · vs{' '}
+          <select className="fx-base" value={base} onChange={(e) => pickBase(e.target.value)} aria-label="Base currency">
+            {BASES.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        </span>
       </div>
       <div className="cross-market" style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, 1fr)` }}>
         {rows.map((r, i) => (
