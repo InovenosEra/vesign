@@ -21,6 +21,7 @@ export default function Breadth() {
   const adv = data.advancers ?? 0, dec = data.decliners ?? 0
   const hi = data.week52_highs ?? 0, lo = data.week52_lows ?? 0
   const ma = data.above_50d_ma_pct != null ? data.above_50d_ma_pct * 100 : null
+  const ma200 = data.above_200d_ma_pct != null ? data.above_200d_ma_pct * 100 : null
   return (
     <>
       <div className="section-h"><h2>Market Breadth</h2><span className="sub">US market · last close</span></div>
@@ -40,6 +41,13 @@ export default function Breadth() {
           <div className="bd-big">{ma == null ? '—' : ma.toFixed(0) + '%'}</div>
           {ma != null && (
             <div className="bd-bar"><div className="a" style={{ width: ma.toFixed(1) + '%' }} /><div className="d" style={{ width: (100 - ma).toFixed(1) + '%' }} /></div>
+          )}
+        </div>
+        <div className="bd-cell">
+          <div className="bd-k">Above 200-day average</div>
+          <div className="bd-big">{ma200 == null ? '—' : ma200.toFixed(0) + '%'}</div>
+          {ma200 != null && (
+            <div className="bd-bar"><div className="a" style={{ width: ma200.toFixed(1) + '%' }} /><div className="d" style={{ width: (100 - ma200).toFixed(1) + '%' }} /></div>
           )}
         </div>
       </div>

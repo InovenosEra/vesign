@@ -3509,6 +3509,12 @@ def _build_market_breadth() -> dict:
             FROM last50
             WHERE rn <= 50
             GROUP BY ticker
+        ),
+        ma200 AS (
+            SELECT ticker, AVG(close) AS ma
+            FROM last50
+            WHERE rn <= 200
+            GROUP BY ticker
         )
         SELECT
             SUM(CASE WHEN p.close IS NOT NULL AND t.close > p.close THEN 1 ELSE 0 END) AS advancers,
@@ -3517,17 +3523,21 @@ def _build_market_breadth() -> dict:
             SUM(CASE WHEN yw.lo52 IS NOT NULL AND t.close <= yw.lo52 THEN 1 ELSE 0 END) AS week52_lows,
             SUM(CASE WHEN ma50.ma IS NOT NULL AND t.close > ma50.ma THEN 1.0 ELSE 0.0 END)
               / NULLIF(SUM(CASE WHEN ma50.ma IS NOT NULL THEN 1.0 ELSE 0.0 END), 0)
-              AS above_50d_ma_pct
+              AS above_50d_ma_pct,
+            SUM(CASE WHEN ma200.ma IS NOT NULL AND t.close > ma200.ma THEN 1.0 ELSE 0.0 END)
+              / NULLIF(SUM(CASE WHEN ma200.ma IS NOT NULL THEN 1.0 ELSE 0.0 END), 0)
+              AS above_200d_ma_pct
         FROM today_px t
         LEFT JOIN prev_px p ON p.ticker = t.ticker
         LEFT JOIN year_window yw ON yw.ticker = t.ticker
         LEFT JOIN ma50 ON ma50.ticker = t.ticker
+        LEFT JOIN ma200 ON ma200.ticker = t.ticker
     """)
     with engine.connect() as conn:
         row = conn.execute(sql).mappings().fetchone()
     if row is None:
         return {"advancers": 0, "decliners": 0, "week52_highs": 0,
-                "week52_lows": 0, "above_50d_ma_pct": None}
+                "week52_lows": 0, "above_50d_ma_pct": None, "above_200d_ma_pct": None}
     return {
         "advancers": int(row["advancers"] or 0),
         "decliners": int(row["decliners"] or 0),
@@ -3535,6 +3545,8 @@ def _build_market_breadth() -> dict:
         "week52_lows": int(row["week52_lows"] or 0),
         "above_50d_ma_pct": round(row["above_50d_ma_pct"], 6)
             if row["above_50d_ma_pct"] is not None else None,
+        "above_200d_ma_pct": round(row["above_200d_ma_pct"], 6)
+            if row["above_200d_ma_pct"] is not None else None,
     }
 
 
