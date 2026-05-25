@@ -2,7 +2,7 @@
  * (Undervalued↔Overvalued vs analyst target). Live prices overlaid (~1s). */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getMovers, getValuation } from '../../api'
+import { getMovers, getValuation, getHighsLows } from '../../api'
 import { useLivePrices } from '../../hooks/useLivePrices'
 import { num, pct, dirClass, overlayLive, overlayUpside, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
@@ -35,6 +35,26 @@ function Panel({ title, pill, type }) {
   )
 }
 
+function HighLowPanel() {
+  const [hl, setHl] = useState('high')
+  const { data } = useQuery({ queryKey: ['market-highs-lows', hl], queryFn: () => getHighsLows(hl, 5), refetchInterval: 60_000 })
+  const rows = data?.movers || []
+  const { prices } = useLivePrices(rows.map(r => r.ticker))
+  return (
+    <div className="mover-panel">
+      <div className="mover-head val-head">
+        <button className={'vt-chip' + (hl === 'high' ? ' active' : '')} onClick={() => setHl('high')}>52W High</button>
+        <button className={'vt-chip' + (hl === 'low' ? ' active' : '')} onClick={() => setHl('low')}>52W Low</button>
+      </div>
+      <div className="mover-list">
+        {rows.length
+          ? rows.map((r, i) => <MoverRow key={i} r={r} kind="change" live={prices[r.ticker]} />)
+          : <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>No data.</div>}
+      </div>
+    </div>
+  )
+}
+
 function ValuationPanel() {
   const [dir, setDir] = useState('under')
   const { data } = useQuery({ queryKey: ['market-valuation'], queryFn: () => getValuation(5), refetchInterval: 300_000 })
@@ -63,6 +83,7 @@ export default function Movers() {
         <Panel title="Most Active" pill="●" type="active" />
         <Panel title="Top Gainers" pill="▲" type="gainers" />
         <Panel title="Top Losers" pill="▼" type="losers" />
+        <HighLowPanel />
         <ValuationPanel />
       </div>
     </div>

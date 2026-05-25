@@ -208,7 +208,7 @@
   /* TWO-COL: movers + breadth */
   .rd .movers-block { margin-bottom: 28px; }
   .rd .movers-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr);
     gap: 12px;
   }
   .rd .mover-panel {

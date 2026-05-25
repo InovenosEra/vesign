@@ -3330,6 +3330,86 @@ def market_movers(
     return _get_market_movers_cached(type, limit)
 
 
+_HL_NEAR_PCT = 2.0  # "at/near" a 52-week extreme = within this % of it
+
+
+def _build_market_highs_lows(hl_type: str, limit: int) -> dict:
+    """US stocks at/near their 52-week high or low (within _HL_NEAR_PCT%).
+
+    Anchored to the global last-close date; ETFs excluded. Returns the same
+    {movers:[...]} shape as the movers panels (each row carries the day change_pct)
+    so the frontend can reuse the mover-row rendering.
+    """
+    sql = text("""
+        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
+        prev_bounds AS (
+            SELECT MAX(d.date) AS prev FROM daily_prices d, bounds b WHERE d.date < b.today
+        ),
+        win AS (
+            SELECT MIN(date) AS start FROM (
+                SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT 252
+            )
+        ),
+        hl AS (
+            SELECT ticker, MAX(close) AS hi, MIN(close) AS lo
+            FROM daily_prices WHERE date >= (SELECT start FROM win)
+            GROUP BY ticker
+        )
+        SELECT t.ticker, c.company, c.logo_url, t.close AS close, pv.close AS prev_close,
+               hl.hi AS hi, hl.lo AS lo
+        FROM daily_prices t
+        JOIN bounds b ON t.date = b.today
+        LEFT JOIN daily_prices pv ON pv.ticker = t.ticker AND pv.date = (SELECT prev FROM prev_bounds)
+        JOIN hl ON hl.ticker = t.ticker
+        JOIN companies c ON c.ticker = t.ticker
+        WHERE COALESCE(c.market, 'US') = 'US'
+          AND COALESCE(c.sector, '') != 'ETF'
+          AND t.close > 0
+    """)
+    with engine.connect() as conn:
+        rows = [dict(r._mapping) for r in conn.execute(sql)]
+
+    def _change(r):
+        if r["prev_close"] in (None, 0) or r["close"] is None:
+            return None
+        return round((r["close"] - r["prev_close"]) / r["prev_close"] * 100, 4)
+
+    scored = []
+    for r in rows:
+        hi, lo, close = r["hi"], r["lo"], r["close"]
+        if hl_type == "high":
+            if hi and close >= hi * (1 - _HL_NEAR_PCT / 100):
+                scored.append((close / hi, r))      # ratio→1.0 = at the high
+        else:
+            if lo and close <= lo * (1 + _HL_NEAR_PCT / 100):
+                scored.append((close / lo, r))      # ratio→1.0 = at the low
+    # high: closest to/at the high first (ratio desc); low: closest to the low first (asc)
+    scored.sort(key=lambda x: x[0], reverse=(hl_type == "high"))
+    movers = [{
+        "ticker": r["ticker"], "company": r["company"], "logo_url": r["logo_url"],
+        "close": r["close"], "change_pct": _change(r),
+    } for _, r in scored[:limit]]
+    return {"movers": movers}
+
+
+def _get_market_highs_lows_cached(hl_type: str, limit: int) -> dict:
+    key = f"highslows:{hl_type}:{limit}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_highs_lows(hl_type, limit)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/highs-lows")
+def market_highs_lows(type: Literal["high", "low"] = "high", limit: int = 5):
+    """US stocks at/near their 52-week high or low (within ~2%)."""
+    return _get_market_highs_lows_cached(type, limit)
+
+
 def _build_market_valuation(limit: int = 6) -> dict:
     """Most under/overvalued US names vs the mean analyst target.
 
