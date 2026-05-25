@@ -4065,7 +4065,7 @@ def _build_market_currencies(base: str) -> dict:
     base = (base or "ILS").upper()
     if base not in _FX_BASES:
         base = "ILS"
-    pairs = [(f"{c}{base}=X", f"{c} / {base}") for c in _FX_KEY if c != base]
+    pairs = [(f"{c}{base}=X", c) for c in _FX_KEY if c != base]  # label = currency code only
     raw = _fetch_yf_quotes(pairs) or {}
     cards = []
     for ticker, label in pairs:

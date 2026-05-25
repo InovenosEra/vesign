@@ -48,7 +48,7 @@ def test_currencies_for_base_ils(cur_app):
     with patch.object(bm, "_fetch_yf_quotes", return_value=fixture):
         body = client.get("/api/market/currencies?base=ILS").json()
     assert body["base"] == "ILS"
-    assert [c["label"] for c in body["currencies"]] == ["USD / ILS", "EUR / ILS", "GBP / ILS", "JPY / ILS", "CHF / ILS"]
+    assert [c["label"] for c in body["currencies"]] == ["USD", "EUR", "GBP", "JPY", "CHF"]
     usd = next(c for c in body["currencies"] if c["ticker"] == "USDILS=X")
     assert usd["price"] == pytest.approx(3.65)
     assert usd["change_pct"] == pytest.approx((3.65 - 3.70) / 3.70 * 100, abs=1e-3)
