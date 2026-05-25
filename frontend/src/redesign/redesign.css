@@ -366,7 +366,7 @@
     background-repeat: no-repeat; background-position: right 8px center;
   }
   .rd .fx-base:hover { border-color: var(--line-2); }
-  .rd .fx-base:focus { outline: none; border-color: var(--blue); }
+  .rd .fx-base:focus { outline: none; border-color: var(--line-2); }
 
   /* NEWS + ANALYST CHANGES */
   .rd .news-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
