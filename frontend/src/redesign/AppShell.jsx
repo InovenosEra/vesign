@@ -11,6 +11,9 @@ import { useUser } from '@clerk/react'
 import { getMarketStatus } from '../api'
 import { useCurrency } from '../context/CurrencyContext'
 import GlobalSearch from '../components/GlobalSearch'
+import SignalModal from '../components/SignalModal'
+import { TickerModalContext } from './TickerModalContext'
+import Tape from './market/Tape'
 import './redesign.css'
 
 const LANGS = [
@@ -135,8 +138,12 @@ function Avatar() {
 }
 
 export default function AppShell({ children }) {
+  const [modalRow, setModalRow] = useState(null)
+  const openTicker = (ticker, company) => { if (ticker) setModalRow({ ticker, company }) }
   return (
+    <TickerModalContext.Provider value={openTicker}>
     <div className="rd">
+      <Tape />
       <div className="top">
         <div className="top-left">
           <div className="logo">
@@ -174,6 +181,8 @@ export default function AppShell({ children }) {
         </div>
       </div>
       {children}
+      {modalRow && <SignalModal row={modalRow} onClose={() => setModalRow(null)} />}
     </div>
+    </TickerModalContext.Provider>
   )
 }

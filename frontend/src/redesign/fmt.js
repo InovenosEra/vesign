@@ -2,6 +2,12 @@
  * Monetary values go through useCurrency().fmtPrice instead, so prices convert
  * with the selected currency. These helpers cover the rest. */
 
+/* Self-hosted logo (absolute, like the mockup) so it resolves regardless of
+ * the local backend having the PNGs. */
+export const LOGO = (t) => 'https://ve-sign.com/logos/' + encodeURIComponent(t) + '.png'
+
+export const dirClass = (v) => (v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '')
+
 export function num(n, opts = {}) {
   if (n == null || !isFinite(n)) return '—'
   const fd = opts.fd != null ? opts.fd : 2
