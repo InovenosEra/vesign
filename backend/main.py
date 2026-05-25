@@ -4147,6 +4147,8 @@ def _build_market_news(limit: int) -> dict:
             "source": it.get("site") or it.get("publisher") or "",
             "url": it.get("url") or "",
             "ticker": symbol if symbol else None,
+            "image": it.get("image") or None,
+            "summary": it.get("text") or None,
             "published_at": published_raw or None,
             "age_minutes": age_minutes,
         })
