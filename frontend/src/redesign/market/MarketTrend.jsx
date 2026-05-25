@@ -5,7 +5,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getBreadth, getIndices, getSectors, getPriceHistory } from '../../api'
-import { num, pct, dirClass, spark } from '../fmt'
+import { useLivePrices } from '../../hooks/useLivePrices'
+import { num, pct, dirClass, spark, overlayLive } from '../fmt'
 
 const RANGES = [['1M', 1], ['3M', 3], ['6M', 6], ['1Y', 12]]
 const INDEXES = [['SPY', 'S&P 500'], ['QQQ', 'Nasdaq 100'], ['DIA', 'Dow Jones'], ['IWM', 'Russell 2000']]
@@ -22,13 +23,16 @@ function StatRow() {
   const { data: idx } = useQuery({ queryKey: ['market-indices'], queryFn: getIndices, refetchInterval: 60_000 })
   const by = Object.fromEntries((idx?.indices || []).map(r => [r.ticker, r]))
   const spy = by.SPY, vix = by.VIX
+  const { prices } = useLivePrices(['SPY', 'VIX'])
+  const spyO = overlayLive(spy?.close, spy?.change_pct, prices.SPY)
+  const vixO = overlayLive(vix?.close, vix?.change_pct, prices.VIX)
   return (
     <div className="mt-stats">
-      <div className="mt-stat"><div className="k">S&amp;P 500</div><div className={'v ' + (spy ? dirClass(spy.change_pct) : '')}>{spy ? pct(spy.change_pct) : '—'}</div></div>
+      <div className="mt-stat"><div className="k">S&amp;P 500</div><div className={'v ' + (spy ? dirClass(spyO.change) : '')}>{spy ? pct(spyO.change) : '—'}</div></div>
       <div className="mt-stat"><div className="k">Breadth (A / D)</div><div className="v">{breadth ? `${breadth.advancers} / ${breadth.decliners}` : '—'}</div></div>
       <div className="mt-stat"><div className="k">52w highs</div><div className="v up">{breadth?.week52_highs ?? '—'}</div></div>
       <div className="mt-stat"><div className="k">52w lows</div><div className="v down">{breadth?.week52_lows ?? '—'}</div></div>
-      <div className="mt-stat"><div className="k">VIX</div><div className={'v ' + (vix ? dirClass(vix.change_pct) : '')}>{vix ? (vix.close == null ? '—' : num(vix.close, { fd: 2 })) : '—'}</div></div>
+      <div className="mt-stat"><div className="k">VIX</div><div className={'v ' + (vix ? dirClass(vixO.change) : '')}>{vix ? (vixO.price == null ? '—' : num(vixO.price, { fd: 2 })) : '—'}</div></div>
     </div>
   )
 }

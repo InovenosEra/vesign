@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getResearch, getPriceHistory, getSignalMarkers, getNews, WHITE_BG_LOGOS } from '../api'
 import { num, pct, dateFmt, ago, dirClass, LOGO } from './fmt'
 import { useCurrency } from '../context/CurrencyContext'
+import { useLivePrices } from '../hooks/useLivePrices'
 import './signal-modal.css'
 
 const sigCls = (s) => ({ BUY: 'buy', SELL: 'sell' }[s] || 'hold')
@@ -114,6 +115,9 @@ export default function SignalModalRd({ row, onClose }) {
   })
 
   const close = r?.close ?? row?.price ?? null
+  // Live current price (overlaid intraday); entry/target prices stay as stored.
+  const { prices: livePx } = useLivePrices(ticker ? [ticker] : [])
+  const liveClose = livePx[ticker] ?? close
   const up = r?.fair_value_upside == null ? null : r.fair_value_upside * 100
   const ml = r?.prediction_score == null ? null : r.prediction_score * 100
   const lo = r?.target_low_price, mean = r?.target_mean_price, hi = r?.target_high_price
@@ -147,7 +151,7 @@ export default function SignalModalRd({ row, onClose }) {
           </div>
           <div />
           <div className="m-price">
-            <div className="px"><span className="s">{symbol}</span>{close == null ? '—' : fmtPrice(close).replace(symbol, '')}</div>
+            <div className="px"><span className="s">{symbol}</span>{liveClose == null ? '—' : fmtPrice(liveClose).replace(symbol, '')}</div>
             <div className={'delta ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)} <span className="abs">ML 5-day</span></div>
           </div>
           <div className="m-close" aria-label="Close" onClick={() => onClose?.()}>
@@ -228,12 +232,12 @@ export default function SignalModalRd({ row, onClose }) {
               </div>
               <div className="bar">
                 <div className="range" style={{ left: '0%', right: '0%' }} />
-                {posFn && close != null && <div className="mark cur" style={{ left: posFn(close) + '%' }} />}
+                {posFn && liveClose != null && <div className="mark cur" style={{ left: posFn(liveClose) + '%' }} />}
                 {posFn && mean != null && <div className="mark mean" style={{ left: posFn(mean) + '%' }} />}
               </div>
               <div className="labels">
                 <div className="col"><span className="l">Low</span><span className="v">{lo != null ? fmtPrice(lo, 0) : '—'}</span></div>
-                <div className="col c"><span className="l">Current</span><span className="v gold">{close != null ? fmtPrice(close) : '—'}</span></div>
+                <div className="col c"><span className="l">Current</span><span className="v gold">{liveClose != null ? fmtPrice(liveClose) : '—'}</span></div>
                 <div className="col c"><span className="l">Mean</span><span className="v">{mean != null ? fmtPrice(mean, 0) : '—'}</span></div>
                 <div className="col r"><span className="l">High</span><span className="v">{hi != null ? fmtPrice(hi, 0) : '—'}</span></div>
               </div>

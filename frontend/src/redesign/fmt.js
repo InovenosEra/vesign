@@ -8,6 +8,26 @@ export const LOGO = (t) => 'https://ve-sign.com/logos/' + encodeURIComponent(t) 
 
 export const dirClass = (v) => (v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '')
 
+/* Live overlay: endpoints return last stored close + change_pct (vs prior close).
+ * Given a live quote, derive prev-close and recompute the live price + change so
+ * the UI is live intraday. Falls back to the stored values when no live quote. */
+export function overlayLive(close, changePct, livePrice) {
+  if (livePrice == null || !isFinite(livePrice)) return { price: close, change: changePct }
+  if (changePct == null || close == null) return { price: livePrice, change: changePct }
+  const prev = close / (1 + changePct / 100)
+  if (!isFinite(prev) || prev === 0) return { price: livePrice, change: changePct }
+  return { price: livePrice, change: (livePrice - prev) / prev * 100 }
+}
+
+/* Same idea for valuation rows: close + upside (vs analyst target). Live price
+ * changes the upside; derive the target, recompute upside against the live price. */
+export function overlayUpside(close, upside, livePrice) {
+  if (livePrice == null || !isFinite(livePrice)) return { price: close, upside }
+  if (upside == null || close == null) return { price: livePrice, upside }
+  const target = close * (1 + upside / 100)
+  return { price: livePrice, upside: livePrice > 0 ? (target - livePrice) / livePrice * 100 : upside }
+}
+
 export function num(n, opts = {}) {
   if (n == null || !isFinite(n)) return '—'
   const fd = opts.fd != null ? opts.fd : 2

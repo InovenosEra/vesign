@@ -1,7 +1,8 @@
 /* Indices row — idx-cards with faded area sparkline. Ported from market-v1.html. */
 import { useQuery } from '@tanstack/react-query'
 import { getIndices } from '../../api'
-import { num, pct, spark } from '../fmt'
+import { useLivePrices } from '../../hooks/useLivePrices'
+import { num, pct, spark, overlayLive } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 
 const LABELS = { SPY: 'S&P 500', QQQ: 'Nasdaq 100', DIA: 'Dow Jones', IWM: 'Russell 2000', VIX: 'VIX' }
@@ -10,26 +11,28 @@ export default function Indices() {
   const open = useTickerModal()
   const { data } = useQuery({ queryKey: ['market-indices'], queryFn: getIndices, refetchInterval: 60_000 })
   const rows = data?.indices || []
+  const { prices } = useLivePrices(rows.map(r => r.ticker))
 
   return (
     <div className="indices">
       {rows.map((row, i) => {
-        const cls = row.change_pct == null ? '' : row.change_pct >= 0 ? 'up' : 'down'
+        const { price, change } = overlayLive(row.close, row.change_pct, prices[row.ticker])
+        const cls = change == null ? '' : change >= 0 ? 'up' : 'down'
         const color = row.ticker === 'VIX'
-          ? (row.change_pct >= 0 ? '#ff4d5c' : '#00d97e')   // VIX inverted
-          : (row.change_pct >= 0 ? '#00d97e' : '#ff4d5c')
+          ? (change >= 0 ? '#ff4d5c' : '#00d97e')   // VIX inverted
+          : (change >= 0 ? '#00d97e' : '#ff4d5c')
         const d = spark(row.sparkline || [], { width: 220, height: 60 })
         const gid = `g_${i}`
-        const abs = row.close != null && row.change_pct != null
-          ? num(row.close * row.change_pct / 100, { fd: 2 }) : '—'
+        const abs = price != null && change != null
+          ? num(price * change / 100, { fd: 2 }) : '—'
         const name = LABELS[row.ticker] || row.ticker
         return (
           <div className="idx-card" key={row.ticker} data-ticker={row.ticker} data-name={name}
             onClick={() => open(row.ticker, name)}>
             <div className="name">{name}</div>
-            <div className="price">{row.close == null ? '—' : num(row.close, { fd: 2 })}</div>
+            <div className="price">{price == null ? '—' : num(price, { fd: 2 })}</div>
             <div className={'change ' + cls}>
-              <span className="pct">{pct(row.change_pct)}</span>
+              <span className="pct">{pct(change)}</span>
               <span className="abs">{abs}</span>
             </div>
             <div className="spark">

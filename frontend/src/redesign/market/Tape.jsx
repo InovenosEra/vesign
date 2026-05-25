@@ -1,21 +1,26 @@
-/* Tape — top-20 by market cap, ported from market-v1.html tape render.
- * Lives above the header (shared). Ticker text is clickable → signal modal. */
+/* Tape — top-20 by market cap. Live during market hours: /api/prices/live is
+ * overlaid (~1s) on the stored close, change recomputed vs derived prev-close. */
 import { useQuery } from '@tanstack/react-query'
 import { getTape } from '../../api'
-import { num, pct, dirClass } from '../fmt'
+import { useLivePrices } from '../../hooks/useLivePrices'
+import { num, pct, dirClass, overlayLive } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 
 export default function Tape() {
   const open = useTickerModal()
   const { data } = useQuery({ queryKey: ['market-tape'], queryFn: getTape, refetchInterval: 60_000 })
   const items = (data?.tape || []).filter(r => r.close != null)
+  const { prices } = useLivePrices(items.map(r => r.ticker))
 
-  const Item = (r, k) => (
-    <span className="tape-item" key={k}>
-      <span className="tk" data-ticker={r.ticker} onClick={() => open(r.ticker)}>{r.ticker}</span>{num(r.close)}
-      <span className={dirClass(r.change_pct)}>{pct(r.change_pct)}</span>
-    </span>
-  )
+  const Item = (r, k) => {
+    const { price, change } = overlayLive(r.close, r.change_pct, prices[r.ticker])
+    return (
+      <span className="tape-item" key={k}>
+        <span className="tk" data-ticker={r.ticker} onClick={() => open(r.ticker)}>{r.ticker}</span>{num(price)}
+        <span className={dirClass(change)}>{pct(change)}</span>
+      </span>
+    )
+  }
 
   return (
     <div className="tape">
