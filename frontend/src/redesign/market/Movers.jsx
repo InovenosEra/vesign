@@ -58,7 +58,7 @@ function ValuationPanel() {
 export default function Movers() {
   return (
     <div className="movers-block">
-      <div className="section-h"><h2>Movers</h2><span className="sub">Live · US market</span></div>
+      <div className="section-h"><h2>Trending Stocks</h2><span className="sub">Live · US market</span></div>
       <div className="movers-grid">
         <Panel title="Most Active" pill="●" type="active" />
         <Panel title="Top Gainers" pill="▲" type="gainers" />
