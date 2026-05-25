@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { searchTickers } from '../api'
 import { useCurrency } from '../context/CurrencyContext'
+import { TickerModalContext } from '../redesign/TickerModalContext'
 import SignalModal from './SignalModal'
 
 export default function GlobalSearch() {
   const { t } = useTranslation()
   const { fmtPrice } = useCurrency()
+  const openTicker = useContext(TickerModalContext)
   const [query, setQuery]       = useState('')
   const [results, setResults]   = useState([])
   const [open, setOpen]         = useState(false)
@@ -62,10 +64,13 @@ export default function GlobalSearch() {
   }
 
   function handleSelect(row) {
-    setSelected(row)
     setOpen(false)
     setQuery('')
     setResults([])
+    // In the redesign, open the redesigned modal via context; otherwise (old
+    // parked pages) fall back to the local SignalModal.
+    if (openTicker) openTicker(row.ticker, row.company)
+    else setSelected(row)
   }
 
   return (
