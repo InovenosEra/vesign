@@ -170,7 +170,7 @@ export default function AppShell({ children }) {
             <NavLink to="/research">Research</NavLink>
           </nav>
         </div>
-        <div className="header-search-slot" style={{ justifySelf: 'center', width: 380, maxWidth: '100%' }}>
+        <div className="header-search-slot" style={{ width: 380, maxWidth: '100%' }}>
           <GlobalSearch />
         </div>
         <div className="topright">
