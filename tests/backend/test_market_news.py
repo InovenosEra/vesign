@@ -101,10 +101,9 @@ def test_empty_when_fetch_returns_none(news_app):
 
 
 def test_blends_macro_and_stock_feeds(news_app):
-    # The feed must surface broad economy/market news, not only single-ticker
-    # stories. We blend FMP's general (macro) + stock feeds and interleave them
-    # with macro leading, so economy news is always present and fronts the hero
-    # even when a single-name story happens to be a few minutes newer.
+    # The feed surfaces both broad economy/market news and single-ticker stories,
+    # merged into one pool and ordered strictly newest-first. Macro stories are
+    # never dropped — they sort by recency alongside the stock stories.
     bm, client = news_app
     import data.fmp as fmp
 
@@ -125,13 +124,12 @@ def test_blends_macro_and_stock_feeds(news_app):
         rows = client.get("/api/market/news/top?limit=10").json()["news"]
 
     titles = [r["title"] for r in rows]
-    # All three present — macro stories are not dropped in favour of tickers.
+    # All three present — both feeds blended, nothing dropped.
     assert "Jobs report beats forecasts" in titles
     assert "Oil slides on demand fears" in titles
     assert "AAPL upgraded" in titles
-    # Macro leads the feed (hero), then we interleave the stock story.
-    assert titles[0] == "Jobs report beats forecasts"
-    assert titles[1] == "AAPL upgraded"
+    # Strictly newest-first: AAPL (10m) leads, then Jobs (30m), then Oil (50m).
+    assert titles == ["AAPL upgraded", "Jobs report beats forecasts", "Oil slides on demand fears"]
 
 
 def test_dedupes_by_url(news_app):

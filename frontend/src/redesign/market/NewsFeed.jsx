@@ -11,7 +11,7 @@ const bg = (img) => (img ? { backgroundImage: `url(${img})` } : undefined)
 const src = (n) => `${n.source || ''}${n.age_minutes != null ? ` · ${ago(n.age_minutes)}` : ''}`
 
 export default function NewsFeed() {
-  const [limit, setLimit] = useState(17)
+  const [limit, setLimit] = useState(31)
   const { data } = useQuery({ queryKey: ['market-news-feed', limit], queryFn: () => getTopNews(limit), refetchInterval: 300_000 })
   const news = data?.news || []
   const trackRef = useRef(null)
@@ -50,7 +50,7 @@ export default function NewsFeed() {
         <button className="news-arrow right" onClick={() => scroll(1)} aria-label="Next">›</button>
       </div>
 
-      <div className="news-more"><a onClick={() => setLimit(l => l + 12)}>Show more news →</a></div>
+      <div className="news-more"><a onClick={() => setLimit(l => l + 20)}>Show more news →</a></div>
     </div>
   )
 }

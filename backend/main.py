@@ -4185,39 +4185,34 @@ _NEWS_CACHE_TTL_SECONDS = 5 * 60
 # just ticker chatter. Each feed is interleaved round-robin so neither category
 # is buried by the other's recency.
 _NEWS_FEEDS = ("news/general-latest", "news/stock-latest")
+_NEWS_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)  # sort floor for undated items
 
 
 def _fetch_top_news(limit: int) -> list | None:
-    """Blend FMP news feeds, round-robin interleaved (macro first).
+    """Pull FMP's macro + single-name news feeds into one combined pool.
 
-    Each feed arrives newest-first from FMP; interleaving keeps both macro and
-    single-name stories visible instead of letting one category's recency push
-    the other off the list. Returns the interleaved list, or None if every feed
-    fails."""
+    Each feed arrives newest-first; we fetch a generous slice of each (so the
+    freshest stories across both always make the cut) and merge them. The caller
+    de-dupes and sorts the pool strictly newest-first. Returns the combined list,
+    or None if every feed fails."""
     from data import fmp as _fmp
-    from itertools import zip_longest
-    feeds: list[list] = []
+    per_feed = min(max(limit, 60), 100)  # over-fetch so the merge has enough to sort
+    items: list = []
     any_ok = False
     for ep in _NEWS_FEEDS:
         try:
-            items = _fmp._get(ep, {"limit": limit}) or []
+            got = _fmp._get(ep, {"limit": per_feed})
         except Exception:
             continue
-        if isinstance(items, list):
+        if isinstance(got, list):
             any_ok = True
-            feeds.append(items)
-    if not any_ok:
-        return None
-    # g0, s0, g1, s1, … — preserves each feed's newest-first order, macro leads.
-    interleaved: list = []
-    for group in zip_longest(*feeds):
-        interleaved.extend(it for it in group if it is not None)
-    return interleaved
+            items.extend(got)
+    return items if any_ok else None
 
 
 def _build_market_news(limit: int) -> dict:
     items = _fetch_top_news(limit) or []
-    out = []
+    scored = []
     now = datetime.now(timezone.utc)
     seen_urls = set()
     for it in items:
@@ -4232,7 +4227,7 @@ def _build_market_news(limit: int) -> dict:
         if published_dt is not None:
             age_minutes = max(0, int((now - published_dt).total_seconds() // 60))
         symbol = it.get("symbol") or it.get("ticker") or None
-        out.append({
+        scored.append((published_dt or _NEWS_EPOCH, {
             "title": it.get("title") or "",
             "source": it.get("site") or it.get("publisher") or "",
             "url": url,
@@ -4241,9 +4236,10 @@ def _build_market_news(limit: int) -> dict:
             "summary": it.get("text") or None,
             "published_at": published_raw or None,
             "age_minutes": age_minutes,
-        })
-    # Keep the blended interleave order (macro-first); just clip to limit.
-    return {"news": out[:limit]}
+        }))
+    # Strictly newest-first across both feeds; undated stories sink to the bottom.
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return {"news": [row for _, row in scored][:limit]}
 
 
 _FMP_NEWS_TZ = ZoneInfo("America/New_York")  # FMP news publishedDate is naive US Eastern
