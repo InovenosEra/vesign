@@ -3,6 +3,7 @@ import os
 import tempfile
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 
 
 @pytest.fixture
@@ -72,16 +73,6 @@ def _insert_mc(bm, ticker, market_cap):
         """), {"t": ticker, "mc": market_cap})
 
 
-def _insert_two_day(bm, ticker, prev, today):
-    from sqlalchemy import text
-    with bm.engine.begin() as conn:
-        for d, c in [("2026-05-21 00:00:00", prev), ("2026-05-22 00:00:00", today)]:
-            conn.execute(text("""
-                INSERT INTO daily_prices (date, ticker, open, high, low, close, volume)
-                VALUES (:d, :t, :c, :c, :c, :c, 0)
-            """), {"d": d, "t": ticker, "c": c})
-
-
 def _insert_base(bm, ticker, close=100.0):
     """One daily row at the latest date -> baseline prev_close = close."""
     from sqlalchemy import text
@@ -94,7 +85,6 @@ def _insert_base(bm, ticker, close=100.0):
 
 def test_returns_one_row_per_sector_with_weighted_change_and_top_movers(sectors_app):
     bm, client = sectors_app
-    from unittest.mock import patch
     # baseline prev_close=100 for all; live snapshot encodes the change% (live - 100)
     tech = [("NVDA", 5_000_000_000_000, 102.0), ("MSFT", 3_000_000_000_000, 99.0), ("AAPL", 4_000_000_000_000, 100.5)]
     energy = [("XOM", 500_000_000_000, 99.7), ("CVX", 300_000_000_000, 99.5)]
@@ -118,7 +108,6 @@ def test_returns_one_row_per_sector_with_weighted_change_and_top_movers(sectors_
 
 def test_top_movers_capped_at_three(sectors_app):
     bm, client = sectors_app
-    from unittest.mock import patch
     changes = [("A", 5.0), ("B", 4.0), ("C", 3.0), ("D", 2.0), ("E", 1.0)]
     for t, ch in changes:
         _insert_company(bm, t, "Industrials"); _insert_mc(bm, t, 100_000_000); _insert_base(bm, t)
@@ -132,7 +121,6 @@ def test_top_movers_capped_at_three(sectors_app):
 
 def test_excludes_non_us_market(sectors_app):
     bm, client = sectors_app
-    from unittest.mock import patch
     _insert_company(bm, "TEVA.TA", "Health Care", market="TASE"); _insert_mc(bm, "TEVA.TA", 100_000_000); _insert_base(bm, "TEVA.TA")
     _insert_company(bm, "JNJ", "Health Care", market="US"); _insert_mc(bm, "JNJ", 1_000_000_000); _insert_base(bm, "JNJ")
     live = {"TEVA.TA": 110.0, "JNJ": 101.0}   # TEVA excluded upstream (non-US baseline)
@@ -146,7 +134,6 @@ def test_excludes_non_us_market(sectors_app):
 def test_skips_sectors_with_null_label(sectors_app):
     """Companies whose sector is NULL shouldn't create a 'None' bucket."""
     bm, client = sectors_app
-    from unittest.mock import patch
     from sqlalchemy import text
     with bm.engine.begin() as conn:
         conn.execute(text("INSERT INTO companies (ticker, company, sector, market) VALUES ('UNK','Unknown',NULL,'US')"))
@@ -171,7 +158,6 @@ def test_sector_change_uses_live_prices(sectors_app):
     bm, client = sectors_app
     _seed_live(bm)
     live = {"AAA": 110.0, "BBB": 110.0, "CCC": 90.0}   # Tech +10%, Energy -10%
-    from unittest.mock import patch
     with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
         sectors = client.get("/api/market/sectors").json()["sectors"]
     by = {s["sector"]: s for s in sectors}
