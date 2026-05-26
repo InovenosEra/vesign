@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useContext, useRef, useMemo, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom'
 import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
@@ -43,60 +43,16 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60_000, gcTime: 24 * 60 * 60_000 } },
 })
 
-// Persist the React Query cache to localStorage so reloads paint instantly
-// from last-known data while React revalidates silently in the background.
-const queryPersister = createSyncStoragePersister({
-  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-  key: 'vesign-rq-cache',
-})
-
-// Per-user query keys — never persist, otherwise after a logout/re-login as
-// a different user we'd briefly serve the previous user's data.
-const USER_SCOPED_QUERY_KEYS = new Set([
-  'watchlists',
-  'watchlist-tickers',
-  'watchlist-holdings',
-  'watchlist-signals',
-  'portfolio-holdings',
-  'portfolio-performance',
-  'portfolio-comparison',
-])
-
-// Queries whose displayed values change daily and must show fresh numbers,
-// not yesterday-while-revalidating. Persisting these caused visible flicker
-// on the SignalsPage header (e.g. "0 BUY / 49 SELL" → "1 BUY / 50 SELL"
-// after a few seconds) because the cached counts came from before the most
-// recent pipeline run. For financial counts, accuracy > instant paint.
-const NO_PERSIST_QUERY_KEYS = new Set([
-  'signals-today',
-  'signals',
-  'signals-success-rate',
-  'signals-markers',
-  'trades',
-  'trades-open',
-])
-
-const persistOptions = {
-  persister: queryPersister,
-  maxAge: 24 * 60 * 60_000,
-  // Bump this string whenever an API response shape changes OR a major prod
-  // data rebuild lands so old caches are invalidated for everyone on next
-  // page load.
-  // v2 (2026-05-04): post NDX-100 ticker addition + V1+V2 historical
-  //                  signal rebuild + signals-table dedup + ETF cleanup.
-  buster: 'v2',
-  dehydrateOptions: {
-    shouldDehydrateQuery: (q) => {
-      const key = q.queryKey?.[0]
-      // Heavy per-ticker chart series stay out of localStorage (large, modal-only).
-      if (key === 'idx-hist' || key === 'price-history') return false
-      // Market panels DO persist: last-known values paint instantly on reload,
-      // then revalidate in the background via their refetchInterval — this avoids
-      // the blank-components flash on cold load. (Brief stale paint < blank.)
-      return !USER_SCOPED_QUERY_KEYS.has(key) && !NO_PERSIST_QUERY_KEYS.has(key)
-    },
-  },
-}
+// Persist options are built per-user inside AppLayout (see PERSIST_BUSTER /
+// useMemo there) so the localStorage cache is namespaced by Clerk user id —
+// every page paints instantly on reload (stale-while-revalidate) without one
+// account ever restoring another account's cached data on a shared browser.
+//
+// Bump PERSIST_BUSTER whenever an API response shape changes OR a major prod
+// data rebuild lands, so old caches are invalidated for everyone on next load.
+// v2 (2026-05-04): post NDX-100 ticker addition + V1+V2 historical signal
+//                  rebuild + signals-table dedup + ETF cleanup.
+const PERSIST_BUSTER = 'v2'
 
 // ---------------------------------------------------------------------------
 // Shared countdown formatter
@@ -657,6 +613,25 @@ function AppLayout() {
     window.addEventListener('vesign:account-disabled', handler)
     return () => window.removeEventListener('vesign:account-disabled', handler)
   }, [])
+
+  // localStorage cache namespaced by user → every page paints instantly on
+  // reload (stale-while-revalidate). Namespacing by userId means a different
+  // account on the same browser never restores the previous user's cached data
+  // (incl. portfolio). Only the heavy per-ticker chart series are kept out.
+  const persistOptions = useMemo(() => ({
+    persister: createSyncStoragePersister({
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      key: `vesign-rq-cache-${userId || 'anon'}`,
+    }),
+    maxAge: 24 * 60 * 60_000,
+    buster: PERSIST_BUSTER,
+    dehydrateOptions: {
+      shouldDehydrateQuery: (q) => {
+        const key = q.queryKey?.[0]
+        return key !== 'idx-hist' && key !== 'price-history'
+      },
+    },
+  }), [userId])
 
   if (disabledReason) return <AccountDisabledScreen reason={disabledReason} />
 
