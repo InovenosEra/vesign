@@ -232,6 +232,34 @@ def analyst_upgrades(ticker: str, limit: int = 8) -> list:
             for item in data[:limit]]
 
 
+def latest_grades(pages: int = 3, per_page: int = 100) -> list:
+    """Market-wide stream of recent analyst rating actions (all symbols).
+
+    Unlike analyst_upgrades(), which needs a ticker, this hits FMP's
+    `grades-latest-news` feed — newest-first across the whole market. Used to
+    build the Upgrades & Downgrades panel on /market. `action` is one of
+    upgrade / downgrade / initialise / hold.
+    """
+    out: list = []
+    for p in range(max(1, pages)):
+        data = _get("grades-latest-news", {"limit": per_page, "page": p})
+        if not data or not isinstance(data, list):
+            break
+        for item in data:
+            out.append({
+                "ticker": item.get("symbol", ""),
+                "date": item.get("publishedDate", ""),
+                "firm": item.get("gradingCompany", ""),
+                "action": (item.get("action") or "").lower(),
+                "from_grade": item.get("previousGrade") or "",
+                "to_grade": item.get("newGrade") or "",
+                "price_target": item.get("priceTarget"),
+            })
+        if len(data) < per_page:
+            break
+    return out
+
+
 # ─── Index constituents ───
 # All four sources used by utils.universe_loader. Returns a list of dicts with
 # at least {ticker, company, sector}. sector may be empty when the source is an

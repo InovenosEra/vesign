@@ -288,6 +288,8 @@
     display: grid; grid-template-columns: 1fr 1fr;
     gap: 16px;
   }
+  /* analyst panels sit below the news feed's "Show more" link — give them air */
+  .rd .analyst-cols { margin-top: 40px; }
   .rd .cal-panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -508,6 +510,19 @@
   .rd .an-row .target { font-family: var(--mono); font-size: 11.5px; color: var(--ink); text-align: right; min-width: 86px; }
   .rd .an-row .target .arr { color: var(--ink-3); margin: 0 5px; font-weight: 400; }
   .rd .an-row .target .old { color: var(--ink-3); }
+  .rd .an-row .grade { font-size: 11px; color: var(--ink); text-align: right; max-width: 160px; line-height: 1.3; }
+  .rd .an-row .grade .arr { color: var(--ink-3); margin: 0 4px; }
+  .rd .an-row .grade .old { color: var(--ink-3); }
+  .rd .an-row .grade .g-pt { font-family: var(--mono); font-size: 10px; color: var(--ink-3); margin-top: 3px; }
+  /* enriched target cell: % move chip + upside line */
+  .rd .an-row .target { min-width: 104px; }
+  .rd .an-row .tp-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+  .rd .an-row .tp-chg { font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; }
+  .rd .an-row .tp-chg.up { color: var(--green); background: rgba(0,217,126,0.13); }
+  .rd .an-row .tp-chg.down { color: var(--red); background: rgba(255,77,92,0.13); }
+  .rd .an-row .tp-upside { font-family: var(--mono); font-size: 10px; margin-top: 3px; }
+  .rd .an-row .tp-upside.up { color: var(--green); }
+  .rd .an-row .tp-upside.down { color: var(--red); }
 
 /* body-level styles applied to the .rd wrapper */
 .rd { background: var(--bg); color: var(--ink); font-family: var(--sans);

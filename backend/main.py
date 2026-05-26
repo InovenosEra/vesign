@@ -4001,9 +4001,34 @@ def _build_market_analyst_changes(days: int, limit: int) -> dict:
         })
 
     classified.sort(key=lambda x: x["abs_change_pct"], reverse=True)
-    for x in classified:
+    top = classified[:limit]
+
+    # Enrich with current price → upside vs the consensus target. Live snapshot
+    # first (matches the rest of /market), latest daily close as fallback.
+    tickers = [x["ticker"] for x in top]
+    if tickers:
+        with engine.connect() as conn:
+            close_rows = conn.execute(
+                text("""
+                    SELECT p1.ticker, p1.close
+                    FROM daily_prices p1
+                    INNER JOIN (SELECT ticker, MAX(date) AS md FROM daily_prices
+                                WHERE ticker IN :tks GROUP BY ticker) p2
+                        ON p1.ticker = p2.ticker AND p1.date = p2.md
+                """).bindparams(bindparam("tks", expanding=True)),
+                {"tks": tickers},
+            ).all()
+        close_map = {r[0]: r[1] for r in close_rows}
+        live = _get_live_snapshot()["prices"]
+        for x in top:
+            px = live.get(x["ticker"]) or close_map.get(x["ticker"])
+            x["price"] = round(float(px), 4) if px else None
+            tp = x["target_mean_price"]
+            x["upside_pct"] = round((tp - px) / px * 100, 1) if (px and px > 0 and tp is not None) else None
+
+    for x in top:
         del x["abs_change_pct"]
-    return {"changes": classified[:limit]}
+    return {"changes": top}
 
 
 def _get_market_analyst_changes_cached(days: int, limit: int) -> dict:
@@ -4022,6 +4047,74 @@ def _get_market_analyst_changes_cached(days: int, limit: int) -> dict:
 def market_analyst_changes_top(days: int = 1, limit: int = 5):
     """Top |Δ TP| moves over the trailing `days` days, ranked, classified."""
     return _get_market_analyst_changes_cached(days, limit)
+
+
+# Upgrades & Downgrades — analyst RATING actions (sibling to analyst-changes,
+# which only covers target-price moves). Sourced from FMP's market-wide
+# grades-latest-news stream, restricted to our US universe (so every row has a
+# logo + company name and the panel stays US-only). Reiterations (action=hold)
+# are dropped; only genuine UPGRADE / DOWNGRADE / INITIATE rows are kept.
+_GRADE_KIND = {"upgrade": "UPGRADE", "downgrade": "DOWNGRADE", "initialise": "INITIATE"}
+
+
+def _build_market_grades(limit: int) -> dict:
+    from data import fmp as _fmp
+    raw = _fmp.latest_grades(pages=3) or []
+
+    with engine.connect() as conn:
+        names = {
+            r[0]: r[1]
+            for r in conn.execute(text(
+                "SELECT ticker, company FROM companies WHERE COALESCE(market,'US') = 'US'"
+            )).all()
+        }
+
+    out, seen = [], set()
+    for it in raw:
+        kind = _GRADE_KIND.get(it.get("action"))
+        if kind is None:
+            continue  # drop holds / reiterations
+        tk = it.get("ticker")
+        if tk not in names:
+            continue  # outside our US universe
+        fg, tg = it.get("from_grade"), it.get("to_grade")
+        if fg and fg == tg:
+            continue  # FMP mislabels some reiterations (e.g. "Buy → Buy") as actions
+        key = (tk, it.get("firm"), tg)
+        if key in seen:
+            continue  # keep only the newest action per firm+grade
+        seen.add(key)
+        out.append({
+            "ticker": tk,
+            "company": names.get(tk),
+            "firm": it.get("firm") or "",
+            "kind": kind,
+            "from_grade": it.get("from_grade") or "",
+            "to_grade": it.get("to_grade") or "",
+            "price_target": it.get("price_target"),
+            "date": it.get("date") or "",
+        })
+        if len(out) >= limit:
+            break
+    return {"grades": out}
+
+
+def _get_market_grades_cached(limit: int) -> dict:
+    key = f"grades:{limit}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _ANALYST_CACHE_TTL_SECONDS:
+            return c["data"]
+        data = _build_market_grades(limit)
+        _market_cache[key] = {"t": now, "data": data}
+        return data
+
+
+@protected.get("/api/market/grades/top")
+def market_grades_top(limit: int = 5):
+    """Latest analyst rating actions (upgrades/downgrades/initiations), US-only."""
+    return _get_market_grades_cached(limit)
 
 
 # Macro strip (cross-market): currency / yield / crypto. Commodities live in

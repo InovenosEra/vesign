@@ -23,9 +23,21 @@ export default function AnalystChanges() {
             <div className="info"><div className="tk">{c.ticker}</div><div className="firm">{c.company || ''}</div></div>
             <span className={'action ' + kindClass(c.kind)}>{kindLabel(c.kind)}</span>
             <div className="target">
-              {c.prev_target_mean_price == null
-                ? fmtPrice(c.target_mean_price, 0)
-                : <><span className="old">{fmtPrice(c.prev_target_mean_price, 0)}</span><span className="arr">→</span>{fmtPrice(c.target_mean_price, 0)}</>}
+              <div className="tp-row">
+                {c.prev_target_mean_price == null
+                  ? fmtPrice(c.target_mean_price, 0)
+                  : <><span className="old">{fmtPrice(c.prev_target_mean_price, 0)}</span><span className="arr">→</span>{fmtPrice(c.target_mean_price, 0)}</>}
+                {c.change_pct != null && (
+                  <span className={'tp-chg ' + (c.change_pct >= 0 ? 'up' : 'down')}>
+                    {c.change_pct >= 0 ? '+' : ''}{Math.round(c.change_pct)}%
+                  </span>
+                )}
+              </div>
+              {c.upside_pct != null && (
+                <div className={'tp-upside ' + (c.upside_pct >= 0 ? 'up' : 'down')}>
+                  {c.upside_pct >= 0 ? '+' : ''}{c.upside_pct}% upside
+                </div>
+              )}
             </div>
           </div>
         ))}

@@ -131,6 +131,7 @@ export const getSectorDetail = (name)        => get(`/market/sector/${encodeURIC
 export const getTape         = ()            => get('/market/tape')
 export const getTopNews      = (n = 5)       => get(`/market/news/top?limit=${n}`)
 export const getTopAnalyst   = (days = 1, n = 5) => get(`/market/analyst-changes/top?days=${days}&limit=${n}`)
+export const getTopGrades    = (n = 5)       => get(`/market/grades/top?limit=${n}`)
 export const getEarningsWeek = ()            => get('/market/earnings/week')
 export const getEconomicCal  = (days = 7)    => get(`/market/economic-calendar?days=${days}`)
 export const getStats        = ()            => get('/stats')
