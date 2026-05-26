@@ -27,6 +27,7 @@ from sqlalchemy import bindparam, create_engine, text, event as sa_event
 from sqlalchemy.pool import NullPool
 from backend.auth import get_current_user
 from backend.yield_calcs import avg_cost_dollar_weighted, Lot, simulate_bank_hand
+from backend import live_snapshot
 
 # ---------------------------------------------------------------------------
 # Config  (.env overrides defaults; .env is gitignored)
@@ -3195,6 +3196,67 @@ _INDICES_TICKERS = ["^GSPC", "^NDX", "^DJI", "^RUT"]  # real index levels; VIX s
 _market_cache: dict[str, dict] = {}
 _market_cache_lock = threading.Lock()
 _MARKET_TTL_SECONDS = 60
+
+# --- Live universe baseline (rebuilt once per trading day) -------------------
+_baseline_cache: dict = {}
+_baseline_date = None
+_baseline_lock = threading.Lock()
+
+
+def _build_universe_baseline() -> dict:
+    """{ticker: {company, sector, logo_url, market_cap, prev_close, volume,
+    hi52, lo52}} for every US ticker with a latest close. prev_close = the
+    most recent completed session's close (MAX date) - the change% baseline
+    and the fallback price for tickers with no live print."""
+    sql = text("""
+        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
+        win AS (
+            SELECT MIN(date) AS start FROM (
+                SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT 252
+            )
+        ),
+        hl AS (
+            SELECT ticker, MAX(close) AS hi, MIN(close) AS lo
+            FROM daily_prices WHERE date >= (SELECT start FROM win)
+            GROUP BY ticker
+        ),
+        mc AS (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker)
+        SELECT c.ticker, c.company, c.sector, c.logo_url,
+               mc.market_cap AS market_cap,
+               t.close AS prev_close, t.volume AS volume,
+               hl.hi AS hi52, hl.lo AS lo52
+        FROM daily_prices t
+        JOIN bounds b ON t.date = b.today
+        JOIN companies c ON c.ticker = t.ticker
+        LEFT JOIN mc ON mc.ticker = c.ticker
+        LEFT JOIN hl ON hl.ticker = c.ticker
+        WHERE COALESCE(c.market, 'US') = 'US' AND t.close > 0
+    """)
+    out = {}
+    with engine.connect() as conn:
+        for r in conn.execute(sql).mappings():
+            out[r["ticker"]] = {
+                "company": r["company"], "sector": r["sector"], "logo_url": r["logo_url"],
+                "market_cap": r["market_cap"], "prev_close": r["prev_close"],
+                "volume": r["volume"], "hi52": r["hi52"], "lo52": r["lo52"],
+            }
+    return out
+
+
+def _latest_price_date():
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT MAX(date) FROM daily_prices")).scalar()
+
+
+def _get_universe_baseline() -> dict:
+    """Daily-cached baseline; rebuilds when MAX(daily_prices.date) advances."""
+    global _baseline_cache, _baseline_date
+    latest = _latest_price_date()
+    with _baseline_lock:
+        if _baseline_date != latest or not _baseline_cache:
+            _baseline_cache = _build_universe_baseline()
+            _baseline_date = latest
+        return _baseline_cache
 
 
 def _build_market_indices() -> dict:
