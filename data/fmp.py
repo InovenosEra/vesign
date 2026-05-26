@@ -100,6 +100,34 @@ def aftermarket_trades(tickers: list) -> dict:
     return out
 
 
+def batch_aftermarket_quotes(tickers: list) -> dict:
+    """Extended-hours (pre/post) bid/ask per ticker via FMP's batched
+    /stable/batch-aftermarket-quote endpoint. Chunks of 100, in parallel.
+    Returns {ticker: {"bidPrice": float|None, "askPrice": float|None}} for
+    rows present in the response; tickers absent from the response are omitted."""
+    if not tickers:
+        return {}
+
+    CHUNK = 100
+    chunks = [tickers[i:i + CHUNK] for i in range(0, len(tickers), CHUNK)]
+
+    def _batch(chunk):
+        data = _get("batch-aftermarket-quote", {"symbols": ",".join(chunk)})
+        if not isinstance(data, list):
+            return {}
+        return {
+            row["symbol"]: {"bidPrice": row.get("bidPrice"), "askPrice": row.get("askPrice")}
+            for row in data if row.get("symbol")
+        }
+
+    out = {}
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        futures = [ex.submit(_batch, c) for c in chunks]
+        for f in as_completed(futures):
+            out.update(f.result())
+    return out
+
+
 def company_profile(ticker: str) -> "dict | None":
     """Company profile: companyName, sector, industry, description, image, mktCap."""
     data = _get("profile", {"symbol": ticker})
