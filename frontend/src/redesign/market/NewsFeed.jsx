@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getTopNews, getPortfolioHoldings } from '../../api'
 import NewsControls from './NewsControls'
 import NewsCard from './NewsCard'
+import NewsRow from './NewsRow'
 import { newsSrc, openUrl, bgImg } from './newsUtil'
 
 export default function NewsFeed() {
@@ -114,10 +115,18 @@ export default function NewsFeed() {
           <div className="news-carousel">
             <button className="news-arrow left" onClick={() => scroll(-1)} aria-label="Previous">‹</button>
             <div className="news-cards" ref={trackRef}>
-              {rest.map((n) => <NewsCard key={n.url || n.title} n={n} />)}
+              {rest.slice(0, 13).map((n) => <NewsCard key={n.url || n.title} n={n} />)}
             </div>
             <button className="news-arrow right" onClick={() => scroll(1)} aria-label="Next">›</button>
           </div>
+          {rest.length > 13 && (
+            <>
+              <div className="news-list-h">More Headlines</div>
+              <div className="news-list">
+                {rest.slice(13).map((n) => <NewsRow key={n.url || n.title} n={n} />)}
+              </div>
+            </>
+          )}
         </>
       )}
 
