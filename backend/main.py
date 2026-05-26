@@ -3392,7 +3392,9 @@ def _get_market_indices_cached() -> dict:
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("indices")
-        if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
+        # Indices are yfinance-backed (slow fetch, ~15-min delayed, flat pre/post)
+        # so they refresh on the slow cadence — not the 3s live-snapshot path.
+        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
             return c["data"]
         data = _build_market_indices()
         _market_cache["indices"] = {"t": now, "data": data}

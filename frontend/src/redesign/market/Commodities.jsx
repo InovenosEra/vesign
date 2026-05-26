@@ -5,7 +5,7 @@ import { getCommodities } from '../../api'
 import { num, pct, dirClass } from '../fmt'
 
 export default function Commodities() {
-  const { data } = useQuery({ queryKey: ['market-commodities'], queryFn: getCommodities, refetchInterval: 3_000 })
+  const { data } = useQuery({ queryKey: ['market-commodities'], queryFn: getCommodities, refetchInterval: 15_000 })
   const rows = data?.commodities || []
   if (!rows.length) return null
   return (

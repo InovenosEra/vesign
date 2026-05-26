@@ -7,7 +7,7 @@ import { num, pct, spark, overlayLive } from '../fmt'
 const LABELS = { '^GSPC': 'S&P 500', '^NDX': 'Nasdaq 100', '^DJI': 'Dow Jones', '^RUT': 'Russell 2000', VIX: 'VIX' }
 
 export default function Indices() {
-  const { data } = useQuery({ queryKey: ['market-indices'], queryFn: getIndices, refetchInterval: 3_000 })
+  const { data } = useQuery({ queryKey: ['market-indices'], queryFn: getIndices, refetchInterval: 15_000 })
   const rows = data?.indices || []
   const { prices } = useLivePrices(rows.map(r => r.ticker))
 
