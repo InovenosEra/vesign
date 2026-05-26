@@ -470,6 +470,9 @@
 /* Market closed — red, static dot (open = green default above) */
 .rd .status.closed { background: var(--red-bg); border-color: rgba(220,38,38,0.25); color: var(--red); }
 .rd .status.closed .dot { background: var(--red); box-shadow: 0 0 8px var(--red); animation: none; }
+/* Pre/Post-market — amber, pulsing dot */
+.rd .status.extended { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.3); color: var(--gold); }
+.rd .status.extended .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
 .rd .avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #00d97e); color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid var(--line-2); }
 
 /* Language + currency selectors */

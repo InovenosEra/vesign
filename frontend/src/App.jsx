@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useRef, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom'
 import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
@@ -645,7 +645,7 @@ function AppLayout() {
   const { user } = useUser()
   const location = useLocation()
   const _p = location.pathname
-  const isRedesignRoute = _p === '/' || ['/market', '/portfolio', '/research'].some(r => _p === r || _p.startsWith(r + '/'))
+  const isRedesignRoute = _p === '/' || ['/market', '/signals', '/portfolio', '/research'].some(r => _p === r || _p.startsWith(r + '/'))
   const [tokenReady, setTokenReady] = useState(false)
   const [disabledReason, setDisabledReason] = useState(null)
 
@@ -680,7 +680,8 @@ function AppLayout() {
                 <Suspense fallback={<PageFallback />}>
                   <Routes>
                     <Route path="/market" element={<AppShell><MarketPage /></AppShell>} />
-                    <Route path="/" element={<AppShell><RdSignalsPage /></AppShell>} />
+                    <Route path="/" element={<Navigate to="/signals" replace />} />
+                    <Route path="/signals" element={<AppShell><RdSignalsPage /></AppShell>} />
                     <Route path="/portfolio" element={<AppShell><RdPortfolioPage /></AppShell>} />
                     <Route path="/research" element={<AppShell><RdResearchPage /></AppShell>} />
                     <Route path="/research/:ticker" element={<AppShell><RdResearchPage /></AppShell>} />

@@ -62,12 +62,20 @@ function MarketChip() {
     refetchInterval: 60_000,
   })
   // Backend returns `phase` (regular | pre | post | idle), not is_open.
-  const open = data?.phase ? data.phase === 'regular' : null
+  // Countdown always tracks the next regular open/close boundary.
+  const phase = data?.phase
   const cd = useCountdown(data?.next_regular_event_utc || data?.next_event_utc)
+  // Map phase → { className, label }. Pre/post are "extended" (amber).
+  const view = {
+    regular: { cls: '', label: 'Market open' },
+    pre: { cls: ' extended', label: 'Pre-market' },
+    post: { cls: ' extended', label: 'Post-market' },
+    idle: { cls: ' closed', label: 'Market closed' },
+  }[phase] ?? { cls: '', label: 'Market…' }
   return (
-    <div className={'status' + (open === false ? ' closed' : '')}>
+    <div className={'status' + view.cls}>
       <span className="dot" />{' '}
-      <span>{open == null ? 'Market…' : open ? 'Market open' : 'Market closed'}</span>
+      <span>{view.label}</span>
       {cd && <span className="ct">{cd}</span>}
     </div>
   )
@@ -165,7 +173,7 @@ export default function AppShell({ children }) {
           </div>
           <nav className="nav">
             <NavLink to="/market">Market</NavLink>
-            <NavLink to="/" end>Signals</NavLink>
+            <NavLink to="/signals">Signals</NavLink>
             <NavLink to="/portfolio">Portfolio</NavLink>
             <NavLink to="/research">Research</NavLink>
           </nav>
