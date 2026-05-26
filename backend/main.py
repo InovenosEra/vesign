@@ -3274,12 +3274,12 @@ _snapshot_cache: dict = {}        # ticker -> live price
 _snapshot_ts: float = 0.0
 _snapshot_phase = None
 _snapshot_lock = threading.Lock()
-_SNAPSHOT_TTL = 3                  # seconds
+_SNAPSHOT_TTL_SECONDS = 3          # seconds
 
 
 def _get_live_snapshot() -> dict:
     """Shared whole-universe live prices. {"phase": str, "prices": {ticker: price}}.
-    Refreshed at most once per _SNAPSHOT_TTL; the lock makes it single-flight.
+    Refreshed at most once per _SNAPSHOT_TTL_SECONDS; the lock makes it single-flight.
     regular -> batch-quote; pre/post -> batched aftermarket mid; idle -> empty.
     On fetch failure the previous snapshot is retained (page never blanks)."""
     global _snapshot_cache, _snapshot_ts, _snapshot_phase
@@ -3288,11 +3288,12 @@ def _get_live_snapshot() -> dict:
     with _snapshot_lock:
         if phase != _snapshot_phase:
             _snapshot_cache = {}
+            _snapshot_ts = 0.0          # force a refetch after a phase change
             _snapshot_phase = phase
         if phase == "idle":
             _snapshot_cache = {}
             return {"phase": phase, "prices": {}}
-        if _snapshot_cache and now - _snapshot_ts < _SNAPSHOT_TTL:
+        if _snapshot_ts and now - _snapshot_ts < _SNAPSHOT_TTL_SECONDS:
             return {"phase": phase, "prices": _snapshot_cache}
         tickers = list(_get_universe_baseline().keys())
         try:

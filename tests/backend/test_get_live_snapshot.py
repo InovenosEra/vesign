@@ -83,3 +83,18 @@ def test_fetch_failure_keeps_previous_snapshot(snap_app):
          patch.object(bm, "fetch_live_prices", side_effect=RuntimeError("FMP down")):
         out = bm._get_live_snapshot()
     assert out["prices"]["AAA"] == 110.0
+
+
+def test_all_falsy_prices_still_honors_ttl(snap_app):
+    bm, _ = snap_app
+    calls = []
+    def fake_live(tickers):
+        calls.append(tickers)
+        return {"AAA": None}            # filtered out -> empty cache, but ts set
+    with patch.object(bm, "_phase_info", return_value={"phase": "regular"}), \
+         patch.object(bm, "fetch_live_prices", side_effect=fake_live):
+        bm._get_live_snapshot()
+        bm._get_live_snapshot()         # within TTL -> must NOT refetch
+        result = bm._get_live_snapshot()
+        assert result["prices"] == {}
+        assert len(calls) == 1          # TTL honored despite empty cache
