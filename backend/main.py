@@ -4187,6 +4187,19 @@ _NEWS_CACHE_TTL_SECONDS = 5 * 60
 _NEWS_FEEDS = ("news/general-latest", "news/stock-latest")
 _NEWS_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)  # sort floor for undated items
 
+# PR/newswire distributors: high-volume press-release spam (class-action notices,
+# micro-cap PRs, generic "Press Release" images) that floods a recency-sorted
+# feed. Matched as a substring of the source domain and filtered out.
+_PR_WIRE_TOKENS = (
+    "newswire", "presswire", "globenewswire", "businesswire", "prnewswire",
+    "accesswire", "newsfile", "prweb", "einpress", "issuerdirect", "prn ",
+)
+
+
+def _is_pr_wire(source: str) -> bool:
+    s = (source or "").lower()
+    return any(tok in s for tok in _PR_WIRE_TOKENS)
+
 
 def _fetch_top_news(limit: int) -> list | None:
     """Pull FMP's macro + single-name news feeds into one combined pool.
@@ -4216,6 +4229,9 @@ def _build_market_news(limit: int) -> dict:
     now = datetime.now(timezone.utc)
     seen_urls = set()
     for it in items:
+        source = it.get("site") or it.get("publisher") or ""
+        if _is_pr_wire(source):
+            continue  # drop PR-wire / press-release spam
         url = it.get("url") or ""
         if url and url in seen_urls:
             continue
@@ -4229,7 +4245,7 @@ def _build_market_news(limit: int) -> dict:
         symbol = it.get("symbol") or it.get("ticker") or None
         scored.append((published_dt or _NEWS_EPOCH, {
             "title": it.get("title") or "",
-            "source": it.get("site") or it.get("publisher") or "",
+            "source": source,
             "url": url,
             "ticker": symbol if symbol else None,
             "image": it.get("image") or None,

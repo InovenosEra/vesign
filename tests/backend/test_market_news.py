@@ -132,6 +132,26 @@ def test_blends_macro_and_stock_feeds(news_app):
     assert titles == ["AAPL upgraded", "Jobs report beats forecasts", "Oil slides on demand fears"]
 
 
+def test_filters_pr_wire_spam(news_app):
+    # PR/newswire distributors (globenewswire, accesswire, prnewswire, …) publish
+    # constant press-release spam that floods a recency feed — filter them out.
+    bm, client = news_app
+    fixture = [
+        {"title": "Class action notice", "site": "globenewswire.com", "url": "p1",
+         "symbol": "", "publishedDate": _ago(2)},
+        {"title": "Micro-cap PR",        "site": "accessnewswire.com", "url": "p2",
+         "symbol": "", "publishedDate": _ago(3)},
+        {"title": "Wire release",        "site": "PR Newswire",        "url": "p3",
+         "symbol": "", "publishedDate": _ago(4)},
+        {"title": "Real market news",    "site": "reuters.com",        "url": "r1",
+         "symbol": "", "publishedDate": _ago(20)},
+    ]
+    with patch.object(bm, "_fetch_top_news", return_value=fixture):
+        rows = client.get("/api/market/news/top?limit=10").json()["news"]
+    titles = [r["title"] for r in rows]
+    assert titles == ["Real market news"]  # only real journalism survives
+
+
 def test_dedupes_by_url(news_app):
     # Blending two feeds can surface the same article twice; keep one per URL.
     bm, client = news_app
