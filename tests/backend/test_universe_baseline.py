@@ -43,6 +43,8 @@ def test_baseline_prev_close_is_latest_session_and_meta(base_app):
     assert base["AAA"]["market_cap"] == 1000
     assert base["AAA"]["hi52"] == 120.0
     assert base["AAA"]["lo52"] == 90.0
+    assert abs(base["AAA"]["ma50"] - 103.3333) < 0.01
+    assert abs(base["AAA"]["ma200"] - 103.3333) < 0.01
 
 
 def test_baseline_cache_returns_same_object_on_second_call(base_app):

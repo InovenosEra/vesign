@@ -3231,16 +3231,26 @@ def _build_universe_baseline() -> dict:
             GROUP BY ticker
         ),
         -- dedup: fundamentals has no UNIQUE(ticker); MAX avoids row-multiplication, cap staleness is immaterial for weighting
-        mc AS (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker)
+        mc AS (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker),
+        last_n AS (
+            SELECT ticker, close,
+                   ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+            FROM daily_prices
+        ),
+        ma50c AS (SELECT ticker, AVG(close) AS ma FROM last_n WHERE rn <= 50 GROUP BY ticker),
+        ma200c AS (SELECT ticker, AVG(close) AS ma FROM last_n WHERE rn <= 200 GROUP BY ticker)
         SELECT c.ticker, c.company, c.sector, c.logo_url,
                mc.market_cap AS market_cap,
                t.close AS prev_close, t.volume AS volume,
-               hl.hi AS hi52, hl.lo AS lo52
+               hl.hi AS hi52, hl.lo AS lo52,
+               ma50c.ma AS ma50, ma200c.ma AS ma200
         FROM daily_prices t
         JOIN bounds b ON t.date = b.today
         JOIN companies c ON c.ticker = t.ticker
         LEFT JOIN mc ON mc.ticker = c.ticker
         LEFT JOIN hl ON hl.ticker = c.ticker
+        LEFT JOIN ma50c ON ma50c.ticker = c.ticker
+        LEFT JOIN ma200c ON ma200c.ticker = c.ticker
         WHERE COALESCE(c.market, 'US') = 'US' AND t.close > 0
     """)
     out = {}
@@ -3250,6 +3260,7 @@ def _build_universe_baseline() -> dict:
                 "company": r["company"], "sector": r["sector"], "logo_url": r["logo_url"],
                 "market_cap": r["market_cap"], "prev_close": r["prev_close"],
                 "volume": r["volume"], "hi52": r["hi52"], "lo52": r["lo52"],
+                "ma50": r["ma50"], "ma200": r["ma200"],
             }
     return out
 
@@ -3562,88 +3573,47 @@ def market_valuation(limit: int = 6):
 
 
 def _build_market_breadth() -> dict:
-    """Market internals across US tickers: advance/decline, 52w hi/lo, %>50d MA."""
-    sql = text("""
-        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
-        prev_bounds AS (
-            SELECT MAX(dp.date) AS prev
-            FROM daily_prices dp, bounds b
-            WHERE dp.date < b.today
-        ),
-        us_tickers AS (
-            SELECT ticker FROM companies WHERE COALESCE(market, 'US') = 'US'
-        ),
-        today_px AS (
-            SELECT dp.ticker, dp.close, dp.volume
-            FROM daily_prices dp, bounds b
-            WHERE dp.date = b.today AND dp.ticker IN (SELECT ticker FROM us_tickers)
-        ),
-        prev_px AS (
-            SELECT dp.ticker, dp.close
-            FROM daily_prices dp, prev_bounds pb
-            WHERE dp.date = pb.prev AND dp.ticker IN (SELECT ticker FROM us_tickers)
-        ),
-        year_window AS (
-            SELECT dp.ticker, MAX(dp.close) AS hi52, MIN(dp.close) AS lo52
-            FROM daily_prices dp, bounds b
-            WHERE dp.ticker IN (SELECT ticker FROM us_tickers)
-              AND dp.date > date(b.today, '-365 days')
-            GROUP BY dp.ticker
-        ),
-        last50 AS (
-            SELECT ticker, close,
-                   ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
-            FROM daily_prices
-            WHERE ticker IN (SELECT ticker FROM us_tickers)
-        ),
-        ma50 AS (
-            SELECT ticker, AVG(close) AS ma
-            FROM last50
-            WHERE rn <= 50
-            GROUP BY ticker
-        ),
-        ma200 AS (
-            SELECT ticker, AVG(close) AS ma
-            FROM last50
-            WHERE rn <= 200
-            GROUP BY ticker
-        )
-        SELECT
-            SUM(CASE WHEN p.close IS NOT NULL AND t.close > p.close THEN 1 ELSE 0 END) AS advancers,
-            SUM(CASE WHEN p.close IS NOT NULL AND t.close < p.close THEN 1 ELSE 0 END) AS decliners,
-            SUM(CASE WHEN p.close IS NOT NULL AND t.close > p.close THEN COALESCE(t.volume, 0) ELSE 0 END) AS up_volume,
-            SUM(CASE WHEN p.close IS NOT NULL AND t.close < p.close THEN COALESCE(t.volume, 0) ELSE 0 END) AS down_volume,
-            SUM(CASE WHEN yw.hi52 IS NOT NULL AND t.close >= yw.hi52 THEN 1 ELSE 0 END) AS week52_highs,
-            SUM(CASE WHEN yw.lo52 IS NOT NULL AND t.close <= yw.lo52 THEN 1 ELSE 0 END) AS week52_lows,
-            SUM(CASE WHEN ma50.ma IS NOT NULL AND t.close > ma50.ma THEN 1.0 ELSE 0.0 END)
-              / NULLIF(SUM(CASE WHEN ma50.ma IS NOT NULL THEN 1.0 ELSE 0.0 END), 0)
-              AS above_50d_ma_pct,
-            SUM(CASE WHEN ma200.ma IS NOT NULL AND t.close > ma200.ma THEN 1.0 ELSE 0.0 END)
-              / NULLIF(SUM(CASE WHEN ma200.ma IS NOT NULL THEN 1.0 ELSE 0.0 END), 0)
-              AS above_200d_ma_pct
-        FROM today_px t
-        LEFT JOIN prev_px p ON p.ticker = t.ticker
-        LEFT JOIN year_window yw ON yw.ticker = t.ticker
-        LEFT JOIN ma50 ON ma50.ticker = t.ticker
-        LEFT JOIN ma200 ON ma200.ticker = t.ticker
-    """)
-    with engine.connect() as conn:
-        row = conn.execute(sql).mappings().fetchone()
-    if row is None:
-        return {"advancers": 0, "decliners": 0, "up_volume": 0, "down_volume": 0,
-                "week52_highs": 0, "week52_lows": 0,
-                "above_50d_ma_pct": None, "above_200d_ma_pct": None}
+    """US-wide breadth from the live snapshot. advance/decline & MA crossings use
+    the live price vs the daily baseline (prev_close, hi52/lo52, ma50/ma200);
+    up/down volume uses the last completed session's volume (intraday volume is
+    not in the snapshot). 52w-high = live price at/above the baseline 52w high."""
+    rows = live_snapshot.compute_universe_rows(
+        _get_live_snapshot()["prices"], _get_universe_baseline())
+    advancers = decliners = 0
+    up_volume = down_volume = 0
+    week52_highs = week52_lows = 0
+    ma50_above = ma50_total = 0
+    ma200_above = ma200_total = 0
+    for r in rows:
+        ch, price, vol = r["change_pct"], r["price"], (r["volume"] or 0)
+        if ch is None or price is None:
+            continue
+        if ch > 0:
+            advancers += 1
+            up_volume += vol
+        elif ch < 0:
+            decliners += 1
+            down_volume += vol
+        hi, lo = r.get("hi52"), r.get("lo52")
+        if hi is not None and price >= hi:
+            week52_highs += 1
+        if lo is not None and price <= lo:
+            week52_lows += 1
+        ma50, ma200 = r.get("ma50"), r.get("ma200")
+        if ma50 is not None:
+            ma50_total += 1
+            if price > ma50:
+                ma50_above += 1
+        if ma200 is not None:
+            ma200_total += 1
+            if price > ma200:
+                ma200_above += 1
     return {
-        "advancers": int(row["advancers"] or 0),
-        "decliners": int(row["decliners"] or 0),
-        "up_volume": int(row["up_volume"] or 0),
-        "down_volume": int(row["down_volume"] or 0),
-        "week52_highs": int(row["week52_highs"] or 0),
-        "week52_lows": int(row["week52_lows"] or 0),
-        "above_50d_ma_pct": round(row["above_50d_ma_pct"], 6)
-            if row["above_50d_ma_pct"] is not None else None,
-        "above_200d_ma_pct": round(row["above_200d_ma_pct"], 6)
-            if row["above_200d_ma_pct"] is not None else None,
+        "advancers": advancers, "decliners": decliners,
+        "up_volume": int(up_volume), "down_volume": int(down_volume),
+        "week52_highs": week52_highs, "week52_lows": week52_lows,
+        "above_50d_ma_pct": round(ma50_above / ma50_total, 6) if ma50_total else None,
+        "above_200d_ma_pct": round(ma200_above / ma200_total, 6) if ma200_total else None,
     }
 
 
@@ -3651,7 +3621,7 @@ def _get_market_breadth_cached() -> dict:
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("breadth")
-        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+        if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
         data = _build_market_breadth()
         _market_cache["breadth"] = {"t": now, "data": data}

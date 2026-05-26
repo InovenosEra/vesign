@@ -26,6 +26,7 @@ def breadth_app():
             CREATE TABLE companies (
                 ticker TEXT PRIMARY KEY, company TEXT, domain TEXT,
                 market TEXT, logo_url TEXT, industry TEXT,
+                sector TEXT,
                 description TEXT, description_short TEXT
             )
         """))
@@ -34,6 +35,7 @@ def breadth_app():
                 ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT
             )
         """))
+        conn.execute(text("CREATE TABLE fundamentals (ticker TEXT, market_cap REAL)"))
     temp_engine.dispose()
 
     import importlib
@@ -52,96 +54,38 @@ def breadth_app():
         pass
 
 
-def _insert_company(bm, ticker, market="US"):
+def test_breadth_from_live_snapshot(breadth_app):
+    bm, client = breadth_app
+    from sqlalchemy import text
+    # Each ticker: older close 90 (05-21) + latest close 100 (05-22, volume 1000).
+    # => prev_close=100, hi52=100, lo52=90, ma50=ma200=95.
+    with bm.engine.begin() as conn:
+        for t in ["AAA", "BBB", "CCC", "DDD"]:
+            conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES (:t,:t,'US')"), {"t": t})
+            conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-21 00:00:00',:t,90,90,90,90,0)"), {"t": t})
+            conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00',:t,100,100,100,100,1000)"), {"t": t})
+    live = {"AAA": 110.0, "BBB": 105.0, "CCC": 95.0, "DDD": 100.0}  # 2 up, 1 down, 1 flat
+    from unittest.mock import patch
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        body = client.get("/api/market/breadth").json()
+    assert body["advancers"] == 2          # AAA, BBB
+    assert body["decliners"] == 1          # CCC (DDD flat -> neither)
+    assert body["up_volume"] == 2000       # AAA + BBB latest-session volume
+    assert body["down_volume"] == 1000     # CCC
+    assert body["week52_highs"] == 3       # AAA(110), BBB(105), DDD(100) all >= hi52 100
+    assert body["week52_lows"] == 0        # none <= lo52 90
+    assert body["above_50d_ma_pct"] == 0.75  # AAA,BBB,DDD > ma 95; CCC(95) not > 95
+
+
+def test_breadth_idle_empty_snapshot(breadth_app):
+    bm, client = breadth_app
     from sqlalchemy import text
     with bm.engine.begin() as conn:
-        conn.execute(text("""
-            INSERT INTO companies (ticker, company, market) VALUES (:t, :t, :m)
-        """), {"t": ticker, "m": market})
-
-
-def _insert_series(bm, ticker, closes_by_date):
-    """closes_by_date: dict[date_str, close]"""
-    from sqlalchemy import text
-    with bm.engine.begin() as conn:
-        for d, c in closes_by_date.items():
-            conn.execute(text("""
-                INSERT INTO daily_prices (date, ticker, open, high, low, close, volume)
-                VALUES (:d, :t, :c, :c, :c, :c, 0)
-            """), {"d": d, "t": ticker, "c": c})
-
-
-def test_advancers_decliners_count_against_prior_day(breadth_app):
-    bm, client = breadth_app
-    # 3 advancers, 2 decliners, 1 flat
-    for t, prev, today in [
-        ("UP1", 100, 110),
-        ("UP2", 100, 105),
-        ("UP3", 100, 101),
-        ("DN1", 100,  99),
-        ("DN2", 100,  90),
-        ("FLT", 100, 100),
-    ]:
-        _insert_company(bm, t)
-        _insert_series(bm, t, {"2026-05-21 00:00:00": prev, "2026-05-22 00:00:00": today})
-
-    body = client.get("/api/market/breadth").json()
-    assert body["advancers"] == 3
-    assert body["decliners"] == 2
-
-
-def test_week52_highs_and_lows(breadth_app):
-    bm, client = breadth_app
-    # HI: today's close = max of the trailing year.
-    _insert_company(bm, "HI")
-    _insert_series(bm, "HI", {
-        "2026-05-20 00:00:00": 150,
-        "2026-05-21 00:00:00": 140,
-        "2026-05-22 00:00:00": 160,  # new 52w high
-    })
-    # LO: today's close = min of the trailing year.
-    _insert_company(bm, "LO")
-    _insert_series(bm, "LO", {
-        "2026-05-20 00:00:00": 50,
-        "2026-05-21 00:00:00": 60,
-        "2026-05-22 00:00:00": 40,  # new 52w low
-    })
-    # MID: today is neither hi nor lo.
-    _insert_company(bm, "MID")
-    _insert_series(bm, "MID", {
-        "2026-05-20 00:00:00": 100,
-        "2026-05-21 00:00:00": 80,
-        "2026-05-22 00:00:00": 90,
-    })
-
-    body = client.get("/api/market/breadth").json()
-    assert body["week52_highs"] == 1
-    assert body["week52_lows"] == 1
-
-
-def test_above_50d_ma_pct(breadth_app):
-    bm, client = breadth_app
-    # ABV: 50 days of 100, today = 110 → above MA
-    # BLW: 50 days of 100, today =  90 → below MA
-    for t, today_close in [("ABV", 110), ("BLW", 90)]:
-        _insert_company(bm, t)
-        series = {}
-        for i in range(1, 51):
-            series[f"2026-03-{i:02d} 00:00:00" if i <= 31 else f"2026-04-{i-31:02d} 00:00:00"] = 100.0
-        series["2026-05-22 00:00:00"] = today_close
-        _insert_series(bm, t, series)
-
-    body = client.get("/api/market/breadth").json()
-    # 1 of 2 US tickers above its 50d MA → 0.5
-    assert body["above_50d_ma_pct"] == pytest.approx(0.5, abs=1e-6)
-
-
-def test_us_only_filter(breadth_app):
-    bm, client = breadth_app
-    _insert_company(bm, "US1", market="US")
-    _insert_series(bm, "US1", {"2026-05-21 00:00:00": 100, "2026-05-22 00:00:00": 110})
-    _insert_company(bm, "TA1.TA", market="TASE")
-    _insert_series(bm, "TA1.TA", {"2026-05-21 00:00:00": 100, "2026-05-22 00:00:00": 110})
-
-    body = client.get("/api/market/breadth").json()
-    assert body["advancers"] == 1  # TASE excluded
+        conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES ('AAA','AAA','US')"))
+        conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00','AAA',100,100,100,100,5)"))
+    from unittest.mock import patch
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
+        body = client.get("/api/market/breadth").json()
+    # No live price -> price == prev_close -> change 0 -> neither advancer nor decliner
+    assert body["advancers"] == 0
+    assert body["decliners"] == 0
