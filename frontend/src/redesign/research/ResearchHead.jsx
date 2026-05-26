@@ -7,13 +7,6 @@ export default function ResearchHead({ tab, setTab, count }) {
   })
   return (
     <div className="page-head">
-      <div className="ph-top">
-        <div className="ph-context">
-          <span className="day">{day}</span>
-          <span className="sep">·</span>
-          <span>Universe</span>
-        </div>
-      </div>
       <div className="ph-tabs">
         <a className={'ph-tab' + (tab === 'screener' ? ' active' : '')}
           href="#screener" onClick={(e) => { e.preventDefault(); setTab('screener') }}>
@@ -23,6 +16,7 @@ export default function ResearchHead({ tab, setTab, count }) {
           href="#deep-dive" onClick={(e) => { e.preventDefault(); setTab('deep-dive') }}>
           Deep dive
         </a>
+        <span className="day ph-inline-day">{day}</span>
       </div>
     </div>
   )

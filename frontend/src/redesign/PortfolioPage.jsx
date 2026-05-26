@@ -66,11 +66,6 @@ export default function PortfolioPage() {
   return (
     <>
       <div className="page-head">
-        <div className="ph-top">
-          <div className="ph-context">
-            <span className="day">{day}</span>
-          </div>
-        </div>
         <div className="ph-tabs">
           <a className={'ph-tab' + (tab === 'holdings' ? ' active' : '')}
             onClick={(e) => { e.preventDefault(); setTab('holdings'); window.scrollTo({ top: 0, behavior: 'instant' }) }}>
@@ -80,6 +75,7 @@ export default function PortfolioPage() {
             onClick={(e) => { e.preventDefault(); setTab('watchlists'); window.scrollTo({ top: 0, behavior: 'instant' }) }}>
             Watchlists <span className="count">{wlCount || '—'}</span>
           </a>
+          <span className="day ph-inline-day">{day}</span>
         </div>
       </div>
 

@@ -19,11 +19,6 @@ export default function PageHead({ tab, setTab }) {
 
   return (
     <div className="page-head">
-      <div className="ph-top">
-        <div className="ph-context">
-          <span className="day">{day}</span>
-        </div>
-      </div>
       <div className="ph-tabs">
         <a
           className={'ph-tab' + (tab === 'today' ? ' active' : '')}
@@ -35,6 +30,7 @@ export default function PageHead({ tab, setTab }) {
           href="#"
           onClick={(e) => { e.preventDefault(); setTab('closed') }}
         >Closed trades <span className="count">{Array.isArray(trades) ? closedCount.toLocaleString() : '—'}</span></a>
+        <span className="day ph-inline-day">{day}</span>
       </div>
     </div>
   )

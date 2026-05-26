@@ -9,16 +9,12 @@ export default function PageHead({ tab, setTab }) {
   const day = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   return (
     <div className="page-head">
-      <div className="ph-top">
-        <div className="ph-context">
-          <span className="day">{day}</span>
-        </div>
-      </div>
       <div className="ph-tabs">
         {TABS.map(t => (
           <a key={t.id} href="#" className={'ph-tab' + (tab === t.id ? ' active' : '')}
             onClick={(e) => { e.preventDefault(); setTab(t.id) }}>{t.label}</a>
         ))}
+        <span className="day ph-inline-day">{day}</span>
       </div>
     </div>
   )
