@@ -3232,10 +3232,13 @@ def _build_universe_baseline() -> dict:
         ),
         -- dedup: fundamentals has no UNIQUE(ticker); MAX avoids row-multiplication, cap staleness is immaterial for weighting
         mc AS (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker),
+        -- no date cap: moving averages need full price history; US-only bounds the scan
         last_n AS (
-            SELECT ticker, close,
-                   ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
-            FROM daily_prices
+            SELECT dp.ticker, dp.close,
+                   ROW_NUMBER() OVER (PARTITION BY dp.ticker ORDER BY dp.date DESC) AS rn
+            FROM daily_prices dp
+            JOIN companies c ON c.ticker = dp.ticker
+            WHERE COALESCE(c.market, 'US') = 'US'
         ),
         ma50c AS (SELECT ticker, AVG(close) AS ma FROM last_n WHERE rn <= 50 GROUP BY ticker),
         ma200c AS (SELECT ticker, AVG(close) AS ma FROM last_n WHERE rn <= 200 GROUP BY ticker)

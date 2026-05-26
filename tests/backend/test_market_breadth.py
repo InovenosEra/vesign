@@ -75,6 +75,7 @@ def test_breadth_from_live_snapshot(breadth_app):
     assert body["week52_highs"] == 3       # AAA(110), BBB(105), DDD(100) all >= hi52 100
     assert body["week52_lows"] == 0        # none <= lo52 90
     assert body["above_50d_ma_pct"] == 0.75  # AAA,BBB,DDD > ma 95; CCC(95) not > 95
+    assert body["above_200d_ma_pct"] == 0.75  # same data: ma200 == 95 for all tickers
 
 
 def test_breadth_idle_empty_snapshot(breadth_app):
