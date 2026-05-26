@@ -847,7 +847,7 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
     if signal:
         wanted = signal.upper()
         rows = [r for r in rows if r.get("signal") == wanted]
-    return rows
+    return _overlay_live(rows)
 
 
 _SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap", "prediction_score"}
@@ -951,7 +951,7 @@ def signals(
         """), conn, params={**params, "limit": page_size, "offset": (page - 1) * page_size})
 
     return {
-        "data": _records(df),
+        "data": _overlay_live(_records(df)),
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -3323,6 +3323,19 @@ def _get_live_snapshot() -> dict:
             logging.getLogger(__name__).warning(
                 "live snapshot fetch failed; keeping previous snapshot", exc_info=True)
         return {"phase": phase, "prices": _snapshot_cache}
+
+
+def _overlay_live(rows: list, price_key: str = "close") -> list:
+    """Return rows with each row's price_key replaced by the live snapshot price
+    when present. Rows absent from the snapshot are returned unchanged. Does NOT
+    mutate the input dicts (callers may pass cached lists) — changed rows are
+    shallow-copied."""
+    prices = _get_live_snapshot()["prices"]
+    out = []
+    for r in rows:
+        live = prices.get(r.get("ticker"))
+        out.append({**r, price_key: live} if live else r)
+    return out
 
 
 def _build_market_indices() -> dict:
