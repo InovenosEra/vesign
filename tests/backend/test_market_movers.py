@@ -123,3 +123,43 @@ def test_invalid_type_returns_422(movers_app):
     bm, client = movers_app
     resp = client.get("/api/market/movers?type=bogus")
     assert resp.status_code == 422
+
+
+def test_excludes_spy_and_voo(movers_app):
+    bm, client = movers_app
+    _setup(bm)                       # AAA..FFF
+    _company(bm, "SPY"); _close(bm, "SPY", 100.0, volume=0)
+    _company(bm, "VOO"); _close(bm, "VOO", 100.0, volume=0)
+    from unittest.mock import patch
+    # SPY/VOO get the biggest live gain; must still be excluded from movers
+    live = {"SPY": 200.0, "VOO": 200.0, "AAA": 110.0, "BBB": 105.0}
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        rows = client.get("/api/market/movers?type=gainers&limit=10").json()["movers"]
+    tickers = [r["ticker"] for r in rows]
+    assert "SPY" not in tickers
+    assert "VOO" not in tickers
+    assert "AAA" in tickers
+
+
+def test_excludes_non_us_market(movers_app):
+    bm, client = movers_app
+    _setup(bm)
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("INSERT INTO companies (ticker, company, market, sector) VALUES ('TEVA','Teva','IL','Health')"))
+        conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00','TEVA',100,100,100,100,1)"))
+    from unittest.mock import patch
+    live = {"TEVA": 200.0, "AAA": 110.0}
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        rows = client.get("/api/market/movers?type=gainers&limit=10").json()["movers"]
+    assert "TEVA" not in [r["ticker"] for r in rows]
+
+
+def test_default_limit_is_five(movers_app):
+    bm, client = movers_app
+    _setup(bm)                       # 6 tickers
+    from unittest.mock import patch
+    live = {"AAA": 110.0, "BBB": 109.0, "CCC": 108.0, "DDD": 107.0, "EEE": 106.0, "FFF": 105.0}
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        rows = client.get("/api/market/movers?type=gainers").json()["movers"]
+    assert len(rows) == 5

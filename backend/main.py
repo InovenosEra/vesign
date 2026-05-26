@@ -3395,7 +3395,8 @@ def _build_market_movers(mover_type: str, limit: int) -> dict:
     out = rows[:limit]
     return {"movers": [
         {"ticker": r["ticker"], "company": r["company"],
-         "close": r["price"], "volume": r["volume"], "change_pct": r["change_pct"]}
+         "close": r["price"],  # "close" kept for API back-compat; may be a live intraday price
+         "volume": r["volume"], "change_pct": r["change_pct"]}
         for r in out
     ]}
 
