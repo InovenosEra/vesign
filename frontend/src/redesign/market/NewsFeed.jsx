@@ -11,7 +11,7 @@ import NewsCard from './NewsCard'
 import { newsSrc, openUrl, bgImg } from './newsUtil'
 
 export default function NewsFeed() {
-  const [limit, setLimit] = useState(31)
+  const [limit, setLimit] = useState(60)
   const [cat, setCat] = useState('all')       // all | macro | stocks | mine
   const [ticker, setTicker] = useState(null)  // trending-chip filter (overrides cat)
   const [q, setQ] = useState('')              // search text
@@ -111,7 +111,7 @@ export default function NewsFeed() {
         </>
       )}
 
-      <div className="news-more"><a onClick={() => setLimit((l) => l + 20)}>Show more news →</a></div>
+      <div className="news-more"><a onClick={() => setLimit((l) => l + 30)}>Show more news →</a></div>
     </div>
   )
 }
