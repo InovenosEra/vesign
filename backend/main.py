@@ -3440,60 +3440,26 @@ _HL_NEAR_PCT = 2.0  # "at/near" a 52-week extreme = within this % of it
 
 
 def _build_market_highs_lows(hl_type: str, limit: int) -> dict:
-    """US stocks at/near their 52-week high or low (within _HL_NEAR_PCT%).
-
-    Anchored to the global last-close date; ETFs excluded. Returns the same
-    {movers:[...]} shape as the movers panels (each row carries the day change_pct)
-    so the frontend can reuse the mover-row rendering.
-    """
-    sql = text("""
-        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
-        prev_bounds AS (
-            SELECT MAX(d.date) AS prev FROM daily_prices d, bounds b WHERE d.date < b.today
-        ),
-        win AS (
-            SELECT MIN(date) AS start FROM (
-                SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT 252
-            )
-        ),
-        hl AS (
-            SELECT ticker, MAX(close) AS hi, MIN(close) AS lo
-            FROM daily_prices WHERE date >= (SELECT start FROM win)
-            GROUP BY ticker
-        )
-        SELECT t.ticker, c.company, c.logo_url, t.close AS close, pv.close AS prev_close,
-               hl.hi AS hi, hl.lo AS lo
-        FROM daily_prices t
-        JOIN bounds b ON t.date = b.today
-        LEFT JOIN daily_prices pv ON pv.ticker = t.ticker AND pv.date = (SELECT prev FROM prev_bounds)
-        JOIN hl ON hl.ticker = t.ticker
-        JOIN companies c ON c.ticker = t.ticker
-        WHERE COALESCE(c.market, 'US') = 'US'
-          AND COALESCE(c.sector, '') != 'ETF'
-          AND t.close > 0
-    """)
-    with engine.connect() as conn:
-        rows = [dict(r._mapping) for r in conn.execute(sql)]
-
-    def _change(r):
-        if r["prev_close"] in (None, 0) or r["close"] is None:
-            return None
-        return round((r["close"] - r["prev_close"]) / r["prev_close"] * 100, 4)
-
+    """US stocks whose LIVE price is within _HL_NEAR_PCT% of their 52w high/low.
+    ETFs excluded. Same {movers:[...]} shape as the movers panels so the frontend
+    reuses the mover-row rendering. A live price making a fresh extreme counts."""
+    rows = live_snapshot.compute_universe_rows(
+        _get_live_snapshot()["prices"], _get_universe_baseline())
     scored = []
     for r in rows:
-        hi, lo, close = r["hi"], r["lo"], r["close"]
+        price, hi, lo, sector = r["price"], r["hi52"], r["lo52"], r["sector"]
+        if price is None or sector == "ETF":
+            continue
         if hl_type == "high":
-            if hi and close >= hi * (1 - _HL_NEAR_PCT / 100):
-                scored.append((close / hi, r))      # ratio→1.0 = at the high
+            if hi and price >= hi * (1 - _HL_NEAR_PCT / 100):
+                scored.append((price / hi, r))      # ratio->1.0 = at the high
         else:
-            if lo and close <= lo * (1 + _HL_NEAR_PCT / 100):
-                scored.append((close / lo, r))      # ratio→1.0 = at the low
-    # high: closest to/at the high first (ratio desc); low: closest to the low first (asc)
+            if lo and price <= lo * (1 + _HL_NEAR_PCT / 100):
+                scored.append((price / lo, r))      # ratio->1.0 = at the low
     scored.sort(key=lambda x: x[0], reverse=(hl_type == "high"))
     movers = [{
         "ticker": r["ticker"], "company": r["company"], "logo_url": r["logo_url"],
-        "close": r["close"], "change_pct": _change(r),
+        "close": r["price"], "change_pct": r["change_pct"],
     } for _, r in scored[:limit]]
     return {"movers": movers}
 
@@ -3503,7 +3469,7 @@ def _get_market_highs_lows_cached(hl_type: str, limit: int) -> dict:
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
-        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+        if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
         data = _build_market_highs_lows(hl_type, limit)
         _market_cache[key] = {"t": now, "data": data}
