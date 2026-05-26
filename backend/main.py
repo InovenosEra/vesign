@@ -2434,7 +2434,7 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             "prev_close": round(float(prev_close), 4) if prev_close is not None else None,
             "first_buy_date": first_buy_date,
         })
-    return result
+    return _overlay_live(result, price_key="latest_close")
 
 
 @protected.get("/api/portfolio/holdings/export")
