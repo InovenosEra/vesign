@@ -43,7 +43,7 @@ function Col({ rows, kind, label }) {
 
 export default function SectorHeatmap({ onOpenSector }) {
   const [mode, setMode] = useState('cap')
-  const { data } = useQuery({ queryKey: ['market-sectors'], queryFn: getSectors, refetchInterval: 300_000 })
+  const { data } = useQuery({ queryKey: ['market-sectors'], queryFn: getSectors, refetchInterval: 3_000 })
   const sectors = (data?.sectors || []).filter(s => s.sector !== 'ETF')
   const valOf = (s) => mode === 'cap' ? s.change_pct : s.change_pct_equal
   const sparkOf = (s) => mode === 'cap' ? s.sparkline : s.sparkline_equal

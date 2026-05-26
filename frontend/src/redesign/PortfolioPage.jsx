@@ -46,7 +46,7 @@ function computeRows(holdings) {
 
 export default function PortfolioPage() {
   const [tab, setTab] = useState('holdings')
-  const { data: holdings } = useQuery({ queryKey: ['portfolio-holdings'], queryFn: () => getPortfolioHoldings('US') })
+  const { data: holdings } = useQuery({ queryKey: ['portfolio-holdings'], queryFn: () => getPortfolioHoldings('US'), refetchInterval: 3_000 })
   const { data: cmp } = useQuery({ queryKey: ['portfolio-comparison'], queryFn: () => getPortfolioComparison('US') })
 
   const arr = Array.isArray(holdings) ? holdings : []

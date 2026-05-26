@@ -24,8 +24,8 @@ function Cell({ label, up, down, leftNum, rightNum }) {
 }
 
 export default function Breadth() {
-  const { data } = useQuery({ queryKey: ['market-breadth'], queryFn: getBreadth, refetchInterval: 60_000 })
-  const { data: sec } = useQuery({ queryKey: ['market-sectors'], queryFn: getSectors, refetchInterval: 300_000 })
+  const { data } = useQuery({ queryKey: ['market-breadth'], queryFn: getBreadth, refetchInterval: 3_000 })
+  const { data: sec } = useQuery({ queryKey: ['market-sectors'], queryFn: getSectors, refetchInterval: 3_000 })
   if (!data) return null
   const adv = data.advancers ?? 0, dec = data.decliners ?? 0
   const upv = data.up_volume ?? 0, dnv = data.down_volume ?? 0

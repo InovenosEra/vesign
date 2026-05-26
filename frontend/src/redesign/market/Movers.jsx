@@ -24,7 +24,7 @@ function MoverRow({ r, kind, live }) {
 }
 
 function Panel({ title, pill, type }) {
-  const { data } = useQuery({ queryKey: ['market-movers', type], queryFn: () => getMovers(type, 10), refetchInterval: 60_000 })
+  const { data } = useQuery({ queryKey: ['market-movers', type], queryFn: () => getMovers(type, 10), refetchInterval: 3_000 })
   const rows = data?.movers || []
   const { prices } = useLivePrices(rows.map(r => r.ticker))
   return (
@@ -37,7 +37,7 @@ function Panel({ title, pill, type }) {
 
 function HighLowPanel() {
   const [hl, setHl] = useState('high')
-  const { data } = useQuery({ queryKey: ['market-highs-lows', hl], queryFn: () => getHighsLows(hl, 10), refetchInterval: 60_000 })
+  const { data } = useQuery({ queryKey: ['market-highs-lows', hl], queryFn: () => getHighsLows(hl, 10), refetchInterval: 3_000 })
   const rows = data?.movers || []
   const { prices } = useLivePrices(rows.map(r => r.ticker))
   return (

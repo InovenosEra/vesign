@@ -51,6 +51,7 @@ function SignalColumn({ kind }) {
   const { data } = useQuery({
     queryKey: ['signals-today', kind, 'US'],
     queryFn: () => getSignalsToday(kind, 'US'),
+    refetchInterval: 3_000,
   })
   const rows = Array.isArray(data) ? data : []
   const dateStr = rows.length ? dateFmt((rows[0].date || '').split(' ')[0]) : ''

@@ -28,7 +28,7 @@ export default function Currencies() {
     setBase(b); setOpen(false)
     try { localStorage.setItem('rd-fx-base', b) } catch { /* ignore */ }
   }
-  const { data } = useQuery({ queryKey: ['market-currencies', base], queryFn: () => getCurrencies(base), refetchInterval: 60_000 })
+  const { data } = useQuery({ queryKey: ['market-currencies', base], queryFn: () => getCurrencies(base), refetchInterval: 3_000 })
   const rows = data?.currencies || []
 
   return (
