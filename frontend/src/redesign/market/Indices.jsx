@@ -1,7 +1,6 @@
 /* Indices row — idx-cards with faded area sparkline. Ported from market-v1.html. */
 import { useQuery } from '@tanstack/react-query'
 import { getIndices } from '../../api'
-import { useLivePrices } from '../../hooks/useLivePrices'
 import { num, pct, spark, overlayLive } from '../fmt'
 
 const LABELS = { '^GSPC': 'S&P 500', '^NDX': 'Nasdaq 100', '^DJI': 'Dow Jones', '^RUT': 'Russell 2000', VIX: 'VIX' }
@@ -9,14 +8,13 @@ const LABELS = { '^GSPC': 'S&P 500', '^NDX': 'Nasdaq 100', '^DJI': 'Dow Jones', 
 export default function Indices() {
   const { data } = useQuery({ queryKey: ['market-indices'], queryFn: getIndices, refetchInterval: 15_000 })
   const rows = data?.indices || []
-  const { prices } = useLivePrices(rows.map(r => r.ticker))
 
   return (
     <>
     <div className="section-h"><h2>Indices</h2><span className="sub">Major US benchmarks · last close</span></div>
     <div className="indices">
       {rows.map((row, i) => {
-        const { price, change } = overlayLive(row.close, row.change_pct, prices[row.ticker])
+        const { price, change } = overlayLive(row.close, row.change_pct)
         const cls = change == null ? '' : change >= 0 ? 'up' : 'down'
         const color = row.ticker === 'VIX'
           ? (change >= 0 ? '#ff4d5c' : '#00d97e')   // VIX inverted
