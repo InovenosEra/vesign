@@ -3621,20 +3621,9 @@ def market_breadth():
     return _get_market_breadth_cached()
 
 
-def _build_market_sectors() -> dict:
-    """Per-sector market-cap-weighted % change (from live snapshot) + top-3 movers by absolute change."""
-    # Live per-ticker change from the shared snapshot + baseline (was a two-row
-    # daily_prices delta). Keep only US tickers that have a sector, a market cap,
-    # and a computable change — matching the old query's WHERE clauses.
-    uni = live_snapshot.compute_universe_rows(
-        _get_live_snapshot()["prices"], _get_universe_baseline())
-    rows = [
-        {"ticker": r["ticker"], "sector": r["sector"],
-         "market_cap": r["market_cap"], "change_pct": r["change_pct"]}
-        for r in uni
-        if r["sector"] and r["market_cap"] and r["change_pct"] is not None
-    ]
-    # ~30-day cap-weighted normalized index per sector, for the tile sparkline.
+def _build_sector_sparklines() -> tuple[dict, dict]:
+    """30-day cap- and equal-weighted normalized index per sector. Daily data
+    (does not change intraday) -> cached per trading day, not on the 3s path."""
     spark_sql = text("""
         WITH last_dates AS (
             SELECT DISTINCT date FROM daily_prices ORDER BY date DESC LIMIT 30
@@ -3668,6 +3657,39 @@ def _build_market_sectors() -> dict:
             idx_eq = norm.mean(axis=1)                        # equal-weighted index
             spark_by_sector[sector_name] = [round(float(v), 5) for v in idx_cap.tolist()]
             spark_eq_by_sector[sector_name] = [round(float(v), 5) for v in idx_eq.tolist()]
+    return spark_by_sector, spark_eq_by_sector
+
+
+_sector_spark_cache: tuple | None = None
+_sector_spark_date = None
+_sector_spark_lock = threading.Lock()
+
+
+def _get_sector_sparklines_cached() -> tuple[dict, dict]:
+    """Daily-cached sector sparklines; rebuilds when MAX(daily_prices.date) advances."""
+    global _sector_spark_cache, _sector_spark_date
+    with _sector_spark_lock:
+        latest = _latest_price_date()
+        if _sector_spark_date != latest or _sector_spark_cache is None:
+            _sector_spark_cache = _build_sector_sparklines()
+            _sector_spark_date = latest
+        return _sector_spark_cache
+
+
+def _build_market_sectors() -> dict:
+    """Per-sector market-cap-weighted % change (from live snapshot) + top-3 movers by absolute change."""
+    # Live per-ticker change from the shared snapshot + baseline (was a two-row
+    # daily_prices delta). Keep only US tickers that have a sector, a market cap,
+    # and a computable change — matching the old query's WHERE clauses.
+    uni = live_snapshot.compute_universe_rows(
+        _get_live_snapshot()["prices"], _get_universe_baseline())
+    rows = [
+        {"ticker": r["ticker"], "sector": r["sector"],
+         "market_cap": r["market_cap"], "change_pct": r["change_pct"]}
+        for r in uni
+        if r["sector"] and r["market_cap"] and r["change_pct"] is not None
+    ]
+    spark_by_sector, spark_eq_by_sector = _get_sector_sparklines_cached()
 
     by_sector: dict[str, list[dict]] = {}
     for r in rows:
