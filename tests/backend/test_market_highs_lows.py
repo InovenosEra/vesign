@@ -98,12 +98,22 @@ def test_etf_excluded(hl_app):
 
 
 def test_live_price_makes_new_high(hl_app):
-    """A live price above the prior 52w high registers as at-high even though the
-    last daily close was below it."""
+    """A live price near the 52w high registers as at-high even though the last
+    daily close was well below the band — proving the LIVE price drives the check,
+    not the stored close."""
     bm, client = hl_app
     _company(bm, "GAPUP")
-    _series(bm, "GAPUP", list(zip(D, [80.0, 90.0, 95.0])))     # hi52 = 95, last close 95
+    # 52w high = 100 (on 05-20); last daily close = 85 (15% below high -> NOT near high)
+    _series(bm, "GAPUP", list(zip(D, [100.0, 90.0, 85.0])))
     from unittest.mock import patch
+    # Without a live price (fallback to prev_close 85) GAPUP would be excluded.
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": {}}):
+        tk_no_live = [r["ticker"] for r in client.get("/api/market/highs-lows?type=high&limit=10").json()["movers"]]
+    assert "GAPUP" not in tk_no_live          # last close 85 is 15% below the 100 high
+    # Clear the panel cache so the second request calls _build_market_highs_lows fresh.
+    with bm._market_cache_lock:
+        bm._market_cache.clear()
+    # With a live price of 99 (>= 100*0.98) it now registers as at-high.
     with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": {"GAPUP": 99.0}}):
-        tk = [r["ticker"] for r in client.get("/api/market/highs-lows?type=high&limit=10").json()["movers"]]
-    assert "GAPUP" in tk     # 99 >= 95 * 0.98
+        tk_live = [r["ticker"] for r in client.get("/api/market/highs-lows?type=high&limit=10").json()["movers"]]
+    assert "GAPUP" in tk_live
