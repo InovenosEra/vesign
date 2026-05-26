@@ -4052,9 +4052,42 @@ def market_analyst_changes_top(days: int = 1, limit: int = 5):
 # Upgrades & Downgrades — analyst RATING actions (sibling to analyst-changes,
 # which only covers target-price moves). Sourced from FMP's market-wide
 # grades-latest-news stream, restricted to our US universe (so every row has a
-# logo + company name and the panel stays US-only). Reiterations (action=hold)
-# are dropped; only genuine UPGRADE / DOWNGRADE / INITIATE rows are kept.
+# logo + company name and the panel stays US-only).
 _GRADE_KIND = {"upgrade": "UPGRADE", "downgrade": "DOWNGRADE", "initialise": "INITIATE"}
+
+# Normalized sell-side rating ladder (higher = more bullish). FMP's own `action`
+# field is unreliable (it tags e.g. Buy→Neutral as "upgrade"), so we derive the
+# direction from the grade text whenever both grades are recognized.
+_GRADE_RANK = {
+    "strong buy": 5, "conviction buy": 5, "top pick": 5,
+    "buy": 4, "outperform": 4, "overweight": 4, "accumulate": 4, "add": 4,
+    "positive": 4, "market outperform": 4, "sector outperform": 4, "speculative buy": 4,
+    "hold": 3, "neutral": 3, "market perform": 3, "sector perform": 3, "perform": 3,
+    "equal weight": 3, "equal-weight": 3, "in-line": 3, "in line": 3, "sector weight": 3,
+    "peer perform": 3, "equalweight": 3,
+    "underperform": 2, "underweight": 2, "reduce": 2, "negative": 2,
+    "sector underperform": 2, "market underperform": 2,
+    "sell": 1, "strong sell": 1, "conviction sell": 1,
+}
+
+
+def _grade_kind(action: str, from_grade: str, to_grade: str) -> "str | None":
+    """Classify a rating action as UPGRADE / DOWNGRADE / INITIATE (or None to drop).
+
+    Prefers the normalized grade ladder over FMP's `action`; falls back to
+    `action` only when a grade isn't in the ladder.
+    """
+    fg, tg = (from_grade or "").lower().strip(), (to_grade or "").lower().strip()
+    if not fg:
+        return "INITIATE"  # no prior grade → new coverage
+    pr, nr = _GRADE_RANK.get(fg), _GRADE_RANK.get(tg)
+    if pr is not None and nr is not None:
+        if nr > pr:
+            return "UPGRADE"
+        if nr < pr:
+            return "DOWNGRADE"
+        return None  # same tier — not a real change
+    return _GRADE_KIND.get((action or "").lower())
 
 
 def _build_market_grades(limit: int) -> dict:
@@ -4071,16 +4104,13 @@ def _build_market_grades(limit: int) -> dict:
 
     out, seen = [], set()
     for it in raw:
-        kind = _GRADE_KIND.get(it.get("action"))
-        if kind is None:
-            continue  # drop holds / reiterations
         tk = it.get("ticker")
         if tk not in names:
             continue  # outside our US universe
-        fg, tg = it.get("from_grade"), it.get("to_grade")
-        if fg and fg == tg:
-            continue  # FMP mislabels some reiterations (e.g. "Buy → Buy") as actions
-        key = (tk, it.get("firm"), tg)
+        kind = _grade_kind(it.get("action"), it.get("from_grade"), it.get("to_grade"))
+        if kind is None:
+            continue  # holds / reiterations / unrankable no-change
+        key = (tk, it.get("firm"), it.get("to_grade"))
         if key in seen:
             continue  # keep only the newest action per firm+grade
         seen.add(key)
@@ -4115,6 +4145,148 @@ def _get_market_grades_cached(limit: int) -> dict:
 def market_grades_top(limit: int = 5):
     """Latest analyst rating actions (upgrades/downgrades/initiations), US-only."""
     return _get_market_grades_cached(limit)
+
+
+# Unified analyst activity — one feed merging rating actions (UPGRADE/DOWNGRADE/
+# INITIATE) and consensus target moves (RAISE-TP/LOWER-TP), each tagged with the
+# company's market cap so the frontend can split into "your stocks" vs "notable"
+# (ranked by size, so it surfaces recognizable names rather than random small caps).
+def _build_market_analyst_activity(limit: int = 50) -> dict:
+    from data import fmp as _fmp
+
+    with engine.connect() as conn:
+        meta = {
+            r[0]: (r[1], r[2])
+            for r in conn.execute(text("""
+                SELECT c.ticker, c.company, f.market_cap
+                FROM companies c
+                LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap
+                           FROM fundamentals GROUP BY ticker) f ON f.ticker = c.ticker
+                WHERE COALESCE(c.market, 'US') = 'US'
+            """)).all()
+        }
+
+    items = []
+
+    # Rating actions (precise timestamps).
+    for it in (_fmp.latest_grades(pages=3) or []):
+        tk = it.get("ticker")
+        if tk not in meta:
+            continue
+        fg, tg = it.get("from_grade"), it.get("to_grade")
+        kind = _grade_kind(it.get("action"), fg, tg)
+        if kind is None:
+            continue
+        items.append({
+            "ticker": tk, "company": meta[tk][0], "market_cap": meta[tk][1],
+            "kind": kind, "firm": it.get("firm") or "",
+            "from_grade": fg or "", "to_grade": tg or "", "price_target": it.get("price_target"),
+            "prev_target": None, "target": None, "change_pct": None,
+            "date": it.get("date") or "",
+        })
+
+    # Consensus target moves (dated to the latest snapshot day). Calls the build
+    # directly — NOT the cached wrapper — because this function already runs while
+    # holding _market_cache_lock, and the cached wrapper would re-acquire that same
+    # (non-reentrant) lock and deadlock. INITIATE-TP rows are dropped as noise.
+    for c in _build_market_analyst_changes(2, 40)["changes"]:
+        if c["kind"] not in ("RAISE-TP", "LOWER-TP"):
+            continue
+        tk = c["ticker"]
+        items.append({
+            "ticker": tk, "company": c["company"], "market_cap": meta.get(tk, (None, None))[1],
+            "kind": c["kind"], "firm": "",
+            "from_grade": "", "to_grade": "", "price_target": None,
+            "prev_target": c["prev_target_mean_price"], "target": c["target_mean_price"],
+            "change_pct": c["change_pct"],
+            "date": c["date"] or "",
+        })
+
+    # Newest-first; dedup per ticker+kind+firm+outcome keeping the most recent.
+    items.sort(key=lambda x: (x["date"], abs(x["change_pct"] or 0)), reverse=True)
+    seen, out = set(), []
+    for x in items:
+        key = (x["ticker"], x["kind"], x["firm"], x["to_grade"] or x["target"])
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(x)
+    return {"activity": out[:limit]}
+
+
+def _get_market_analyst_activity_cached(limit: int) -> dict:
+    # Build OUTSIDE the cache lock: this build is multi-second (3 FMP page fetches
+    # + live snapshot), and holding _market_cache_lock across it would freeze every
+    # other market endpoint (the 3s tape, news, indices…) on each 5-min rebuild.
+    # Two concurrent misses may both build — fine; far better than blocking the page.
+    key = f"analyst-activity:{limit}"
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get(key)
+        if c is not None and now - c["t"] < _ANALYST_CACHE_TTL_SECONDS:
+            return c["data"]
+    data = _build_market_analyst_activity(limit)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
+
+
+@protected.get("/api/market/analyst-activity")
+def market_analyst_activity(limit: int = 50):
+    """Unified analyst-activity feed (ratings + target moves), US-only, with market cap."""
+    return _get_market_analyst_activity_cached(limit)
+
+
+# Per-ticker analyst consensus — the always-available fallback for the "Your stocks"
+# column, so a holding still shows its analyst picture (consensus target + upside vs
+# current price) even when it had no recent rating/target *change* in the feed.
+def _build_market_analyst_consensus(tickers: list) -> dict:
+    tickers = [t for t in dict.fromkeys(tickers) if t]
+    if not tickers:
+        return {"consensus": []}
+    with engine.connect() as conn:
+        names = {
+            r[0]: r[1] for r in conn.execute(
+                text("SELECT ticker, company FROM companies WHERE ticker IN :tks")
+                .bindparams(bindparam("tks", expanding=True)), {"tks": tickers}).all()
+        }
+        targets = {
+            r[0]: r[1] for r in conn.execute(text("""
+                SELECT h.ticker, h.target_mean_price
+                FROM analyst_targets_history h
+                INNER JOIN (SELECT ticker, MAX(date) AS md FROM analyst_targets_history
+                            WHERE ticker IN :tks AND target_mean_price IS NOT NULL
+                            GROUP BY ticker) m ON h.ticker = m.ticker AND h.date = m.md
+                WHERE h.ticker IN :tks
+            """).bindparams(bindparam("tks", expanding=True)), {"tks": tickers}).all()
+        }
+        closes = {
+            r[0]: r[1] for r in conn.execute(text("""
+                SELECT p1.ticker, p1.close FROM daily_prices p1
+                INNER JOIN (SELECT ticker, MAX(date) AS md FROM daily_prices
+                            WHERE ticker IN :tks GROUP BY ticker) p2
+                    ON p1.ticker = p2.ticker AND p1.date = p2.md
+            """).bindparams(bindparam("tks", expanding=True)), {"tks": tickers}).all()
+        }
+    live = _get_live_snapshot()["prices"]
+    out = []
+    for tk in tickers:
+        tp = targets.get(tk)
+        px = live.get(tk) or closes.get(tk)
+        out.append({
+            "ticker": tk,
+            "company": names.get(tk),
+            "target": round(float(tp), 4) if tp is not None else None,
+            "price": round(float(px), 4) if px else None,
+            "upside_pct": round((tp - px) / px * 100, 1) if (tp is not None and px and px > 0) else None,
+        })
+    return {"consensus": out}
+
+
+@protected.get("/api/market/analyst-consensus")
+def market_analyst_consensus(tickers: str = ""):
+    """Consensus target + upside for the given comma-separated tickers (US-only)."""
+    return _build_market_analyst_consensus(tickers.split(",") if tickers else [])
 
 
 # Macro strip (cross-market): currency / yield / crypto. Commodities live in
