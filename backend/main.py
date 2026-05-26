@@ -3345,6 +3345,7 @@ def _build_market_indices() -> dict:
     daily table entry when no live quote is available)."""
     pairs = [(t, t) for t in _INDICES_TICKERS] + [("^VIX", "^VIX")]
     live = _fetch_yf_quotes(pairs) or {}
+    intraday = _get_indices_intraday_cached([t for t, _ in pairs])
     out = []
     with engine.connect() as conn:
         for ticker in _INDICES_TICKERS:
@@ -3352,25 +3353,39 @@ def _build_market_indices() -> dict:
                 "SELECT close FROM index_prices WHERE ticker=:t ORDER BY date DESC LIMIT 30"),
                 {"t": ticker}).fetchall()
             closes = [r[0] for r in rows][::-1]
-            out.append(_index_entry_live(ticker, closes, live.get(ticker)))
+            out.append(_index_entry_live(ticker, closes, live.get(ticker), intraday.get(ticker)))
         vix_rows = conn.execute(text("SELECT close FROM vix ORDER BY date DESC LIMIT 30")).fetchall()
         vix_closes = [r[0] for r in vix_rows][::-1]
-        out.append(_index_entry_live("VIX", vix_closes, live.get("^VIX")))
+        out.append(_index_entry_live("VIX", vix_closes, live.get("^VIX"), intraday.get("^VIX")))
     return {"indices": out}
 
 
-def _index_entry_live(ticker: str, closes: list, live_q: "dict | None") -> dict:
+def _index_entry_live(ticker: str, closes: list, live_q: "dict | None",
+                      intraday: "list | None" = None) -> dict:
     """Like _index_entry but, when a live quote is present, uses its price as the
-    latest value and computes change% vs the live prev_close; the sparkline's last
-    point is replaced with the live price so the card and sparkline agree."""
-    if not closes and not live_q:
+    latest value and computes change% vs the live prev_close.
+
+    Sparkline: TODAY's intraday path when available (so the line's direction
+    matches the day's % — a down day shows a falling line). Prev close is
+    prepended so the drawn move spans yesterday's close → now. Falls back to the
+    30-day daily series when no intraday data exists (e.g. fetch failed)."""
+    if not closes and not live_q and not intraday:
         return {"ticker": ticker, "close": None, "change_pct": None, "sparkline": []}
     if live_q and live_q.get("price"):
         price = live_q["price"]
         prev = live_q.get("prev_close") or (closes[-1] if closes else None)
         change_pct = round((price - prev) / prev * 100, 4) if prev else None
-        spark = (closes[:-1] + [price]) if closes else [price]
+        if intraday:
+            spark = ([prev] if prev else []) + intraday[:-1] + [price]
+        else:
+            spark = (closes[:-1] + [price]) if closes else [price]
         return {"ticker": ticker, "close": price, "change_pct": change_pct, "sparkline": spark}
+    if intraday:
+        last = intraday[-1]
+        prev = (closes[-1] if closes else None) or intraday[0]
+        change_pct = round((last - prev) / prev * 100, 4) if prev else None
+        return {"ticker": ticker, "close": last, "change_pct": change_pct,
+                "sparkline": ([prev] if prev else []) + intraday}
     return _index_entry(ticker, closes)
 
 
@@ -3389,17 +3404,39 @@ def _index_entry(ticker: str, closes: list[float]) -> dict:
     }
 
 
+_INTRADAY_TTL_SECONDS = 300  # intraday 5-min bars don't need 60s freshness
+
+
+def _get_indices_intraday_cached(tickers: list[str]) -> dict:
+    """Cached intraday sparkline series (5-min TTL, built outside the lock). Keeps
+    the slow intraday yfinance call off the 60s indices-refresh cadence so it runs
+    rarely. A transient empty fetch is not cached (so we retry next call)."""
+    now = time.time()
+    with _market_cache_lock:
+        c = _market_cache.get("indices-intraday")
+        if c is not None and now - c["t"] < _INTRADAY_TTL_SECONDS:
+            return c["data"]
+    data = _fetch_yf_intraday(tickers)
+    if data:
+        with _market_cache_lock:
+            _market_cache["indices-intraday"] = {"t": time.time(), "data": data}
+    return data
+
+
 def _get_market_indices_cached() -> dict:
+    # Indices are yfinance-backed (slow fetch, ~15-min delayed, flat pre/post) so
+    # they refresh on the slow cadence — not the 3s live-snapshot path. The build
+    # (two yfinance calls incl. the intraday sparkline, ~3s) runs OUTSIDE the lock
+    # so a rebuild can't block the 3s tape and the other market endpoints.
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("indices")
-        # Indices are yfinance-backed (slow fetch, ~15-min delayed, flat pre/post)
-        # so they refresh on the slow cadence — not the 3s live-snapshot path.
         if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
             return c["data"]
-        data = _build_market_indices()
-        _market_cache["indices"] = {"t": now, "data": data}
-        return data
+    data = _build_market_indices()
+    with _market_cache_lock:
+        _market_cache["indices"] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/indices")
@@ -4338,6 +4375,31 @@ def _fetch_yf_quotes(pairs: list[tuple[str, str]]) -> dict | None:
         except Exception:
             continue
     return out or None
+
+
+def _fetch_yf_intraday(tickers: list[str]) -> dict:
+    """Today's intraday close path per ticker (5-min bars) from yfinance.
+
+    Returns {ticker: [float, ...]} for the most recent trading session; empty
+    dict on failure so the caller falls back to the 30-day daily sparkline.
+    """
+    try:
+        raw = yf.download(" ".join(tickers), period="1d", interval="5m",
+                          auto_adjust=False, progress=False)
+        if raw is None or raw.empty:
+            return {}
+    except Exception:
+        return {}
+    out: dict = {}
+    for t in tickers:
+        try:
+            s = _extract_close_series(raw, t)
+            vals = [float(x) for x in s.tolist() if x == x]  # drop NaNs
+            if vals:
+                out[t] = vals
+        except Exception:
+            continue
+    return out
 
 
 # Back-compat alias — test_market_cross patches this name.
