@@ -13,6 +13,7 @@ import { newsSrc, openUrl, bgImg } from './newsUtil'
 
 export default function NewsFeed() {
   const [limit, setLimit] = useState(100)
+  const [listCount, setListCount] = useState(20)  // More Headlines rows (10 per column)
   const [cat, setCat] = useState('all')       // all | macro | stocks | mine
   const [ticker, setTicker] = useState(null)  // trending-chip filter (overrides cat)
   const [q, setQ] = useState('')              // search text
@@ -71,6 +72,12 @@ export default function NewsFeed() {
     const t = trackRef.current
     if (t) t.scrollBy({ left: dir * t.clientWidth, behavior: 'smooth' })
   }
+  const showMore = () => {
+    if (isFiltered) { setLimit((l) => l + 30); return }   // grid view: fetch more
+    const next = listCount + 20                            // All view: reveal 20 more rows
+    setListCount(next)
+    if (13 + next > limit) setLimit(13 + next + 13)        // keep enough fetched ahead
+  }
 
   if (!news.length) return null
 
@@ -123,14 +130,14 @@ export default function NewsFeed() {
             <>
               <div className="nh-h">More Headlines</div>
               <div className="nh-list">
-                {rest.slice(13).map((n) => <NewsRow key={n.url || n.title} n={n} />)}
+                {rest.slice(13, 13 + listCount).map((n) => <NewsRow key={n.url || n.title} n={n} />)}
               </div>
             </>
           )}
         </>
       )}
 
-      <div className="news-more"><a onClick={() => setLimit((l) => l + 30)}>Show more news →</a></div>
+      <div className="news-more"><a onClick={showMore}>Show more news →</a></div>
     </div>
   )
 }
