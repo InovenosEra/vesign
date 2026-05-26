@@ -3326,33 +3326,38 @@ def _get_live_snapshot() -> dict:
 
 
 def _build_market_indices() -> dict:
-    """Return {indices: [...]} for the 5 headline cards.
-
-    ^GSPC/^NDX/^DJI/^RUT (real index levels) read from index_prices; VIX from the
-    vix table. Both come from yfinance via market_data.update_indices/update_vix.
-    Each entry: {ticker, close, change_pct, sparkline} where sparkline is up to
-    the last 30 closes oldest→newest. close=None when the ticker has no data.
-    """
+    """Headline indices + VIX: 30-day sparkline from index_prices/vix tables,
+    LATEST value + change% overlaid from live yfinance quotes (falls back to the
+    daily table entry when no live quote is available)."""
+    pairs = [(t, t) for t in _INDICES_TICKERS] + [("^VIX", "^VIX")]
+    live = _fetch_yf_quotes(pairs) or {}
     out = []
     with engine.connect() as conn:
         for ticker in _INDICES_TICKERS:
-            rows = conn.execute(
-                text(
-                    "SELECT close FROM index_prices "
-                    "WHERE ticker = :t ORDER BY date DESC LIMIT 30"
-                ),
-                {"t": ticker},
-            ).fetchall()
-            closes = [r[0] for r in rows][::-1]  # oldest → newest
-            out.append(_index_entry(ticker, closes))
-
-        vix_rows = conn.execute(
-            text("SELECT close FROM vix ORDER BY date DESC LIMIT 30")
-        ).fetchall()
+            rows = conn.execute(text(
+                "SELECT close FROM index_prices WHERE ticker=:t ORDER BY date DESC LIMIT 30"),
+                {"t": ticker}).fetchall()
+            closes = [r[0] for r in rows][::-1]
+            out.append(_index_entry_live(ticker, closes, live.get(ticker)))
+        vix_rows = conn.execute(text("SELECT close FROM vix ORDER BY date DESC LIMIT 30")).fetchall()
         vix_closes = [r[0] for r in vix_rows][::-1]
-        out.append(_index_entry("VIX", vix_closes))
-
+        out.append(_index_entry_live("VIX", vix_closes, live.get("^VIX")))
     return {"indices": out}
+
+
+def _index_entry_live(ticker: str, closes: list, live_q: "dict | None") -> dict:
+    """Like _index_entry but, when a live quote is present, uses its price as the
+    latest value and computes change% vs the live prev_close; the sparkline's last
+    point is replaced with the live price so the card and sparkline agree."""
+    if not closes and not live_q:
+        return {"ticker": ticker, "close": None, "change_pct": None, "sparkline": []}
+    if live_q and live_q.get("price"):
+        price = live_q["price"]
+        prev = live_q.get("prev_close") or (closes[-1] if closes else None)
+        change_pct = round((price - prev) / prev * 100, 4) if prev else None
+        spark = (closes[:-1] + [price]) if closes else [price]
+        return {"ticker": ticker, "close": price, "change_pct": change_pct, "sparkline": spark}
+    return _index_entry(ticker, closes)
 
 
 def _index_entry(ticker: str, closes: list[float]) -> dict:
@@ -3374,7 +3379,7 @@ def _get_market_indices_cached() -> dict:
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("indices")
-        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+        if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
         data = _build_market_indices()
         _market_cache["indices"] = {"t": now, "data": data}

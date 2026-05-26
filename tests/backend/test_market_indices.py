@@ -76,7 +76,9 @@ def test_returns_five_indices_with_close_and_change(indices_app):
     _insert_vix(bm, date="2026-05-21 00:00:00", close=17.00)
     _insert_vix(bm, date="2026-05-22 00:00:00", close=16.70)  # -1.7647%
 
-    body = client.get("/api/market/indices").json()
+    from unittest.mock import patch
+    with patch.object(bm, "_fetch_yf_quotes", return_value={}):
+        body = client.get("/api/market/indices").json()
     by = {row["ticker"]: row for row in body["indices"]}
     assert set(by.keys()) == {"^GSPC", "^NDX", "^DJI", "^RUT", "VIX"}
     assert by["^GSPC"]["close"] == pytest.approx(7470.0)
@@ -92,7 +94,9 @@ def test_sparkline_is_chronological_and_capped_at_30(indices_app):
         date = f"2026-04-{i+1:02d} 00:00:00" if i < 30 else f"2026-05-{i-29:02d} 00:00:00"
         _insert_price(bm, date=date, ticker="^GSPC", close=100.0 + i)
 
-    spy = next(r for r in client.get("/api/market/indices").json()["indices"] if r["ticker"] == "^GSPC")
+    from unittest.mock import patch
+    with patch.object(bm, "_fetch_yf_quotes", return_value={}):
+        spy = next(r for r in client.get("/api/market/indices").json()["indices"] if r["ticker"] == "^GSPC")
     spark = spy["sparkline"]
     assert len(spark) == 30
     assert spark == sorted(spark)
@@ -103,7 +107,9 @@ def test_sparkline_is_chronological_and_capped_at_30(indices_app):
 def test_missing_ticker_returns_null_close(indices_app):
     bm, client = indices_app
     _insert_price(bm, date="2026-05-22 00:00:00", ticker="^GSPC", close=7470.0)
-    body = client.get("/api/market/indices").json()
+    from unittest.mock import patch
+    with patch.object(bm, "_fetch_yf_quotes", return_value={}):
+        body = client.get("/api/market/indices").json()
     by = {row["ticker"]: row for row in body["indices"]}
     assert set(by.keys()) == {"^GSPC", "^NDX", "^DJI", "^RUT", "VIX"}
     assert by["^NDX"]["close"] is None
@@ -115,7 +121,29 @@ def test_missing_ticker_returns_null_close(indices_app):
 def test_change_pct_null_with_single_day(indices_app):
     bm, client = indices_app
     _insert_price(bm, date="2026-05-22 00:00:00", ticker="^GSPC", close=7470.0)
-    spy = next(r for r in client.get("/api/market/indices").json()["indices"] if r["ticker"] == "^GSPC")
+    from unittest.mock import patch
+    with patch.object(bm, "_fetch_yf_quotes", return_value={}):
+        spy = next(r for r in client.get("/api/market/indices").json()["indices"] if r["ticker"] == "^GSPC")
     assert spy["close"] == pytest.approx(7470.0)
     assert spy["change_pct"] is None
     assert spy["sparkline"] == [7470.0]
+
+
+def test_indices_latest_from_live_yf(indices_app):
+    bm, client = indices_app
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        for d, c in [("2026-05-21 00:00:00", 7000.0), ("2026-05-22 00:00:00", 7100.0)]:
+            conn.execute(text("INSERT INTO index_prices (date,ticker,close) VALUES (:d,'^GSPC',:c)"), {"d": d, "c": c})
+        conn.execute(text("INSERT INTO vix (date, close) VALUES ('2026-05-22 00:00:00', 18.0)"))
+    live = {"^GSPC": {"price": 7150.0, "prev_close": 7100.0},
+            "^NDX": {"price": 1.0, "prev_close": 1.0}, "^DJI": {"price": 1.0, "prev_close": 1.0},
+            "^RUT": {"price": 1.0, "prev_close": 1.0}, "^VIX": {"price": 18.5, "prev_close": 18.0}}
+    from unittest.mock import patch
+    with patch.object(bm, "_fetch_yf_quotes", return_value=live):
+        idx = client.get("/api/market/indices").json()["indices"]
+    gspc = next(i for i in idx if i["ticker"] == "^GSPC")
+    assert gspc["close"] == 7150.0                       # live, not the 7100 table close
+    assert round(gspc["change_pct"], 4) == round((7150 - 7100) / 7100 * 100, 4)
+    assert len(gspc["sparkline"]) >= 2                   # sparkline still from table
+    assert gspc["sparkline"][-1] == 7150.0               # last point replaced with live price
