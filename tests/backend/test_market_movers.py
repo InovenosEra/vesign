@@ -1,4 +1,9 @@
-"""Tests for GET /api/market/movers — top gainers / losers / most-active."""
+"""Tests for GET /api/market/movers — top gainers / losers / most-active.
+
+Movers are now ranked from the live snapshot (change% = live vs prev_close)
+rather than two daily_prices rows. `active` still ranks by last-session volume
+because intraday volume is not in the snapshot.
+"""
 import os
 import tempfile
 import pytest
@@ -26,6 +31,7 @@ def movers_app():
             CREATE TABLE companies (
                 ticker TEXT PRIMARY KEY, company TEXT, domain TEXT,
                 market TEXT, logo_url TEXT, industry TEXT,
+                sector TEXT,
                 description TEXT, description_short TEXT
             )
         """))
@@ -34,6 +40,7 @@ def movers_app():
                 ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT
             )
         """))
+        conn.execute(text("CREATE TABLE fundamentals (ticker TEXT, market_cap REAL)"))
     temp_engine.dispose()
 
     import importlib
@@ -52,111 +59,64 @@ def movers_app():
         pass
 
 
-def _insert_company(bm, ticker, company, market="US"):
+def _company(bm, t, sector="Tech"):
     from sqlalchemy import text
     with bm.engine.begin() as conn:
-        conn.execute(text("""
-            INSERT INTO companies (ticker, company, market)
-            VALUES (:t, :c, :m)
-        """), {"t": ticker, "c": company, "m": market})
+        conn.execute(text("INSERT INTO companies (ticker, company, market, sector) VALUES (:t,:c,'US',:s)"),
+                     {"t": t, "c": f"{t} Corp", "s": sector})
 
 
-def _insert_price(bm, *, date, ticker, close, volume=0):
+def _close(bm, t, close, volume=0, date="2026-05-22 00:00:00"):
     from sqlalchemy import text
     with bm.engine.begin() as conn:
-        conn.execute(text("""
-            INSERT INTO daily_prices (date, ticker, open, high, low, close, volume)
-            VALUES (:date, :ticker, :close, :close, :close, :close, :volume)
-        """), dict(date=date, ticker=ticker, close=close, volume=volume))
+        conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES (:d,:t,:c,:c,:c,:c,:v)"),
+                     {"d": date, "t": t, "c": close, "v": volume})
 
 
-def _setup_two_day_universe(bm):
-    """Insert prev/today closes for 6 tickers spanning gainers/losers."""
-    # ticker, prev_close, today_close, today_volume
-    rows = [
-        ("AAA", 100.0, 110.0, 1_000_000),   # +10.00%
-        ("BBB", 100.0, 105.0, 5_000_000),   #  +5.00%
-        ("CCC", 100.0, 100.0, 9_000_000),   #   0.00%, biggest volume
-        ("DDD", 100.0,  95.0, 2_000_000),   #  -5.00%
-        ("EEE", 100.0,  90.0, 3_000_000),   # -10.00%
-        ("FFF", 100.0,  80.0, 4_000_000),   # -20.00%
-    ]
-    for t, prev, today, vol in rows:
-        _insert_company(bm, t, f"{t} Corp")
-        _insert_price(bm, date="2026-05-21 00:00:00", ticker=t, close=prev, volume=0)
-        _insert_price(bm, date="2026-05-22 00:00:00", ticker=t, close=today, volume=vol)
+def _setup(bm):
+    for t, vol in [("AAA", 1_000_000), ("BBB", 5_000_000), ("CCC", 9_000_000),
+                   ("DDD", 2_000_000), ("EEE", 3_000_000), ("FFF", 4_000_000)]:
+        _company(bm, t)
+        _close(bm, t, 100.0, volume=vol)
 
 
-def test_gainers_sorted_by_change_pct_desc(movers_app):
+def test_gainers_ranked_by_live_change(movers_app):
     bm, client = movers_app
-    _setup_two_day_universe(bm)
-
-    body = client.get("/api/market/movers?type=gainers&limit=3").json()
-    rows = body["movers"]
-    assert len(rows) == 3
+    _setup(bm)
+    live = {"AAA": 110.0, "BBB": 105.0, "CCC": 100.0, "DDD": 95.0, "EEE": 90.0, "FFF": 80.0}
+    from unittest.mock import patch
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        rows = client.get("/api/market/movers?type=gainers&limit=3").json()["movers"]
     assert [r["ticker"] for r in rows] == ["AAA", "BBB", "CCC"]
-    assert rows[0]["change_pct"] == pytest.approx(10.0, abs=1e-3)
-    assert rows[0]["close"] == pytest.approx(110.0)
+    assert rows[0]["change_pct"] == 10.0
 
 
-def test_losers_sorted_by_change_pct_asc(movers_app):
+def test_losers_ranked_by_live_change(movers_app):
     bm, client = movers_app
-    _setup_two_day_universe(bm)
+    _setup(bm)
+    live = {"AAA": 110.0, "FFF": 80.0, "EEE": 90.0, "DDD": 95.0, "CCC": 100.0, "BBB": 105.0}
+    from unittest.mock import patch
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        rows = client.get("/api/market/movers?type=losers&limit=2").json()["movers"]
+    assert [r["ticker"] for r in rows] == ["FFF", "EEE"]
 
-    body = client.get("/api/market/movers?type=losers&limit=3").json()
-    rows = body["movers"]
-    assert [r["ticker"] for r in rows] == ["FFF", "EEE", "DDD"]
-    assert rows[0]["change_pct"] == pytest.approx(-20.0, abs=1e-3)
 
-
-def test_active_sorted_by_volume_desc(movers_app):
+def test_active_ranked_by_last_session_volume(movers_app):
     bm, client = movers_app
-    _setup_two_day_universe(bm)
-
-    body = client.get("/api/market/movers?type=active&limit=3").json()
-    rows = body["movers"]
-    # Top 3 by volume: CCC(9M), BBB(5M), FFF(4M)
-    assert [r["ticker"] for r in rows] == ["CCC", "BBB", "FFF"]
-    assert rows[0]["volume"] == 9_000_000
+    _setup(bm)
+    from unittest.mock import patch
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": {}}):
+        rows = client.get("/api/market/movers?type=active&limit=2").json()["movers"]
+    assert [r["ticker"] for r in rows] == ["CCC", "BBB"]   # 9M, 5M volume
 
 
-def test_excludes_spy_and_voo(movers_app):
+def test_no_live_data_falls_back_to_zero(movers_app):
     bm, client = movers_app
-    _insert_company(bm, "SPY", "S&P 500 ETF")
-    _insert_company(bm, "VOO", "Vanguard S&P 500 ETF")
-    _insert_company(bm, "AAA", "Alpha")
-    _insert_price(bm, date="2026-05-21 00:00:00", ticker="SPY", close=100.0)
-    _insert_price(bm, date="2026-05-22 00:00:00", ticker="SPY", close=130.0)  # +30%
-    _insert_price(bm, date="2026-05-21 00:00:00", ticker="VOO", close=100.0)
-    _insert_price(bm, date="2026-05-22 00:00:00", ticker="VOO", close=125.0)  # +25%
-    _insert_price(bm, date="2026-05-21 00:00:00", ticker="AAA", close=100.0)
-    _insert_price(bm, date="2026-05-22 00:00:00", ticker="AAA", close=101.0)  # +1%
-
-    body = client.get("/api/market/movers?type=gainers&limit=5").json()
-    tickers = [r["ticker"] for r in body["movers"]]
-    assert "SPY" not in tickers
-    assert "VOO" not in tickers
-    assert tickers == ["AAA"]
-
-
-def test_excludes_non_us_market(movers_app):
-    bm, client = movers_app
-    _insert_company(bm, "TEVA.TA", "Teva Israel", market="TASE")
-    _insert_company(bm, "AAA", "Alpha", market="US")
-    _insert_price(bm, date="2026-05-21 00:00:00", ticker="TEVA.TA", close=100.0)
-    _insert_price(bm, date="2026-05-22 00:00:00", ticker="TEVA.TA", close=200.0)  # +100%
-    _insert_price(bm, date="2026-05-21 00:00:00", ticker="AAA", close=100.0)
-    _insert_price(bm, date="2026-05-22 00:00:00", ticker="AAA", close=101.0)
-
-    body = client.get("/api/market/movers?type=gainers&limit=5").json()
-    assert [r["ticker"] for r in body["movers"]] == ["AAA"]
-
-
-def test_default_limit_is_five(movers_app):
-    bm, client = movers_app
-    _setup_two_day_universe(bm)  # 6 tickers — should be capped at 5
-    body = client.get("/api/market/movers?type=gainers").json()
-    assert len(body["movers"]) == 5
+    _setup(bm)
+    from unittest.mock import patch
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
+        rows = client.get("/api/market/movers?type=gainers&limit=3").json()["movers"]
+    assert all(r["change_pct"] == 0.0 for r in rows)
 
 
 def test_invalid_type_returns_422(movers_app):

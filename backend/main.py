@@ -3205,6 +3205,7 @@ _INDICES_TICKERS = ["^GSPC", "^NDX", "^DJI", "^RUT"]  # real index levels; VIX s
 _market_cache: dict[str, dict] = {}
 _market_cache_lock = threading.Lock()
 _MARKET_TTL_SECONDS = 60
+_LIVE_PANEL_TTL = 3   # seconds — price-driven panels refresh fast (live snapshot)
 
 # --- Live universe baseline (rebuilt once per trading day) -------------------
 _baseline_cache: dict[str, dict] = {}
@@ -3376,50 +3377,27 @@ _MOVERS_EXCLUDE = ("SPY", "VOO")  # ETFs/funds shouldn't crowd the top movers pa
 
 
 def _build_market_movers(mover_type: str, limit: int) -> dict:
-    """Top N US tickers ranked by 1-day change % (gainers/losers) or volume (active)."""
-    sort_clause = {
-        "gainers": "change_pct DESC NULLS LAST",
-        "losers":  "change_pct ASC NULLS LAST",
-        "active":  "today.volume DESC NULLS LAST",
-    }[mover_type]
-    sql = text(f"""
-        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
-        prev_bounds AS (
-            SELECT MAX(dp.date) AS prev
-            FROM daily_prices dp, bounds b
-            WHERE dp.date < b.today
-        )
-        SELECT
-            today.ticker, c.company, today.close, today.volume,
-            CASE
-              WHEN prev.close IS NULL OR prev.close = 0 THEN NULL
-              ELSE ROUND((today.close - prev.close) / prev.close * 100.0, 4)
-            END AS change_pct
-        FROM daily_prices today
-        JOIN bounds b ON today.date = b.today
-        LEFT JOIN daily_prices prev
-          ON prev.ticker = today.ticker
-         AND prev.date = (SELECT prev FROM prev_bounds)
-        JOIN companies c ON c.ticker = today.ticker
-        WHERE COALESCE(c.market, 'US') = 'US'
-          AND today.ticker NOT IN :exclude
-        ORDER BY {sort_clause}
-        LIMIT :limit
-    """).bindparams(bindparam("exclude", expanding=True))
-    with engine.connect() as conn:
-        rows = conn.execute(sql, {"exclude": list(_MOVERS_EXCLUDE), "limit": limit}).mappings().all()
-    return {
-        "movers": [
-            {
-                "ticker": r["ticker"],
-                "company": r["company"],
-                "close": r["close"],
-                "volume": r["volume"],
-                "change_pct": r["change_pct"],
-            }
-            for r in rows
-        ]
-    }
+    """Top N US tickers ranked by LIVE change % (gainers/losers) or last-session
+    volume (active). change% = live price (snapshot) vs prev close; tickers with
+    no live print sit at 0%. (Intraday volume is not in the snapshot, so 'active'
+    ranks by the last completed session's volume.)"""
+    rows = live_snapshot.compute_universe_rows(
+        _get_live_snapshot()["prices"], _get_universe_baseline())
+    rows = [r for r in rows if r["ticker"] not in _MOVERS_EXCLUDE]
+    if mover_type == "gainers":
+        rows = [r for r in rows if r["change_pct"] is not None]
+        rows.sort(key=lambda r: r["change_pct"], reverse=True)
+    elif mover_type == "losers":
+        rows = [r for r in rows if r["change_pct"] is not None]
+        rows.sort(key=lambda r: r["change_pct"])
+    else:  # active
+        rows.sort(key=lambda r: (r["volume"] or 0), reverse=True)
+    out = rows[:limit]
+    return {"movers": [
+        {"ticker": r["ticker"], "company": r["company"],
+         "close": r["price"], "volume": r["volume"], "change_pct": r["change_pct"]}
+        for r in out
+    ]}
 
 
 def _get_market_movers_cached(mover_type: str, limit: int) -> dict:
@@ -3427,7 +3405,7 @@ def _get_market_movers_cached(mover_type: str, limit: int) -> dict:
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
-        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+        if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
         data = _build_market_movers(mover_type, limit)
         _market_cache[key] = {"t": now, "data": data}
