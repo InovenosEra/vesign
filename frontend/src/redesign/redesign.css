@@ -385,8 +385,16 @@
   .rd .news-hero .img { height: 270px; border-radius: 10px; background: var(--bg-3) center / cover no-repeat; flex-shrink: 0; }
   .rd .news-hero .h-title { font-size: 23px; font-weight: 700; color: var(--ink); line-height: 1.22; letter-spacing: -0.01em; }
   .rd .news-hero:hover .h-title { color: var(--blue-2); }
-  .rd .news-hero .h-summary { margin-top: 12px; font-size: 13.5px; color: var(--ink-2); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-  .rd .news-hero .h-src { margin-top: 12px; font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); }
+  .rd .news-hero .content { display: flex; flex-direction: column; }
+  .rd .news-hero .h-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); margin-bottom: 11px; }
+  .rd .news-hero .h-ticker { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; }
+  .rd .news-hero .h-ticker img { width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: #fff; }
+  .rd .news-hero .h-ticker span { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--blue-2); }
+  .rd .news-hero .h-summary { margin-top: 12px; font-size: 14px; color: var(--ink-2); line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+  .rd .news-hero .h-foot { margin-top: auto; padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .rd .news-hero .h-src { font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); }
+  .rd .news-hero .h-read { font-size: 12.5px; font-weight: 600; color: var(--blue-2); white-space: nowrap; }
+  .rd .news-hero:hover .h-read { color: #93c5fd; }
   .rd .news-carousel { position: relative; }
   .rd .news-cards { display: flex; gap: 16px; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; padding: 2px; scroll-snap-type: x mandatory; }
   .rd .news-cards::-webkit-scrollbar { display: none; }

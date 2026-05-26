@@ -96,9 +96,19 @@ export default function NewsFeed() {
           <div className="news-hero" onClick={() => openUrl(hero.url)}>
             <div className="img" style={bgImg(hero.image)} />
             <div className="content">
+              <div className="h-eyebrow">Top Story</div>
               <div className="h-title">{hero.title}</div>
+              {hero.ticker && (
+                <div className="h-ticker">
+                  <img src={`/logos/${hero.ticker}.png`} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                  <span>{hero.ticker}</span>
+                </div>
+              )}
               {hero.summary && <div className="h-summary">{hero.summary}</div>}
-              <div className="h-src">{newsSrc(hero)}</div>
+              <div className="h-foot">
+                <span className="h-src">{newsSrc(hero)}</span>
+                <span className="h-read">Read full article →</span>
+              </div>
             </div>
           </div>
           <div className="news-carousel">
