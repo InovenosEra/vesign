@@ -43,3 +43,22 @@ def test_baseline_prev_close_is_latest_session_and_meta(base_app):
     assert base["AAA"]["market_cap"] == 1000
     assert base["AAA"]["hi52"] == 120.0
     assert base["AAA"]["lo52"] == 90.0
+
+
+def test_baseline_cache_returns_same_object_on_second_call(base_app):
+    bm, _ = base_app
+    first = bm._get_universe_baseline()
+    second = bm._get_universe_baseline()
+    assert first is second          # served from cache, not rebuilt
+
+
+def test_baseline_includes_ticker_with_null_market_cap(base_app):
+    bm, _ = base_app
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        # US ticker with a price row but NO fundamentals row -> market_cap None
+        conn.execute(text("INSERT INTO companies (ticker, company, sector, market) VALUES ('NMC','No MarketCap','Tech','US')"))
+        conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00','NMC',50,50,50,50,1)"))
+    base = bm._get_universe_baseline()
+    assert "NMC" in base
+    assert base["NMC"]["market_cap"] is None

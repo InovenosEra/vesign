@@ -3198,7 +3198,7 @@ _market_cache_lock = threading.Lock()
 _MARKET_TTL_SECONDS = 60
 
 # --- Live universe baseline (rebuilt once per trading day) -------------------
-_baseline_cache: dict = {}
+_baseline_cache: dict[str, dict] = {}
 _baseline_date = None
 _baseline_lock = threading.Lock()
 
@@ -3220,6 +3220,7 @@ def _build_universe_baseline() -> dict:
             FROM daily_prices WHERE date >= (SELECT start FROM win)
             GROUP BY ticker
         ),
+        -- dedup: fundamentals has no UNIQUE(ticker); MAX avoids row-multiplication, cap staleness is immaterial for weighting
         mc AS (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker)
         SELECT c.ticker, c.company, c.sector, c.logo_url,
                mc.market_cap AS market_cap,
@@ -3243,7 +3244,7 @@ def _build_universe_baseline() -> dict:
     return out
 
 
-def _latest_price_date():
+def _latest_price_date() -> "str | None":
     with engine.connect() as conn:
         return conn.execute(text("SELECT MAX(date) FROM daily_prices")).scalar()
 
@@ -3251,8 +3252,8 @@ def _latest_price_date():
 def _get_universe_baseline() -> dict:
     """Daily-cached baseline; rebuilds when MAX(daily_prices.date) advances."""
     global _baseline_cache, _baseline_date
-    latest = _latest_price_date()
     with _baseline_lock:
+        latest = _latest_price_date()
         if _baseline_date != latest or not _baseline_cache:
             _baseline_cache = _build_universe_baseline()
             _baseline_date = latest
