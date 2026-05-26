@@ -4209,7 +4209,7 @@ def _fetch_top_news(limit: int) -> list | None:
     de-dupes and sorts the pool strictly newest-first. Returns the combined list,
     or None if every feed fails."""
     from data import fmp as _fmp
-    per_feed = min(max(limit, 60), 100)  # over-fetch so the merge has enough to sort
+    per_feed = min(max(limit, 60), 200)  # over-fetch so the merge has enough to sort
     items: list = []
     any_ok = False
     for ep in _NEWS_FEEDS:
