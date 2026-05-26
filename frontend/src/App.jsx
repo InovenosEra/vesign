@@ -657,7 +657,7 @@ function AppLayout() {
                 <Suspense fallback={<PageFallback />}>
                   <Routes>
                     <Route path="/market" element={<AppShell><MarketPage /></AppShell>} />
-                    <Route path="/" element={<Navigate to="/signals" replace />} />
+                    <Route path="/" element={<Navigate to="/market" replace />} />
                     <Route path="/signals" element={<AppShell><RdSignalsPage /></AppShell>} />
                     <Route path="/portfolio" element={<AppShell><RdPortfolioPage /></AppShell>} />
                     <Route path="/research" element={<AppShell><RdResearchPage /></AppShell>} />

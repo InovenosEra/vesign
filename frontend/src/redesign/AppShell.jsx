@@ -154,7 +154,7 @@ export default function AppShell({ children }) {
       <Tape />
       <div className="top">
         <div className="top-left">
-          <div className="logo">
+          <NavLink to="/market" className="logo" style={{ textDecoration: 'none', color: 'inherit' }}>
             <svg className="logo-mark" viewBox="0 0 100 100" fill="none" aria-label="VeSign">
               <defs>
                 <linearGradient id="rd-grad-nav" x1="50" y1="0" x2="50" y2="100" gradientUnits="userSpaceOnUse">
@@ -170,7 +170,7 @@ export default function AppShell({ children }) {
               <path d="M28 24 Q50 6 72 24" stroke="url(#rd-grad-nav)" strokeWidth="1.8" fill="none" opacity="0.7" />
             </svg>
             <div className="logo-text">VeSign</div>
-          </div>
+          </NavLink>
           <nav className="nav">
             <NavLink to="/market">Market</NavLink>
             <NavLink to="/signals">Signals</NavLink>
