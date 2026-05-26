@@ -10,7 +10,7 @@ export default function Commodities() {
   if (!rows.length) return null
   return (
     <>
-      <div className="section-h"><h2>Commodities</h2><span className="sub">Futures · last close</span></div>
+      <div className="section-h"><h2>Commodities</h2><span className="sub">Futures · delayed</span></div>
       <div className="cross-market" style={{ gridTemplateColumns: `repeat(${rows.length}, 1fr)` }}>
         {rows.map((r, i) => (
           <div className="cm-cell" key={i}>

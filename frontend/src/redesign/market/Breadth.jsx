@@ -40,7 +40,7 @@ export default function Breadth() {
 
   return (
     <>
-      <div className="section-h"><h2>Market Breadth</h2><span className="sub">US market · last close</span></div>
+      <div className="section-h"><h2>Market Breadth</h2><span className="sub">US market · live</span></div>
       <div className="breadth">
         <Cell label="Advancers / Decliners"
           up={adv} down={dec} leftNum={`${fmtN(adv)} advancing`} rightNum={`${fmtN(dec)} declining`} />
