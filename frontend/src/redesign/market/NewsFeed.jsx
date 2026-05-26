@@ -121,8 +121,8 @@ export default function NewsFeed() {
           </div>
           {rest.length > 13 && (
             <>
-              <div className="news-list-h">More Headlines</div>
-              <div className="news-list">
+              <div className="nh-h">More Headlines</div>
+              <div className="nh-list">
                 {rest.slice(13).map((n) => <NewsRow key={n.url || n.title} n={n} />)}
               </div>
             </>
