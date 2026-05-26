@@ -390,7 +390,7 @@
   .rd .news-carousel { position: relative; }
   .rd .news-cards { display: flex; gap: 16px; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; padding: 2px; scroll-snap-type: x mandatory; }
   .rd .news-cards::-webkit-scrollbar { display: none; }
-  .rd .news-card { flex: 0 0 calc((100% - 80px) / 6); cursor: pointer; scroll-snap-align: start; }
+  .rd .news-card { flex: 0 0 calc((100% - 96px) / 7); cursor: pointer; scroll-snap-align: start; }
   .rd .news-card .img { height: 190px; border-radius: 8px; background: var(--bg-3) center / cover no-repeat; }
   .rd .news-card .c-title { margin-top: 10px; font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .rd .news-card:hover .c-title { color: var(--blue-2); }
