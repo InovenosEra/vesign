@@ -160,3 +160,26 @@ def test_skips_sectors_with_null_label(sectors_app):
 
     body = client.get("/api/market/sectors").json()
     assert body["sectors"] == []
+
+
+def _seed_live(bm):
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        for t, sector, mc in [("AAA", "Tech", 1000), ("BBB", "Tech", 1000), ("CCC", "Energy", 500)]:
+            conn.execute(text("INSERT INTO companies (ticker,company,sector,market) VALUES (:t,:c,:s,'US')"),
+                         {"t": t, "c": f"{t} Corp", "s": sector})
+            conn.execute(text("INSERT INTO fundamentals (ticker, market_cap) VALUES (:t,:mc)"), {"t": t, "mc": mc})
+            conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00',:t,100,100,100,100,1)"),
+                         {"t": t})
+
+
+def test_sector_change_uses_live_prices(sectors_app):
+    bm, client = sectors_app
+    _seed_live(bm)
+    live = {"AAA": 110.0, "BBB": 110.0, "CCC": 90.0}   # Tech +10%, Energy -10%
+    from unittest.mock import patch
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        sectors = client.get("/api/market/sectors").json()["sectors"]
+    by = {s["sector"]: s for s in sectors}
+    assert round(by["Tech"]["change_pct"], 2) == 10.0
+    assert round(by["Energy"]["change_pct"], 2) == -10.0

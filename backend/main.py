@@ -3665,32 +3665,18 @@ def market_breadth():
 
 
 def _build_market_sectors() -> dict:
-    """Per-sector market-cap-weighted % change + top-3 movers by absolute change."""
-    sql = text("""
-        WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
-        prev_bounds AS (
-            SELECT MAX(dp.date) AS prev
-            FROM daily_prices dp, bounds b WHERE dp.date < b.today
-        ),
-        ticker_change AS (
-            SELECT
-                c.ticker, c.sector, f.market_cap,
-                ((t.close - p.close) / p.close * 100.0) AS change_pct
-            FROM companies c
-            JOIN daily_prices t
-              ON t.ticker = c.ticker AND t.date = (SELECT today FROM bounds)
-            JOIN daily_prices p
-              ON p.ticker = c.ticker AND p.date = (SELECT prev FROM prev_bounds)
-            JOIN fundamentals f ON f.ticker = c.ticker
-            WHERE COALESCE(c.market, 'US') = 'US'
-              AND c.sector IS NOT NULL
-              AND f.market_cap IS NOT NULL
-              AND f.market_cap > 0
-              AND p.close IS NOT NULL AND p.close <> 0
-        )
-        SELECT ticker, sector, market_cap, change_pct
-        FROM ticker_change
-    """)
+    """Per-sector market-cap-weighted % change (from live snapshot) + top-3 movers by absolute change."""
+    # Live per-ticker change from the shared snapshot + baseline (was a two-row
+    # daily_prices delta). Keep only US tickers that have a sector, a market cap,
+    # and a computable change — matching the old query's WHERE clauses.
+    uni = live_snapshot.compute_universe_rows(
+        _get_live_snapshot()["prices"], _get_universe_baseline())
+    rows = [
+        {"ticker": r["ticker"], "sector": r["sector"],
+         "market_cap": r["market_cap"], "change_pct": r["change_pct"]}
+        for r in uni
+        if r["sector"] and r["market_cap"] and r["change_pct"] is not None
+    ]
     # ~30-day cap-weighted normalized index per sector, for the tile sparkline.
     spark_sql = text("""
         WITH last_dates AS (
@@ -3707,7 +3693,6 @@ def _build_market_sectors() -> dict:
           AND dp.close IS NOT NULL
     """)
     with engine.connect() as conn:
-        rows = conn.execute(sql).mappings().all()
         sdf = pd.read_sql(spark_sql, conn)
 
     spark_by_sector: dict[str, list[float]] = {}
@@ -3768,7 +3753,7 @@ def _get_market_sectors_cached() -> dict:
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("sectors")
-        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+        if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
         data = _build_market_sectors()
         _market_cache["sectors"] = {"t": now, "data": data}
