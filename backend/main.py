@@ -3868,23 +3868,17 @@ def _build_market_tape() -> dict:
     next company by market cap fills its slot. close/change are the last-close
     and prior-close on the global trading dates.
     """
-    out = []
     with engine.connect() as conn:
         ranked = conn.execute(
             text("""
-                WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
-                prev_bounds AS (
-                    SELECT MAX(d.date) AS prev FROM daily_prices d, bounds b
-                    WHERE d.date < b.today
-                )
-                SELECT f.ticker, c.company, t.close AS close, pv.close AS prev_close
+                WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices)
+                SELECT f.ticker, c.company
                 FROM (
                     SELECT ticker, MAX(market_cap) AS market_cap
                     FROM fundamentals GROUP BY ticker
                 ) f
                 JOIN companies c ON c.ticker = f.ticker
                 JOIN daily_prices t ON t.ticker = f.ticker AND t.date = (SELECT today FROM bounds)
-                LEFT JOIN daily_prices pv ON pv.ticker = f.ticker AND pv.date = (SELECT prev FROM prev_bounds)
                 WHERE f.market_cap IS NOT NULL
                   AND c.market = 'US'
                   AND COALESCE(c.sector, '') != 'ETF'
@@ -3892,20 +3886,28 @@ def _build_market_tape() -> dict:
             """)
         ).fetchall()
 
-        # Walk cap-descending, keeping one ticker per company (first seen = highest
-        # cap), until we have _TAPE_LIMIT distinct companies.
-        seen = set()
-        for ticker, company, close, prev_close in ranked:
-            key = re.sub(r"\s*\(Class [^)]*\)\s*$", "", company or ticker).strip()
-            if key in seen:
-                continue
-            seen.add(key)
-            change_pct = None
-            if prev_close not in (None, 0) and close is not None:
-                change_pct = round((close - prev_close) / prev_close * 100, 4)
-            out.append({"ticker": ticker, "close": close, "change_pct": change_pct})
-            if len(out) >= _TAPE_LIMIT:
-                break
+    # Price + change come from the shared live snapshot vs the daily baseline
+    # (prev_close = latest completed session) — identical basis to the movers /
+    # breadth panels, so a ticker reads the same % everywhere.
+    snap = _get_live_snapshot()["prices"]
+    base = _get_universe_baseline()
+    out = []
+    seen = set()
+    for ticker, company in ranked:
+        key = re.sub(r"\s*\(Class [^)]*\)\s*$", "", company or ticker).strip()
+        if key in seen:
+            continue
+        meta = base.get(ticker)
+        if not meta:
+            continue
+        seen.add(key)
+        prev = meta["prev_close"]
+        live = snap.get(ticker)
+        price = live if live else prev
+        change_pct = round((price - prev) / prev * 100, 4) if prev else None
+        out.append({"ticker": ticker, "close": price, "change_pct": change_pct})
+        if len(out) >= _TAPE_LIMIT:
+            break
     return {"tape": out}
 
 
@@ -3913,7 +3915,7 @@ def _get_market_tape_cached() -> dict:
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("tape")
-        if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
+        if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
         data = _build_market_tape()
         _market_cache["tape"] = {"t": now, "data": data}

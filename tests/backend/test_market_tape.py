@@ -53,7 +53,11 @@ def tape_app():
     import importlib
     import backend.main as bm
     importlib.reload(bm)
-    yield bm, TestClient(bm.app)
+    from unittest.mock import patch
+    # Default: empty live snapshot so selection tests are hermetic (no real FMP
+    # fetch) and deterministic. Tests asserting change% re-patch with prices.
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": {}}):
+        yield bm, TestClient(bm.app)
 
     for fname in os.listdir(tmpdir):
         try:
@@ -93,15 +97,20 @@ def _insert_company(bm, *, ticker, company=None, sector="Information Technology"
 
 def test_tape_returns_top_stocks_ordered_by_market_cap(tape_app):
     bm, client = tape_app
+    from unittest.mock import patch
     # Three stocks, descending cap order is MID > BIG > SMALL by mcap value below.
     _insert_company(bm, ticker="BIG", market_cap=2_000e9)
     _insert_company(bm, ticker="MID", market_cap=5_000e9)   # largest
     _insert_company(bm, ticker="SMALL", market_cap=100e9)
-    _insert_two_day(bm, ticker="MID", prev=100.0, today=102.0)   # +2.0
-    _insert_two_day(bm, ticker="BIG", prev=300.0, today=297.0)   # -1.0
-    _insert_two_day(bm, ticker="SMALL", prev=50.0, today=50.5)   # +1.0
+    # baseline prev_close = latest session close (MAX date); the live snapshot
+    # supplies the current price, change% = (live - prev_close)/prev_close.
+    _insert_two_day(bm, ticker="MID", prev=100.0, today=100.0)
+    _insert_two_day(bm, ticker="BIG", prev=300.0, today=300.0)
+    _insert_two_day(bm, ticker="SMALL", prev=50.0, today=50.0)
+    live = {"MID": 102.0, "BIG": 297.0, "SMALL": 50.5}   # +2.0%, -1.0%, +1.0%
 
-    items = client.get("/api/market/tape").json()["tape"]
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": live}):
+        items = client.get("/api/market/tape").json()["tape"]
     assert [r["ticker"] for r in items] == ["MID", "BIG", "SMALL"]  # cap desc
 
     by = {r["ticker"]: r for r in items}
