@@ -1,5 +1,6 @@
 import base64
 import bisect
+import logging
 import math
 import os
 import threading
@@ -487,6 +488,14 @@ def fetch_aftermarket_trades(tickers: list[str]) -> dict:
     if not tickers:
         return {}
     return _amt(tickers)
+
+
+def fetch_aftermarket_quotes(tickers: list[str]) -> dict:
+    """Wraps data.fmp.batch_aftermarket_quotes for testability."""
+    from data.fmp import batch_aftermarket_quotes as _baq
+    if not tickers:
+        return {}
+    return _baq(tickers)
 
 
 # ---------------------------------------------------------------------------
@@ -3258,6 +3267,46 @@ def _get_universe_baseline() -> dict:
             _baseline_cache = _build_universe_baseline()
             _baseline_date = latest
         return _baseline_cache
+
+
+# --- Live whole-universe price snapshot (3s, single-flight, phase-aware) -----
+_snapshot_cache: dict = {}        # ticker -> live price
+_snapshot_ts: float = 0.0
+_snapshot_phase = None
+_snapshot_lock = threading.Lock()
+_SNAPSHOT_TTL = 3                  # seconds
+
+
+def _get_live_snapshot() -> dict:
+    """Shared whole-universe live prices. {"phase": str, "prices": {ticker: price}}.
+    Refreshed at most once per _SNAPSHOT_TTL; the lock makes it single-flight.
+    regular -> batch-quote; pre/post -> batched aftermarket mid; idle -> empty.
+    On fetch failure the previous snapshot is retained (page never blanks)."""
+    global _snapshot_cache, _snapshot_ts, _snapshot_phase
+    phase = _phase_info()["phase"]
+    now = time.time()
+    with _snapshot_lock:
+        if phase != _snapshot_phase:
+            _snapshot_cache = {}
+            _snapshot_phase = phase
+        if phase == "idle":
+            _snapshot_cache = {}
+            return {"phase": phase, "prices": {}}
+        if _snapshot_cache and now - _snapshot_ts < _SNAPSHOT_TTL:
+            return {"phase": phase, "prices": _snapshot_cache}
+        tickers = list(_get_universe_baseline().keys())
+        try:
+            if phase == "regular":
+                fresh = fetch_live_prices(tickers)
+            else:  # pre / post
+                quotes = fetch_aftermarket_quotes(tickers)
+                fresh = {t: live_snapshot.mid_price(q) for t, q in quotes.items()}
+            _snapshot_cache = {t: p for t, p in fresh.items() if p}
+            _snapshot_ts = now
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "live snapshot fetch failed; keeping previous snapshot", exc_info=True)
+        return {"phase": phase, "prices": _snapshot_cache}
 
 
 def _build_market_indices() -> dict:
