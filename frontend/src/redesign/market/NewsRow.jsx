@@ -1,11 +1,12 @@
 /* Compact news row for the "More Headlines" list below the carousel:
  * thumbnail + headline + ticker tag + source · age. (nh-* classes avoid a
- * collision with the legacy .news-row used by the analyst/news block.) */
-import { newsSrc, openUrl, bgImg } from './newsUtil'
+ * collision with the legacy .news-row used by the analyst/news block.)
+ * Clicking opens the in-app reading drawer via onOpen(n). */
+import { newsSrc, bgImg } from './newsUtil'
 
-export default function NewsRow({ n }) {
+export default function NewsRow({ n, onOpen }) {
   return (
-    <div className="nh-row" onClick={() => openUrl(n.url)}>
+    <div className="nh-row" onClick={() => onOpen(n)}>
       <div className="nh-thumb" style={bgImg(n.image)} />
       <div className="nh-body">
         <div className="nh-title">{n.title}</div>

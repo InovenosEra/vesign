@@ -9,7 +9,8 @@ import { getTopNews, getPortfolioHoldings } from '../../api'
 import NewsControls from './NewsControls'
 import NewsCard from './NewsCard'
 import NewsRow from './NewsRow'
-import { newsSrc, openUrl, bgImg } from './newsUtil'
+import NewsReader from './NewsReader'
+import { newsSrc, bgImg } from './newsUtil'
 
 export default function NewsFeed() {
   const [limit, setLimit] = useState(100)
@@ -18,6 +19,7 @@ export default function NewsFeed() {
   const [ticker, setTicker] = useState(null)  // trending-chip filter (overrides cat)
   const [q, setQ] = useState('')              // search text
   const [seenTs, setSeenTs] = useState(null)  // newest published_at the user has "caught up" to
+  const [reader, setReader] = useState(null)  // story shown in the reading drawer (null = closed)
 
   const { data } = useQuery({ queryKey: ['market-news-feed', limit], queryFn: () => getTopNews(limit), refetchInterval: 300_000 })
   const { data: holdings } = useQuery({ queryKey: ['portfolio-holdings'], queryFn: () => getPortfolioHoldings('US') })
@@ -97,11 +99,11 @@ export default function NewsFeed() {
         <div className="news-empty">No stories match. <a onClick={clearFilters}>Clear filters</a></div>
       ) : isFiltered ? (
         <div className="news-grid">
-          {filtered.map((n) => <NewsCard key={n.url || n.title} n={n} />)}
+          {filtered.map((n) => <NewsCard key={n.url || n.title} n={n} onOpen={setReader} />)}
         </div>
       ) : (
         <>
-          <div className="news-hero" onClick={() => openUrl(hero.url)}>
+          <div className="news-hero" onClick={() => setReader(hero)}>
             <div className="img" style={bgImg(hero.image)} />
             <div className="content">
               <div className="h-eyebrow">Top Story</div>
@@ -122,7 +124,7 @@ export default function NewsFeed() {
           <div className="news-carousel">
             <button className="news-arrow left" onClick={() => scroll(-1)} aria-label="Previous">‹</button>
             <div className="news-cards" ref={trackRef}>
-              {rest.slice(0, 13).map((n) => <NewsCard key={n.url || n.title} n={n} />)}
+              {rest.slice(0, 13).map((n) => <NewsCard key={n.url || n.title} n={n} onOpen={setReader} />)}
             </div>
             <button className="news-arrow right" onClick={() => scroll(1)} aria-label="Next">›</button>
           </div>
@@ -130,7 +132,7 @@ export default function NewsFeed() {
             <>
               <div className="nh-h">More Headlines</div>
               <div className="nh-list">
-                {rest.slice(13, 13 + listCount).map((n) => <NewsRow key={n.url || n.title} n={n} />)}
+                {rest.slice(13, 13 + listCount).map((n) => <NewsRow key={n.url || n.title} n={n} onOpen={setReader} />)}
               </div>
             </>
           )}
@@ -138,6 +140,10 @@ export default function NewsFeed() {
       )}
 
       <div className="news-more"><a onClick={showMore}>Show more news →</a></div>
+
+      {reader && (
+        <NewsReader story={reader} allNews={news} onOpen={setReader} onClose={() => setReader(null)} />
+      )}
     </div>
   )
 }
