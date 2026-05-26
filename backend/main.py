@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, UTC, date, timezone
+from zoneinfo import ZoneInfo
 from fpdf import FPDF
 from typing import Literal, Optional
 
@@ -4245,15 +4246,23 @@ def _build_market_news(limit: int) -> dict:
     return {"news": out[:limit]}
 
 
+_FMP_NEWS_TZ = ZoneInfo("America/New_York")  # FMP news publishedDate is naive US Eastern
+
+
 def _parse_iso8601(s: str) -> datetime | None:
     if not s:
         return None
     # FMP returns "2026-05-22 14:30:00" or ISO8601; Python's fromisoformat handles both with a Z swap.
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00").replace(" ", "T"))\
-            .astimezone(timezone.utc)
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00").replace(" ", "T"))
     except ValueError:
         return None
+    # FMP news timestamps are naive US-Eastern. A bare .astimezone(utc) would
+    # assume the server's LOCAL tz (e.g. IDT), over-aging every story by the
+    # ET↔local offset (~7h on an IDT machine). Localize to ET first.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_FMP_NEWS_TZ)
+    return dt.astimezone(timezone.utc)
 
 
 def _get_market_news_cached(limit: int) -> dict:
