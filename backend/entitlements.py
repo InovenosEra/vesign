@@ -258,6 +258,34 @@ def unlock_purchase(user_id: str, *, occurrences, kind, price_cents) -> int:
         return int(bal_row[0])
 
 
+def gate_signals_multidate(rows, *, plan, unlocks, latest_date):
+    """Redact ONLY the latest-date BUY/SELL rows in a mixed multi-date list
+    (e.g. /api/signals). Historical signals and HOLDs are always returned full
+    — they're the public track record. No first-N preview here (that's a
+    feature of the dedicated Signals-page endpoints). `latest_date` is the
+    market's most recent signal date as YYYY-MM-DD, or None to gate nothing."""
+    if plan == "max" or not latest_date:
+        return list(rows)
+    out = []
+    for r in rows:
+        sig = (r.get("signal") or "").upper()
+        date = _norm_date(r.get("date"))
+        if sig in ("BUY", "SELL") and date == latest_date:
+            k = sig.lower()
+            ticker = r.get("ticker")
+            if plan == "pro" and (k, ticker, date) in unlocks:
+                out.append(r)
+            elif plan == "free":
+                out.append(_locked_row(k, date, "upgrade"))
+            else:  # pro, not unlocked
+                price = PER_ROW_PRICE_CENTS if k == "buy" else None
+                out.append(_locked_row(k, date, "pay", price_cents=price,
+                                       token=lock_token(k, ticker, date)))
+        else:
+            out.append(r)
+    return out
+
+
 def gate_signals(rows, *, kind, plan, unlocks):
     """Redact a BUY or SELL list for the given plan. Returns a NEW list; full
     rows are passed through by reference (read-only), locked rows are fresh."""

@@ -887,6 +887,7 @@ def signals(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=10, le=500),
     market: Optional[str] = None,
+    user=Depends(get_current_user),
 ):
     """Signals for the last N months with server-side sort and pagination.
 
@@ -966,8 +967,15 @@ def signals(
             LIMIT :limit OFFSET :offset
         """), conn, params={**params, "limit": page_size, "offset": (page - 1) * page_size})
 
+    data = _overlay_live(_records(df))
+    today = _get_signals_today_cached(mkt)
+    latest_date = ent._norm_date(today[0]["date"]) if today else None
+    data = ent.gate_signals_multidate(
+        data, plan=ent.get_plan(user["id"]),
+        unlocks=ent.get_unlocks(user["id"]), latest_date=latest_date,
+    )
     return {
-        "data": _overlay_live(_records(df)),
+        "data": data,
         "total": total,
         "page": page,
         "page_size": page_size,

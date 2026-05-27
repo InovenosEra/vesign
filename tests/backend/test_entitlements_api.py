@@ -39,6 +39,9 @@ def api():
         conn.execute(text("""CREATE TABLE analyst_expectations (
             ticker TEXT PRIMARY KEY, target_mean_price REAL, target_low_price REAL,
             target_high_price REAL)"""))
+        # Required by /api/signals subquery: (s.close * shares_outstanding) AS market_cap
+        conn.execute(text("""CREATE TABLE market_cap_history (
+            ticker TEXT, date TEXT, shares_outstanding REAL)"""))
         for i in range(3):
             conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES (:t,:t,'US')"),
                          {"t": f"T{i}"})
@@ -178,3 +181,21 @@ def test_unlock_all_idempotent(api):
     client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
     second = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
     assert second.json()["balance_cents"] == 50   # already owned → no second charge
+
+
+def test_api_signals_list_redacts_today_buys_for_free(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "free"
+    resp = client.get("/api/signals?signal=BUY&market=US&months=120").json()
+    rows = resp["data"]
+    assert rows and all(r.get("locked") for r in rows)
+    assert all("ticker" not in r for r in rows)     # enumeration closed
+    del os.environ["DEV_PLAN"]
+
+
+def test_api_signals_list_full_for_max(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "max"
+    rows = client.get("/api/signals?signal=BUY&market=US&months=120").json()["data"]
+    assert rows and all(r.get("ticker") for r in rows)
+    del os.environ["DEV_PLAN"]
