@@ -204,10 +204,6 @@ class InsufficientFunds(Exception):
     pass
 
 
-class UpgradeRequired(Exception):
-    pass
-
-
 def resolve_token(token: str, kind: str, candidate_rows, *, date_key) -> tuple[str, str] | None:
     """Find the (ticker, signal_date) whose token matches, by recomputing the
     HMAC for each candidate. Returns None if no match."""
@@ -222,7 +218,10 @@ def resolve_token(token: str, kind: str, candidate_rows, *, date_key) -> tuple[s
 def unlock_purchase(user_id: str, *, occurrences, kind, price_cents) -> int:
     """Atomically: skip already-owned occurrences, charge `price_cents` iff at
     least one is new, record unlocks + ledger. Returns the new balance.
-    Raises InsufficientFunds. Caller guarantees plan == 'pro'."""
+    Raises InsufficientFunds. Caller guarantees plan == 'pro'.
+
+    The charge is a single conditional UPDATE (WHERE balance_cents >= price) so
+    concurrent requests cannot double-spend or drive the balance negative."""
     with engine.begin() as conn:
         owned = {
             (r[0], r[1]) for r in conn.execute(text(
@@ -230,13 +229,18 @@ def unlock_purchase(user_id: str, *, occurrences, kind, price_cents) -> int:
             ), {"u": user_id, "k": kind}).fetchall()
         }
         new = [(t, d) for (t, d) in occurrences if (t, d) not in owned]
-        bal_row = conn.execute(
-            text("SELECT balance_cents FROM wallets WHERE user_id = :u"), {"u": user_id}
-        ).fetchone()
-        balance = int(bal_row[0]) if bal_row else 0
         if not new:
-            return balance                          # nothing to buy; no charge
-        if balance < price_cents:
+            bal_row = conn.execute(
+                text("SELECT balance_cents FROM wallets WHERE user_id = :u"), {"u": user_id}
+            ).fetchone()
+            return int(bal_row[0]) if bal_row else 0      # nothing to buy; no charge
+        # Atomic check-and-deduct: matches 0 rows if the wallet is missing or
+        # underfunded, which is the race-safe "insufficient funds" signal.
+        res = conn.execute(text("""
+            UPDATE wallets SET balance_cents = balance_cents - :p
+            WHERE user_id = :u AND balance_cents >= :p
+        """), {"u": user_id, "p": price_cents})
+        if res.rowcount != 1:
             raise InsufficientFunds()
         for (t, d) in new:
             conn.execute(text("""
@@ -244,15 +248,14 @@ def unlock_purchase(user_id: str, *, occurrences, kind, price_cents) -> int:
                 VALUES (:u, :k, :t, :d)
             """), {"u": user_id, "k": kind, "t": t, "d": d})
         conn.execute(text("""
-            INSERT INTO wallets (user_id, balance_cents) VALUES (:u, -:p)
-            ON CONFLICT(user_id) DO UPDATE SET balance_cents = balance_cents - :p
-        """), {"u": user_id, "p": price_cents})
-        conn.execute(text("""
             INSERT INTO wallet_txns (user_id, amount_cents, reason, ref)
             VALUES (:u, :a, :r, :ref)
         """), {"u": user_id, "a": -price_cents, "r": f"unlock_{kind}",
                "ref": ",".join(f"{t}:{d}" for t, d in new)})
-        return balance - price_cents
+        bal_row = conn.execute(
+            text("SELECT balance_cents FROM wallets WHERE user_id = :u"), {"u": user_id}
+        ).fetchone()
+        return int(bal_row[0])
 
 
 def gate_signals(rows, *, kind, plan, unlocks):

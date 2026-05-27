@@ -149,3 +149,32 @@ def test_unlock_buy_all_is_flat_fifty(api):
     assert resp.json()["balance_cents"] == 50         # 100 - 50 flat, all 3 BUYs unlocked
     rows = client.get("/api/signals/today?signal=BUY&market=US").json()
     assert all(not r.get("locked") for r in rows)
+
+
+def test_unlock_error_codes_are_distinct(api):
+    bm, client = api
+    import backend.entitlements as e
+    # free → UPGRADE_REQUIRED
+    e.set_plan("dev-bypass", "free")
+    token = e.lock_token("buy", "T0", "2026-05-26")
+    r1 = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+    assert r1.status_code == 402 and r1.json()["detail"]["code"] == "UPGRADE_REQUIRED"
+    # pro but broke → INSUFFICIENT_FUNDS
+    e.set_plan("dev-bypass", "pro")
+    r2 = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+    assert r2.status_code == 402 and r2.json()["detail"]["code"] == "INSUFFICIENT_FUNDS"
+
+
+def test_unlock_bad_kind_and_scope_rejected(api):
+    bm, client = api
+    _seed_pro(bm, 100)
+    assert client.post("/api/signals/unlock", json={"kind": "bogus", "scope": "all", "market": "US"}).status_code == 400
+    assert client.post("/api/signals/unlock", json={"kind": "buy", "scope": "bogus", "market": "US"}).status_code == 400
+
+
+def test_unlock_all_idempotent(api):
+    bm, client = api
+    _seed_pro(bm, 100)
+    client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
+    second = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
+    assert second.json()["balance_cents"] == 50   # already owned → no second charge
