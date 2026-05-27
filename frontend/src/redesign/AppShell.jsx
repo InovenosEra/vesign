@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { useUser } from '@clerk/react'
 import { getMarketStatus } from '../api'
 import { useCurrency } from '../context/CurrencyContext'
+import { MeProvider } from '../context/MeContext'
 import GlobalSearch from '../components/GlobalSearch'
 import SignalModal from './SignalModalRd'
 import { TickerModalContext } from './TickerModalContext'
@@ -188,7 +189,7 @@ export default function AppShell({ children }) {
           <Avatar />
         </div>
       </div>
-      {children}
+      <MeProvider>{children}</MeProvider>
       {modalRow && <SignalModal row={modalRow} onClose={() => setModalRow(null)} />}
     </div>
     </TickerModalContext.Provider>
