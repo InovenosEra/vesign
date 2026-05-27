@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from sqlalchemy import bindparam, create_engine, text, event as sa_event
 from sqlalchemy.pool import NullPool
 from backend.auth import get_current_user
+from backend import entitlements as ent
 from backend.yield_calcs import avg_cost_dollar_weighted, Lot, simulate_bank_hand
 from backend import live_snapshot
 
@@ -841,14 +842,21 @@ def _get_signals_today_cached(mkt: str) -> list[dict]:
 
 
 @protected.get("/api/signals/today")
-def signals_today(signal: Optional[str] = None, market: Optional[str] = None):
-    """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD&market=US|IL filter."""
+def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
+                  user=Depends(get_current_user)):
+    """Today's signals (latest date in DB). Optional ?signal=BUY|SELL|HOLD&market=US|IL filter.
+    BUY/SELL lists are redacted per the requesting user's plan + unlocks."""
     mkt = (market or "US").upper()
     rows = _get_signals_today_cached(mkt)
     if signal:
         wanted = signal.upper()
         rows = [r for r in rows if r.get("signal") == wanted]
-    return _overlay_live(rows)
+    rows = _overlay_live(rows)
+    if signal and signal.upper() in ("BUY", "SELL"):
+        plan = ent.get_plan(user["id"])
+        unlocks = ent.get_unlocks(user["id"])
+        rows = ent.gate_signals(rows, kind=signal.upper(), plan=plan, unlocks=unlocks)
+    return rows
 
 
 _SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap", "prediction_score"}
@@ -2245,9 +2253,19 @@ def _get_open_trades_cached(mkt: str, include_lots: bool = False) -> list[dict]:
 
 
 @protected.get("/api/trades/open")
-def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0):
-    """Tickers with a BUY signal and no SELL since — currently open positions."""
-    return _get_open_trades_cached((market or "US").upper(), bool(include_lots))
+def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
+                user=Depends(get_current_user)):
+    """Tickers with a BUY signal and no SELL since — currently open positions.
+    Redacted per the requesting user's plan + unlocks; sorted by yield desc."""
+    rows = _get_open_trades_cached((market or "US").upper(), bool(include_lots))
+    rows = sorted(
+        rows,
+        key=lambda r: (r.get("unrealized_pct") is not None, r.get("unrealized_pct") or 0.0),
+        reverse=True,
+    )
+    plan = ent.get_plan(user["id"])
+    unlocks = ent.get_unlocks(user["id"])
+    return ent.gate_open_trades(rows, plan=plan, unlocks=unlocks)
 
 
 @protected.get("/api/trades/open/export")
@@ -2261,7 +2279,7 @@ def open_trades_export(
 
     mkt = (market or "US").upper()
 
-    rows = open_trades(market=mkt, include_lots=1)   # include lots so export has DCA columns
+    rows = _get_open_trades_cached(mkt, include_lots=True)  # include lots so export has DCA columns
     df = pd.DataFrame(rows)
 
     if not df.empty:
