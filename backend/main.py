@@ -516,6 +516,13 @@ class WatchlistCreate(BaseModel):
     name: str
 
 
+class UnlockBody(BaseModel):
+    kind: str                      # buy | sell | open
+    scope: str                     # row | all
+    lock_token: Optional[str] = None
+    market: Optional[str] = "US"
+
+
 class TickerAdd(BaseModel):
     ticker: str
     note: str = ""
@@ -2277,6 +2284,51 @@ def me_entitlements(user=Depends(get_current_user)):
         "per_row_price_cents": ent.PER_ROW_PRICE_CENTS,
         "see_all_price_cents": ent.SEE_ALL_PRICE_CENTS,
     }
+
+
+@protected.post("/api/signals/unlock")
+def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
+    uid = user["id"]
+    plan = ent.get_plan(uid)
+    if plan == "max":
+        return {"balance_cents": ent.get_balance(uid)}     # already fully open
+    if plan != "pro":
+        raise HTTPException(status_code=402, detail={"code": "UPGRADE_REQUIRED"})
+
+    kind = body.kind.lower()
+    scope = body.scope.lower()
+    mkt = (body.market or "US").upper()
+    if kind not in ("buy", "sell", "open"):
+        raise HTTPException(status_code=400, detail="bad kind")
+
+    # Build the candidate occurrence list (un-redacted) for this kind.
+    if kind in ("buy", "sell"):
+        sig = "BUY" if kind == "buy" else "SELL"
+        candidates = [r for r in _get_signals_today_cached(mkt) if r.get("signal") == sig]
+        date_key = "date"
+    else:  # open
+        candidates = _get_open_trades_cached(mkt, False)
+        date_key = "buy_date"
+
+    if scope == "row":
+        if kind != "buy" or not body.lock_token:
+            raise HTTPException(status_code=400, detail="row unlock is BUY-only and needs a token")
+        match = ent.resolve_token(body.lock_token, kind, candidates, date_key=date_key)
+        if not match:
+            raise HTTPException(status_code=404, detail="signal not found")
+        occurrences = [match]
+        price = ent.PER_ROW_PRICE_CENTS
+    elif scope == "all":
+        occurrences = [(r["ticker"], ent._norm_date(r.get(date_key))) for r in candidates if r.get("ticker")]
+        price = ent.SEE_ALL_PRICE_CENTS
+    else:
+        raise HTTPException(status_code=400, detail="bad scope")
+
+    try:
+        balance = ent.unlock_purchase(uid, occurrences=occurrences, kind=kind, price_cents=price)
+    except ent.InsufficientFunds:
+        raise HTTPException(status_code=402, detail={"code": "INSUFFICIENT_FUNDS"})
+    return {"balance_cents": balance}
 
 
 @protected.get("/api/trades/open/export")

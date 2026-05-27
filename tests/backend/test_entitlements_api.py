@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def api():
-    saved = {k: os.environ.get(k) for k in ("DB_PATH", "BYPASS_AUTH", "DEV_PLAN", "DEV_WALLET_CENTS")}
+    saved = {k: os.environ.get(k) for k in ("DB_PATH", "BYPASS_AUTH", "DEV_PLAN", "DEV_WALLET_CENTS", "BYPASS_USER_ID")}
     tmpdir = tempfile.mkdtemp()
     os.environ["DB_PATH"] = os.path.join(tmpdir, "ent_api.db")
     os.environ["BYPASS_AUTH"] = "1"
@@ -50,6 +50,9 @@ def api():
     import data.loaders as loaders; importlib.reload(loaders)
     import backend.entitlements as ent; importlib.reload(ent)
     import backend.main as bm; importlib.reload(bm)
+    # load_dotenv() inside bm may re-set BYPASS_USER_ID from .env — remove it
+    # so get_current_user falls back to the default "dev-bypass" synthetic id.
+    os.environ.pop("BYPASS_USER_ID", None)
     yield bm, TestClient(bm.app)
     import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
     for k, v in saved.items():
@@ -84,3 +87,65 @@ def test_me_reports_plan_balance_and_prices(api):
     assert d["per_row_price_cents"] == 10
     assert d["see_all_price_cents"] == 50
     del os.environ["DEV_PLAN"]; del os.environ["DEV_WALLET_CENTS"]
+
+
+def _seed_pro(bm, cents):
+    import backend.entitlements as e
+    e.set_plan("dev-bypass", "pro")
+    e.credit("dev-bypass", cents, reason="test-seed")
+
+
+def test_unlock_buy_row_deducts_and_reveals(api):
+    bm, client = api
+    _seed_pro(bm, 100)
+    import backend.entitlements as e
+    token = e.lock_token("buy", "T0", "2026-05-26")
+    resp = client.post("/api/signals/unlock",
+                       json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+    assert resp.status_code == 200
+    assert resp.json()["balance_cents"] == 90        # 100 - 10
+    rows = client.get("/api/signals/today?signal=BUY&market=US").json()
+    t0 = next(r for r in rows if r.get("ticker") == "T0")
+    assert not t0.get("locked")
+
+
+def test_unlock_is_idempotent_no_double_charge(api):
+    bm, client = api
+    _seed_pro(bm, 100)
+    import backend.entitlements as e
+    token = e.lock_token("buy", "T0", "2026-05-26")
+    body = {"kind": "buy", "scope": "row", "lock_token": token, "market": "US"}
+    client.post("/api/signals/unlock", json=body)
+    second = client.post("/api/signals/unlock", json=body)
+    assert second.json()["balance_cents"] == 90      # unchanged on re-purchase
+
+
+def test_unlock_insufficient_funds(api):
+    bm, client = api
+    _seed_pro(bm, 5)
+    import backend.entitlements as e
+    token = e.lock_token("buy", "T0", "2026-05-26")
+    resp = client.post("/api/signals/unlock",
+                       json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+    assert resp.status_code == 402
+
+
+def test_unlock_rejected_for_free_plan(api):
+    bm, client = api
+    import backend.entitlements as e
+    e.set_plan("dev-bypass", "free")
+    token = e.lock_token("buy", "T0", "2026-05-26")
+    resp = client.post("/api/signals/unlock",
+                       json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+    assert resp.status_code == 402
+
+
+def test_unlock_buy_all_is_flat_fifty(api):
+    bm, client = api
+    _seed_pro(bm, 100)
+    resp = client.post("/api/signals/unlock",
+                       json={"kind": "buy", "scope": "all", "market": "US"})
+    assert resp.status_code == 200
+    assert resp.json()["balance_cents"] == 50         # 100 - 50 flat, all 3 BUYs unlocked
+    rows = client.get("/api/signals/today?signal=BUY&market=US").json()
+    assert all(not r.get("locked") for r in rows)
