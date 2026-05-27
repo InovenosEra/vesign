@@ -17,34 +17,19 @@ const HEAD = (
   </tr>
 )
 
-// Decoy values for locked open rows — never real data (CSS-blurred). The Yield
-// column is the exception: Free's top-10 rows reveal the real yield (sharp) as
-// the teaser; deeper/locked rows show a lock glyph.
-const FAKE_OPEN = [
-  { tk: 'ABCD',  co: 'Holdings Inc',    bought: '12 May 26', entry: '142.30', price: '158.90', days: 14, pnl: '+$116' },
-  { tk: 'ABC',   co: 'Capital Group',   bought: '04 May 26', entry: '88.10',  price: '94.50',  days: 22, pnl: '+$72' },
-  { tk: 'ABCDE', co: 'Technologies',    bought: '28 Apr 26', entry: '245.30', price: '231.05', days: 29, pnl: '-$58' },
-  { tk: 'ABCD',  co: 'Industries Ltd',  bought: '19 May 26', entry: '57.90',  price: '63.40',  days: 8,  pnl: '+$95' },
-  { tk: 'ABCD',  co: 'Global Partners', bought: '07 May 26', entry: '134.05', price: '149.70', days: 19, pnl: '+$117' },
-]
-
-function LockedOpenRow({ p, idx = 0 }) {
-  const f = FAKE_OPEN[idx % FAKE_OPEN.length]
-  // Free: top-10 keep yield (reveal includes 'yield'); rest fully faded.
+// Locked open row: ONLY the Yield is ever shown. Every other column is hidden
+// (no decoy, no blur) — Free's top-10 reveal the real yield (sharp) as the
+// teaser; deeper/locked rows show a lock glyph. Nothing identifying is rendered.
+function LockedOpenRow({ p }) {
   const yld = p.reveal?.includes('yield') ? p.unrealized_pct : null
   return (
     <tr className="locked-row">
-      <td>
-        <div className="ticker-cell lock-blur" aria-hidden="true">
-          <span className="logo-skel" />
-          <span className="tk">{f.tk}</span><span className="co">{f.co}</span>
-        </div>
-      </td>
-      <td className="r muted"><span className="lock-blur" aria-hidden="true">{f.bought}</span></td>
-      <td className="r"><span className="lock-blur" aria-hidden="true">{f.entry}</span></td>
-      <td className="r"><span className="lock-blur" aria-hidden="true">{f.price}</span></td>
-      <td className="r muted"><span className="lock-blur" aria-hidden="true">{f.days}</span></td>
-      <td className="r up"><span className="lock-blur" aria-hidden="true">{f.pnl}</span></td>
+      <td><span className="lock-pill">🔒 Locked</span></td>
+      <td className="r" />
+      <td className="r" />
+      <td className="r" />
+      <td className="r" />
+      <td className="r" />
       <td className={'r ' + (yld != null ? dirClass(yld) : '')} style={{ paddingRight: 18 }}>
         {yld == null ? <span className="lock-pill">🔒</span> : <strong>{pct(yld)}</strong>}
       </td>
@@ -105,7 +90,7 @@ export default function OpenTrades() {
         head={HEAD}
         rows={rows}
         row={(p, i) => isLocked(p)
-          ? <LockedOpenRow key={i} p={p} idx={i} />
+          ? <LockedOpenRow key={i} p={p} />
           : <FullOpenRow key={i} p={p} />}
         emptyLabel="No open positions."
         colspan={7}
