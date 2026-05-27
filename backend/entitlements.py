@@ -23,6 +23,13 @@ _UNLOCK_SECRET = (
     or "vesign-dev-unlock-secret"
 ).encode()
 
+if not os.getenv("UNLOCK_SECRET") and not os.getenv("CLERK_SECRET_KEY"):
+    import warnings
+    warnings.warn(
+        "UNLOCK_SECRET not set — using dev fallback secret; set it in prod .env",
+        stacklevel=1,
+    )
+
 
 def _ensure_tables() -> None:
     with engine.begin() as conn:
@@ -92,11 +99,13 @@ def set_plan(user_id: str, plan: str) -> None:
 
 
 def get_balance(user_id: str) -> int:
-    if _dev_enabled() and os.getenv("DEV_WALLET_CENTS") is not None:
-        try:
-            return int(os.getenv("DEV_WALLET_CENTS"))
-        except ValueError:
-            pass
+    if _dev_enabled():
+        raw = os.getenv("DEV_WALLET_CENTS")
+        if raw is not None:
+            try:
+                return int(raw)
+            except ValueError:
+                pass
     with engine.connect() as conn:
         row = conn.execute(
             text("SELECT balance_cents FROM wallets WHERE user_id = :u"), {"u": user_id}

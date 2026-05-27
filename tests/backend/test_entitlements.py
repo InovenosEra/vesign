@@ -1,5 +1,6 @@
 """Unit tests for backend.entitlements (pure helpers, no HTTP)."""
 import os
+import shutil
 import tempfile
 import importlib
 import pytest
@@ -8,9 +9,10 @@ import pytest
 @pytest.fixture
 def ent():
     """Fresh entitlements module bound to a temp DB, dev-gate ON."""
+    saved = {k: os.environ.get(k) for k in ("DB_PATH", "BYPASS_AUTH", "DEV_PLAN", "DEV_WALLET_CENTS")}
     tmpdir = tempfile.mkdtemp()
     os.environ["DB_PATH"] = os.path.join(tmpdir, "ent.db")
-    os.environ["BYPASS_AUTH"] = "1"          # dev gate for overrides
+    os.environ["BYPASS_AUTH"] = "1"
     os.environ.pop("DEV_PLAN", None)
     os.environ.pop("DEV_WALLET_CENTS", None)
     import data.loaders as loaders
@@ -18,9 +20,12 @@ def ent():
     import backend.entitlements as e
     importlib.reload(e)
     yield e
-    for f in os.listdir(tmpdir):
-        try: os.remove(os.path.join(tmpdir, f))
-        except OSError: pass
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    for k, v in saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
 
 
 def test_default_plan_is_free(ent):
@@ -62,3 +67,8 @@ def test_lock_token_is_stable_and_opaque(ent):
     assert t1 == t2
     assert "AAPL" not in t1            # ticker must not be derivable from the token
     assert ent.lock_token("buy", "MSFT", "2026-05-26") != t1
+
+
+def test_set_plan_invalid_raises(ent):
+    with pytest.raises(ValueError):
+        ent.set_plan("user_x", "platinum")
