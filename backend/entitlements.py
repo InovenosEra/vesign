@@ -1,0 +1,142 @@
+"""Subscription tiers, wallet, and per-signal unlocks for the Signals page.
+
+Plan source is our own DB table (admin-controlled, like blocked_users). A
+short-circuit dev override (env DEV_PLAN / DEV_WALLET_CENTS) is honored ONLY
+when BYPASS_AUTH=1 — i.e. local dev and tests, never production.
+"""
+import hashlib
+import hmac
+import os
+
+from sqlalchemy import text
+
+from data.loaders import engine
+
+PLANS = ("free", "pro", "max")
+PER_ROW_PRICE_CENTS = 10
+SEE_ALL_PRICE_CENTS = 50
+PRO_PREVIEW_ROWS = 10
+
+_UNLOCK_SECRET = (
+    os.getenv("UNLOCK_SECRET")
+    or os.getenv("CLERK_SECRET_KEY")
+    or "vesign-dev-unlock-secret"
+).encode()
+
+
+def _ensure_tables() -> None:
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS user_plans (
+                user_id    TEXT PRIMARY KEY,
+                plan       TEXT NOT NULL DEFAULT 'free',
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS wallets (
+                user_id       TEXT PRIMARY KEY,
+                balance_cents INTEGER NOT NULL DEFAULT 0
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS signal_unlocks (
+                user_id     TEXT NOT NULL,
+                kind        TEXT NOT NULL,
+                ticker      TEXT NOT NULL,
+                signal_date TEXT NOT NULL,
+                created_at  TEXT DEFAULT (datetime('now')),
+                UNIQUE(user_id, kind, ticker, signal_date)
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS wallet_txns (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL,
+                reason     TEXT NOT NULL,
+                ref        TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """))
+
+
+_ensure_tables()
+
+
+def _dev_enabled() -> bool:
+    return os.getenv("BYPASS_AUTH") == "1"
+
+
+def get_plan(user_id: str) -> str:
+    if _dev_enabled():
+        dev = os.getenv("DEV_PLAN")
+        if dev in PLANS:
+            return dev
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT plan FROM user_plans WHERE user_id = :u"), {"u": user_id}
+        ).fetchone()
+    return row[0] if row and row[0] in PLANS else "free"
+
+
+def set_plan(user_id: str, plan: str) -> None:
+    if plan not in PLANS:
+        raise ValueError(f"bad plan {plan!r}")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO user_plans (user_id, plan, updated_at)
+            VALUES (:u, :p, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET plan = :p, updated_at = datetime('now')
+        """), {"u": user_id, "p": plan})
+
+
+def get_balance(user_id: str) -> int:
+    if _dev_enabled() and os.getenv("DEV_WALLET_CENTS") is not None:
+        try:
+            return int(os.getenv("DEV_WALLET_CENTS"))
+        except ValueError:
+            pass
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT balance_cents FROM wallets WHERE user_id = :u"), {"u": user_id}
+        ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def credit(user_id: str, amount_cents: int, *, reason: str, ref: str | None = None) -> int:
+    """Add (or, if negative, remove) balance and log a ledger entry. Returns new balance."""
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO wallets (user_id, balance_cents) VALUES (:u, :a)
+            ON CONFLICT(user_id) DO UPDATE SET balance_cents = balance_cents + :a
+        """), {"u": user_id, "a": amount_cents})
+        conn.execute(text("""
+            INSERT INTO wallet_txns (user_id, amount_cents, reason, ref)
+            VALUES (:u, :a, :r, :ref)
+        """), {"u": user_id, "a": amount_cents, "r": reason, "ref": ref})
+        row = conn.execute(
+            text("SELECT balance_cents FROM wallets WHERE user_id = :u"), {"u": user_id}
+        ).fetchone()
+    return int(row[0])
+
+
+def get_unlocks(user_id: str) -> set[tuple[str, str, str]]:
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT kind, ticker, signal_date FROM signal_unlocks WHERE user_id = :u
+        """), {"u": user_id}).fetchall()
+    return {(r[0], r[1], r[2]) for r in rows}
+
+
+def record_unlock(user_id: str, kind: str, ticker: str, signal_date: str) -> None:
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT OR IGNORE INTO signal_unlocks (user_id, kind, ticker, signal_date)
+            VALUES (:u, :k, :t, :d)
+        """), {"u": user_id, "k": kind, "t": ticker, "d": signal_date})
+
+
+def lock_token(kind: str, ticker: str, signal_date: str) -> str:
+    msg = f"{kind}|{ticker}|{signal_date}".encode()
+    return hmac.new(_UNLOCK_SECRET, msg, hashlib.sha256).hexdigest()
