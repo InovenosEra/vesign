@@ -189,6 +189,25 @@ Per endpoint:
   insufficient-balance, wrong-plan rejection, bulk reveals all locked rows.
 - `/api/me` shape per plan.
 
+## Sibling-endpoint hardening (added 2026-05-27, post-implementation)
+
+The page endpoints aren't the only ones that expose today's identities. Closed
+so the paywall holds at the API level, not just in the UI:
+
+- **`/api/signals`** (paginated, multi-date list) — now redacts only the
+  latest-date BUY/SELL rows per plan via `gate_signals_multidate`; historical
+  signals + HOLDs stay free (public track record). Closes one-call enumeration.
+- **`/api/signals/export`** — non-Max excludes latest-date BUY/SELL rows in SQL;
+  historical/HOLD still export; Max full.
+- **`/api/trades/open/export`** — Max-only (entire content is today's premium
+  identities); Free/Pro → HTTP 402.
+
+Deferred (low value — single-ticker *confirm*, not enumeration; and used by live
+research charts, so gating needs a UX call):
+- `/api/signals/markers` — historical markers for a known ticker; today's marker
+  still visible. `/api/signals/by-tickers` — latest signal for known tickers.
+- `/api/signals/success-rate` exposes no identities — left open.
+
 ## Out of scope / TBD
 
 - **Closed trades + 4 stat cards** gating — open to all for now; revisit later.
@@ -196,6 +215,13 @@ Per endpoint:
 - **Upgrade CTA destination** — placeholder now; Clerk billing vs `/pricing`
   page decided later.
 - **Clerk Billing sync** of plan — future; DB table is source of truth now.
+- **`UNLOCK_SECRET`** must be set in prod `.env` (HMAC for lock tokens) — falls
+  back to a public dev string otherwise (module warns on import). Set locally
+  2026-05-27.
+- **`markers` / `by-tickers`** gating — deferred (see above).
+- **Concurrent double-charge** — `unlock_purchase` prevents negative balance via
+  conditional UPDATE; two simultaneous identical requests could still double-log
+  one unlock. Harden with `BEGIN IMMEDIATE` if it matters at scale.
 
 ## Affected files (anticipated)
 
