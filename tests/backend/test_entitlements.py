@@ -126,3 +126,43 @@ def test_free_sell_rows_all_locked(ent):
     rows = [_sig("AAPL")]; rows[0]["signal"] = "SELL"
     out = ent.gate_signals(rows, kind="SELL", plan="free", unlocks=set())
     assert out[0]["locked"] is True and out[0]["reason"] == "upgrade"
+
+
+def _open(ticker, yld, buy_date="2026-05-01"):
+    return {"ticker": ticker, "company": ticker + " Inc", "logo_url": "x.png",
+            "buy_price": 100.0, "current_price": 100.0 + yld,
+            "days_held": 10, "unrealized_pct": yld, "buy_date": buy_date}
+
+
+def test_open_max_full(ent):
+    rows = [_open("AAPL", 5.0)]
+    assert ent.gate_open_trades(rows, plan="max", unlocks=set()) == rows
+
+
+def test_open_free_shows_only_yield_on_top_ten(ent):
+    rows = [_open(f"T{i}", float(20 - i)) for i in range(12)]  # already yield-desc
+    out = ent.gate_open_trades(rows, plan="free", unlocks=set())
+    # top 10: locked, but yield (unrealized_pct) revealed, nothing else
+    assert out[0]["locked"] is True and out[0]["reason"] == "upgrade"
+    assert out[0]["reveal"] == ["yield"]
+    assert out[0]["unrealized_pct"] == 20.0
+    assert "ticker" not in out[0] and "buy_price" not in out[0]
+    # row 11 (index 10): fully locked, NO yield
+    assert out[10]["reveal"] == []
+    assert "unrealized_pct" not in out[10]
+
+
+def test_open_pro_previews_ten_then_bulk_locks(ent):
+    rows = [_open(f"T{i}", float(20 - i)) for i in range(12)]
+    out = ent.gate_open_trades(rows, plan="pro", unlocks=set())
+    assert out[0]["ticker"] == "T0"
+    assert out[10]["locked"] is True and out[10]["reason"] == "pay"
+    assert "unlock_price_cents" not in out[10]      # bulk-only
+    assert "lock_token" in out[10]
+
+
+def test_open_pro_unlocked_row_is_full(ent):
+    rows = [_open(f"T{i}", float(20 - i)) for i in range(12)]
+    unlocks = {("open", "T10", "2026-05-01")}
+    out = ent.gate_open_trades(rows, plan="pro", unlocks=unlocks)
+    assert out[10]["ticker"] == "T10" and not out[10].get("locked")

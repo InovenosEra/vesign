@@ -175,6 +175,31 @@ def _locked_row(kind, signal_date, reason, *, price_cents=None, token=None,
     return row
 
 
+def gate_open_trades(rows, *, plan, unlocks):
+    """Redact the open-trades list. `rows` MUST already be sorted by yield desc
+    (the endpoint does this). Free: top-10 reveal yield only; rest fully locked.
+    Pro: first-10 preview, rest bulk-lockable."""
+    if plan == "max":
+        return list(rows)
+    out = []
+    for i, r in enumerate(rows):
+        date = _norm_date(r.get("buy_date"))
+        ticker = r.get("ticker")
+        if plan == "free":
+            if i < PRO_PREVIEW_ROWS:
+                out.append(_locked_row("open", date, "upgrade", reveal=["yield"],
+                                       revealed_values={"unrealized_pct": r.get("unrealized_pct")}))
+            else:
+                out.append(_locked_row("open", date, "upgrade"))
+            continue
+        # pro
+        if ("open", ticker, date) in unlocks or i < PRO_PREVIEW_ROWS:
+            out.append(r)
+            continue
+        out.append(_locked_row("open", date, "pay", token=lock_token("open", ticker, date)))
+    return out
+
+
 def gate_signals(rows, *, kind, plan, unlocks):
     """Redact a BUY or SELL list for the given plan. Returns a NEW list; full
     rows are passed through by reference (read-only), locked rows are fresh."""
