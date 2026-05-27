@@ -10,7 +10,8 @@ import { useTranslation } from 'react-i18next'
 import { useUser } from '@clerk/react'
 import { getMarketStatus } from '../api'
 import { useCurrency } from '../context/CurrencyContext'
-import { MeProvider } from '../context/MeContext'
+import { MeProvider, useMe } from '../context/MeContext'
+import { fmtCents } from './signals/gating'
 import GlobalSearch from '../components/GlobalSearch'
 import SignalModal from './SignalModalRd'
 import { TickerModalContext } from './TickerModalContext'
@@ -146,11 +147,20 @@ function Avatar() {
   return <div className="avatar" title={user?.firstName || ''}>{initials}</div>
 }
 
+function WalletChip() {
+  const me = useMe()
+  if (me.plan === 'free') return null
+  return (
+    <span className="wallet-chip" title="Wallet balance">{fmtCents(me.balance_cents)}</span>
+  )
+}
+
 export default function AppShell({ children }) {
   const [modalRow, setModalRow] = useState(null)
   const openTicker = (ticker, company) => { if (ticker) setModalRow({ ticker, company }) }
   return (
     <TickerModalContext.Provider value={openTicker}>
+    <MeProvider>
     <div className="rd">
       <Tape />
       <div className="top">
@@ -183,15 +193,17 @@ export default function AppShell({ children }) {
           <GlobalSearch />
         </div>
         <div className="topright">
+          <WalletChip />
           <MarketChip />
           <LangSelect />
           <CcySelect />
           <Avatar />
         </div>
       </div>
-      <MeProvider>{children}</MeProvider>
+      {children}
       {modalRow && <SignalModal row={modalRow} onClose={() => setModalRow(null)} />}
     </div>
+    </MeProvider>
     </TickerModalContext.Provider>
   )
 }
