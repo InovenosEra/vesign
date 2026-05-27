@@ -244,3 +244,7 @@ export const getPortfolioPerformance = (market = 'US', months = 12) =>
 
 export const getPortfolioComparison = (market = 'US') =>
   get(`/portfolio/comparison?market=${market}`)
+
+// --- Entitlements (plan + wallet) ------------------------------------------
+export const getMe = () => get('/me')
+export const unlockSignal = (body) => post('/signals/unlock', body)
