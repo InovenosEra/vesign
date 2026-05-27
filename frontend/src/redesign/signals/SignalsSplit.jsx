@@ -1,10 +1,12 @@
 /* BUY + SELL signal lists, side by side. Ported from the trades-v5.html
  * .signals-split block + its signalRow()/healthDots() renderers.
  * Data: getSignalsToday(signal,'US'). */
-import { useQuery } from '@tanstack/react-query'
-import { getSignalsToday } from '../../api'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getSignalsToday, unlockSignal } from '../../api'
 import { num, pct, dirClass, dateFmt, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
+import { useMe } from '../../context/MeContext'
+import { isLocked, hasMoreLocked, fmtCents } from './gating'
 import { logoCls } from './util'
 import PagedTable from './Pager'
 
@@ -24,19 +26,38 @@ const HEAD = (
   </tr>
 )
 
-function SignalRow({ s }) {
+function LockedRow({ s, kind, onUnlock }) {
+  const me = useMe()
+  const canPay = s.reason === 'pay'
+  const label = canPay && kind === 'BUY'
+    ? `Unlock · ${fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)}`
+    : canPay ? 'Locked — see all below' : 'Upgrade to unlock'
+  return (
+    <tr className="locked-row">
+      <td colSpan={6}>
+        <div className="lock-cell">
+          <span className="lock-veil" aria-hidden>████  ███████████</span>
+          {canPay && kind === 'BUY' ? (
+            <button className="lock-cta" onClick={() => onUnlock(s)}>{label}</button>
+          ) : (
+            <span className="lock-note">{label}</span>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function FullRow({ s }) {
   const open = useTickerModal()
   const upside = s.fair_value_upside == null ? null : s.fair_value_upside * 100
   const mlPct = s.prediction_score == null ? null : s.prediction_score * 100
   return (
     <tr data-ticker={s.ticker} data-company={s.company || ''} onClick={() => open(s.ticker, s.company)}>
-      <td>
-        <div className="ticker-cell">
-          <img className={logoCls(s.ticker)} src={LOGO(s.ticker)} alt={s.ticker} />
-          <span className="tk">{s.ticker}</span>
-          <span className="co">{s.company || ''}</span>
-        </div>
-      </td>
+      <td><div className="ticker-cell">
+        <img className={logoCls(s.ticker)} src={LOGO(s.ticker)} alt={s.ticker} />
+        <span className="tk">{s.ticker}</span><span className="co">{s.company || ''}</span>
+      </div></td>
       <td className="r">{s.close == null ? '—' : num(s.close)}</td>
       <td className={'r ' + dirClass(upside)}>{pct(upside)}</td>
       <td className="r"><span className="health">{healthDots(s.health_score)}</span></td>
@@ -48,16 +69,37 @@ function SignalRow({ s }) {
 
 function SignalColumn({ kind }) {
   const isBuy = kind === 'BUY'
+  const me = useMe()
+  const qc = useQueryClient()
   const { data } = useQuery({
     queryKey: ['signals-today', kind, 'US'],
     queryFn: () => getSignalsToday(kind, 'US'),
     refetchInterval: 3_000,
   })
   const rows = Array.isArray(data) ? data : []
-  const dateStr = rows.length ? dateFmt((rows[0].date || '').split(' ')[0]) : ''
-  const sub = rows.length || dateStr
-    ? `${dateStr} · ${rows.length} ${rows.length === 1 ? 'signal' : 'signals'}`
-    : '—'
+
+  async function unlockRow(s) {
+    try {
+      await unlockSignal({ kind: kind.toLowerCase(), scope: 'row', lock_token: s.lock_token, market: 'US' })
+      qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
+    } catch (e) {
+      if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
+    }
+  }
+  async function unlockAll() {
+    try {
+      await unlockSignal({ kind: kind.toLowerCase(), scope: 'all', market: 'US' })
+      qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
+    } catch (e) {
+      if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
+    }
+  }
+
+  const dateStr = rows.length ? dateFmt((rows[0].signal_date || rows[0].date || '').split(' ')[0]) : ''
+  const sub = rows.length ? `${dateStr} · ${rows.length} ${rows.length === 1 ? 'signal' : 'signals'}` : '—'
+  const showSeeAll = me.plan === 'pro' && hasMoreLocked(rows)
 
   return (
     <div>
@@ -67,11 +109,18 @@ function SignalColumn({ kind }) {
           {isBuy ? 'Buy signals' : 'Sell signals'}
         </h2>
         <span className="sub">{sub}</span>
+        {showSeeAll && (
+          <button className="see-all-cta" onClick={unlockAll}>
+            {isBuy ? 'Unlock all today' : 'See all'} · {fmtCents(me.see_all_price_cents)}
+          </button>
+        )}
       </div>
       <PagedTable
         head={HEAD}
         rows={rows}
-        row={(s, i) => <SignalRow key={i} s={s} />}
+        row={(s, i) => isLocked(s)
+          ? <LockedRow key={i} s={s} kind={kind} onUnlock={unlockRow} />
+          : <FullRow key={i} s={s} />}
         emptyLabel={isBuy ? 'No buy signals today.' : 'No sell signals today.'}
         colspan={6}
       />

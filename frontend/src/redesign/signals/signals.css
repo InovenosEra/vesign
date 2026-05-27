@@ -177,3 +177,11 @@
   .rd .health .s.off { background: rgba(255,255,255,0.10); }
   .rd .vqs-pill { display: inline-block; padding: 1px 6px; border-radius: 3px; font-family: var(--mono); font-size: 10.5px; font-weight: 600; background: rgba(168,85,247,0.13); color: var(--purple); }
   .rd .mini-spark { display: inline-block; vertical-align: middle; }
+
+.locked-row td { background: repeating-linear-gradient(45deg, var(--surface-2, #14171c), var(--surface-2, #14171c) 8px, transparent 8px, transparent 16px); }
+.lock-cell { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 2px 6px; }
+.lock-veil { font-family: var(--mono); letter-spacing: 2px; color: var(--ink-3, #4a5160); filter: blur(0.3px); user-select: none; }
+.lock-note { font-size: 12px; color: var(--ink-3, #6b7280); text-transform: uppercase; letter-spacing: .04em; }
+.lock-cta, .see-all-cta { font-family: var(--mono); font-size: 12px; border: 1px solid var(--accent, #2e7d32); color: var(--accent, #4ade80); background: transparent; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.lock-cta:hover, .see-all-cta:hover { background: var(--accent, #2e7d32); color: #fff; }
+.see-all-cta { margin-left: auto; }
