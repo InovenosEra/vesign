@@ -72,3 +72,15 @@ def test_max_buy_signals_are_full(api):
     rows = client.get("/api/signals/today?signal=BUY&market=US").json()
     assert rows and all(r.get("ticker") for r in rows)
     del os.environ["DEV_PLAN"]
+
+
+def test_me_reports_plan_balance_and_prices(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "pro"
+    os.environ["DEV_WALLET_CENTS"] = "250"
+    d = client.get("/api/me").json()
+    assert d["plan"] == "pro"
+    assert d["balance_cents"] == 250
+    assert d["per_row_price_cents"] == 10
+    assert d["see_all_price_cents"] == 50
+    del os.environ["DEV_PLAN"]; del os.environ["DEV_WALLET_CENTS"]

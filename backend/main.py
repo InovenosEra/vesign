@@ -2268,6 +2268,17 @@ def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
     return ent.gate_open_trades(rows, plan=plan, unlocks=unlocks)
 
 
+@protected.get("/api/me")
+def me_entitlements(user=Depends(get_current_user)):
+    uid = user["id"]
+    return {
+        "plan": ent.get_plan(uid),
+        "balance_cents": ent.get_balance(uid),
+        "per_row_price_cents": ent.PER_ROW_PRICE_CENTS,
+        "see_all_price_cents": ent.SEE_ALL_PRICE_CENTS,
+    }
+
+
 @protected.get("/api/trades/open/export")
 @protected.get("/api/trades/open/export.xlsx")  # legacy alias
 def open_trades_export(
