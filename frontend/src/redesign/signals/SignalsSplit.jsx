@@ -26,23 +26,37 @@ const HEAD = (
   </tr>
 )
 
-function LockedRow({ s, kind, onUnlock }) {
+// Decoy values for locked rows — never real data. The cells are CSS-blurred so
+// they read as "real but obscured"; the actual ticker/numbers are placeholders,
+// so nothing identifiable is in the DOM even with the blur removed.
+const FAKE_SIG = [
+  { tk: 'ABCD',  co: 'Holdings Inc',     price: '182.40', up: '+14.2%', vqs: 8, ml: '+6.1%', h: 4 },
+  { tk: 'ABC',   co: 'Capital Group',    price: '88.10',  up: '+9.7%',  vqs: 9, ml: '+3.4%', h: 5 },
+  { tk: 'ABCDE', co: 'Technologies',     price: '245.30', up: '+5.6%',  vqs: 7, ml: '+2.2%', h: 3 },
+  { tk: 'ABCD',  co: 'Industries Ltd',   price: '57.90',  up: '+11.8%', vqs: 8, ml: '+4.9%', h: 4 },
+  { tk: 'ABCD',  co: 'Global Partners',  price: '134.05', up: '+7.3%',  vqs: 9, ml: '+5.5%', h: 5 },
+]
+
+function LockedRow({ s, kind, onUnlock, idx = 0 }) {
   const me = useMe()
-  const canPay = s.reason === 'pay'
-  const label = canPay && kind === 'BUY'
-    ? `Unlock · ${fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)}`
-    : canPay ? 'Locked — see all below' : 'Upgrade to unlock'
+  const f = FAKE_SIG[idx % FAKE_SIG.length]
+  const canPayRow = s.reason === 'pay' && kind === 'BUY'
   return (
     <tr className="locked-row">
-      <td colSpan={6}>
-        <div className="lock-cell">
-          <span className="lock-veil" aria-hidden>████  ███████████</span>
-          {canPay && kind === 'BUY' ? (
-            <button className="lock-cta" onClick={() => onUnlock(s)}>{label}</button>
-          ) : (
-            <span className="lock-note">{label}</span>
-          )}
+      <td>
+        <div className="ticker-cell lock-blur" aria-hidden="true">
+          <span className="logo-skel" />
+          <span className="tk">{f.tk}</span><span className="co">{f.co}</span>
         </div>
+      </td>
+      <td className="r"><span className="lock-blur" aria-hidden="true">{f.price}</span></td>
+      <td className="r up"><span className="lock-blur" aria-hidden="true">{f.up}</span></td>
+      <td className="r"><span className="health lock-blur" aria-hidden="true">{healthDots(f.h)}</span></td>
+      <td className="r"><span className="vqs-pill lock-blur" aria-hidden="true">{f.vqs}</span></td>
+      <td className="r" style={{ paddingRight: 18 }}>
+        {canPayRow
+          ? <button className="lock-pill" onClick={() => onUnlock(s)} title="Unlock this signal">🔓 {fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)}</button>
+          : <span className="lock-pill">🔒 {s.reason === 'pay' ? 'See all' : 'Upgrade'}</span>}
       </td>
     </tr>
   )
@@ -119,7 +133,7 @@ function SignalColumn({ kind }) {
         head={HEAD}
         rows={rows}
         row={(s, i) => isLocked(s)
-          ? <LockedRow key={i} s={s} kind={kind} onUnlock={unlockRow} />
+          ? <LockedRow key={i} s={s} kind={kind} onUnlock={unlockRow} idx={i} />
           : <FullRow key={i} s={s} />}
         emptyLabel={isBuy ? 'No buy signals today.' : 'No sell signals today.'}
         colspan={6}
