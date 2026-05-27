@@ -1013,6 +1013,7 @@ def signals_export(
     sort_dir: str = Query(default="desc"),
     market: Optional[str] = None,
     format: str = Query(default="xlsx", description="xlsx | csv | zip"),
+    user=Depends(get_current_user),
 ):
     """Export of the Signals table — full per-ticker columns, all history, in
     the chosen `format` (xlsx / csv / zip-of-csv).
@@ -1052,6 +1053,14 @@ def signals_export(
     if search:
         conditions.append("(LOWER(s.ticker) LIKE :search OR LOWER(c.company) LIKE :search)")
         params["search"] = f"%{search.lower()}%"
+
+    # Paywall: non-Max exports must not leak today's premium BUY/SELL identities.
+    if ent.get_plan(user["id"]) != "max":
+        _today = _get_signals_today_cached(mkt)
+        _latest = ent._norm_date(_today[0]["date"]) if _today else None
+        if _latest:
+            conditions.append("NOT (s.signal IN ('BUY','SELL') AND DATE(s.date) = :latest_date)")
+            params["latest_date"] = _latest
 
     where = "WHERE " + " AND ".join(conditions)
 
@@ -2344,8 +2353,12 @@ def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
 def open_trades_export(
     market: Optional[str] = None,
     format: str = Query(default="xlsx", description="xlsx | csv | zip"),
+    user=Depends(get_current_user),
 ):
     """Export of currently open positions (BUY with no subsequent SELL) — xlsx/csv/zip."""
+    if ent.get_plan(user["id"]) != "max":
+        raise HTTPException(status_code=402, detail={"code": "UPGRADE_REQUIRED"})
+
     from backend.exports import dispatch_dataframe_response
 
     mkt = (market or "US").upper()

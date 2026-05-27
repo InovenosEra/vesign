@@ -21,7 +21,14 @@ def api():
         conn.execute(text("""CREATE TABLE signals (date TEXT, ticker TEXT, close REAL,
             rsi REAL, target_mean_price REAL, target_low_price REAL, target_high_price REAL,
             prediction_score REAL, vqs INTEGER, signal TEXT, lot_seq INTEGER,
-            health_score INTEGER, fair_value_upside REAL)"""))
+            health_score INTEGER, fair_value_upside REAL,
+            rsi_3day_flag INTEGER, bb_condition INTEGER, analyst_condition INTEGER,
+            volume_flag INTEGER, week52_condition INTEGER, health_condition INTEGER,
+            ml_condition INTEGER, open REAL, high REAL, low REAL, volume REAL,
+            bb_high REAL, bb_low REAL, macd REAL, rsi_factor REAL, bb_factor REAL,
+            macd_factor REAL, trend_factor REAL, volume_sma_20 REAL, volume_ratio REAL,
+            week52_high REAL, pct_from_52w_high REAL, number_of_analysts INTEGER,
+            bb_pct_b REAL, score REAL, vesign_score REAL, news_block_reason TEXT)"""))
         conn.execute(text("""CREATE TABLE companies (ticker TEXT PRIMARY KEY, company TEXT,
             market TEXT, industry TEXT, domain TEXT, description TEXT, description_short TEXT,
             logo_url TEXT, sector TEXT)"""))
@@ -42,6 +49,9 @@ def api():
         # Required by /api/signals subquery: (s.close * shares_outstanding) AS market_cap
         conn.execute(text("""CREATE TABLE market_cap_history (
             ticker TEXT, date TEXT, shares_outstanding REAL)"""))
+        # Required by _build_open_trades: ML prediction fields at buy date
+        conn.execute(text("""CREATE TABLE predictions (
+            ticker TEXT, date TEXT, pred_5d REAL, pred_20d REAL, prediction_score REAL)"""))
         for i in range(3):
             conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES (:t,:t,'US')"),
                          {"t": f"T{i}"})
@@ -198,4 +208,26 @@ def test_api_signals_list_full_for_max(api):
     os.environ["DEV_PLAN"] = "max"
     rows = client.get("/api/signals?signal=BUY&market=US&months=120").json()["data"]
     assert rows and all(r.get("ticker") for r in rows)
+    del os.environ["DEV_PLAN"]
+
+
+def test_signals_export_excludes_today_buys_for_nonmax(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "free"
+    free_csv = client.get("/api/signals/export?market=US&format=csv").content
+    assert b"T0" not in free_csv and b"T1" not in free_csv  # today's BUYs excluded
+    os.environ["DEV_PLAN"] = "max"
+    max_csv = client.get("/api/signals/export?market=US&format=csv").content
+    assert b"T0" in max_csv                                  # max gets everything
+    del os.environ["DEV_PLAN"]
+
+
+def test_open_trades_export_is_max_only(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "free"
+    assert client.get("/api/trades/open/export?market=US&format=csv").status_code == 402
+    os.environ["DEV_PLAN"] = "pro"
+    assert client.get("/api/trades/open/export?market=US&format=csv").status_code == 402
+    os.environ["DEV_PLAN"] = "max"
+    assert client.get("/api/trades/open/export?market=US&format=csv").status_code != 402
     del os.environ["DEV_PLAN"]
