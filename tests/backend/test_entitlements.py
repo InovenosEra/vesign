@@ -72,3 +72,57 @@ def test_lock_token_is_stable_and_opaque(ent):
 def test_set_plan_invalid_raises(ent):
     with pytest.raises(ValueError):
         ent.set_plan("user_x", "platinum")
+
+
+def _sig(ticker, date="2026-05-26 00:00:00"):
+    return {"ticker": ticker, "company": ticker + " Inc", "logo_url": "x.png",
+            "close": 100.0, "fair_value_upside": 0.2, "vqs": 9,
+            "prediction_score": 0.3, "signal": "BUY", "date": date}
+
+
+def test_max_sees_full_buy_rows(ent):
+    rows = [_sig("AAPL"), _sig("MSFT")]
+    out = ent.gate_signals(rows, kind="BUY", plan="max", unlocks=set())
+    assert out == rows                         # untouched
+
+
+def test_free_buy_rows_are_locked_and_carry_no_identity(ent):
+    out = ent.gate_signals([_sig("AAPL")], kind="BUY", plan="free", unlocks=set())
+    r = out[0]
+    assert r["locked"] is True and r["reason"] == "upgrade"
+    for leaky in ("ticker", "company", "logo_url", "close", "fair_value_upside", "vqs"):
+        assert leaky not in r                  # SECURITY INVARIANT
+    assert "unlock_price_cents" not in r       # free can't purchase
+    assert "lock_token" not in r
+
+
+def test_pro_buy_rows_locked_with_per_row_price_and_token(ent):
+    out = ent.gate_signals([_sig("AAPL")], kind="BUY", plan="pro", unlocks=set())
+    r = out[0]
+    assert r["locked"] is True and r["reason"] == "pay"
+    assert r["unlock_price_cents"] == ent.PER_ROW_PRICE_CENTS
+    assert r["lock_token"] == ent.lock_token("buy", "AAPL", "2026-05-26")
+    assert "ticker" not in r
+
+
+def test_pro_buy_row_unlocked_is_full(ent):
+    unlocks = {("buy", "AAPL", "2026-05-26")}
+    out = ent.gate_signals([_sig("AAPL")], kind="BUY", plan="pro", unlocks=unlocks)
+    assert out[0]["ticker"] == "AAPL" and not out[0].get("locked")
+
+
+def test_pro_sell_previews_first_ten_then_locks_bulk_only(ent):
+    rows = [_sig(f"T{i}", ) for i in range(12)]
+    for r in rows: r["signal"] = "SELL"
+    out = ent.gate_signals(rows, kind="SELL", plan="pro", unlocks=set())
+    assert out[0]["ticker"] == "T0"            # first 10 visible
+    assert out[9]["ticker"] == "T9"
+    assert out[10]["locked"] is True and out[10]["reason"] == "pay"
+    assert "unlock_price_cents" not in out[10] # SELL is bulk-only (no per-row price)
+    assert "lock_token" in out[10]
+
+
+def test_free_sell_rows_all_locked(ent):
+    rows = [_sig("AAPL")]; rows[0]["signal"] = "SELL"
+    out = ent.gate_signals(rows, kind="SELL", plan="free", unlocks=set())
+    assert out[0]["locked"] is True and out[0]["reason"] == "upgrade"

@@ -149,3 +149,53 @@ def record_unlock(user_id: str, kind: str, ticker: str, signal_date: str) -> Non
 def lock_token(kind: str, ticker: str, signal_date: str) -> str:
     msg = f"{kind}|{ticker}|{signal_date}".encode()
     return hmac.new(_UNLOCK_SECRET, msg, hashlib.sha256).hexdigest()
+
+
+def _norm_date(value) -> str:
+    return str(value or "")[:10]
+
+
+def _locked_row(kind, signal_date, reason, *, price_cents=None, token=None,
+                reveal=None, revealed_values=None) -> dict:
+    """A redacted row. Carries NO identifying fields — only what the UI needs
+    to render a faded row and (for Pro) a purchase affordance."""
+    row = {
+        "locked": True,
+        "kind": kind,
+        "signal_date": signal_date,
+        "reason": reason,                # 'upgrade' | 'pay'
+        "reveal": reveal or [],
+    }
+    if price_cents is not None:
+        row["unlock_price_cents"] = price_cents
+    if token is not None:
+        row["lock_token"] = token
+    if revealed_values:
+        row.update(revealed_values)
+    return row
+
+
+def gate_signals(rows, *, kind, plan, unlocks):
+    """Redact a BUY or SELL list for the given plan. Returns a NEW list; full
+    rows are passed through by reference (read-only), locked rows are fresh."""
+    k = kind.lower()                     # 'buy' | 'sell'
+    if plan == "max":
+        return list(rows)
+    out = []
+    for i, r in enumerate(rows):
+        date = _norm_date(r.get("date"))
+        if plan == "free":
+            out.append(_locked_row(k, date, "upgrade"))
+            continue
+        # pro
+        ticker = r.get("ticker")
+        if (k, ticker, date) in unlocks:
+            out.append(r)
+            continue
+        if k == "sell" and i < PRO_PREVIEW_ROWS:
+            out.append(r)               # free 10-row preview (SELL only)
+            continue
+        price = PER_ROW_PRICE_CENTS if k == "buy" else None   # SELL is bulk-only
+        out.append(_locked_row(k, date, "pay", price_cents=price,
+                               token=lock_token(k, ticker, date)))
+    return out
