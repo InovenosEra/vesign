@@ -8,19 +8,33 @@ import PageHead from './signals/PageHead'
 import SignalsSplit from './signals/SignalsSplit'
 import OpenTrades from './signals/OpenTrades'
 import ClosedTrades from './signals/ClosedTrades'
+import { tradeWindow } from './signals/util'
+import { useReady, PageSkeleton } from './LoadGate'
+import { getSignalsToday, getOpenTrades, getStats, getTrades } from '../api'
 
 export default function SignalsPage() {
   const [tab, setTab] = useState('today')
+  const { start, end } = tradeWindow()
+  // Both panes mount (display toggled), so all their queries fire on load. Gate
+  // each pane so its sections appear together instead of popping in piecemeal.
+  const todayReady = useReady(true, [
+    [['signals-today', 'BUY', 'US'], () => getSignalsToday('BUY', 'US')],
+    [['signals-today', 'SELL', 'US'], () => getSignalsToday('SELL', 'US')],
+    [['open-trades', 'US'], () => getOpenTrades('US')],
+  ])
+  const closedReady = useReady(true, [
+    [['stats'], getStats],
+    [['trades', start, end, 'US'], () => getTrades({ start, end, market: 'US' })],
+  ])
   return (
     <>
       <PageHead tab={tab} setTab={setTab} />
       <div className="body">
         <div className={'tab-pane' + (tab === 'today' ? ' active' : '')}>
-          <SignalsSplit />
-          <OpenTrades />
+          {todayReady ? <><SignalsSplit /><OpenTrades /></> : <PageSkeleton />}
         </div>
         <div className={'tab-pane' + (tab === 'closed' ? ' active' : '')}>
-          <ClosedTrades />
+          {closedReady ? <ClosedTrades /> : <PageSkeleton />}
         </div>
       </div>
     </>

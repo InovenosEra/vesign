@@ -4,13 +4,14 @@
  * comparison, holdings table) + a Watchlists tab. */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getPortfolioHoldings, getPortfolioComparison } from '../api'
+import { getPortfolioHoldings, getPortfolioComparison, getPortfolioPerformance } from '../api'
 import KpiStrip from './portfolio/KpiStrip'
 import PerformanceChart from './portfolio/PerformanceChart'
 import AllocationDonut from './portfolio/AllocationDonut'
 import WatchlistComparison from './portfolio/WatchlistComparison'
 import HoldingsTable from './portfolio/HoldingsTable'
 import WatchlistsTab from './portfolio/WatchlistsTab'
+import { useReady, PageSkeleton } from './LoadGate'
 import './portfolio/portfolio.css'
 
 function computeRows(holdings) {
@@ -48,6 +49,13 @@ export default function PortfolioPage() {
   const [tab, setTab] = useState('holdings')
   const { data: holdings } = useQuery({ queryKey: ['portfolio-holdings'], queryFn: () => getPortfolioHoldings('US'), refetchInterval: 3_000 })
   const { data: cmp } = useQuery({ queryKey: ['portfolio-comparison'], queryFn: () => getPortfolioComparison('US') })
+  // Gate the holdings tab so KPIs + performance chart + allocation + comparison +
+  // table all appear together (perf chart fetches its own series separately).
+  const holdingsReady = useReady(tab === 'holdings', [
+    [['portfolio-holdings'], () => getPortfolioHoldings('US')],
+    [['portfolio-comparison'], () => getPortfolioComparison('US')],
+    [['portfolio-performance'], () => getPortfolioPerformance('US')],
+  ])
 
   const arr = Array.isArray(holdings) ? holdings : []
   const { rows, totals, best, worst, largest } = computeRows(arr)
@@ -82,7 +90,9 @@ export default function PortfolioPage() {
       <div className="body">
         {tab === 'holdings' && (
           <div id="holdings" className="tab-pane active">
-            {!rows.length ? (
+            {!holdingsReady ? (
+              <PageSkeleton />
+            ) : !rows.length ? (
               <div className="section-h"><span className="sub">No holdings yet.</span></div>
             ) : (
               <>
