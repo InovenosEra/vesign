@@ -29,12 +29,11 @@ const ContactPage = lazy(() => import('./pages/ContactPage'))
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
+// Suspense fallback while a page's lazy JS chunk downloads (sub-second). Render
+// nothing rather than a bare "Loading…" label flashing in the corner — the page
+// (and its own skeletons) takes over the instant the chunk resolves.
 function PageFallback() {
-  return (
-    <div style={{ padding: '4rem 2rem', color: 'var(--muted)' }}>
-      Loading…
-    </div>
-  )
+  return null
 }
 
 // gcTime must be ≥ persistOptions.maxAge so persisted entries aren't dropped
