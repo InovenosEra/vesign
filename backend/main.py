@@ -758,14 +758,22 @@ def fx_rates():
 def data_status():
     """Freshness check for the stale-data banner.
 
-    Returns the latest US signal date vs. the last NYSE trading session. If the
-    daily pipeline OOM'd or was skipped, `stale=True` and the UI shows a banner.
+    `expected` is the most recent NYSE session the daily 07:00 pipeline should
+    already have ingested — i.e. the last session STRICTLY BEFORE the most recent
+    07:00 run that has finished. A session's data only lands at the *next*
+    morning's run, so between midnight and ~08:00 we must NOT expect the session
+    that just closed (otherwise the banner false-alarms every night). `days_stale`
+    counts missed NYSE *sessions*, not calendar days.
     """
-    from datetime import timedelta as _td
-    today = date.today()
-    # Last closed US trading session (prior day, holiday-aware via XNYS calendar).
-    sched = _nyse_cal.schedule(today - _td(days=14), today - _td(days=1))
-    expected = sched.index[-1].date() if len(sched) else (today - _td(days=1))
+    from datetime import timedelta as _td, datetime as _dt
+    PIPELINE_DONE_HOUR = 8  # daily run fires at 07:00 and finishes well before 08:00
+    now = _dt.now()
+    # Most recent 07:00 run that has completed: today's if we're past the done-hour,
+    # otherwise yesterday's. The run on day D ingests sessions up to the last
+    # trading day strictly before D.
+    last_run_date = now.date() if now.hour >= PIPELINE_DONE_HOUR else now.date() - _td(days=1)
+    sched = _nyse_cal.schedule(last_run_date - _td(days=14), last_run_date - _td(days=1))
+    expected = sched.index[-1].date() if len(sched) else (last_run_date - _td(days=1))
 
     with engine.connect() as conn:
         r = conn.execute(text(
@@ -777,7 +785,12 @@ def data_status():
         return {"latest": None, "expected": expected.isoformat(), "stale": True, "days_stale": None}
 
     latest_d = date.fromisoformat(latest_str)
-    days_stale = (expected - latest_d).days
+    # Count missed trading sessions (not calendar days) between what we have and expect.
+    if latest_d >= expected:
+        days_stale = 0
+    else:
+        missed = _nyse_cal.schedule(latest_d + _td(days=1), expected)
+        days_stale = len(missed)
     return {
         "latest":      latest_str,
         "expected":    expected.isoformat(),
