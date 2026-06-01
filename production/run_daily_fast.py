@@ -25,6 +25,7 @@ from portfolio.allocator import run_allocator
 # Import repair + validation functions from run_daily (single source of truth)
 from production.run_daily import (
     _repair_price_gaps, _repair_market_caps, _repair_analyst_targets,
+    _repair_market_cap_history,
     _validate_pipeline,
 )
 
@@ -77,6 +78,7 @@ def run_daily_fast():
     run_allocator()
 
     # ── Remaining self-healing repairs ───────────────────────────────────────
+    _repair_market_cap_history()  # before _repair_market_caps: fills its Stage-2 fallback source
     _repair_market_caps()
 
     # ── Final validation: log PASS/FAIL for every data layer ─────────────────

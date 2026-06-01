@@ -230,6 +230,7 @@
   "login.welcome": "Welcome to Vesign",
   "login.aboutUs": "About us",
   "landing.statSignals": "Signals generated",
+  "landing.statSignalsYear": "Signals generated / year",
   "landing.statWinRate": "Avg. win rate",
   "landing.statAvgYield": "Avg. yield per trade",
   "landing.statStocks": "Stocks scanned daily",

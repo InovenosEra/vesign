@@ -213,6 +213,7 @@
   "login.welcome": "Willkommen bei Vesign",
   "login.aboutUs": "Über uns",
   "landing.statSignals": "Generierte Signale",
+  "landing.statSignalsYear": "Generierte Signale / Jahr",
   "landing.statWinRate": "Ø Gewinnrate",
   "landing.statAvgYield": "Ø Rendite pro Trade",
   "landing.statStocks": "Täglich gescannte Aktien",

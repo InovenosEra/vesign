@@ -43,10 +43,10 @@ const DIMENSIONS = [
 ]
 
 const STATS = [
-  { display: '1,500+', labelKey: 'landing.statStocks' },
-  { display: '900+',   labelKey: 'landing.statSignals' },
-  { display: '~80%',   labelKey: 'landing.statWinRate' },
-  { display: '~25%',   labelKey: 'landing.statAvgYield' },
+  { display: '1,800',  labelKey: 'landing.statStocks' },
+  { display: '~300',   labelKey: 'landing.statSignalsYear' },
+  { display: '~75%',   labelKey: 'landing.statWinRate' },
+  { display: '~30%',   labelKey: 'landing.statAvgYield' },
 ]
 
 function AboutContent({ standalone }) {

@@ -213,6 +213,7 @@
   "login.welcome": "Benvenuto su Vesign",
   "login.aboutUs": "Chi siamo",
   "landing.statSignals": "Segnali generati",
+  "landing.statSignalsYear": "Segnali generati / anno",
   "landing.statWinRate": "Tasso di successo medio",
   "landing.statAvgYield": "Rendimento medio per operazione",
   "landing.statStocks": "Azioni analizzate ogni giorno",

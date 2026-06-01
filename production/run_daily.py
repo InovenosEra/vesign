@@ -177,6 +177,46 @@ def _repair_market_caps():
     print(f"Market cap repair done: {stage1 + stage2}/{len(tickers)} fixed.")
 
 
+def _repair_market_cap_history():
+    """Backfill market_cap_history for universe tickers that have NO rows at all.
+
+    The All Signals table computes point-in-time M.Cap as
+    close × market_cap_history.shares_outstanding, so a ticker with zero rows
+    renders "—". Onboarding populates this for new tickers, but legacy tickers
+    (added before EV-backfill was standard) or silently-failed fetches stay
+    empty forever — _repair_market_caps only READS this table, never fills it.
+    This closes that gap. Must run BEFORE _repair_market_caps so its Stage-2
+    close×shares fallback can use the freshly-filled rows.
+    """
+    import pandas as pd
+    from production.backfill_historical_marketcap import fetch_enterprise_values
+
+    missing = pd.read_sql(
+        "SELECT co.ticker FROM companies co "
+        "WHERE co.ticker NOT LIKE '%.TA' AND co.ticker NOT IN ('SPY','VOO') "
+        "AND NOT EXISTS (SELECT 1 FROM market_cap_history m WHERE m.ticker = co.ticker)",
+        engine,
+    )["ticker"].tolist()
+    if not missing:
+        print("Market cap history repair: none needed.")
+        return
+    print(f"Market cap history repair: {len(missing)} tickers with 0 rows…")
+    filled, total_rows, failed = 0, 0, []
+    for t in missing:
+        try:
+            rows = fetch_enterprise_values(t)
+            if not rows:
+                failed.append(t)
+                continue
+            pd.DataFrame(rows).to_sql("market_cap_history", engine, if_exists="append", index=False)
+            filled += 1
+            total_rows += len(rows)
+        except Exception:
+            failed.append(t)
+    print(f"Market cap history repair done: {filled}/{len(missing)} filled "
+          f"({total_rows} rows); empty/failed: {len(failed)}")
+
+
 def _repair_fundamentals(limit=200):
     """Fill/refresh TTM fundamentals (P/E, EPS, revenue, margins, ROE, D/E).
 
@@ -441,6 +481,7 @@ def run_daily():
     run_allocator()
 
     # ── Remaining self-healing repairs ───────────────────────────────────────
+    _repair_market_cap_history()  # before _repair_market_caps: fills its Stage-2 fallback source
     _repair_market_caps()
     _repair_fundamentals()
     _download_missing_logos()
