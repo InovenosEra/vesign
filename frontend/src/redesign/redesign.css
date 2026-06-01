@@ -582,3 +582,17 @@
 .rd .hs-row.sel::after { content: '✓'; margin-left: auto; color: var(--blue-2); font-size: 12px; }
 .rd .hs-row .hs-sym { font-size: 13px; width: 14px; text-align: center; }
 .rd .hs-row .hs-flag { font-size: 16px; }
+
+/* --- Overview load skeleton: sections paint together instead of popping in --- */
+@keyframes rdShimmer { 0% { background-position: -450px 0; } 100% { background-position: 450px 0; } }
+.rd-skel {
+  background-color: rgba(255,255,255,0.045);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,0.07) 45%, rgba(255,255,255,0.11) 50%, rgba(255,255,255,0.07) 55%, rgba(255,255,255,0) 100%);
+  background-size: 450px 100%;
+  background-repeat: no-repeat;
+  animation: rdShimmer 1.3s ease-in-out infinite;
+  border-radius: 10px;
+}
+.ov-skel { display: flex; flex-direction: column; gap: 20px; }
+.ov-skel-h { height: 15px; width: 210px; opacity: 0.65; }
+.ov-skel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
