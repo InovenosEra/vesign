@@ -3085,6 +3085,7 @@ def research_ticker(
         "de_ratio":            _v(row.get("de_ratio")),
         "signal":              _v(row.get("signal")),
         "close":               _v(close),
+        "vqs":                 _v(row.get("vqs")),
         "vesign_score":        int(row["vesign_score"]) if row.get("vesign_score") is not None else None,
         "rsi":                 _v(row.get("rsi")),
         "bb_pct_b":            _v(row.get("bb_pct_b")),

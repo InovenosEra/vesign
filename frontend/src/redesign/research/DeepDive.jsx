@@ -9,8 +9,9 @@
  * Data: getResearch, getPriceHistory, getEarnings, getNews, getSignalMarkers,
  * searchTickers. */
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getResearch, getPriceHistory, getEarnings, getNews, getSignalMarkers, searchTickers } from '../../api'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getResearch, getPriceHistory, getEarnings, getNews, getSignalMarkers, searchTickers,
+  getWatchlists, getWatchlistTickers, addTicker, removeTicker } from '../../api'
 import { num, pct, dateFmt, ago, LOGO } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
 
@@ -23,11 +24,14 @@ const capB = (mc) => mc == null ? '—'
 const healthDots = (n) => [0, 1, 2, 3, 4].map(i => <span key={i} className={'s' + (i < (n || 0) ? '' : ' off')} />)
 // margins/roe/growth come back as raw fractions
 const pctFrac = (f, fd = 1) => f == null ? '—' : (f * 100).toFixed(fd) + '%'
-const RANGES = [['1M', 1], ['3M', 3], ['6M', 6], ['1Y', 12], ['5Y', 60], ['ALL', 60]]
+const RANGES = [['1M', 1], ['3M', 3], ['6M', 6], ['1Y', 12], ['5Y', 60], ['ALL', 600]]
 const RECENT = ['NVDA', 'META', 'MTD', 'MU', 'AAPL']
 
-/* Inline-SVG price line — identical path math to the mockup's paintPriceChart. */
-function PriceChart({ history }) {
+const _day = (d) => String(d || '').slice(0, 10)
+
+/* Inline-SVG price line — identical path math to the mockup's paintPriceChart.
+ * BUY/SELL signal markers are plotted on the line (the legend promises them). */
+function PriceChart({ history, markers }) {
   const W = 800, H = 340
   const out = useMemo(() => {
     if (!Array.isArray(history) || history.length < 2) return null
@@ -45,8 +49,23 @@ function PriceChart({ history }) {
       const dt = new Date(history[Math.round(i / 6 * (N - 1))].date)
       return dt.toLocaleDateString(undefined, { month: 'short' })
     })
-    return { pts, fill, dx, dy, yLabels, xLabels }
-  }, [history])
+    // Map each marker to the nearest in-range price point.
+    const lo = _day(history[0].date), hiD = _day(history[N - 1].date)
+    const marks = (Array.isArray(markers) ? markers : []).map(m => {
+      const md = _day(m.date)
+      if (md < lo || md > hiD) return null
+      let idx = history.findIndex(p => _day(p.date) === md)
+      if (idx < 0) {
+        const mt = new Date(md).getTime()
+        let best = -1, bestD = Infinity
+        history.forEach((p, i) => { const dd = Math.abs(new Date(_day(p.date)).getTime() - mt); if (dd < bestD) { bestD = dd; best = i } })
+        idx = best
+      }
+      if (idx < 0) return null
+      return { x: xFor(idx), y: yFor(history[idx].close), buy: (m.signal || '').toUpperCase() === 'BUY' }
+    }).filter(Boolean)
+    return { pts, fill, dx, dy, yLabels, xLabels, marks }
+  }, [history, markers])
 
   return (
     <>
@@ -68,6 +87,13 @@ function PriceChart({ history }) {
           <line x1="0" x2="800" y1="272" y2="272" stroke="rgba(255,255,255,0.04)" />
           <path d={out?.fill || ''} fill="url(#dd-nvda-grad)" />
           <polyline fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinejoin="round" points={out?.pts || ''} />
+          {(out?.marks || []).map((m, i) => (
+            <polygon key={i}
+              points={m.buy
+                ? `${m.x},${m.y + 13} ${m.x - 5},${m.y + 22} ${m.x + 5},${m.y + 22}`
+                : `${m.x},${m.y - 13} ${m.x - 5},${m.y - 22} ${m.x + 5},${m.y - 22}`}
+              fill={m.buy ? '#00d97e' : '#ff4d5c'} stroke="#0b0e14" strokeWidth="1" />
+          ))}
           {out && <circle cx={out.dx} cy={out.dy} r="4" fill="#60a5fa" />}
         </svg>
       </div>
@@ -98,6 +124,31 @@ export default function DeepDive({ ticker, setTicker }) {
   // Live search suggestions for the deep-dive input.
   const { data: suggestions } = useQuery({
     queryKey: ['dd-search', sugQ], queryFn: () => searchTickers(sugQ, 6), enabled: sugQ.trim().length >= 1,
+  })
+
+  // Watchlist membership — powers the "In your watchlists" cell + the Watchlist button.
+  const qc = useQueryClient()
+  const { data: watchlists } = useQuery({ queryKey: ['dd-watchlists'], queryFn: getWatchlists })
+  const wlIds = (watchlists || []).map(w => w.id).join(',')
+  const { data: membership } = useQuery({
+    queryKey: ['dd-membership', ticker, wlIds],
+    enabled: !!ticker && Array.isArray(watchlists) && watchlists.length > 0,
+    queryFn: async () => Promise.all((watchlists || []).map(async w => {
+      const ts = await getWatchlistTickers(w.id).catch(() => [])
+      const has = Array.isArray(ts) && ts.some(x => (x.ticker || x) === ticker)
+      return { id: w.id, name: w.name, has }
+    })),
+  })
+  const memberOf = (membership || []).filter(m => m.has)
+  const firstList = (watchlists || [])[0]
+  const inFirst = !!(membership || []).find(m => m.id === firstList?.id)?.has
+  const toggleWatch = useMutation({
+    mutationFn: async () => {
+      if (!firstList) return
+      if (inFirst) await removeTicker(firstList.id, ticker)
+      else await addTicker(firstList.id, ticker)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dd-membership'] }),
   })
 
   const submit = (t) => {
@@ -174,17 +225,11 @@ export default function DeepDive({ ticker, setTicker }) {
           <div className="px"><span className="s">{symbol}</span><span>{close == null ? '—' : fmtPrice(close).replace(symbol, '')}</span></div>
           <div className={'delta ' + dirCls(ml)}>{ml == null ? '—' : pct(ml)}</div>
           <div className="dd-hero-actions">
-            <div className="btn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
-              Watchlist
-            </div>
-            <div className="btn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18 M7 14l4-4 4 4 5-5" /></svg>
-              Compare
-            </div>
-            <div className="btn primary">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14m-7-7h14" /></svg>
-              New trade
+            <div className={'btn' + (inFirst ? ' primary' : '')}
+              onClick={() => !toggleWatch.isPending && firstList && toggleWatch.mutate()}
+              style={{ cursor: firstList ? 'pointer' : 'default', opacity: toggleWatch.isPending ? 0.6 : 1 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill={inFirst ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
+              {inFirst ? `In ${firstList?.name || 'watchlist'}` : 'Watchlist'}
             </div>
           </div>
         </div>
@@ -207,7 +252,7 @@ export default function DeepDive({ ticker, setTicker }) {
               ))}
             </div>
           </div>
-          <PriceChart history={history} />
+          <PriceChart history={history} markers={markers} />
         </div>
 
         {/* VERDICT */}
@@ -219,7 +264,7 @@ export default function DeepDive({ ticker, setTicker }) {
           <div className="dd-verdict-body">
             <div className="dd-vstat">
               <div className="lbl">VQS score <span className="desc">Vesign quality score (1–10)</span></div>
-              <div className="val purple"><span>{r?.vesign_score ?? '—'}</span> <small style={{ color: 'var(--ink-3)', fontSize: 11 }}>/10</small></div>
+              <div className="val purple"><span>{r?.vqs ?? '—'}</span> <small style={{ color: 'var(--ink-3)', fontSize: 11 }}>/10</small></div>
             </div>
             <div className="dd-vstat">
               <div className="lbl">Predicted upside <span className="desc">to analyst mean target</span></div>
@@ -240,7 +285,11 @@ export default function DeepDive({ ticker, setTicker }) {
             <div className="dd-vstat">
               <div className="lbl">In your watchlists</div>
               <div className="val" style={{ fontSize: 12 }}>
-                <span className="sector-pill" style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 3, fontFamily: 'var(--mono)', fontSize: 10.5, background: 'var(--bg-3)', color: 'var(--ink-2)', marginLeft: 4 }}>Core Tech</span>
+                {memberOf.length
+                  ? memberOf.map(m => (
+                    <span key={m.id} className="sector-pill" style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 3, fontFamily: 'var(--mono)', fontSize: 10.5, background: 'var(--bg-3)', color: 'var(--ink-2)', marginLeft: 4 }}>{m.name}</span>
+                  ))
+                  : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>}
               </div>
             </div>
           </div>
@@ -252,7 +301,6 @@ export default function DeepDive({ ticker, setTicker }) {
         <div className="section-h" style={{ padding: '0 4px' }}>
           <h2>Fundamentals</h2>
           <span className="sub">TTM · last reported</span>
-          <a className="right" href="#">View full financials →</a>
         </div>
         <div className="dd-fund-grid">
           <div className="dd-fund-cell"><div className="l">Market Cap</div><div className="v">{capB(r?.market_cap)}</div></div>
@@ -298,7 +346,7 @@ export default function DeepDive({ ticker, setTicker }) {
             <div className="dd-an-rec">
               <div className="cell"><div className="l">Upside to mean</div><div className={'v ' + dirCls(up)}>{up == null ? '—' : pct(up)}</div></div>
               <div className="cell"><div className="l">Analysts</div><div className="v">{r?.number_of_analysts ? Math.round(r.number_of_analysts) : '—'}</div></div>
-              <div className="cell"><div className="l">VQS</div><div className="v">{r?.vesign_score ?? '—'}<span className="sub">/10</span></div></div>
+              <div className="cell"><div className="l">VQS</div><div className="v">{r?.vqs ?? '—'}<span className="sub">/10</span></div></div>
             </div>
           </div>
         </div>
@@ -307,7 +355,7 @@ export default function DeepDive({ ticker, setTicker }) {
         <div className="dd-panel">
           <div className="dd-panel-head">
             <h3>ML predictions</h3>
-            <span className="meta">Walk-forward model · v2.4</span>
+            <span className="meta">Walk-forward model</span>
           </div>
           <div className="dd-ml-body">
             <div className="dd-ml-row">
@@ -323,24 +371,12 @@ export default function DeepDive({ ticker, setTicker }) {
             </div>
             <div className="dd-ml-row">
               <div className="top">
-                <span className="lbl">20-day return</span>
-                <span className="pred up">+8.2%</span>
+                <span className="lbl">Direction (5d)</span>
+                <span className={'pred ' + dirCls(ml)}>{ml == null ? '—' : ml > 0 ? 'UP' : ml < 0 ? 'DOWN' : 'FLAT'}</span>
               </div>
-              <div className="bar"><span className="fill" style={{ width: '41%' }} /></div>
               <div className="conf">
-                <span>Confidence <span className="v">Medium</span></span>
-                <span>Range +4.4% — +12.8%</span>
-              </div>
-            </div>
-            <div className="dd-ml-row">
-              <div className="top">
-                <span className="lbl">Direction probability (5d)</span>
-                <span className="pred up">78% UP</span>
-              </div>
-              <div className="bar"><span className="fill" style={{ width: '28%' }} /></div>
-              <div className="conf">
-                <span>Up <span className="v">78%</span></span>
-                <span>Down <span className="v">22%</span></span>
+                <span>Model</span>
+                <span>Walk-forward · quarterly retrain</span>
               </div>
             </div>
           </div>
@@ -356,7 +392,6 @@ export default function DeepDive({ ticker, setTicker }) {
               ? `${r.trade_count} closed trade${r.trade_count === 1 ? '' : 's'} on ${ticker}` + (r.win_rate != null ? ` · WR ${r.win_rate.toFixed(0)}%` : '')
               : `No closed Vesign trades on ${ticker} yet`}
           </span>
-          <a className="right" href="#">View all signals →</a>
         </div>
         <div className="dd-panel">
           <div className="dd-history-body">
@@ -388,7 +423,6 @@ export default function DeepDive({ ticker, setTicker }) {
         <div className="section-h" style={{ padding: '0 4px' }}>
           <h2>Recent news</h2>
           <span className="sub">Latest</span>
-          <a className="right" href="#">All {ticker} news →</a>
         </div>
         <div className="dd-panel">
           <div className="dd-news-body">
