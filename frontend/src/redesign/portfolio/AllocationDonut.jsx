@@ -2,15 +2,13 @@
  * Ported from portfolio-v1.html's donut render (extended with real toggle state). */
 import { useState } from 'react'
 import { num, pct } from '../fmt'
+import { useCurrency } from '../../context/CurrencyContext'
 
 const DONUT_COLORS = ['#3b82f6', '#22d3ee', '#00d97e', '#a855f7', '#f59e0b', '#ec4899', '#60a5fa', '#6b7280']
 const C = 2 * Math.PI * 38 // circumference, r=38
 
 function group(rows, mode) {
-  const keyOf = (r) =>
-    mode === 'sector' ? (r.industry || 'Other')
-      : mode === 'watchlist' ? 'My Holdings'
-      : r.ticker
+  const keyOf = (r) => mode === 'industry' ? (r.industry || 'Other') : r.ticker
   const map = new Map()
   rows.filter(r => r.value).forEach(r => {
     const k = keyOf(r)
@@ -27,7 +25,8 @@ function group(rows, mode) {
 }
 
 export default function AllocationDonut({ rows, totalValue, totalYld }) {
-  const [mode, setMode] = useState('sector')
+  const [mode, setMode] = useState('industry')
+  const { symbol, rate } = useCurrency()
   const alloc = totalValue > 0 ? group(rows, mode) : []
 
   let offset = 0
@@ -50,9 +49,8 @@ export default function AllocationDonut({ rows, totalValue, totalYld }) {
       <div className="panel-head">
         <h3>Allocation</h3>
         <div className="chips">
-          <span className={'chip' + (mode === 'sector' ? ' active' : '')} onClick={() => setMode('sector')}>Sector</span>
+          <span className={'chip' + (mode === 'industry' ? ' active' : '')} onClick={() => setMode('industry')}>Industry</span>
           <span className={'chip' + (mode === 'ticker' ? ' active' : '')} onClick={() => setMode('ticker')}>Ticker</span>
-          <span className={'chip' + (mode === 'watchlist' ? ' active' : '')} onClick={() => setMode('watchlist')}>Watchlist</span>
         </div>
       </div>
       <div className="alloc-body">
@@ -68,7 +66,7 @@ export default function AllocationDonut({ rows, totalValue, totalYld }) {
           </svg>
           <div className="alloc-center">
             <div className="lbl">Current value</div>
-            <div className="big"><span className="s">$</span><span>{num(totalValue, { fd: 0 })}</span></div>
+            <div className="big"><span className="s">{symbol}</span><span>{num(totalValue * rate, { fd: 0 })}</span></div>
             <div className={'delta ' + (totalYld >= 0 ? 'up' : 'down')}>{pct(totalYld)} lifetime</div>
           </div>
         </div>

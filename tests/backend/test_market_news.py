@@ -29,6 +29,9 @@ def news_app():
                 ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT
             )
         """))
+        # News tickers are validated against the universe (foreign EXCH:TICKER junk
+        # is dropped), so seed the symbols the tests assert carry through.
+        conn.execute(text("INSERT INTO companies (ticker, company) VALUES ('NVDA', 'NVIDIA')"))
     temp_engine.dispose()
 
     import importlib

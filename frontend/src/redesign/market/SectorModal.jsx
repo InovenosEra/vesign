@@ -103,14 +103,13 @@ export default function SectorModal({ sector, onClose }) {
           <table className="sm-tbl">
             <thead><tr>
               <th className="l">Ticker</th><th className="r">Price</th><th className="r">Day</th>
-              <th className="r">Mkt cap</th><th className="r">P/E</th><th className="r">Signal</th><th className="r">VQS</th>
+              <th className="r">Mkt cap</th><th className="r">P/E</th>
             </tr></thead>
             <tbody>
               {isLoading || !d
-                ? <tr><td className="l" colSpan="7" style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 24 }}>{isLoading ? 'Loading…' : 'No data.'}</td></tr>
+                ? <tr><td className="l" colSpan="5" style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 24 }}>{isLoading ? 'Loading…' : 'No data.'}</td></tr>
                 : (d.constituents || []).map((c) => {
                   const wb = WHITE_BG_LOGOS.has(c.ticker) ? ' white-bg' : ''
-                  const sig = (c.signal || 'HOLD').toLowerCase()
                   return (
                     <tr key={c.ticker} data-ticker={c.ticker} onClick={() => openTicker(c.ticker, c.company)}>
                       <td className="l"><div className="sm-tk-cell"><img className={'sm-logo' + wb} src={LOGO(c.ticker)} alt={c.ticker} /><span className="sm-tk">{c.ticker}</span><span className="sm-co">{c.company || ''}</span></div></td>
@@ -118,8 +117,6 @@ export default function SectorModal({ sector, onClose }) {
                       <td className={dir(c.change_pct)}>{fmtPct(c.change_pct)}</td>
                       <td>{capB(c.market_cap)}</td>
                       <td>{c.pe_ttm == null ? '—' : fmtNum(c.pe_ttm, 1)}</td>
-                      <td><span className={'sm-sig ' + sig}>{c.signal || 'HOLD'}</span></td>
-                      <td>{c.vqs == null ? '—' : c.vqs}</td>
                     </tr>
                   )
                 })}

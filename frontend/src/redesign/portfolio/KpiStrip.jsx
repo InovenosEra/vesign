@@ -1,22 +1,25 @@
 /* Portfolio KPI strip — Total Invested / Current Value / P&L / vs Vesign / Best-Worst.
  * Ported from portfolio-v1.html's HOLDINGS KPI render block. */
 import { num, pct } from '../fmt'
+import { useCurrency } from '../../context/CurrencyContext'
 
-export default function KpiStrip({ totals, best, worst, largest, vsVesign }) {
+export default function KpiStrip({ totals, best, worst, largest, vsVesign, watchlistCount }) {
   const { totalCost, totalValue, totalPnl, totalYld, todayDelta, todayPct, count } = totals
+  const { symbol, rate } = useCurrency()
+  const wc = watchlistCount == null ? 1 : watchlistCount
   return (
     <div className="kpi-row">
       <div className="kpi-card">
         <div className="lbl">Total Invested</div>
-        <div className="val"><span className="s">$</span><span>{num(totalCost, { fd: 2 })}</span></div>
-        <div className="delta"><span className="muted">{count} holdings · 1 watchlist</span></div>
+        <div className="val"><span className="s">{symbol}</span><span>{num(totalCost * rate, { fd: 2 })}</span></div>
+        <div className="delta"><span className="muted">{count} holdings · {wc} watchlist{wc === 1 ? '' : 's'}</span></div>
       </div>
 
       <div className="kpi-card accent">
         <div className="lbl">Current Value</div>
-        <div className="val"><span className="s">$</span><span>{num(totalValue, { fd: 2 })}</span></div>
+        <div className="val"><span className="s">{symbol}</span><span>{num(totalValue * rate, { fd: 2 })}</span></div>
         <div className={'delta ' + (todayDelta >= 0 ? 'up' : 'down')}>
-          {todayDelta >= 0 ? '+' : '−'}${num(Math.abs(todayDelta), { fd: 2 })} today
+          {todayDelta >= 0 ? '+' : '−'}{symbol}{num(Math.abs(todayDelta) * rate, { fd: 2 })} today
           <span className="abs">{pct(todayPct)}</span>
         </div>
       </div>
@@ -24,7 +27,7 @@ export default function KpiStrip({ totals, best, worst, largest, vsVesign }) {
       <div className="kpi-card">
         <div className="lbl">Total P&amp;L</div>
         <div className={'val ' + (totalPnl >= 0 ? 'up' : 'down')}>
-          <span className="s">{totalPnl >= 0 ? '+$' : '−$'}</span>{num(Math.abs(totalPnl), { fd: 2 })}
+          <span className="s">{totalPnl >= 0 ? '+' : '−'}{symbol}</span>{num(Math.abs(totalPnl) * rate, { fd: 2 })}
         </div>
         <div className={'delta ' + (totalYld >= 0 ? 'up' : 'down')}>
           {pct(totalYld)}<span className="abs">since inception</span>

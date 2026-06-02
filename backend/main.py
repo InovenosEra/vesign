@@ -1254,7 +1254,8 @@ def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144)):
     """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay)."""
     with engine.connect() as conn:
         df = pd.read_sql(text("""
-            SELECT DATE(date) AS date, signal, lot_seq, close
+            SELECT DATE(date) AS date, signal, lot_seq, close,
+                   vqs, fair_value_upside, CAST(health_score AS INTEGER) AS health_score
             FROM signals
             WHERE ticker = :t
               AND signal IN ('BUY', 'SELL')
@@ -2326,6 +2327,17 @@ def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
     """Tickers with a BUY signal and no SELL since — currently open positions.
     Redacted per the requesting user's plan + unlocks; sorted by yield desc."""
     rows = _get_open_trades_cached((market or "US").upper(), bool(include_lots))
+    # Overlay the live snapshot price (the cache holds the last stored close), and
+    # recompute the unrealized yield off it — matches signals/today + the rest.
+    live = _get_live_snapshot()["prices"]
+    rows = [
+        ({**r, "current_price": round(float(live[r["ticker"]]), 2),
+          "unrealized_pct": round((live[r["ticker"]] - (r.get("avg_cost") or r.get("buy_price")))
+                                  / (r.get("avg_cost") or r.get("buy_price")) * 100, 2)
+          if (r.get("avg_cost") or r.get("buy_price")) else r.get("unrealized_pct")}
+         if live.get(r.get("ticker")) else r)
+        for r in rows
+    ]
     rows = sorted(
         rows,
         key=lambda r: (r.get("unrealized_pct") is not None, r.get("unrealized_pct") or 0.0),
@@ -3953,18 +3965,15 @@ def _build_market_sector_detail(sector: str) -> dict:
         WITH bounds AS (SELECT MAX(date) AS today FROM daily_prices),
         prev_bounds AS (
             SELECT MAX(dp.date) AS prev FROM daily_prices dp, bounds b WHERE dp.date < b.today
-        ),
-        latest_sig AS (SELECT DATE(MAX(date)) AS d FROM signals)
+        )
         SELECT c.ticker, c.company, c.logo_url, f.market_cap, f.pe_ttm,
-               t.close AS close,
+               t.close AS close, p.close AS prev_close,
                ((t.close - p.close) / p.close * 100.0) AS change_pct,
-               s.signal, s.vqs,
-               CAST(COALESCE(s.health_score, h.score) AS INTEGER) AS health_score
+               CAST(h.score AS INTEGER) AS health_score
         FROM companies c
         JOIN daily_prices t ON t.ticker = c.ticker AND t.date = (SELECT today FROM bounds)
         JOIN daily_prices p ON p.ticker = c.ticker AND p.date = (SELECT prev FROM prev_bounds)
         LEFT JOIN fundamentals f ON f.ticker = c.ticker
-        LEFT JOIN signals s ON s.ticker = c.ticker AND DATE(s.date) = (SELECT d FROM latest_sig)
         LEFT JOIN company_health h ON h.ticker = c.ticker
         WHERE c.sector = :sector
           AND COALESCE(c.market, 'US') = 'US'
@@ -3992,9 +4001,16 @@ def _build_market_sector_detail(sector: str) -> dict:
     wsum = 0.0
     adv = dec = 0
     pes = []
+    live = _get_live_snapshot()["prices"]   # overlay live price like the sibling panels
     for r in rows:
         mc = r["market_cap"] or 0
-        cp = r["change_pct"]
+        close = r["close"]
+        lp = live.get(r["ticker"])
+        if lp and r["prev_close"]:
+            close = lp
+            cp = (lp - r["prev_close"]) / r["prev_close"] * 100.0
+        else:
+            cp = r["change_pct"]
         if mc > 0 and cp is not None:
             total_mc += mc
             wsum += mc * cp
@@ -4005,9 +4021,9 @@ def _build_market_sector_detail(sector: str) -> dict:
             pes.append(r["pe_ttm"])
         consts.append({
             "ticker": r["ticker"], "company": r["company"], "logo_url": r["logo_url"],
-            "close": r["close"], "change_pct": round(cp, 4) if cp is not None else None,
+            "close": close, "change_pct": round(cp, 4) if cp is not None else None,
             "market_cap": mc or None, "pe_ttm": round(r["pe_ttm"], 2) if r["pe_ttm"] is not None else None,
-            "signal": r["signal"], "vqs": r["vqs"], "health_score": r["health_score"],
+            "health_score": r["health_score"],
         })
     consts.sort(key=lambda x: x["market_cap"] or 0, reverse=True)
 
@@ -4727,6 +4743,16 @@ def _fetch_top_news(limit: int) -> list | None:
 
 def _build_market_news(limit: int) -> dict:
     items = _fetch_top_news(limit) or []
+    # Validate symbols against our universe so foreign "EXCH:TICKER" forms (e.g.
+    # "NEST:CA" → "CA") don't render a bogus ticker chip / 404 logo / dead research link.
+    cand = {(it.get("symbol") or it.get("ticker") or "").upper() for it in items}
+    cand.discard("")
+    valid_tickers: set = set()
+    if cand:
+        with engine.connect() as conn:
+            sql = text("SELECT ticker FROM companies WHERE ticker IN :tt")\
+                .bindparams(bindparam("tt", expanding=True))
+            valid_tickers = {r[0] for r in conn.execute(sql, {"tt": sorted(cand)})}
     scored = []
     now = datetime.now(timezone.utc)
     seen_urls = set()
@@ -4744,12 +4770,12 @@ def _build_market_news(limit: int) -> dict:
         age_minutes = None
         if published_dt is not None:
             age_minutes = max(0, int((now - published_dt).total_seconds() // 60))
-        symbol = it.get("symbol") or it.get("ticker") or None
+        symbol = (it.get("symbol") or it.get("ticker") or "").upper()
         scored.append((published_dt or _NEWS_EPOCH, {
             "title": it.get("title") or "",
             "source": source,
             "url": url,
-            "ticker": symbol if symbol else None,
+            "ticker": symbol if symbol in valid_tickers else None,
             "image": it.get("image") or None,
             "summary": it.get("text") or None,
             "published_at": published_raw or None,

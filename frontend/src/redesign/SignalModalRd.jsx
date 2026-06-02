@@ -8,8 +8,10 @@
  * Data mirrors research/DeepDive.jsx: getResearch (primary), getPriceHistory
  * (chart), getSignalMarkers (Signal history tab), getNews (News tab). */
 import { useState, useMemo, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getResearch, getPriceHistory, getSignalMarkers, getNews, WHITE_BG_LOGOS } from '../api'
+import { useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getResearch, getPriceHistory, getSignalMarkers, getNews, WHITE_BG_LOGOS,
+  getWatchlists, getWatchlistTickers, addTicker, removeTicker } from '../api'
 import { num, pct, dateFmt, ago, dirClass, LOGO } from './fmt'
 import { useCurrency } from '../context/CurrencyContext'
 import { useLivePrices } from '../hooks/useLivePrices'
@@ -114,6 +116,30 @@ export default function SignalModalRd({ row, onClose }) {
     enabled: !!ticker && tab === 'm-news',
   })
 
+  // Watchlist membership → powers the "Add to watchlist" footer button.
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const { data: watchlists } = useQuery({ queryKey: ['dd-watchlists'], queryFn: getWatchlists })
+  const wlIds = (watchlists || []).map(w => w.id).join(',')
+  const { data: membership } = useQuery({
+    queryKey: ['dd-membership', ticker, wlIds],
+    enabled: !!ticker && Array.isArray(watchlists) && watchlists.length > 0,
+    queryFn: async () => Promise.all((watchlists || []).map(async w => {
+      const ts = await getWatchlistTickers(w.id).catch(() => [])
+      return { id: w.id, has: Array.isArray(ts) && ts.some(x => (x.ticker || x) === ticker) }
+    })),
+  })
+  const firstList = (watchlists || [])[0]
+  const inFirst = !!(membership || []).find(m => m.id === firstList?.id)?.has
+  const toggleWatch = useMutation({
+    mutationFn: async () => {
+      if (!firstList) return
+      if (inFirst) await removeTicker(firstList.id, ticker)
+      else await addTicker(firstList.id, ticker)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dd-membership'] }),
+  })
+
   const close = r?.close ?? row?.price ?? null
   // Live current price (overlaid intraday); entry/target prices stay as stored.
   const { prices: livePx } = useLivePrices(ticker ? [ticker] : [])
@@ -143,7 +169,6 @@ export default function SignalModalRd({ row, onClose }) {
               <div className="tk">{r?.ticker || ticker || '—'}</div>
               <div className="co">{company}</div>
               <div className="meta">
-                {r?.exchange && <span className="pill">{r.exchange}</span>}
                 <span className="pill">{sector}</span>
                 {r?.domain && <a href={'https://' + r.domain} target="_blank" rel="noreferrer">{r.domain} ↗</a>}
               </div>
@@ -164,7 +189,7 @@ export default function SignalModalRd({ row, onClose }) {
           <div className="strip-default" style={{ display: 'contents' }}>
             <span className={'m-sig-tag ' + sigCls(r?.signal)}>{r?.signal || '—'}</span>
             <div className="m-sig-note">
-              VQS <span className="vqs">{r?.vesign_score ?? '—'}</span> · Predicted upside <span className="hl" style={{ color: 'var(--green, #00d97e)' }}>{up == null ? '—' : pct(up)}</span> · Health <span className="hl">{r?.health_score ?? '—'} / 5</span>
+              VQS <span className="vqs">{r?.vqs ?? '—'}</span> · Predicted upside <span className="hl" style={{ color: 'var(--green, #00d97e)' }}>{up == null ? '—' : pct(up)}</span> · Health <span className="hl">{r?.health_score ?? '—'} / 5</span>
             </div>
             <div className="m-sig-since">{r?.trade_count ? <>{r.trade_count} historical trade{r.trade_count === 1 ? '' : 's'}</> : ''}</div>
           </div>
@@ -204,10 +229,10 @@ export default function SignalModalRd({ row, onClose }) {
               </div>
 
               <div className="m-verdict">
-                <div className="m-vrow"><div className="lbl">VQS score<small>Vesign quality (1–10)</small></div><div className="val purple">{r?.vesign_score ?? '—'} / 10</div></div>
+                <div className="m-vrow"><div className="lbl">VQS score<small>Vesign quality (1–10)</small></div><div className="val purple">{r?.vqs ?? '—'} / 10</div></div>
                 <div className="m-vrow"><div className="lbl">Predicted upside<small>to analyst mean</small></div><div className={'val ' + dirClass(up)}>{up == null ? '—' : pct(up)}</div></div>
                 <div className="m-vrow"><div className="lbl">Health<small>5-point score</small></div><div className="val"><span className="health">{healthDots(r?.health_score)}</span></div></div>
-                <div className="m-vrow"><div className="lbl">ML 5-day<small>walk-forward v2.4</small></div><div className={'val ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)}</div></div>
+                <div className="m-vrow"><div className="lbl">ML 5-day<small>walk-forward model</small></div><div className={'val ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)}</div></div>
                 <div className="m-vrow"><div className="lbl">Entry price<small>Vesign target</small></div><div className="val">{close == null ? '—' : fmtPrice(close)}</div></div>
               </div>
             </div>
@@ -316,21 +341,16 @@ export default function SignalModalRd({ row, onClose }) {
         {/* FOOT */}
         <div className="m-foot">
           <div className="actions">
-            <div className="btn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
-              Add to watchlist
-            </div>
-            <div className="btn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18 M7 14l4-4 4 4 5-5" /></svg>
-              Compare
+            <div className={'btn' + (inFirst ? ' primary' : '')}
+              onClick={() => firstList && !toggleWatch.isPending && toggleWatch.mutate()}
+              style={{ cursor: firstList ? 'pointer' : 'default', opacity: toggleWatch.isPending ? 0.6 : 1 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill={inFirst ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
+              {inFirst ? `In ${firstList?.name || 'watchlist'}` : 'Add to watchlist'}
             </div>
           </div>
           <div className="spacer" />
-          <a className="link">Open full research →</a>
-          <div className="btn primary">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14m-7-7h14" /></svg>
-            New trade
-          </div>
+          <a className="link" style={{ cursor: 'pointer' }}
+            onClick={() => { if (ticker) { onClose?.(); navigate(`/research?ticker=${encodeURIComponent(ticker)}`) } }}>Open full research →</a>
         </div>
 
       </div>

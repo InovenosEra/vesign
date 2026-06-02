@@ -96,7 +96,7 @@ export default function PortfolioPage() {
               <div className="section-h"><span className="sub">No holdings yet.</span></div>
             ) : (
               <>
-                <KpiStrip totals={totals} best={best} worst={worst} largest={largest} vsVesign={vsVesign} />
+                <KpiStrip totals={totals} best={best} worst={worst} largest={largest} vsVesign={vsVesign} watchlistCount={wlCount} />
                 <div className="perf-grid">
                   <PerformanceChart />
                   <AllocationDonut rows={rows} totalValue={totals.totalValue} totalYld={totals.totalYld} />

@@ -65,6 +65,7 @@ export default function ClosedTrades() {
   const winRate = stats?.win_rate != null ? pct(stats.win_rate) : '—'
   const avgYield = stats?.avg_yield != null ? pct(stats.avg_yield) : '—'
   const avgYieldCls = stats?.avg_yield != null ? (stats.avg_yield >= 0 ? 'up' : 'down') : 'up'
+  const winRateCls = stats?.win_rate != null ? (stats.win_rate >= 50 ? 'up' : 'down') : 'up'
   const avgDays = stats?.avg_hold_days != null
     ? <>{Math.round(stats.avg_hold_days)} <small style={{ color: 'var(--ink-3)', fontSize: 13 }}>days</small></>
     : '—'
@@ -92,7 +93,7 @@ export default function ClosedTrades() {
     <>
       <div className="metrics">
         <StatCard label="Total trades" value={total} />
-        <StatCard label="Win rate" value={winRate} cls="up" />
+        <StatCard label="Win rate" value={winRate} cls={winRateCls} />
         <StatCard label="Avg yield" value={avgYield} cls={avgYieldCls} />
         <StatCard label="Avg days held" value={avgDays} />
       </div>
