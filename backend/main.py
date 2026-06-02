@@ -1643,11 +1643,26 @@ def get_holdings(list_id: int, user=Depends(get_current_user)):
 
 @protected.post("/api/watchlists/{list_id}/holdings", status_code=201)
 def add_holding(list_id: int, body: HoldingCreate, user=Depends(get_current_user)):
+    tk = (body.ticker or "").strip().upper()
+    if not tk:
+        raise HTTPException(status_code=400, detail="ticker is required")
+    if body.quantity is None or body.quantity <= 0:
+        raise HTTPException(status_code=400, detail="quantity must be greater than 0")
+    if body.buy_price is None or body.buy_price < 0:
+        raise HTTPException(status_code=400, detail="buy_price must be >= 0")
+    try:
+        bd = date.fromisoformat(body.buy_date)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="buy_date must be YYYY-MM-DD")
+    if bd > date.today():
+        raise HTTPException(status_code=400, detail="buy_date cannot be in the future")
     with engine.begin() as conn:
         _assert_owns_list(conn, list_id, user["id"])
+        if not conn.execute(text("SELECT 1 FROM companies WHERE ticker = :t"), {"t": tk}).fetchone():
+            raise HTTPException(status_code=400, detail=f"unknown ticker {tk}")
         result = conn.execute(
             text("INSERT INTO watchlist_holdings (watchlist_id, ticker, quantity, buy_price, buy_date) VALUES (:lid, :ticker, :qty, :price, :date)"),
-            {"lid": list_id, "ticker": body.ticker.upper(), "qty": body.quantity, "price": body.buy_price, "date": body.buy_date},
+            {"lid": list_id, "ticker": tk, "qty": body.quantity, "price": body.buy_price, "date": body.buy_date},
         )
     return {"id": result.lastrowid}
 
