@@ -111,7 +111,7 @@ export default function DeepDive({ ticker, setTicker }) {
   const [input, setInput] = useState(ticker)
   const [sugQ, setSugQ] = useState('')
 
-  const { data: r } = useQuery({ queryKey: ['research', ticker], queryFn: () => getResearch(ticker), enabled: !!ticker })
+  const { data: r } = useQuery({ queryKey: ['research', ticker], queryFn: () => getResearch(ticker), enabled: !!ticker, refetchInterval: 20_000 })
   const { data: history } = useQuery({
     queryKey: ['price-history', ticker, months],
     queryFn: () => getPriceHistory(ticker, rangeBounds(months)),

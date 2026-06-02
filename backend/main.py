@@ -3049,8 +3049,13 @@ def research_ticker(
     def _v(v):
         return None if (isinstance(v, float) and math.isnan(v)) else v
 
-    # Compute fair_value_upside freshly from latest close + analyst target
+    # Overlay the live snapshot price (matches the rest of /market + signals) so
+    # the deep-dive hero/analyst bar show the live price, not the last stored close.
     close = row.get("close")
+    live_px = _get_live_snapshot()["prices"].get(ticker)
+    if live_px:
+        close = live_px
+    # Compute fair_value_upside freshly from (live) close + analyst target
     target_mean = row.get("target_mean_price")
     if close and target_mean and float(close) > 0:
         fair_value_upside = (float(target_mean) - float(close)) / float(close)
