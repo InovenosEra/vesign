@@ -1,6 +1,6 @@
 /* Add-holding / add-lot form. Used both for a brand-new ticker (no preset) and
  * for adding a lot to an existing ticker (presetTicker locks the symbol). */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { searchTickers, addHolding, getResearch } from '../../api'
 import { validateHolding } from './holdingForm'
@@ -24,14 +24,13 @@ export default function AddHoldingForm({ watchlists, presetTicker, onDone }) {
   })
 
   // Prefill price with the live/current price once a ticker is chosen.
-  useQuery({
-    queryKey: ['hold-price', ticker], enabled: !!ticker,
-    queryFn: async () => {
-      const r = await getResearch(ticker)
-      if (r?.close != null && price === '') setPrice(String(r.close.toFixed ? r.close.toFixed(2) : r.close))
-      return r?.close ?? null
-    },
+  const { data: liveClose } = useQuery({
+    queryKey: ['hold-price', ticker], enabled: !!ticker, staleTime: 60_000,
+    queryFn: () => getResearch(ticker).then(r => (r?.close ?? null)),
   })
+  useEffect(() => {
+    if (liveClose != null && price === '') setPrice(liveClose.toFixed(2))
+  }, [liveClose])  // only when the fetched price changes; leaves user edits intact
 
   const save = useMutation({
     mutationFn: () => addHolding(wlId ?? lists[0]?.id, {

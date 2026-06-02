@@ -71,3 +71,12 @@ def test_add_then_delete_lot_roundtrip(lots_app):
     assert any(l["id"] == hid and l["ticker"] == "MSFT" for l in lots)
     assert client.delete(f"/api/watchlists/1/holdings/{hid}").status_code == 204
     assert client.get("/api/portfolio/holdings/lots?ticker=MSFT").json() == []
+
+
+def test_add_holding_normalizes_date(lots_app):
+    bm, client = lots_app
+    r = client.post("/api/watchlists/1/holdings",
+                    json={"ticker": "AAPL", "quantity": 1, "buy_price": 50.0, "buy_date": "2026-3-5"})
+    assert r.status_code == 201
+    lots = client.get("/api/portfolio/holdings/lots?ticker=AAPL").json()
+    assert any(l["id"] == r.json()["id"] and l["buy_date"] == "2026-03-05" for l in lots)

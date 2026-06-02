@@ -1651,7 +1651,11 @@ def add_holding(list_id: int, body: HoldingCreate, user=Depends(get_current_user
     if body.buy_price is None or body.buy_price < 0:
         raise HTTPException(status_code=400, detail="buy_price must be >= 0")
     try:
-        bd = date.fromisoformat(body.buy_date)
+        try:
+            bd = date.fromisoformat(body.buy_date)
+        except ValueError:
+            from datetime import datetime as _dt
+            bd = _dt.strptime(body.buy_date, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="buy_date must be YYYY-MM-DD")
     if bd > date.today():
@@ -1662,7 +1666,7 @@ def add_holding(list_id: int, body: HoldingCreate, user=Depends(get_current_user
             raise HTTPException(status_code=400, detail=f"unknown ticker {tk}")
         result = conn.execute(
             text("INSERT INTO watchlist_holdings (watchlist_id, ticker, quantity, buy_price, buy_date) VALUES (:lid, :ticker, :qty, :price, :date)"),
-            {"lid": list_id, "ticker": tk, "qty": body.quantity, "price": body.buy_price, "date": body.buy_date},
+            {"lid": list_id, "ticker": tk, "qty": body.quantity, "price": body.buy_price, "date": bd.isoformat()},
         )
     return {"id": result.lastrowid}
 
