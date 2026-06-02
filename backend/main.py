@@ -2596,6 +2596,27 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
     return _overlay_live(result, price_key="latest_close")
 
 
+@protected.get("/api/portfolio/holdings/lots")
+def portfolio_holding_lots(ticker: str, user=Depends(get_current_user), market: str = Query(default="US")):
+    """Individual lots for one ticker across the user's watchlists, newest first.
+    The aggregate /holdings endpoint has no lot IDs; this drives the per-lot
+    view + delete in the Portfolio Holdings table."""
+    tk = (ticker or "").strip().upper()
+    if not tk:
+        return []
+    market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
+    with engine.connect() as conn:
+        rows = conn.execute(text(f"""
+            SELECT wh.id, wh.watchlist_id, wl.name AS watchlist_name,
+                   wh.ticker, wh.quantity, wh.buy_price, wh.buy_date
+            FROM watchlist_holdings wh
+            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
+            WHERE wl.user_id = :uid AND wh.ticker = :tk AND {market_filter}
+            ORDER BY wh.buy_date DESC, wh.id DESC
+        """), {"uid": user["id"], "tk": tk}).mappings().all()
+    return [dict(r) for r in rows]
+
+
 @protected.get("/api/portfolio/holdings/export")
 @protected.get("/api/portfolio/holdings/export.xlsx")  # legacy alias
 def portfolio_holdings_export(

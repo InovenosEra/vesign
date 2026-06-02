@@ -1,0 +1,73 @@
+"""Tests for /api/portfolio/holdings/lots and add_holding validation."""
+import os
+import tempfile
+from unittest.mock import patch
+import pytest
+from fastapi.testclient import TestClient
+
+
+@pytest.fixture
+def lots_app():
+    tmpdir = tempfile.mkdtemp()
+    os.environ["DB_PATH"] = os.path.join(tmpdir, "test_lots.db")
+    os.environ["BYPASS_AUTH"] = "1"
+    os.environ.pop("BYPASS_USER_ID", None)   # uid == 'dev-bypass'
+    from sqlalchemy import create_engine, text
+    eng = create_engine(f"sqlite:///{os.environ['DB_PATH']}", poolclass=None)
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE watchlist_lists (id INTEGER PRIMARY KEY, user_id TEXT, name TEXT)"))
+        conn.execute(text("CREATE TABLE watchlist_holdings (id INTEGER PRIMARY KEY, watchlist_id INTEGER, ticker TEXT, quantity REAL, buy_price REAL, buy_date TEXT)"))
+        conn.execute(text("CREATE TABLE companies (ticker TEXT PRIMARY KEY, company TEXT, sector TEXT, market TEXT, industry TEXT, description TEXT, description_short TEXT, logo_url TEXT, domain TEXT)"))
+        conn.execute(text("CREATE TABLE watchlist (list_id INTEGER, ticker TEXT, note TEXT)"))
+        conn.execute(text("CREATE TABLE company_health_history (ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT)"))
+        conn.execute(text("INSERT INTO watchlist_lists (id, user_id, name) VALUES (1,'dev-bypass','Mine'), (2,'someone-else','Theirs')"))
+        conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES ('AAPL','Apple','US'), ('MSFT','Microsoft','US')"))
+        conn.execute(text("INSERT INTO watchlist_holdings (watchlist_id,ticker,quantity,buy_price,buy_date) VALUES (1,'AAPL',10,100.0,'2026-01-01'), (1,'AAPL',5,120.0,'2026-02-01'), (2,'MSFT',3,300.0,'2026-01-01')"))
+    eng.dispose()
+    import importlib, backend.main as bm
+    importlib.reload(bm)
+    os.environ.pop("BYPASS_USER_ID", None)
+    yield bm, TestClient(bm.app)
+    for f in os.listdir(tmpdir):
+        try: os.remove(os.path.join(tmpdir, f))
+        except OSError: pass
+    os.rmdir(tmpdir)
+
+
+def test_lots_returns_user_ticker_lots_newest_first(lots_app):
+    bm, client = lots_app
+    rows = client.get("/api/portfolio/holdings/lots?ticker=aapl").json()
+    assert [r["buy_date"] for r in rows] == ["2026-02-01", "2026-01-01"]
+    assert all(r["ticker"] == "AAPL" for r in rows)
+    assert all("id" in r and r["watchlist_id"] == 1 and r["watchlist_name"] == "Mine" for r in rows)
+
+
+def test_lots_excludes_other_users(lots_app):
+    bm, client = lots_app
+    assert client.get("/api/portfolio/holdings/lots?ticker=MSFT").json() == []
+
+
+def test_lots_empty_ticker(lots_app):
+    bm, client = lots_app
+    assert client.get("/api/portfolio/holdings/lots?ticker=").json() == []
+
+
+def test_add_holding_rejects_bad_input(lots_app):
+    bm, client = lots_app
+    base = {"ticker": "AAPL", "quantity": 1, "buy_price": 100.0, "buy_date": "2026-01-01"}
+    assert client.post("/api/watchlists/1/holdings", json={**base, "quantity": 0}).status_code == 400
+    assert client.post("/api/watchlists/1/holdings", json={**base, "buy_price": -5}).status_code == 400
+    assert client.post("/api/watchlists/1/holdings", json={**base, "buy_date": "2099-01-01"}).status_code == 400
+    assert client.post("/api/watchlists/1/holdings", json={**base, "ticker": "NOPE"}).status_code == 400
+
+
+def test_add_then_delete_lot_roundtrip(lots_app):
+    bm, client = lots_app
+    r = client.post("/api/watchlists/1/holdings",
+                    json={"ticker": "msft", "quantity": 2, "buy_price": 310.0, "buy_date": "2026-03-01"})
+    assert r.status_code == 201
+    hid = r.json()["id"]
+    lots = client.get("/api/portfolio/holdings/lots?ticker=MSFT").json()
+    assert any(l["id"] == hid and l["ticker"] == "MSFT" for l in lots)
+    assert client.delete(f"/api/watchlists/1/holdings/{hid}").status_code == 204
+    assert client.get("/api/portfolio/holdings/lots?ticker=MSFT").json() == []
