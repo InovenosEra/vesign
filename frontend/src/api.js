@@ -195,6 +195,8 @@ export const removeTicker = (id, ticker) =>
 export const getHoldings = (id) => get(`/watchlists/${id}/holdings`)
 export const addHolding = (id, body) => post(`/watchlists/${id}/holdings`, body)
 export const deleteHolding = (id, holdingId) => del(`/watchlists/${id}/holdings/${holdingId}`)
+export const getHoldingLots = (ticker, market = 'US') =>
+  get(`/portfolio/holdings/lots?ticker=${encodeURIComponent(ticker)}&market=${market}`)
 
 // --- Search ----------------------------------------------------------------
 export const searchTickers = (q, limit = 10) =>
