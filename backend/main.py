@@ -832,11 +832,32 @@ def _build_signals_today(mkt: str) -> list[dict]:
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
                    s.vqs,
-                   s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.domain, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
-                   f.market_cap, f.pe_ttm
+                   s.signal, s.lot_seq, c.company, c.logo_url, c.sector, c.industry, c.domain, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
+                   f.market_cap, f.pe_ttm,
+                   ps.day_change_pct, ps.week52_high
             FROM signals s
             LEFT JOIN companies c ON s.ticker = c.ticker
             {_MARKET_CAP_JOIN}
+            LEFT JOIN (
+                -- per-ticker: today's % change vs prior close + 52-week high (from daily_prices)
+                SELECT ticker,
+                       CASE WHEN pc IS NOT NULL AND pc != 0 AND lc IS NOT NULL
+                            THEN (lc - pc) / pc * 100 END AS day_change_pct,
+                       hi AS week52_high
+                FROM (
+                    SELECT ticker,
+                           MAX(CASE WHEN rn = 1 THEN close END) AS lc,
+                           MAX(CASE WHEN rn = 2 THEN close END) AS pc,
+                           MAX(CASE WHEN dt >= DATE(maxd, '-365 days') THEN close END) AS hi
+                    FROM (
+                        SELECT ticker, date AS dt, close,
+                               ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn,
+                               MAX(date) OVER (PARTITION BY ticker) AS maxd
+                        FROM daily_prices
+                    )
+                    GROUP BY ticker
+                )
+            ) ps ON s.ticker = ps.ticker
             WHERE COALESCE(c.market, 'US') = :market
             AND c.ticker NOT IN ('SPY', 'VOO')
             AND DATE(s.date) = (
@@ -871,7 +892,17 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
     if signal:
         wanted = signal.upper()
         rows = [r for r in rows if r.get("signal") == wanted]
-    rows = _overlay_live(rows)
+    # Overlay the live price onto `close` and keep `day_change_pct` consistent with
+    # it: when a live price exists it's "today" vs the prior stored close; otherwise
+    # the row keeps the last completed session's change computed in SQL.
+    live = _get_live_snapshot()["prices"]
+    rows = [
+        ({**r, "close": live[r["ticker"]],
+          "day_change_pct": ((live[r["ticker"]] - r["close"]) / r["close"] * 100)
+          if r.get("close") else r.get("day_change_pct")}
+         if live.get(r.get("ticker")) else r)
+        for r in rows
+    ]
     if signal and signal.upper() in ("BUY", "SELL"):
         plan = ent.get_plan(user["id"])
         unlocks = ent.get_unlocks(user["id"])

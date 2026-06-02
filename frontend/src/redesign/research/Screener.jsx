@@ -1,8 +1,8 @@
 /* Screener tab — filter rail + ranked results table.
- * Ported from research-v1.html's renderScreener()/initSlider() inline JS.
- * Data: signals/today (US). Rows open the shared SignalModal (matching the
- * mockup's body click → openSignalModal). Filters/sliders are React state. */
-import { useState, useRef, useCallback, useEffect } from 'react'
+ * Data: signals/today (US), filtered/sorted/paginated client-side. Rows open the
+ * shared ticker modal. Filters persist via "Save filter set"; column visibility
+ * and the chosen sort persist too. */
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, WHITE_BG_LOGOS } from '../../api'
 import { num, pct, dirClass, LOGO } from '../fmt'
@@ -15,15 +15,17 @@ const SECTOR_ABBR = {
   'Financials': 'Fin.', 'Industrials': 'Indu.', 'Energy': 'Energy', 'Materials': 'Mat.',
   'Real Estate': 'RE', 'Utilities': 'Util.',
 }
-const KNOWN_SECTORS = new Set(['Information Technology', 'Communication Services', 'Financials',
-  'Health Care', 'Industrials', 'Consumer Discretionary', 'Energy', 'Materials'])
+// All 11 GICS sectors are real, filterable pills; anything else (blank/ETF) → "Other".
 const SECTOR_PILLS = [
   ['Information Technology', 'Technology'], ['Communication Services', 'Communication'],
   ['Financials', 'Financials'], ['Health Care', 'Health Care'], ['Industrials', 'Industrials'],
-  ['Consumer Discretionary', 'Consumer Disc.'], ['Energy', 'Energy'], ['Materials', 'Materials'],
+  ['Consumer Discretionary', 'Consumer Disc.'], ['Consumer Staples', 'Staples'], ['Energy', 'Energy'],
+  ['Materials', 'Materials'], ['Real Estate', 'Real Estate'], ['Utilities', 'Utilities'],
   ['__other', 'Other'],
 ]
+const KNOWN_SECTORS = new Set(SECTOR_PILLS.map(([v]) => v).filter(v => v !== '__other'))
 const CAP_PILLS = [['mega', 'Mega >$200B'], ['large', 'Large $10–200B'], ['mid', 'Mid $2–10B'], ['small', 'Small <$2B']]
+const PAGE_SIZE = 25
 
 const sigCls = (s) => ({ BUY: 'buy', SELL: 'sell' }[s] || 'hold')
 const capB = (mc) => mc == null ? '—'
@@ -82,21 +84,92 @@ const DEFAULTS = {
   search: '',
 }
 
+// Column registry — single source of truth for the table, sorting, the Columns
+// picker, and CSV export. `cell` renders the table cell; `csv` returns the raw
+// value for export (defaults to the row's `key`). `sortable`/`hideable` gate the
+// header click + the picker.
+const COLUMNS = [
+  { key: 'ticker', label: 'Ticker', hideable: false, sortable: true,
+    cell: (r) => (
+      <div className="ticker-cell">
+        <img className={'logo-mini' + (WHITE_BG_LOGOS.has(r.ticker) ? ' white-bg' : '')} src={LOGO(r.ticker)} alt={r.ticker} />
+        <div className="tc-text"><div className="tk">{r.ticker}</div><div className="co">{r.company || ''}</div></div>
+      </div>),
+    csv: (r) => r.ticker },
+  { key: 'sector', label: 'Sector',
+    cell: (r) => <span className="sector-pill">{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span>,
+    csv: (r) => r.sector || '' },
+  { key: 'close', label: 'Price', align: 'r', sortable: true,
+    cell: (r, c) => r.close == null ? '—' : c.fmtPrice(r.close) },
+  { key: 'day_change_pct', label: 'Day', align: 'r', sortable: true,
+    cell: (r) => <span className={dirClass(r.day_change_pct)}>{r.day_change_pct == null ? '—' : pct(r.day_change_pct)}</span> },
+  { key: 'market_cap', label: 'Mkt cap', align: 'r', sortable: true, cell: (r) => capB(r.market_cap) },
+  { key: 'signal', label: 'Signal', sortable: true,
+    cell: (r) => <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
+  { key: 'vqs', label: 'VQS', align: 'r', sortable: true,
+    cell: (r) => <span className={'vqs-pill ' + (r.vqs >= 8 ? 'high' : r.vqs >= 6 ? 'mid' : '')}>{r.vqs ?? '—'}</span> },
+  { key: 'fair_value_upside', label: 'Pred. upside', align: 'r', sortable: true,
+    cell: (r, c) => {
+      if (r.fair_value_upside == null) return <span className="muted">—</span>
+      const up = r.fair_value_upside * 100
+      return (<>
+        <span className="upside-bar"><span className={'fill' + (up < 0 ? ' down' : '')} style={{ width: Math.max(0, Math.min(100, up / c.maxUp * 100)).toFixed(0) + '%' }} /></span>
+        <span className={dirClass(up)}>{pct(up)}</span>
+      </>)
+    },
+    csv: (r) => r.fair_value_upside == null ? '' : (r.fair_value_upside * 100).toFixed(2) },
+  { key: 'health_score', label: 'Health', align: 'r', sortable: true,
+    cell: (r) => <span className="health">{healthDots(r.health_score)}</span> },
+  { key: 'prediction_score', label: 'ML 5d', align: 'r', sortable: true,
+    cell: (r) => {
+      const ml = r.prediction_score == null ? null : r.prediction_score * 100
+      return <span className={dirClass(ml)}>{ml == null ? '—' : pct(ml)}</span>
+    },
+    csv: (r) => r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(2) },
+  { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true,
+    cell: (r) => r.pe_ttm == null ? <span className="muted">—</span> : num(r.pe_ttm, { fd: 1 }) },
+  { key: 'week52_high', label: '52w high', align: 'r', sortable: true,
+    cell: (r, c) => r.week52_high == null ? <span className="muted">—</span> : c.fmtPrice(r.week52_high) },
+]
+const COL_BY_KEY = Object.fromEntries(COLUMNS.map(c => [c.key, c]))
+
+const FILTER_LS = 'rd-screener-filters'
+const COLS_LS = 'rd-screener-hidden-cols'
+const loadJSON = (k) => { try { return JSON.parse(localStorage.getItem(k)) } catch { return null } }
+
 export default function Screener({ onCount }) {
   const openTicker = useTickerModal()
   const { fmtPrice } = useCurrency()
   const { data: rows } = useQuery({ queryKey: ['signals-today', 'US'], queryFn: () => getSignalsToday(null, 'US') })
   const all = Array.isArray(rows) ? rows : []
 
-  const [signals, setSignals] = useState(new Set(DEFAULTS.signals))
-  const [sectors, setSectors] = useState(new Set(DEFAULTS.sectors))
-  const [caps, setCaps] = useState(new Set(DEFAULTS.caps))
-  const [health, setHealth] = useState(DEFAULTS.health)
-  const [dir, setDir] = useState(DEFAULTS.dir)
-  const [vqs, setVqs] = useState({ ...DEFAULTS.vqs })
-  const [upside, setUpside] = useState({ ...DEFAULTS.upside })
-  const [pe, setPe] = useState({ ...DEFAULTS.pe })
-  const [search, setSearch] = useState(DEFAULTS.search)
+  // Restore a previously-saved filter set (arrays → Sets), else defaults.
+  const saved = useMemo(() => loadJSON(FILTER_LS), [])
+  const initSet = (key) => saved && saved[key] ? new Set(saved[key]) : new Set(DEFAULTS[key])
+  const initVal = (key) => saved && saved[key] != null ? saved[key] : DEFAULTS[key]
+
+  const [signals, setSignals] = useState(() => initSet('signals'))
+  const [sectors, setSectors] = useState(() => initSet('sectors'))
+  const [caps, setCaps] = useState(() => initSet('caps'))
+  const [health, setHealth] = useState(() => initVal('health'))
+  const [dir, setDir] = useState(() => initVal('dir'))
+  const [vqs, setVqs] = useState(() => ({ ...(saved?.vqs || DEFAULTS.vqs) }))
+  const [upside, setUpside] = useState(() => ({ ...(saved?.upside || DEFAULTS.upside) }))
+  const [pe, setPe] = useState(() => ({ ...(saved?.pe || DEFAULTS.pe) }))
+  const [search, setSearch] = useState(() => initVal('search'))
+
+  const [sort, setSort] = useState({ key: 'fair_value_upside', dir: 'desc' })
+  const [page, setPage] = useState(1)
+  const [hidden, setHidden] = useState(() => new Set(loadJSON(COLS_LS) || []))
+  const [colsOpen, setColsOpen] = useState(false)
+  const [savedFlag, setSavedFlag] = useState(false)
+  const colsRef = useRef(null)
+
+  useEffect(() => {
+    const onDown = (e) => { if (colsRef.current && !colsRef.current.contains(e.target)) setColsOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
 
   const toggle = (setFn) => (key) => setFn(prev => {
     const next = new Set(prev)
@@ -111,6 +184,23 @@ export default function Screener({ onCount }) {
     setVqs({ ...DEFAULTS.vqs }); setUpside({ ...DEFAULTS.upside }); setPe({ ...DEFAULTS.pe })
     setSearch('')
   }
+  const saveFilters = () => {
+    const payload = {
+      signals: [...signals], sectors: [...sectors], caps: [...caps],
+      health, dir, vqs, upside, pe, search,
+    }
+    try { localStorage.setItem(FILTER_LS, JSON.stringify(payload)) } catch { /* ignore */ }
+    setSavedFlag(true); setTimeout(() => setSavedFlag(false), 1600)
+  }
+  const toggleCol = (key) => setHidden(prev => {
+    const next = new Set(prev)
+    next.has(key) ? next.delete(key) : next.add(key)
+    try { localStorage.setItem(COLS_LS, JSON.stringify([...next])) } catch { /* ignore */ }
+    return next
+  })
+  const toggleSort = (key) => setSort(s => s.key === key
+    ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' }
+    : { key, dir: key === 'ticker' || key === 'signal' || key === 'sector' ? 'asc' : 'desc' })
 
   // Treat slider extremes as unbounded (matches mockup's -Infinity/Infinity).
   const vqsLo = vqs.lo <= 0 ? -Infinity : vqs.lo
@@ -121,7 +211,7 @@ export default function Screener({ onCount }) {
   const peHi = pe.hi >= 100 ? Infinity : pe.hi
   const q = search.trim().toUpperCase()
 
-  const filtered = all.filter(r => {
+  const filtered = useMemo(() => all.filter(r => {
     if (signals.size && !signals.has(r.signal)) return false
     if (sectors.size) {
       const sec = KNOWN_SECTORS.has(r.sector) ? r.sector : '__other'
@@ -144,15 +234,57 @@ export default function Screener({ onCount }) {
     if (dir === 'down' && !(ml < 0)) return false
     if (q && !(`${r.ticker} ${r.company || ''}`.toUpperCase().includes(q))) return false
     return true
-  })
+  }), [all, signals, sectors, caps, health, dir, vqsLo, vqsHi, upLo, upHi, peLo, peHi, q])
 
   useEffect(() => { onCount && onCount(filtered.length) }, [filtered.length, onCount])
 
-  const ranked = filtered.slice()
-    .filter(r => r.fair_value_upside != null)
-    .sort((a, b) => b.fair_value_upside - a.fair_value_upside)
-    .slice(0, 60)
-  const maxUp = Math.max(...ranked.map(r => r.fair_value_upside * 100), 1)
+  const sorted = useMemo(() => {
+    const mul = sort.dir === 'asc' ? 1 : -1
+    return filtered.slice().sort((a, b) => {
+      const av = a[sort.key], bv = b[sort.key]
+      const an = av == null, bn = bv == null
+      if (an && bn) return 0
+      if (an) return 1   // nulls always last
+      if (bn) return -1
+      if (typeof av === 'string') return mul * String(av).localeCompare(String(bv))
+      return mul * (av - bv)
+    })
+  }, [filtered, sort])
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  // Keep page in range when results shrink / sort changes.
+  useEffect(() => { if (page > pageCount) setPage(1) }, [pageCount, page])
+  const curPage = Math.min(page, pageCount)
+  const pageRows = sorted.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE)
+  const maxUp = Math.max(...filtered.filter(r => r.fair_value_upside != null).map(r => r.fair_value_upside * 100), 1)
+
+  const visibleCols = COLUMNS.filter(c => !hidden.has(c.key))
+  const ctx = { fmtPrice, maxUp }
+
+  const exportCsv = () => {
+    const header = visibleCols.map(c => c.label)
+    const lines = [header.join(',')]
+    for (const r of sorted) {
+      const cells = visibleCols.map(c => {
+        const raw = c.csv ? c.csv(r) : r[c.key]
+        const s = raw == null ? '' : String(raw)
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+      })
+      lines.push(cells.join(','))
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `vesign-screener-${sorted.length}.csv`
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const sortLabel = COL_BY_KEY[sort.key]?.label || 'Predicted upside'
+  const pages = pagerPages(curPage, pageCount)
+  const from = sorted.length ? (curPage - 1) * PAGE_SIZE + 1 : 0
+  const to = Math.min(curPage * PAGE_SIZE, sorted.length)
 
   return (
     <div className="research-layout">
@@ -238,24 +370,36 @@ export default function Screener({ onCount }) {
         </div>
 
         <div className="fg">
-          <button className="save-btn">Save filter set</button>
+          <button className="save-btn" onClick={saveFilters}>{savedFlag ? 'Saved ✓' : 'Save filter set'}</button>
         </div>
       </aside>
 
       {/* MAIN RESULTS */}
       <div className="results-area">
         <div className="results-toolbar">
-          <div className="count"><strong>{filtered.length.toLocaleString()}</strong> tickers · sorted by predicted upside</div>
+          <div className="count"><strong>{filtered.length.toLocaleString()}</strong> tickers · sorted by {sortLabel.toLowerCase()}</div>
           <div className="spacer" />
-          <div className="pill-btn">
+          <div className="pill-btn" onClick={() => toggleSort(sort.key)} title="Toggle sort direction">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M6 12h12M10 18h4" /></svg>
-            Predicted upside <span className="arr">↓</span>
+            {sortLabel} <span className="arr">{sort.dir === 'desc' ? '↓' : '↑'}</span>
           </div>
-          <div className="pill-btn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v18H3z M3 9h18 M9 21V9" /></svg>
-            Columns
-          </div>
-          <div className="pill-btn">
+          <span className="hdr-select" ref={colsRef} style={{ position: 'relative' }}>
+            <div className="pill-btn" onClick={() => setColsOpen(o => !o)}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v18H3z M3 9h18 M9 21V9" /></svg>
+              Columns
+            </div>
+            {colsOpen && (
+              <div className="hs-menu" role="menu" style={{ display: 'block', right: 0, minWidth: 160 }}>
+                {COLUMNS.filter(c => c.hideable !== false).map(c => (
+                  <button key={c.key} type="button" role="menuitemcheckbox" aria-checked={!hidden.has(c.key)}
+                    className={'hs-row' + (!hidden.has(c.key) ? ' sel' : '')} onClick={() => toggleCol(c.key)}>
+                    <span className="hs-sym">{hidden.has(c.key) ? '' : '✓'}</span><span className="hs-name">{c.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
+          <div className="pill-btn" onClick={exportCsv}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12 M7 10l5 5 5-5 M5 21h14" /></svg>
             Export CSV
           </div>
@@ -264,69 +408,52 @@ export default function Screener({ onCount }) {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Ticker</th>
-              <th>Sector</th>
-              <th className="r sortable">Price</th>
-              <th className="r sortable">Day</th>
-              <th className="r sortable">Mkt cap</th>
-              <th>Signal</th>
-              <th className="r sortable">VQS</th>
-              <th className="r sortable">Pred. upside <span className="arr">↓</span></th>
-              <th className="r">Health</th>
-              <th className="r sortable">ML 5d</th>
-              <th className="r sortable">P/E</th>
-              <th className="r" style={{ paddingRight: 18 }}>52w high</th>
+              {visibleCols.map(c => (
+                <th key={c.key} className={(c.align === 'r' ? 'r ' : '') + (c.sortable ? 'sortable' : '')}
+                  onClick={c.sortable ? () => toggleSort(c.key) : undefined}>
+                  {c.label}{sort.key === c.key && <span className="arr">{sort.dir === 'desc' ? '↓' : '↑'}</span>}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {ranked.length ? ranked.map(r => {
-              const up = r.fair_value_upside * 100
-              const ml = r.prediction_score == null ? null : r.prediction_score * 100
-              const vqsKls = r.vqs >= 8 ? 'high' : r.vqs >= 6 ? 'mid' : ''
-              const wb = WHITE_BG_LOGOS.has(r.ticker) ? ' white-bg' : ''
-              return (
-                <tr key={r.ticker} data-ticker={r.ticker} data-company={r.company || ''}
-                  onClick={() => openTicker(r.ticker, r.company)}>
-                  <td>
-                    <div className="ticker-cell">
-                      <img className={'logo-mini' + wb} src={LOGO(r.ticker)} alt={r.ticker} />
-                      <div className="tc-text"><div className="tk">{r.ticker}</div><div className="co">{r.company || ''}</div></div>
-                    </div>
+            {pageRows.length ? pageRows.map(r => (
+              <tr key={r.ticker} data-ticker={r.ticker} data-company={r.company || ''}
+                onClick={() => openTicker(r.ticker, r.company)}>
+                {visibleCols.map(c => (
+                  <td key={c.key} className={c.align === 'r' ? 'r' : ''}
+                    style={c.key === 'week52_high' ? { paddingRight: 18 } : undefined}>
+                    {c.cell(r, ctx)}
                   </td>
-                  <td><span className="sector-pill">{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span></td>
-                  <td className="r">{r.close == null ? '—' : fmtPrice(r.close)}</td>
-                  <td className={'r ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)}</td>
-                  <td className="r">{capB(r.market_cap)}</td>
-                  <td><span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span></td>
-                  <td className="r"><span className={'vqs-pill ' + vqsKls}>{r.vqs ?? '—'}</span></td>
-                  <td className="r">
-                    <span className="upside-bar"><span className={'fill' + (up < 0 ? ' down' : '')} style={{ width: Math.max(0, Math.min(100, up / maxUp * 100)).toFixed(0) + '%' }} /></span>
-                    <span className={dirClass(up)}>{pct(up)}</span>
-                  </td>
-                  <td className="r"><span className="health">{healthDots(r.health_score)}</span></td>
-                  <td className={'r ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)}</td>
-                  <td className={'r ' + (r.pe_ttm == null ? 'muted' : '')}>{r.pe_ttm == null ? '—' : num(r.pe_ttm, { fd: 1 })}</td>
-                  <td className="r muted" style={{ paddingRight: 18 }}>—</td>
-                </tr>
-              )
-            }) : (
-              <tr><td colSpan="12" className="muted" style={{ textAlign: 'center', padding: 24 }}>No tickers match these filters.</td></tr>
+                ))}
+              </tr>
+            )) : (
+              <tr><td colSpan={visibleCols.length} className="muted" style={{ textAlign: 'center', padding: 24 }}>No tickers match these filters.</td></tr>
             )}
           </tbody>
         </table>
 
         <div className="pager">
-          <span className="p">‹</span>
-          <span className="p active">1</span>
-          <span className="p">2</span>
-          <span className="p">3</span>
-          <span className="p">4</span>
-          <span className="p gap">…</span>
-          <span className="p">21</span>
-          <span className="p">›</span>
-          <span className="meta">Page 1 of 21 · {Math.min(12, ranked.length)} of {filtered.length}</span>
+          <span className={'p' + (curPage === 1 ? ' disabled' : '')} onClick={() => curPage > 1 && setPage(curPage - 1)}>‹</span>
+          {pages.map((p, i) => p === '…'
+            ? <span key={'g' + i} className="p gap">…</span>
+            : <span key={p} className={'p' + (p === curPage ? ' active' : '')} onClick={() => setPage(p)}>{p}</span>)}
+          <span className={'p' + (curPage === pageCount ? ' disabled' : '')} onClick={() => curPage < pageCount && setPage(curPage + 1)}>›</span>
+          <span className="meta">Page {curPage} of {pageCount} · {from.toLocaleString()}–{to.toLocaleString()} of {sorted.length.toLocaleString()}</span>
         </div>
       </div>
     </div>
   )
+}
+
+// Page numbers with ellipses: always show first/last + a window around current.
+function pagerPages(cur, count) {
+  if (count <= 7) return Array.from({ length: count }, (_, i) => i + 1)
+  const out = [1]
+  const lo = Math.max(2, cur - 1), hi = Math.min(count - 1, cur + 1)
+  if (lo > 2) out.push('…')
+  for (let p = lo; p <= hi; p++) out.push(p)
+  if (hi < count - 1) out.push('…')
+  out.push(count)
+  return out
 }
