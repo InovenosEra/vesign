@@ -405,3 +405,25 @@
     margin-top: 4px;
     font-family: var(--mono); font-size: 11px; color: var(--ink-3);
   }
+
+/* Add-holding form + lot management */
+.row-chevron { cursor: pointer; color: var(--ink-3); user-select: none; padding: 0 4px; }
+.add-holding-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 8px; margin: 8px 0; position: relative; }
+.ahf-field { position: relative; }
+.ahf-input { background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; color: var(--ink); padding: 7px 10px; font-size: 13px; max-width: 140px; }
+.ahf-suggest { position: absolute; top: 36px; left: 0; right: 0; z-index: 30; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden; min-width: 200px; }
+.ahf-suggest-row { padding: 7px 10px; cursor: pointer; font-size: 12.5px; }
+.ahf-suggest-row:hover { background: var(--bg-2); }
+.ahf-btn { background: var(--accent, #3b82f6); color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+.ahf-btn.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--line-2); }
+.ahf-err { color: #ff4d5c; font-size: 12px; flex-basis: 100%; }
+.lots-row > td { background: var(--bg-2); padding: 0 18px 12px 36px; }
+.lots-wrap { padding-top: 8px; }
+.lots-table { width: 100%; font-size: 12.5px; }
+.lots-table th { color: var(--ink-3); font-weight: 500; text-align: left; padding: 4px 8px; }
+.lots-table th.r, .lots-table td.r { text-align: right; }
+.lots-table td { padding: 4px 8px; }
+.lot-del { background: none; border: none; cursor: pointer; opacity: 0.6; }
+.lot-del:hover { opacity: 1; }
+.add-lot-btn { margin-top: 8px; background: transparent; border: 1px dashed var(--line-2); color: var(--ink-2); border-radius: 6px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.lots-empty { color: var(--ink-3); font-size: 12.5px; padding: 8px 0; }

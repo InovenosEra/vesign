@@ -1,8 +1,13 @@
 /* Holdings table — one row per ticker; click opens the SignalModal.
  * Ported verbatim from portfolio-v1.html's HOLDINGS TABLE block. */
+import { useState, Fragment } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { useCurrency } from '../../context/CurrencyContext'
+import { getWatchlists } from '../../api'
+import AddHoldingForm from './AddHoldingForm'
+import HoldingLots from './HoldingLots'
 
 const csvCell = (v) => {
   const s = v == null ? '' : String(v)
@@ -12,6 +17,14 @@ const csvCell = (v) => {
 export default function HoldingsTable({ rows, subhead }) {
   const open = useTickerModal()
   const { fmtPrice, fmtAmount } = useCurrency()
+
+  const [expanded, setExpanded] = useState(() => new Set())
+  const [adding, setAdding] = useState(false)
+  const { data: watchlists } = useQuery({ queryKey: ['dd-watchlists'], queryFn: getWatchlists })
+  const toggle = (t) => setExpanded(prev => {
+    const n = new Set(prev); n.has(t) ? n.delete(t) : n.add(t); return n
+  })
+  const COLS = 10  // chevron + the 9 existing columns
 
   const exportCsv = () => {
     const header = ['Ticker', 'Company', 'Shares', 'Avg cost', 'Last close', 'Day %', 'Total cost', 'Current value', 'P&L', 'Yield %']
@@ -32,11 +45,14 @@ export default function HoldingsTable({ rows, subhead }) {
       <div className="section-h">
         <h2>Holdings</h2>
         <span className="sub">{subhead}</span>
-        <a className="right" style={{ cursor: 'pointer' }} onClick={exportCsv}>Export CSV →</a>
+        <a className="right" style={{ cursor: 'pointer' }} onClick={() => setAdding(a => !a)}>+ Add holding</a>
+        <a className="right" style={{ cursor: 'pointer', marginRight: 12 }} onClick={exportCsv}>Export CSV →</a>
       </div>
+      {adding && <AddHoldingForm watchlists={watchlists} onDone={() => setAdding(false)} />}
       <table className="data-table">
         <thead>
           <tr>
+            <th style={{ width: 28 }}></th>
             <th>Ticker</th>
             <th className="r">Shares</th>
             <th className="r">Avg cost</th>
@@ -50,25 +66,33 @@ export default function HoldingsTable({ rows, subhead }) {
         </thead>
         <tbody>
           {rows.map(r => (
-            <tr key={r.ticker} onClick={() => open(r.ticker, r.company || '')}>
-              <td>
-                <div className="ticker-cell">
-                  <img className="logo-mini" src={LOGO(r.ticker)} alt={r.ticker} />
-                  <span className="tk">{r.ticker}</span>
-                  <span className="co">{r.company || ''}</span>
-                </div>
-              </td>
-              <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 2 })}</td>
-              <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
-              <td className="r">{r.latest_close == null ? '—' : fmtPrice(r.latest_close)}</td>
-              <td className={'r ' + dirClass(r.day)}>{pct(r.day)}</td>
-              <td className="r muted">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
-              <td className="r">{r.value == null ? '—' : fmtPrice(r.value)}</td>
-              <td className={'r ' + dirClass(r.pnl)}>
-                {r.pnl == null ? '—' : fmtAmount(r.pnl)}
-              </td>
-              <td className={'r ' + dirClass(r.yld)} style={{ paddingRight: 18 }}><strong>{pct(r.yld)}</strong></td>
-            </tr>
+            <Fragment key={r.ticker}>
+              <tr onClick={() => open(r.ticker, r.company || '')}>
+                <td style={{ width: 28 }}>
+                  <span className="row-chevron" onClick={(e) => { e.stopPropagation(); toggle(r.ticker) }}>
+                    {expanded.has(r.ticker) ? '▾' : '▸'}
+                  </span>
+                </td>
+                <td>
+                  <div className="ticker-cell">
+                    <img className="logo-mini" src={LOGO(r.ticker)} alt={r.ticker} />
+                    <span className="tk">{r.ticker}</span>
+                    <span className="co">{r.company || ''}</span>
+                  </div>
+                </td>
+                <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 2 })}</td>
+                <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
+                <td className="r">{r.latest_close == null ? '—' : fmtPrice(r.latest_close)}</td>
+                <td className={'r ' + dirClass(r.day)}>{pct(r.day)}</td>
+                <td className="r muted">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
+                <td className="r">{r.value == null ? '—' : fmtPrice(r.value)}</td>
+                <td className={'r ' + dirClass(r.pnl)}>{r.pnl == null ? '—' : fmtAmount(r.pnl)}</td>
+                <td className={'r ' + dirClass(r.yld)} style={{ paddingRight: 18 }}><strong>{pct(r.yld)}</strong></td>
+              </tr>
+              {expanded.has(r.ticker) && (
+                <HoldingLots ticker={r.ticker} latestClose={r.latest_close} watchlists={watchlists} colSpan={COLS} />
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
