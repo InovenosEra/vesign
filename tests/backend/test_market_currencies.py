@@ -81,6 +81,25 @@ def test_base_excluded_and_invalid_base_defaults_ils(cur_app):
     assert all(not c["ticker"].startswith("USDUSD") for c in body["currencies"])
 
 
+def test_db_baseline_derives_cross_when_live_down(cur_app):
+    """Cold process + total live failure → crosses derived from the USD-anchored
+    market_quotes baseline. USD-vs-ILS = u[ILS]/u[USD] = stored USDILS close."""
+    bm, client = cur_app
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("CREATE TABLE market_quotes (date DATETIME, ticker TEXT, close FLOAT)"))
+        seed = {"USDILS=X": 3.70, "USDEUR=X": 0.92, "USDGBP=X": 0.79, "USDJPY=X": 156.0, "USDCHF=X": 0.88}
+        for tk, px in seed.items():
+            conn.execute(text("INSERT INTO market_quotes (date,ticker,close) VALUES ('2026-06-01',:t,:p)"), {"t": tk, "p": px})
+    bm._fx_last_good.clear()
+    with patch.object(bm, "_fetch_yf_quotes", return_value=None):
+        body = client.get("/api/market/currencies?base=ILS").json()
+    by = {c["label"]: c for c in body["currencies"]}
+    assert by["USD"]["stale"] is True
+    assert by["USD"]["price"] == pytest.approx(3.70)               # u[ILS]/u[USD] = 3.70/1
+    assert by["EUR"]["price"] == pytest.approx(3.70 / 0.92, abs=1e-3)  # u[ILS]/u[EUR]
+
+
 def test_partial_fetch_keeps_previously_seen_currencies(cur_app):
     """A later partial yfinance batch must NOT drop currency cards already seen —
     they stay (stale at last-good rate) instead of vanishing."""

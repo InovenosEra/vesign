@@ -4584,15 +4584,69 @@ def _fetch_cross_quotes() -> dict | None:
     return _fetch_yf_quotes(_CROSS_TICKERS)
 
 
+def _db_quote_baseline(tickers: list[str]) -> dict:
+    """{ticker: {close, change_pct}} from the market_quotes daily table (latest vs
+    prior close). Returns {} if the table is absent — so endpoints degrade to the
+    live fetch instead of erroring (e.g. on prod before its pipeline first runs)."""
+    if not tickers:
+        return {}
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT ticker, close, rn FROM (
+                    SELECT ticker, close,
+                           ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+                    FROM market_quotes WHERE ticker IN :tt
+                ) WHERE rn <= 2
+            """).bindparams(bindparam("tt", expanding=True)), {"tt": tickers}).fetchall()
+    except Exception:
+        return {}
+    latest, prev = {}, {}
+    for tk, close, rn in rows:
+        (latest if rn == 1 else prev)[tk] = close
+    out = {}
+    for tk, c in latest.items():
+        p = prev.get(tk)
+        out[tk] = {"close": c, "change_pct": round((c - p) / p * 100, 4) if p not in (None, 0) else None}
+    return out
+
+
+def _db_fx_baseline() -> dict:
+    """USD-anchored FX from market_quotes: {"u": {ccy: units-per-USD}, "u_prev": {…}}
+    (USD itself = 1.0). Lets currency crosses derive as u[base]/u[ccy]. {} if absent."""
+    syms = {f"USD{c}=X": c for c in _FX_BASES if c != "USD"}  # covers ILS (default base) too
+    if not syms:
+        return {}
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT ticker, close, rn FROM (
+                    SELECT ticker, close,
+                           ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+                    FROM market_quotes WHERE ticker IN :tt
+                ) WHERE rn <= 2
+            """).bindparams(bindparam("tt", expanding=True)), {"tt": list(syms)}).fetchall()
+    except Exception:
+        return {}
+    u, u_prev = {"USD": 1.0}, {"USD": 1.0}
+    for tk, close, rn in rows:
+        c = syms.get(tk)
+        if c:
+            (u if rn == 1 else u_prev)[c] = close
+    return {"u": u, "u_prev": u_prev}
+
+
 def _build_yf_strip(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
     """Compose a {key: [rows]} strip from yfinance quotes.
 
     A ticker missing from the current (possibly partial) fetch is served from its
-    last-known-good value with stale=true, so cards never vanish under concurrent
-    yfinance load. A ticker never yet seen is omitted until it first returns data.
+    last-known-good value with stale=true — first the in-memory cache (freshest
+    intraday), then the market_quotes DB baseline (survives restarts) — so cards
+    never vanish under concurrent yfinance load. Never-seen tickers are omitted.
     """
     raw = (fetch(pairs) if fetch else _fetch_yf_quotes(pairs)) or {}
     last_good = _yf_ticker_last_good.setdefault(key, {})
+    db = _db_quote_baseline([t for t, _ in pairs])
     rows = []
     for ticker, label in pairs:
         q = raw.get(ticker)
@@ -4607,6 +4661,10 @@ def _build_yf_strip(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
             g = last_good[ticker]
             rows.append({"ticker": ticker, "label": label,
                          "price": g["price"], "change_pct": g["change_pct"], "stale": True})
+        elif ticker in db:
+            g = db[ticker]
+            rows.append({"ticker": ticker, "label": label,
+                         "price": g["close"], "change_pct": g["change_pct"], "stale": True})
         # else: never seen yet — nothing to show for this ticker
     return {key: rows}
 
@@ -4653,6 +4711,8 @@ def _build_market_currencies(base: str) -> dict:
     pairs = [(f"{c}{base}=X", c) for c in _FX_KEY if c != base]  # label = currency code only
     raw = _fetch_yf_quotes(pairs) or {}
     last_good = _fx_last_good.setdefault(base, {})
+    fx = _db_fx_baseline()           # USD-anchored daily baseline (survives restarts)
+    u, u_prev = fx.get("u", {}), fx.get("u_prev", {})
     cards = []
     for ticker, label in pairs:
         q = raw.get(ticker)
@@ -4668,6 +4728,15 @@ def _build_market_currencies(base: str) -> dict:
             price, prev = g["price"], g.get("prev_close")
             change_pct = round((price - prev) / prev * 100, 4) if prev not in (None, 0) else None
             cards.append({"ticker": ticker, "label": label, "price": price,
+                          "change_pct": change_pct, "stale": True})
+        elif label in u and base in u:
+            # Derive the cross from the DB USD anchors: rate(label in base) = u[base]/u[label].
+            cross = u[base] / u[label]
+            change_pct = None
+            if label in u_prev and base in u_prev and u_prev[label]:
+                cross_prev = u_prev[base] / u_prev[label]
+                change_pct = round((cross - cross_prev) / cross_prev * 100, 4) if cross_prev else None
+            cards.append({"ticker": ticker, "label": label, "price": cross,
                           "change_pct": change_pct, "stale": True})
         # else: never seen yet — skip this currency
         if len(cards) >= 5:

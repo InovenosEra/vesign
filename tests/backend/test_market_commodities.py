@@ -91,6 +91,34 @@ FULL = {
 }
 
 
+def test_db_baseline_served_when_live_down_and_no_memory(comm_app):
+    """Cold process + total live failure → cards served from the market_quotes DB
+    baseline (stale), not dropped. Proves the durable persisted fallback."""
+    bm, client = comm_app
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("CREATE TABLE market_quotes (date DATETIME, ticker TEXT, close FLOAT)"))
+        for d, px in [("2026-05-29", 4400.0), ("2026-06-01", 4500.0)]:  # GC=F latest=4500, prev=4400
+            conn.execute(text("INSERT INTO market_quotes (date,ticker,close) VALUES (:d,'GC=F',:p)"), {"d": d, "p": px})
+    bm._yf_ticker_last_good.clear()
+    with patch.object(bm, "_fetch_yf_quotes", return_value=None):
+        body = client.get("/api/market/commodities").json()
+    gold = next((r for r in body["commodities"] if r["ticker"] == "GC=F"), None)
+    assert gold is not None and gold["stale"] is True
+    assert gold["price"] == 4500.0
+    assert gold["change_pct"] == pytest.approx((4500 - 4400) / 4400 * 100, abs=1e-3)
+
+
+def test_no_market_quotes_table_degrades_gracefully(comm_app):
+    """Missing market_quotes table must NOT 500 — endpoint just falls back to live."""
+    bm, client = comm_app
+    bm._yf_ticker_last_good.clear()
+    with patch.object(bm, "_fetch_yf_quotes", return_value=FIXTURE):
+        resp = client.get("/api/market/commodities")
+    assert resp.status_code == 200
+    assert len(resp.json()["commodities"]) == 6  # live fixture, no DB needed
+
+
 def test_partial_fetch_keeps_previously_seen_cards(comm_app):
     """A later partial yfinance batch (live-snapshot contention) must NOT drop
     cards already seen — they're served stale at their last-good price instead.

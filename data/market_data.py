@@ -229,6 +229,14 @@ def update_vix():
 #   ^GSPC = S&P 500, ^NDX = Nasdaq-100, ^DJI = Dow Jones, ^RUT = Russell 2000.
 INDEX_SYMBOLS = ["^GSPC", "^NDX", "^DJI", "^RUT"]
 
+# Commodity futures + macro cross + FX (USD-anchored: USD<CCY>=X = units of CCY
+# per 1 USD, so any display base derives as cross(c, base) = u[base] / u[c]).
+COMMODITY_SYMBOLS = ["GC=F", "SI=F", "PL=F", "PA=F", "CL=F", "BZ=F", "NG=F", "HG=F"]
+CROSS_SYMBOLS = ["DX-Y.NYB", "^TNX", "BTC-USD"]
+FX_USD_SYMBOLS = ["USDEUR=X", "USDGBP=X", "USDJPY=X", "USDCHF=X", "USDCNY=X",
+                  "USDAUD=X", "USDCAD=X", "USDILS=X"]
+MARKET_QUOTE_SYMBOLS = COMMODITY_SYMBOLS + CROSS_SYMBOLS + FX_USD_SYMBOLS
+
 
 def update_indices():
     """Fetch real index levels into the index_prices table — mirrors update_vix().
@@ -279,6 +287,57 @@ def update_indices():
 
     except Exception as e:
         print(f"Index update failed: {e}")
+
+
+def update_market_quotes():
+    """Store daily closes for commodity futures, the macro cross strip, and FX
+    (USD-anchored) in market_quotes — mirrors update_indices. Lets the
+    commodities/currencies/cross strips read a DB baseline + history instead of
+    hammering yfinance on every web request (which caused live-contention bugs)."""
+    print("Updating market quotes (commodities / cross / FX) incrementally...")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS market_quotes (date DATETIME, ticker TEXT, close FLOAT)"
+        ))
+
+    try:
+        existing = pd.read_sql("SELECT MAX(date) as last_date FROM market_quotes", engine)
+        last = existing["last_date"][0]
+        start_date = (pd.to_datetime(last).date() + timedelta(days=1)) if last is not None \
+            else datetime.now(UTC).date() - timedelta(days=3 * 365)
+    except Exception:
+        start_date = datetime.now(UTC).date() - timedelta(days=3 * 365)
+
+    today = datetime.now(UTC).date()
+    if start_date >= today:
+        print("Market quotes already up to date")
+        return
+
+    print(f"Downloading market quotes from {start_date} to {today}")
+    try:
+        data = yf.download(MARKET_QUOTE_SYMBOLS, start=start_date, end=today,
+                           auto_adjust=False, progress=False)
+        if data is None or data.empty:
+            data = yf.download(MARKET_QUOTE_SYMBOLS, period="5d", auto_adjust=False, progress=False)
+        if data is None or data.empty:
+            print("Market quotes download returned empty data")
+            return
+
+        close = data["Close"].reset_index().rename(columns={"Date": "date"})
+        long = close.melt(id_vars=["date"], var_name="ticker", value_name="close").dropna()
+
+        today_ts = pd.Timestamp(datetime.now(UTC).date())
+        start_ts = pd.Timestamp(start_date)
+        long = long[(long["date"] < today_ts) & (long["date"] >= start_ts)]
+        long.drop_duplicates(subset=["date", "ticker"], inplace=True)
+        if long.empty:
+            print("Market quotes: no new rows to insert")
+            return
+        long[["date", "ticker", "close"]].to_sql("market_quotes", engine, if_exists="append", index=False)
+        print(f"Market quotes updated successfully ({len(long)} new rows)")
+
+    except Exception as e:
+        print(f"Market quotes update failed: {e}")
 
 
 def snapshot_analyst_targets(date_str: str) -> None:
