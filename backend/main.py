@@ -3323,6 +3323,15 @@ _market_cache_lock = threading.Lock()
 _MARKET_TTL_SECONDS = 60
 _LIVE_PANEL_TTL = 3   # seconds — price-driven panels refresh fast (live snapshot)
 
+# Per-ticker last-known-good values for the yfinance strips. yfinance batch
+# downloads return only a SUBSET of the requested tickers when under concurrent
+# load (e.g. while the whole-universe live snapshot is running), so a fresh build
+# would otherwise DROP the missing cards. We fall back to the last-good value
+# (marked stale) for any ticker missing from the current fetch, so a card that
+# has ever loaded never disappears. Accessed only under _market_cache_lock.
+_yf_ticker_last_good: dict[str, dict] = {}  # {strip_key: {ticker: {price, change_pct}}}
+_fx_last_good: dict[str, dict] = {}         # {base: {currency: {price, prev_close}}}
+
 # --- Live universe baseline (rebuilt once per trading day) -------------------
 _baseline_cache: dict[str, dict] = {}
 _baseline_date = None
@@ -4523,29 +4532,30 @@ def _fetch_cross_quotes() -> dict | None:
 
 
 def _build_yf_strip(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
-    """Compose a {key: [rows]} strip from yfinance quotes; stale fallback on failure."""
-    raw = fetch(pairs) if fetch else _fetch_yf_quotes(pairs)
-    if raw:
-        rows = []
-        for ticker, label in pairs:
-            q = raw.get(ticker)
-            if not q:
-                continue
-            price = q.get("price")
-            prev = q.get("prev_close")
-            change_pct = None
-            if price is not None and prev not in (None, 0):
-                change_pct = round((price - prev) / prev * 100, 4)
-            rows.append({
-                "ticker": ticker, "label": label,
-                "price": price, "change_pct": change_pct, "stale": False,
-            })
-        return {key: rows}
+    """Compose a {key: [rows]} strip from yfinance quotes.
 
-    cached = _market_cache.get(key + "_last_good")
-    if cached is None:
-        return {key: []}
-    return {key: [{**r, "stale": True} for r in cached["data"][key]]}
+    A ticker missing from the current (possibly partial) fetch is served from its
+    last-known-good value with stale=true, so cards never vanish under concurrent
+    yfinance load. A ticker never yet seen is omitted until it first returns data.
+    """
+    raw = (fetch(pairs) if fetch else _fetch_yf_quotes(pairs)) or {}
+    last_good = _yf_ticker_last_good.setdefault(key, {})
+    rows = []
+    for ticker, label in pairs:
+        q = raw.get(ticker)
+        price = q.get("price") if q else None
+        if price is not None:
+            prev = q.get("prev_close")
+            change_pct = round((price - prev) / prev * 100, 4) if prev not in (None, 0) else None
+            last_good[ticker] = {"price": price, "change_pct": change_pct}
+            rows.append({"ticker": ticker, "label": label,
+                         "price": price, "change_pct": change_pct, "stale": False})
+        elif ticker in last_good:
+            g = last_good[ticker]
+            rows.append({"ticker": ticker, "label": label,
+                         "price": g["price"], "change_pct": g["change_pct"], "stale": True})
+        # else: never seen yet — nothing to show for this ticker
+    return {key: rows}
 
 
 def _get_yf_strip_cached(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
@@ -4556,8 +4566,6 @@ def _get_yf_strip_cached(pairs: list[tuple[str, str]], key: str, fetch=None) -> 
             return c["data"]
         data = _build_yf_strip(pairs, key, fetch=fetch)
         _market_cache[key] = {"t": now, "data": data}
-        if data[key] and not any(r.get("stale") for r in data[key]):
-            _market_cache[key + "_last_good"] = {"t": now, "data": data}
         return data
 
 
@@ -4581,21 +4589,34 @@ _FX_BASES = ["ILS", "USD", "EUR", "GBP", "JPY", "CHF", "CNY", "AUD", "CAD"]  # s
 def _build_market_currencies(base: str) -> dict:
     """5 key currencies' rate per 1 unit in `base` (e.g. base=ILS → USD/ILS, EUR/ILS …).
     Fetches the full key list (minus the base) and keeps the first 5 with data, so a
-    missing cross (e.g. CNYILS=X) just falls through to the next currency."""
+    missing cross (e.g. CNYILS=X) just falls through to the next currency.
+
+    A currency missing from the current (possibly partial) fetch is served from its
+    last-known-good rate with stale=true, so cards don't vanish under concurrent
+    yfinance load. A currency never yet seen is skipped until it first returns data."""
     base = (base or "ILS").upper()
     if base not in _FX_BASES:
         base = "ILS"
     pairs = [(f"{c}{base}=X", c) for c in _FX_KEY if c != base]  # label = currency code only
     raw = _fetch_yf_quotes(pairs) or {}
+    last_good = _fx_last_good.setdefault(base, {})
     cards = []
     for ticker, label in pairs:
         q = raw.get(ticker)
-        if not q or q.get("price") is None:
-            continue
-        price = q["price"]
-        prev = q.get("prev_close")
-        change_pct = round((price - prev) / prev * 100, 4) if prev not in (None, 0) else None
-        cards.append({"ticker": ticker, "label": label, "price": price, "change_pct": change_pct})
+        price = q.get("price") if q else None
+        if price is not None:
+            prev = q.get("prev_close")
+            change_pct = round((price - prev) / prev * 100, 4) if prev not in (None, 0) else None
+            last_good[label] = {"price": price, "prev_close": prev}
+            cards.append({"ticker": ticker, "label": label, "price": price,
+                          "change_pct": change_pct, "stale": False})
+        elif label in last_good:
+            g = last_good[label]
+            price, prev = g["price"], g.get("prev_close")
+            change_pct = round((price - prev) / prev * 100, 4) if prev not in (None, 0) else None
+            cards.append({"ticker": ticker, "label": label, "price": price,
+                          "change_pct": change_pct, "stale": True})
+        # else: never seen yet — skip this currency
         if len(cards) >= 5:
             break
     return {"base": base, "bases": _FX_BASES, "currencies": cards}

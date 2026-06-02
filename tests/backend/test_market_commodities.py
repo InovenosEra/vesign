@@ -77,3 +77,40 @@ def test_empty_when_no_cache_and_fetch_fails(comm_app):
     with patch.object(bm, "_fetch_yf_quotes", return_value=None):
         body = client.get("/api/market/commodities").json()
     assert body == {"commodities": []}
+
+
+FULL = {
+    "GC=F": {"price": 4520.0, "prev_close": 4500.0},
+    "SI=F": {"price": 76.0,   "prev_close": 75.0},
+    "PL=F": {"price": 1959.0, "prev_close": 1920.0},
+    "PA=F": {"price": 1402.0, "prev_close": 1360.0},
+    "CL=F": {"price": 96.0,   "prev_close": 98.0},
+    "BZ=F": {"price": 100.0,  "prev_close": 100.0},
+    "NG=F": {"price": 3.00,   "prev_close": 2.90},
+    "HG=F": {"price": 6.40,   "prev_close": 6.30},
+}
+
+
+def test_partial_fetch_keeps_previously_seen_cards(comm_app):
+    """A later partial yfinance batch (live-snapshot contention) must NOT drop
+    cards already seen — they're served stale at their last-good price instead.
+    Reproduces the disappearing-cards bug."""
+    bm, client = comm_app
+    with patch.object(bm, "_fetch_yf_quotes", return_value=FULL):
+        first = client.get("/api/market/commodities").json()
+    assert len(first["commodities"]) == 8  # all eight present after a clean fetch
+
+    with bm._market_cache_lock:
+        bm._market_cache["commodities"]["t"] = 0.0  # force expiry → rebuild
+    partial = {  # only two come back this time
+        "GC=F": {"price": 4530.0, "prev_close": 4500.0},
+        "CL=F": {"price": 95.0,   "prev_close": 98.0},
+    }
+    with patch.object(bm, "_fetch_yf_quotes", return_value=partial):
+        body = client.get("/api/market/commodities").json()
+
+    by = {r["ticker"]: r for r in body["commodities"]}
+    assert set(by.keys()) == set(FULL.keys())            # none vanish
+    assert by["GC=F"]["stale"] is False and by["GC=F"]["price"] == 4530.0  # refreshed
+    assert by["SI=F"]["stale"] is True and by["SI=F"]["price"] == 76.0     # last-good
+    assert by["PA=F"]["stale"] is True and by["PA=F"]["price"] == 1402.0   # last-good
