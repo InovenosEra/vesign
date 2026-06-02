@@ -5,6 +5,7 @@ VIX comes from the vix table. Both are populated from yfinance by the pipeline.
 """
 import os
 import tempfile
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -37,7 +38,11 @@ def indices_app():
     import importlib
     import backend.main as bm
     importlib.reload(bm)
-    yield bm, TestClient(bm.app)
+    # The indices builder fetches the intraday sparkline via _fetch_yf_intraday in
+    # addition to the live quote. Stub it so real yfinance intraday data can't leak
+    # into tests that drive _fetch_yf_quotes; tests opt into live data via that mock.
+    with patch.object(bm, "_fetch_yf_intraday", return_value={}):
+        yield bm, TestClient(bm.app)
 
     for fname in os.listdir(tmpdir):
         try:

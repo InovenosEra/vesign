@@ -1,6 +1,7 @@
 """Tests for GET /api/market/analyst-changes/top — top moves in analyst targets."""
 import os
 import tempfile
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -34,12 +35,18 @@ def analyst_app():
                 ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT
             )
         """))
+        # The endpoint enriches top changes with a current price from daily_prices
+        # (live-snapshot first, daily close as fallback).
+        conn.execute(text("CREATE TABLE daily_prices (date DATETIME, ticker TEXT, open FLOAT, high FLOAT, low FLOAT, close FLOAT, volume BIGINT)"))
     temp_engine.dispose()
 
     import importlib
     import backend.main as bm
     importlib.reload(bm)
-    yield bm, TestClient(bm.app)
+    # Stub the whole-universe live snapshot so price-enrichment is deterministic and
+    # never reaches yfinance (the tests assert on TP changes, not on live price).
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
+        yield bm, TestClient(bm.app)
 
     for fname in os.listdir(tmpdir):
         try:
