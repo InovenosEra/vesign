@@ -8,7 +8,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useUser, useClerk } from '@clerk/react'
+import { useUser, useClerk, useReverification } from '@clerk/react'
+import { isReverificationCancelledError } from '@clerk/react/errors'
 import { useCurrency } from '../context/CurrencyContext'
 import { useMe } from '../context/MeContext'
 import { fmtCents } from './signals/gating'
@@ -103,16 +104,20 @@ function PhoneModal({ user, onClose, notify }) {
   const [res, setRes] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Adding a phone is a "sensitive" op — Clerk requires step-up reverification.
+  // useReverification pops Clerk's quick "verify it's you" prompt and retries.
+  const createPhone = useReverification((phoneNumber) => user.createPhoneNumber({ phoneNumber }))
 
   const sendCode = async () => {
     if (!value.trim()) { setErr('Enter a phone number'); return }
     setBusy(true); setErr('')
     try {
-      const r = await user.createPhoneNumber({ phoneNumber: value.trim() })
+      const r = await createPhone(value.trim())
       await r.prepareVerification()
       setRes(r); setStep('code')
-    } catch (e) { setErr(clerkErr(e, 'Could not send the verification code.')) }
-    finally { setBusy(false) }
+    } catch (e) {
+      if (!isReverificationCancelledError(e)) setErr(clerkErr(e, 'Could not send the verification code.'))
+    } finally { setBusy(false) }
   }
   const confirm = async () => {
     if (!code.trim()) { setErr('Enter the code we sent you'); return }
@@ -239,15 +244,18 @@ function PasswordModal({ user, onClose, notify }) {
   const [conf, setConf] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Changing a password is sensitive — Clerk may require step-up reverification.
+  const updatePassword = useReverification((opts) => user.updatePassword(opts))
   const submit = async () => {
     if (nw.length < 8) { setErr('New password must be at least 8 characters'); return }
     if (nw !== conf) { setErr('New passwords do not match'); return }
     setBusy(true); setErr('')
     try {
-      await user.updatePassword(hasPw ? { currentPassword: cur, newPassword: nw } : { newPassword: nw })
+      await updatePassword(hasPw ? { currentPassword: cur, newPassword: nw } : { newPassword: nw })
       notify('Password updated', 'success'); onClose()
-    } catch (e) { setErr(clerkErr(e, 'Could not update your password.')) }
-    finally { setBusy(false) }
+    } catch (e) {
+      if (!isReverificationCancelledError(e)) setErr(clerkErr(e, 'Could not update your password.'))
+    } finally { setBusy(false) }
   }
   return (
     <div className="acc-modal-overlay" onClick={onClose}>
