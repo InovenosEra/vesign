@@ -6,6 +6,7 @@
  * Billing, payment, API keys, integrations, 2FA, sessions, notifications and
  * trading toggles are mock UI (no backend yet) — interactive but not persisted. */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useUser, useClerk, useReverification } from '@clerk/react'
@@ -98,42 +99,72 @@ const clerkErr = (e, fallback) => e?.errors?.[0]?.longMessage || e?.errors?.[0]?
 /* E.164 = dial code + national number (digits only, trunk-0 dropped). */
 const buildE164 = (dial, national) => dial + (national || '').replace(/\D/g, '').replace(/^0/, '')
 
-/* Country-code picker: flag + dial code, searchable dropdown. */
+/* Country-code picker: flag + dial code, searchable dropdown. The menu is
+ * rendered in a portal (fixed-positioned, anchored to the button) so the
+ * surrounding card's overflow:hidden can't clip the country list. */
 function CountrySelect({ value, onChange }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
-  const ref = useRef(null)
+  const [pos, setPos] = useState(null)
+  const btnRef = useRef(null)
+  const menuRef = useRef(null)
+
   useEffect(() => {
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    if (!open) return undefined
+    const MENU_W = 280, MENU_H = 320
+    const place = () => {
+      const r = btnRef.current?.getBoundingClientRect()
+      if (!r) return
+      const below = r.bottom + 6
+      const flipUp = below + MENU_H > window.innerHeight && r.top - MENU_H - 6 > 0
+      setPos({ left: Math.min(r.left, window.innerWidth - MENU_W - 8), top: flipUp ? r.top - MENU_H - 6 : below, width: MENU_W, height: MENU_H })
+    }
+    place()
+    const onDown = (e) => {
+      if (btnRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
     document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [])
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+      document.removeEventListener('mousedown', onDown)
+    }
+  }, [open])
+
   const ql = q.trim().toLowerCase()
   const list = ql
     ? COUNTRIES.filter(c => c.name.toLowerCase().includes(ql) || c.dial.includes(ql) || c.iso.toLowerCase() === ql)
     : COUNTRIES
+  const pick = (c) => { onChange(c); setOpen(false); setQ('') }
+
   return (
-    <div className={'cc-select' + (open ? ' open' : '')} ref={ref}>
-      <button type="button" className="cc-btn" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}>
+    <div className={'cc-select' + (open ? ' open' : '')}>
+      <button ref={btnRef} type="button" className="cc-btn" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}>
         <span className="cc-flag">{flagEmoji(value.iso)}</span>
         <span className="cc-dial">{value.dial}</span>
         <svg className="cc-caret" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9" /></svg>
       </button>
-      {open && (
-        <div className="cc-menu" role="listbox">
-          <input className="cc-search" autoFocus placeholder="Search country…" value={q} onChange={e => setQ(e.target.value)} />
-          <div className="cc-list">
-            {list.map(c => (
-              <button key={c.iso + c.dial} type="button" className={'cc-row' + (c.iso === value.iso ? ' sel' : '')}
-                onClick={() => { onChange(c); setOpen(false); setQ('') }}>
-                <span className="cc-flag">{flagEmoji(c.iso)}</span>
-                <span className="cc-name">{c.name}</span>
-                <span className="cc-dial">{c.dial}</span>
-              </button>
-            ))}
-            {!list.length && <div className="cc-empty">No match</div>}
+      {open && pos && createPortal(
+        <div className="rd">
+          <div className="cc-menu" role="listbox" ref={menuRef}
+            style={{ position: 'fixed', left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.height }}>
+            <input className="cc-search" autoFocus placeholder="Search country…" value={q} onChange={e => setQ(e.target.value)} />
+            <div className="cc-list">
+              {list.map(c => (
+                <button key={c.iso + c.dial} type="button" className={'cc-row' + (c.iso === value.iso ? ' sel' : '')} onClick={() => pick(c)}>
+                  <span className="cc-flag">{flagEmoji(c.iso)}</span>
+                  <span className="cc-name">{c.name}</span>
+                  <span className="cc-dial">{c.dial}</span>
+                </button>
+              ))}
+              {!list.length && <div className="cc-empty">No match</div>}
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
