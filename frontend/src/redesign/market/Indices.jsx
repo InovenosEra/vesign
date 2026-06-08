@@ -15,10 +15,12 @@ export default function Indices() {
     <div className="indices">
       {rows.map((row, i) => {
         const { price, change } = overlayLive(row.close, row.change_pct)
-        const cls = change == null ? '' : change >= 0 ? 'up' : 'down'
-        const color = row.ticker === 'VIX'
-          ? (change >= 0 ? '#ff4d5c' : '#00d97e')   // VIX inverted
-          : (change >= 0 ? '#00d97e' : '#ff4d5c')
+        // VIX is inverted: a FALLING VIX (less fear) reads as "good" → green, like a
+        // rising index. One `positive` flag drives BOTH the % text colour and the
+        // sparkline so the card can never show a red % over a green line.
+        const positive = row.ticker === 'VIX' ? change < 0 : change >= 0
+        const cls = change == null ? '' : positive ? 'up' : 'down'
+        const color = positive ? '#00d97e' : '#ff4d5c'
         const d = spark(row.sparkline || [], { width: 220, height: 60 })
         const gid = `g_${i}`
         const abs = price != null && change != null
