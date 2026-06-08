@@ -18,6 +18,7 @@ const AppShell = lazy(() => import('./redesign/AppShell'))
 const RdSignalsPage = lazy(() => import('./redesign/SignalsPage'))
 const RdPortfolioPage = lazy(() => import('./redesign/PortfolioPage'))
 const RdResearchPage = lazy(() => import('./redesign/ResearchPage'))
+const RdAccountPage = lazy(() => import('./redesign/AccountPage'))
 const SignalsPage = lazy(() => import('./pages/SignalsPage'))
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'))
 const TradesPage = lazy(() => import('./pages/TradesPage'))
@@ -602,7 +603,7 @@ function AppLayout() {
   const { user } = useUser()
   const location = useLocation()
   const _p = location.pathname
-  const isRedesignRoute = _p === '/' || ['/market', '/signals', '/portfolio', '/research'].some(r => _p === r || _p.startsWith(r + '/'))
+  const isRedesignRoute = _p === '/' || ['/market', '/signals', '/portfolio', '/research', '/account'].some(r => _p === r || _p.startsWith(r + '/'))
   const [tokenReady, setTokenReady] = useState(false)
   const [disabledReason, setDisabledReason] = useState(null)
 
@@ -661,6 +662,7 @@ function AppLayout() {
                     <Route path="/portfolio" element={<AppShell><RdPortfolioPage /></AppShell>} />
                     <Route path="/research" element={<AppShell><RdResearchPage /></AppShell>} />
                     <Route path="/research/:ticker" element={<AppShell><RdResearchPage /></AppShell>} />
+                    <Route path="/account" element={<AppShell><RdAccountPage /></AppShell>} />
                     {/* Old pages kept reachable during the port (not in redesign nav). */}
                     <Route path="/signals-old" element={<SignalsPage />} />
                     <Route path="/trades" element={<TradesPage />} />

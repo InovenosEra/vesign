@@ -7,9 +7,8 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { useUser, useClerk } from '@clerk/react'
+import { useUser } from '@clerk/react'
 import { getMarketStatus } from '../api'
-import ProfilePictureModal from '../components/ProfilePictureModal'
 import { useCurrency } from '../context/CurrencyContext'
 import { MeProvider, useMe } from '../context/MeContext'
 import { fmtCents } from './signals/gating'
@@ -140,43 +139,15 @@ function CcySelect() {
 
 function Avatar() {
   const { user } = useUser()
-  const { signOut, openUserProfile } = useClerk()
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const [showPic, setShowPic] = useState(false)
-  const ref = useRef(null)
-  useEffect(() => {
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [])
   const initials = ((user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')) || 'IL'
-  const items = [
-    { key: 'header.editPicture', action: () => { setShowPic(true); setOpen(false) } },
-    { key: 'header.changePassword', action: () => { openUserProfile(); setOpen(false) } },
-    { key: 'header.signOut', action: () => { setOpen(false); signOut({ redirectUrl: '/sign-in' }) } },
-  ]
   return (
-    <>
-      <div className={'hdr-select avatar-select' + (open ? ' open' : '')} ref={ref}>
-        <button type="button" className="avatar" title={user?.firstName || ''}
-          aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(o => !o)}
-          style={{ padding: 0, overflow: 'hidden' }}>
-          {user?.imageUrl
-            ? <img src={user.imageUrl} alt={initials}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-            : initials}
-        </button>
-        <div className="hs-menu" role="menu">
-          {items.map(i => (
-            <button key={i.key} type="button" role="menuitem" className="hs-row" onClick={i.action}>
-              {t(i.key)}
-            </button>
-          ))}
-        </div>
-      </div>
-      {showPic && <ProfilePictureModal onClose={() => setShowPic(false)} />}
-    </>
+    <NavLink to="/account" className="avatar" title={user?.firstName || 'Account'}
+      aria-label="Account" style={{ padding: 0, overflow: 'hidden', textDecoration: 'none' }}>
+      {user?.imageUrl
+        ? <img src={user.imageUrl} alt={initials}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+        : initials}
+    </NavLink>
   )
 }
 
