@@ -360,7 +360,13 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
       await r.prepareVerification()
       setPending({ res: r, e164, makePrimary: replacing })
     } catch (e) {
-      if (!isReverificationCancelledError(e)) notify(clerkErr(e, 'Could not send the verification code.'), 'error')
+      if (isReverificationCancelledError(e)) return
+      const code = e?.errors?.[0]?.code
+      const raw = e?.errors?.[0]?.message || ''
+      const friendly = (code === 'feature_not_enabled' || /not a valid parameter/i.test(raw))
+        ? 'Phone sign-in isn’t enabled for this account yet.'
+        : clerkErr(e, 'Could not send the verification code.')
+      notify(friendly, 'error')
     } finally { setSendingPhone(false) }
   }
   const closePending = () => { setPending(null); setNational(''); setReplacing(false) }
