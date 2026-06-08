@@ -301,14 +301,10 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
         </div>
         <div className="field-row">
           <div className="field-label">Email address<small>Your sign-in identity — can't be changed</small></div>
-          <div className="field-value">
-            <input className="input medium" value={user?.primaryEmailAddress?.emailAddress || ''} readOnly disabled />
-            {user?.primaryEmailAddress?.verification?.status === 'verified' && <span className="verified-tag">✓ Verified</span>}
-          </div>
-          <span className="locked-tag" title="Email is your sign-in identity and can't be changed">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
-            Locked
-          </span>
+          <div className="field-value"><span className="email-plain">{user?.primaryEmailAddress?.emailAddress || ''}</span></div>
+          {user?.primaryEmailAddress?.verification?.status === 'verified'
+            ? <span className="verified-tag">✓ Verified</span>
+            : <span />}
         </div>
         <div className="field-row">
           <div className="field-label">Phone (optional)<small>For SMS alerts on critical signals</small></div>
