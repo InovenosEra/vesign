@@ -54,7 +54,7 @@
 .rd .setting-card-body { padding: 4px 22px; }
 
 /* FIELD ROW */
-.rd .field-row { display: grid; grid-template-columns: 220px 1fr auto; align-items: center; gap: 22px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.rd .field-row { display: grid; grid-template-columns: 280px 1fr auto; align-items: center; gap: 22px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .rd .field-row:last-child { border-bottom: none; }
 .rd .field-row .field-label { font-size: 13px; color: var(--ink); font-weight: 500; }
 .rd .field-row .field-label small { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); font-weight: 400; margin-top: 3px; line-height: 1.4; }
