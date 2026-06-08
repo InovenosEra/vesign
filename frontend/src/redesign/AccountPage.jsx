@@ -5,7 +5,7 @@
  * language (i18n), plan + wallet balance (useMe), password/sign-out (Clerk).
  * Billing, payment, API keys, integrations, 2FA, sessions, notifications and
  * trading toggles are mock UI (no backend yet) — interactive but not persisted. */
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useUser, useClerk } from '@clerk/react'
@@ -71,31 +71,144 @@ function Card({ title, hint, badge, children, bodyPad }) {
   )
 }
 
+/* Bottom-right confirmation toast. Auto-dismisses after a few seconds. */
+function Toast({ toast, onDone }) {
+  useEffect(() => {
+    if (!toast) return undefined
+    const id = setTimeout(onDone, 3500)
+    return () => clearTimeout(id)
+  }, [toast, onDone])
+  if (!toast) return null
+  const icon = toast.type === 'error'
+    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></svg>
+    : toast.type === 'info'
+      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+      : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M20 6L9 17l-5-5" /></svg>
+  return (
+    <div className={'acc-toast ' + (toast.type || 'success')} role="status">
+      <span className="tico">{icon}</span><span>{toast.msg}</span>
+    </div>
+  )
+}
+
+const clerkErr = (e, fallback) => e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || fallback
+
+/* In-app verification modal for changing email / adding phone — runs the real
+ * Clerk create + code-verify flow inline (no redirect to the hosted Clerk page). */
+function VerifyModal({ kind, user, onClose, notify }) {
+  const isEmail = kind === 'email'
+  const [step, setStep] = useState('input')      // 'input' → 'code'
+  const [value, setValue] = useState('')
+  const [code, setCode] = useState('')
+  const [res, setRes] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const sendCode = async () => {
+    if (!value.trim()) { setErr(isEmail ? 'Enter an email address' : 'Enter a phone number'); return }
+    setBusy(true); setErr('')
+    try {
+      let r
+      if (isEmail) { r = await user.createEmailAddress({ email: value.trim() }); await r.prepareVerification({ strategy: 'email_code' }) }
+      else { r = await user.createPhoneNumber({ phoneNumber: value.trim() }); await r.prepareVerification() }
+      setRes(r); setStep('code')
+    } catch (e) { setErr(clerkErr(e, 'Could not send the verification code.')) }
+    finally { setBusy(false) }
+  }
+  const confirm = async () => {
+    if (!code.trim()) { setErr('Enter the code we sent you'); return }
+    setBusy(true); setErr('')
+    try {
+      await res.attemptVerification({ code: code.trim() })
+      if (isEmail) await user.update({ primaryEmailAddressId: res.id })
+      await user.reload?.()
+      notify(isEmail ? 'Email address updated' : 'Phone number added', 'success')
+      onClose()
+    } catch (e) { setErr(clerkErr(e, 'That code didn’t match. Try again.')) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="acc-modal-overlay" onClick={onClose}>
+      <div className="acc-modal" onClick={e => e.stopPropagation()}>
+        <div className="acc-modal-head">
+          <h3>{isEmail ? 'Change email address' : 'Add phone number'}</h3>
+          <button className="x" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="acc-modal-body">
+          {step === 'input' ? (
+            <div>
+              <label>{isEmail ? 'New email address' : 'Phone number (with country code)'}</label>
+              <input className="input" autoFocus value={value} onChange={e => setValue(e.target.value)}
+                placeholder={isEmail ? 'you@example.com' : '+972 50 123 4567'}
+                onKeyDown={e => e.key === 'Enter' && sendCode()} />
+            </div>
+          ) : (
+            <div>
+              <label>Enter the 6-digit code sent to {value}</label>
+              <input className="input mono" autoFocus value={code} onChange={e => setCode(e.target.value)}
+                placeholder="123456" inputMode="numeric" onKeyDown={e => e.key === 'Enter' && confirm()} />
+            </div>
+          )}
+          {err && <div className="err">{err}</div>}
+        </div>
+        <div className="acc-modal-foot">
+          <button className="btn sm" onClick={onClose} disabled={busy}>Cancel</button>
+          {step === 'input'
+            ? <button className="btn sm primary" onClick={sendCode} disabled={busy}>{busy ? 'Sending…' : 'Send code'}</button>
+            : <button className="btn sm primary" onClick={confirm} disabled={busy}>{busy ? 'Verifying…' : 'Verify'}</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ---- panes ---- */
-function ProfilePane({ user, openUserProfile, currency, setCurrency, i18n }) {
+function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
+  const [name, setName] = useState(user?.fullName || '')
+  const [savingName, setSavingName] = useState(false)
+  const [modal, setModal] = useState(null)   // 'email' | 'phone' | null
+  useEffect(() => { setName(user?.fullName || '') }, [user?.fullName])
+
+  const saveName = async () => {
+    const trimmed = name.trim()
+    if (!trimmed) { notify('Display name cannot be empty', 'error'); return }
+    if (trimmed === (user?.fullName || '')) { notify('No changes to save', 'info'); return }
+    const [first, ...rest] = trimmed.split(/\s+/)
+    setSavingName(true)
+    try {
+      await user.update({ firstName: first, lastName: rest.join(' ') })
+      await user.reload?.()
+      notify('Display name updated', 'success')
+    } catch (e) { notify(clerkErr(e, 'Could not update your name.'), 'error') }
+    finally { setSavingName(false) }
+  }
+  const phone = user?.primaryPhoneNumber?.phoneNumber
+
   return (
     <>
       <div className="acc-pane-head"><h2>Profile</h2><span className="sub">Personal information &amp; display preferences</span></div>
       <Card title="Identity">
         <div className="field-row">
           <div className="field-label">Display name<small>Shown on the platform and in exports</small></div>
-          <div className="field-value"><input className="input medium" defaultValue={user?.fullName || ''} /></div>
-          <button className="btn sm" onClick={() => openUserProfile()}>Update</button>
+          <div className="field-value"><input className="input medium" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveName()} /></div>
+          <button className="btn sm" onClick={saveName} disabled={savingName}>{savingName ? 'Saving…' : 'Update'}</button>
         </div>
         <div className="field-row">
           <div className="field-label">Email address<small>Used for sign-in and signal alerts</small></div>
           <div className="field-value">
-            <input className="input medium" defaultValue={user?.primaryEmailAddress?.emailAddress || ''} readOnly />
+            <input className="input medium" value={user?.primaryEmailAddress?.emailAddress || ''} readOnly />
             {user?.primaryEmailAddress?.verification?.status === 'verified' && <span className="verified-tag">✓ Verified</span>}
           </div>
-          <button className="btn sm" onClick={() => openUserProfile()}>Change</button>
+          <button className="btn sm" onClick={() => setModal('email')}>Change</button>
         </div>
         <div className="field-row">
           <div className="field-label">Phone (optional)<small>For SMS alerts on critical signals</small></div>
-          <div className="field-value"><input className="input medium" placeholder="+972 50 123 4567" /></div>
-          <button className="btn sm" onClick={() => openUserProfile()}>Add</button>
+          <div className="field-value"><input className="input medium" value={phone || ''} readOnly placeholder="+972 50 123 4567" /></div>
+          <button className="btn sm" onClick={() => setModal('phone')}>{phone ? 'Change' : 'Add'}</button>
         </div>
       </Card>
+      {modal && <VerifyModal kind={modal} user={user} notify={notify} onClose={() => setModal(null)} />}
       <Card title="Display">
         <div className="field-row">
           <div className="field-label">Currency<small>Used across the platform for monetary values</small></div>
@@ -459,6 +572,9 @@ function DataPane() {
 
 export default function AccountPage() {
   const [pane, setPane] = useState('profile')
+  const [toast, setToast] = useState(null)
+  const notify = useCallback((msg, type = 'success') => setToast({ msg, type, k: Date.now() }), [])
+  const dismissToast = useCallback(() => setToast(null), [])
   const { user } = useUser()
   const { signOut, openUserProfile } = useClerk()
   const { i18n } = useTranslation()
@@ -514,7 +630,7 @@ export default function AccountPage() {
 
         <main className="acc-main">
           <div className="acc-pane">
-            {pane === 'profile' && <ProfilePane user={user} openUserProfile={openUserProfile} currency={currency} setCurrency={setCurrency} i18n={i18n} />}
+            {pane === 'profile' && <ProfilePane user={user} currency={currency} setCurrency={setCurrency} i18n={i18n} notify={notify} />}
             {pane === 'plan' && <PlanPane planLabel={planLabel} />}
             {pane === 'wallet' && <WalletPane balanceCents={me.balance_cents} unlockCents={me.per_row_price_cents} />}
             {pane === 'notifications' && <NotificationsPane />}
@@ -525,6 +641,7 @@ export default function AccountPage() {
           </div>
         </main>
       </div>
+      <Toast toast={toast} onDone={dismissToast} />
     </>
   )
 }
