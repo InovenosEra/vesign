@@ -249,6 +249,18 @@
 .rd .acc-modal-body .input { max-width: none; width: 100%; }
 .rd .acc-modal-body .err { color: var(--red); font-size: 12px; }
 .rd .acc-modal-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid var(--line); }
+.rd .acc-modal.wide { max-width: 540px; }
+
+/* PICTURE MODAL */
+.rd .pic-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.rd .pic-tab { padding: 8px 16px; font-size: 13px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--ink-3); cursor: pointer; font-family: var(--sans); margin-bottom: -1px; }
+.rd .pic-tab:hover { color: var(--ink-2); }
+.rd .pic-tab.active { color: var(--ink); border-bottom-color: var(--blue); font-weight: 600; }
+.rd .pic-upload { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0; }
+.rd .pic-preview { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line-2); }
+.rd .pic-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 300px; overflow-y: auto; }
+.rd .pic-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; cursor: pointer; display: block; transition: outline .12s; }
+.rd .pic-grid img:hover { outline: 2px solid var(--blue); }
 
 /* RESPONSIVE */
 @media (max-width: 880px) {

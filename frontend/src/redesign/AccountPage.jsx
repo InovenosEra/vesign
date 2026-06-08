@@ -5,7 +5,7 @@
  * language (i18n), plan + wallet balance (useMe), password/sign-out (Clerk).
  * Billing, payment, API keys, integrations, 2FA, sessions, notifications and
  * trading toggles are mock UI (no backend yet) — interactive but not persisted. */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useUser, useClerk } from '@clerk/react'
@@ -157,6 +157,114 @@ function VerifyModal({ kind, user, onClose, notify }) {
           {step === 'input'
             ? <button className="btn sm primary" onClick={sendCode} disabled={busy}>{busy ? 'Sending…' : 'Send code'}</button>
             : <button className="btn sm primary" onClick={confirm} disabled={busy}>{busy ? 'Verifying…' : 'Verify'}</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* In-app profile-picture editor — upload from computer or search Unsplash, then
+ * save via Clerk's user.setProfileImage (no redirect to the hosted Clerk page). */
+function PictureModal({ user, onClose, notify }) {
+  const [tab, setTab] = useState('upload')
+  const [preview, setPreview] = useState(null)   // { url, file }
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const fileRef = useRef(null)
+  const UNSPLASH = import.meta.env.VITE_UNSPLASH_ACCESS_KEY
+
+  const onFile = (e) => { const f = e.target.files?.[0]; if (f) { setPreview({ url: URL.createObjectURL(f), file: f }); setErr('') } }
+  const save = async (file) => {
+    setBusy(true); setErr('')
+    try { await user.setProfileImage({ file }); await user.reload?.(); notify('Profile picture updated', 'success'); onClose() }
+    catch (e) { setErr(clerkErr(e, 'Could not save the image.')) } finally { setBusy(false) }
+  }
+  const search = async (e) => {
+    e.preventDefault(); if (!query.trim()) return
+    setBusy(true); setErr('')
+    try {
+      const r = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=15&orientation=squarish&client_id=${UNSPLASH}`)
+      const d = await r.json(); setResults(d.results || []); if (!(d.results || []).length) setErr('No results found.')
+    } catch { setErr('Search failed.') } finally { setBusy(false) }
+  }
+  const applyUrl = async (url) => {
+    setBusy(true); setErr('')
+    try { const r = await fetch(url); const b = await r.blob(); await save(new File([b], 'profile.jpg', { type: b.type })) }
+    catch (e) { setErr(clerkErr(e, 'Could not save the image.')); setBusy(false) }
+  }
+
+  return (
+    <div className="acc-modal-overlay" onClick={onClose}>
+      <div className="acc-modal wide" onClick={e => e.stopPropagation()}>
+        <div className="acc-modal-head"><h3>Edit profile picture</h3><button className="x" onClick={onClose} aria-label="Close">✕</button></div>
+        <div className="acc-modal-body">
+          <div className="pic-tabs">
+            <button className={'pic-tab' + (tab === 'upload' ? ' active' : '')} onClick={() => { setTab('upload'); setErr('') }}>Upload</button>
+            <button className={'pic-tab' + (tab === 'search' ? ' active' : '')} onClick={() => { setTab('search'); setErr('') }}>Search online</button>
+          </div>
+          {tab === 'upload' ? (
+            <div className="pic-upload">
+              {preview ? <img className="pic-preview" src={preview.url} alt="" />
+                : user?.imageUrl ? <img className="pic-preview" src={user.imageUrl} alt="" />
+                  : <div className="pic-preview" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 12 }}>No image</div>}
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
+              <button className="btn sm" onClick={() => fileRef.current?.click()}>Choose image…</button>
+              {preview && <button className="btn sm primary" onClick={() => save(preview.file)} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>}
+            </div>
+          ) : (
+            <div>
+              <form onSubmit={search} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input className="input" placeholder="lion, mountain, abstract…" value={query} onChange={e => setQuery(e.target.value)} autoFocus />
+                <button className="btn sm primary" type="submit" disabled={busy || !query.trim()}>{busy ? '…' : 'Search'}</button>
+              </form>
+              {results.length > 0 && (
+                <div className="pic-grid">
+                  {results.map(img => <img key={img.id} src={img.urls.thumb} alt={img.alt_description || ''} onClick={() => !busy && applyUrl(img.urls.regular)} />)}
+                </div>
+              )}
+              {!UNSPLASH && <div className="err">Image search is unavailable (missing VITE_UNSPLASH_ACCESS_KEY).</div>}
+            </div>
+          )}
+          {err && <div className="err">{err}</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* In-app password change — Clerk user.updatePassword, no hosted-page redirect. */
+function PasswordModal({ user, onClose, notify }) {
+  const hasPw = user?.passwordEnabled
+  const [cur, setCur] = useState('')
+  const [nw, setNw] = useState('')
+  const [conf, setConf] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const submit = async () => {
+    if (nw.length < 8) { setErr('New password must be at least 8 characters'); return }
+    if (nw !== conf) { setErr('New passwords do not match'); return }
+    setBusy(true); setErr('')
+    try {
+      await user.updatePassword(hasPw ? { currentPassword: cur, newPassword: nw } : { newPassword: nw })
+      notify('Password updated', 'success'); onClose()
+    } catch (e) { setErr(clerkErr(e, 'Could not update your password.')) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="acc-modal-overlay" onClick={onClose}>
+      <div className="acc-modal" onClick={e => e.stopPropagation()}>
+        <div className="acc-modal-head"><h3>{hasPw ? 'Change password' : 'Set password'}</h3><button className="x" onClick={onClose} aria-label="Close">✕</button></div>
+        <div className="acc-modal-body">
+          {hasPw && <div><label>Current password</label><input className="input" type="password" value={cur} onChange={e => setCur(e.target.value)} autoFocus /></div>}
+          <div><label>New password</label><input className="input" type="password" placeholder="At least 8 characters" value={nw} onChange={e => setNw(e.target.value)} autoFocus={!hasPw} /></div>
+          <div><label>Confirm new password</label><input className="input" type="password" value={conf} onChange={e => setConf(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} /></div>
+          {err && <div className="err">{err}</div>}
+        </div>
+        <div className="acc-modal-foot">
+          <button className="btn sm" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="btn sm primary" onClick={submit} disabled={busy}>{busy ? 'Updating…' : 'Update password'}</button>
         </div>
       </div>
     </div>
@@ -469,17 +577,19 @@ function TradingPane() {
   )
 }
 
-function SecurityPane({ openUserProfile }) {
+function SecurityPane({ user, openUserProfile, notify }) {
+  const [pwModal, setPwModal] = useState(false)
   return (
     <>
       <div className="acc-pane-head"><h2>Security</h2><span className="sub">Password, two-factor authentication, and sessions</span></div>
-      <Card title="Password" hint="Manage via your account portal">
+      <Card title="Password" hint="Last changed via Vesign">
         <div className="field-row">
           <div className="field-label">Password<small>Change your sign-in password</small></div>
           <div className="field-value"><span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)' }}>••••••••••••</span></div>
-          <button className="btn sm primary" onClick={() => openUserProfile()}>Change password</button>
+          <button className="btn sm primary" onClick={() => setPwModal(true)}>{user?.passwordEnabled ? 'Change password' : 'Set password'}</button>
         </div>
       </Card>
+      {pwModal && <PasswordModal user={user} notify={notify} onClose={() => setPwModal(false)} />}
       <Card title="Two-factor authentication" badge={{ label: 'Enabled' }}>
         <div className="field-row">
           <div className="field-label">Authenticator app<small>Time-based one-time password (TOTP)</small></div>
@@ -573,6 +683,7 @@ function DataPane() {
 export default function AccountPage() {
   const [pane, setPane] = useState('profile')
   const [toast, setToast] = useState(null)
+  const [picModal, setPicModal] = useState(false)
   const notify = useCallback((msg, type = 'success') => setToast({ msg, type, k: Date.now() }), [])
   const dismissToast = useCallback(() => setToast(null), [])
   const { user } = useUser()
@@ -601,7 +712,7 @@ export default function AccountPage() {
           <div className="acc-user-card">
             <div className="ava">
               {user?.imageUrl ? <img src={user.imageUrl} alt={initials} /> : initials}
-              <div className="edit" title="Change picture" onClick={() => openUserProfile()}>
+              <div className="edit" title="Change picture" onClick={() => setPicModal(true)}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 19l7-7 3 3-7 7-3-3z M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /></svg>
               </div>
             </div>
@@ -635,12 +746,13 @@ export default function AccountPage() {
             {pane === 'wallet' && <WalletPane balanceCents={me.balance_cents} unlockCents={me.per_row_price_cents} />}
             {pane === 'notifications' && <NotificationsPane />}
             {pane === 'trading' && <TradingPane />}
-            {pane === 'security' && <SecurityPane openUserProfile={openUserProfile} />}
+            {pane === 'security' && <SecurityPane user={user} openUserProfile={openUserProfile} notify={notify} />}
             {pane === 'api' && <ApiPane />}
             {pane === 'data' && <DataPane />}
           </div>
         </main>
       </div>
+      {picModal && <PictureModal user={user} notify={notify} onClose={() => setPicModal(false)} />}
       <Toast toast={toast} onDone={dismissToast} />
     </>
   )
