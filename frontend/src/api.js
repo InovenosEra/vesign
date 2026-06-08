@@ -75,6 +75,15 @@ async function patch(path, body) {
   return handleResponse(res)
 }
 
+async function put(path, body) {
+  const res = await fetch(BASE + path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS, ...await authHeaders() },
+    body: JSON.stringify(body),
+  })
+  return handleResponse(res)
+}
+
 async function del(path) {
   const res = await fetch(BASE + path, {
     method: 'DELETE',
@@ -249,4 +258,5 @@ export const getPortfolioComparison = (market = 'US') =>
 
 // --- Entitlements (plan + wallet) ------------------------------------------
 export const getMe = () => get('/me')
+export const savePhone = (phone) => put('/account/phone', { phone })
 export const unlockSignal = (body) => post('/signals/unlock', body)

@@ -239,6 +239,15 @@ def _init_tables():
                 UNIQUE(list_id, ticker)
             )
         """))
+        # Per-user app settings (phone for SMS alerts, etc.) — kept in our own DB,
+        # NOT Clerk (Clerk phone is a paid auth feature; we send our own alerts).
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id    TEXT PRIMARY KEY,
+                phone      TEXT DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """))
 
     # Schema migration in its own connection so a failure doesn't poison the
     # watchlist transaction above (SQLite marks a connection as "needs rollback"
@@ -521,6 +530,10 @@ class UnlockBody(BaseModel):
     scope: str                     # row | all
     lock_token: Optional[str] = None
     market: Optional[str] = "US"
+
+
+class PhoneBody(BaseModel):
+    phone: str = ""                # E.164 (+972...), or "" to clear
 
 
 class TickerAdd(BaseModel):
@@ -2367,6 +2380,13 @@ def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
     return ent.gate_open_trades(rows, plan=plan, unlocks=unlocks)
 
 
+def _get_user_phone(uid: str) -> str:
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT phone FROM user_settings WHERE user_id = :u"),
+                           {"u": uid}).fetchone()
+    return (row[0] if row else "") or ""
+
+
 @protected.get("/api/me")
 def me_entitlements(user=Depends(get_current_user)):
     uid = user["id"]
@@ -2375,7 +2395,28 @@ def me_entitlements(user=Depends(get_current_user)):
         "balance_cents": ent.get_balance(uid),
         "per_row_price_cents": ent.PER_ROW_PRICE_CENTS,
         "see_all_price_cents": ent.SEE_ALL_PRICE_CENTS,
+        "phone": _get_user_phone(uid),
     }
+
+
+_PHONE_RE = re.compile(r"^\+\d{8,15}$")
+
+
+@protected.put("/api/account/phone")
+def set_account_phone(body: PhoneBody, user=Depends(get_current_user)):
+    """Save (or clear) the user's phone number for SMS alerts. Stored in our own
+    DB, not Clerk. Expects E.164 (+countrycode...) or empty string to remove."""
+    uid = user["id"]
+    phone = (body.phone or "").strip()
+    if phone and not _PHONE_RE.match(phone):
+        raise HTTPException(status_code=422, detail={"code": "INVALID_PHONE"})
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO user_settings (user_id, phone, updated_at)
+            VALUES (:u, :p, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET phone = :p, updated_at = datetime('now')
+        """), {"u": uid, "p": phone})
+    return {"phone": phone}
 
 
 @protected.post("/api/signals/unlock")

@@ -9,10 +9,12 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { useUser, useClerk, useReverification } from '@clerk/react'
 import { isReverificationCancelledError } from '@clerk/react/errors'
 import { useCurrency } from '../context/CurrencyContext'
 import { useMe } from '../context/MeContext'
+import { savePhone } from '../api'
 import { fmtCents } from './signals/gating'
 import { LOGO } from './fmt'
 import { COUNTRIES, flagEmoji, countryByIso } from './countries'
@@ -170,49 +172,6 @@ function CountrySelect({ value, onChange }) {
   )
 }
 
-/* Code-only confirmation modal — the SMS has already been requested when this
- * opens, so the user just enters the code. Email is intentionally NOT editable
- * (it is the sign-in identity / unique account id). */
-function PhoneCodeModal({ user, res, e164, makePrimary, onClose, notify }) {
-  const [code, setCode] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const confirm = async () => {
-    if (!code.trim()) { setErr('Enter the code we sent you'); return }
-    setBusy(true); setErr('')
-    try {
-      await res.attemptVerification({ code: code.trim() })
-      if (makePrimary) { try { await user.update({ primaryPhoneNumberId: res.id }) } catch { /* keep as additional number */ } }
-      await user.reload?.()
-      notify('Phone number added', 'success')
-      onClose()
-    } catch (e) { setErr(clerkErr(e, 'That code didn’t match. Try again.')) }
-    finally { setBusy(false) }
-  }
-  return (
-    <div className="acc-modal-overlay" onClick={onClose}>
-      <div className="acc-modal" onClick={e => e.stopPropagation()}>
-        <div className="acc-modal-head">
-          <h3>Confirm your phone</h3>
-          <button className="x" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-        <div className="acc-modal-body">
-          <div>
-            <label>Enter the 6-digit code sent to {e164}</label>
-            <input className="input mono" autoFocus value={code} onChange={e => setCode(e.target.value)}
-              placeholder="123456" inputMode="numeric" onKeyDown={e => e.key === 'Enter' && confirm()} />
-          </div>
-          {err && <div className="err">{err}</div>}
-        </div>
-        <div className="acc-modal-foot">
-          <button className="btn sm" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn sm primary" onClick={confirm} disabled={busy}>{busy ? 'Verifying…' : 'Verify'}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /* In-app profile-picture editor — upload from computer or search Unsplash, then
  * save via Clerk's user.setProfileImage (no redirect to the hosted Clerk page). */
 function PictureModal({ user, onClose, notify }) {
@@ -325,13 +284,13 @@ function PasswordModal({ user, onClose, notify }) {
 }
 
 /* ---- panes ---- */
-function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
+function ProfilePane({ user, phone, currency, setCurrency, i18n, notify }) {
+  const qc = useQueryClient()
   const [name, setName] = useState(user?.fullName || '')
   const [savingName, setSavingName] = useState(false)
   const [country, setCountry] = useState(() => countryByIso('IL'))
   const [national, setNational] = useState('')
-  const [sendingPhone, setSendingPhone] = useState(false)
-  const [pending, setPending] = useState(null)     // { res, e164, makePrimary }
+  const [savingPhone, setSavingPhone] = useState(false)
   const [replacing, setReplacing] = useState(false)
   const countryTouched = useRef(false)
   useEffect(() => { setName(user?.fullName || '') }, [user?.fullName])
@@ -345,31 +304,32 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
     }).catch(() => { /* keep default */ })
     return () => { cancelled = true }
   }, [])
-  // Adding a phone is "sensitive" — Clerk requires step-up reverification.
-  const createPhone = useReverification((phoneNumber) => user.createPhoneNumber({ phoneNumber }))
-  const phone = user?.primaryPhoneNumber?.phoneNumber
 
-  const addPhone = async () => {
+  // Phone is stored in OUR DB (not Clerk — Clerk phone is a paid auth feature).
+  // We just save the E.164 number for future SMS alerts; no verification step.
+  const submitPhone = async () => {
     const digits = national.replace(/\D/g, '')
     if (!digits) { notify('Enter a phone number', 'error'); return }
     const e164 = buildE164(country.dial, national)
     if (!/^\+\d{8,15}$/.test(e164)) { notify('Enter a valid phone number', 'error'); return }
-    setSendingPhone(true)
+    setSavingPhone(true)
     try {
-      const r = await createPhone(e164)
-      await r.prepareVerification()
-      setPending({ res: r, e164, makePrimary: replacing })
-    } catch (e) {
-      if (isReverificationCancelledError(e)) return
-      const code = e?.errors?.[0]?.code
-      const raw = e?.errors?.[0]?.message || ''
-      const friendly = (code === 'feature_not_enabled' || /not a valid parameter/i.test(raw))
-        ? 'Phone sign-in isn’t enabled for this account yet.'
-        : clerkErr(e, 'Could not send the verification code.')
-      notify(friendly, 'error')
-    } finally { setSendingPhone(false) }
+      await savePhone(e164)
+      await qc.invalidateQueries({ queryKey: ['me'] })
+      notify('Phone number saved', 'success')
+      setReplacing(false); setNational('')
+    } catch { notify('Could not save your phone number', 'error') }
+    finally { setSavingPhone(false) }
   }
-  const closePending = () => { setPending(null); setNational(''); setReplacing(false) }
+  const removePhone = async () => {
+    setSavingPhone(true)
+    try {
+      await savePhone('')
+      await qc.invalidateQueries({ queryKey: ['me'] })
+      notify('Phone number removed', 'info')
+    } catch { notify('Could not remove your phone number', 'error') }
+    finally { setSavingPhone(false) }
+  }
 
   const saveName = async () => {
     const trimmed = name.trim()
@@ -410,16 +370,20 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
                 <div className="phone-input">
                   <CountrySelect value={country} onChange={c => { countryTouched.current = true; setCountry(c) }} />
                   <input className="input" value={national} onChange={e => setNational(e.target.value)}
-                    placeholder="54 557 4094" inputMode="tel" onKeyDown={e => e.key === 'Enter' && addPhone()} />
+                    placeholder="54 557 4094" inputMode="tel" onKeyDown={e => e.key === 'Enter' && submitPhone()} />
                 </div>
               )}
           </div>
           {phone && !replacing
-            ? <button className="btn sm" onClick={() => setReplacing(true)}>Change</button>
-            : <button className="btn sm" onClick={addPhone} disabled={sendingPhone}>{sendingPhone ? 'Sending…' : 'Add'}</button>}
+            ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn sm" onClick={() => setReplacing(true)}>Change</button>
+                <button className="btn sm danger" onClick={removePhone} disabled={savingPhone}>Remove</button>
+              </div>
+            )
+            : <button className="btn sm" onClick={submitPhone} disabled={savingPhone}>{savingPhone ? 'Saving…' : 'Save'}</button>}
         </div>
       </Card>
-      {pending && <PhoneCodeModal user={user} res={pending.res} e164={pending.e164} makePrimary={pending.makePrimary} notify={notify} onClose={closePending} />}
       <Card title="Display">
         <div className="field-row">
           <div className="field-label">Currency<small>Used across the platform for monetary values</small></div>
@@ -844,7 +808,7 @@ export default function AccountPage() {
 
         <main className="acc-main">
           <div className="acc-pane">
-            {pane === 'profile' && <ProfilePane user={user} currency={currency} setCurrency={setCurrency} i18n={i18n} notify={notify} />}
+            {pane === 'profile' && <ProfilePane user={user} phone={me.phone} currency={currency} setCurrency={setCurrency} i18n={i18n} notify={notify} />}
             {pane === 'plan' && <PlanPane planLabel={planLabel} />}
             {pane === 'wallet' && <WalletPane balanceCents={me.balance_cents} unlockCents={me.per_row_price_cents} />}
             {pane === 'notifications' && <NotificationsPane />}
