@@ -14,6 +14,7 @@ import { useCurrency } from '../context/CurrencyContext'
 import { useMe } from '../context/MeContext'
 import { fmtCents } from './signals/gating'
 import { LOGO } from './fmt'
+import { COUNTRIES, flagEmoji, countryByIso } from './countries'
 import './account.css'
 
 const PLAN_LABELS = { free: 'Free', pro: 'Pro', max: 'Max', pro_plus: 'Pro+' }
@@ -94,85 +95,87 @@ function Toast({ toast, onDone }) {
 
 const clerkErr = (e, fallback) => e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || fallback
 
-/* Coerce a typed phone number to E.164, which Clerk requires. Handles +prefixed,
- * 00-international, and bare national numbers. A single leading 0 (national trunk
- * prefix) is assumed Israeli (+972) — the app's home country and placeholder. */
-function toE164(raw) {
-  const s = (raw || '').replace(/[\s\-().]/g, '')
-  if (s.startsWith('+')) return s
-  if (s.startsWith('00')) return '+' + s.slice(2)
-  if (s.startsWith('0')) return '+972' + s.slice(1)
-  if (/^\d{8,}$/.test(s)) return '+' + s
-  return s
+/* E.164 = dial code + national number (digits only, trunk-0 dropped). */
+const buildE164 = (dial, national) => dial + (national || '').replace(/\D/g, '').replace(/^0/, '')
+
+/* Country-code picker: flag + dial code, searchable dropdown. */
+function CountrySelect({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef(null)
+  useEffect(() => {
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+  const ql = q.trim().toLowerCase()
+  const list = ql
+    ? COUNTRIES.filter(c => c.name.toLowerCase().includes(ql) || c.dial.includes(ql) || c.iso.toLowerCase() === ql)
+    : COUNTRIES
+  return (
+    <div className={'cc-select' + (open ? ' open' : '')} ref={ref}>
+      <button type="button" className="cc-btn" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}>
+        <span className="cc-flag">{flagEmoji(value.iso)}</span>
+        <span className="cc-dial">{value.dial}</span>
+        <svg className="cc-caret" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {open && (
+        <div className="cc-menu" role="listbox">
+          <input className="cc-search" autoFocus placeholder="Search country…" value={q} onChange={e => setQ(e.target.value)} />
+          <div className="cc-list">
+            {list.map(c => (
+              <button key={c.iso + c.dial} type="button" className={'cc-row' + (c.iso === value.iso ? ' sel' : '')}
+                onClick={() => { onChange(c); setOpen(false); setQ('') }}>
+                <span className="cc-flag">{flagEmoji(c.iso)}</span>
+                <span className="cc-name">{c.name}</span>
+                <span className="cc-dial">{c.dial}</span>
+              </button>
+            ))}
+            {!list.length && <div className="cc-empty">No match</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
-/* In-app phone add/change — runs Clerk's create + SMS-code verify flow inline
- * (no redirect to the hosted Clerk page). Email is intentionally NOT editable:
- * it is the sign-in identity and unique account identifier. */
-function PhoneModal({ user, onClose, notify }) {
-  const [step, setStep] = useState('input')      // 'input' → 'code'
-  const [value, setValue] = useState('')
+/* Code-only confirmation modal — the SMS has already been requested when this
+ * opens, so the user just enters the code. Email is intentionally NOT editable
+ * (it is the sign-in identity / unique account id). */
+function PhoneCodeModal({ user, res, e164, makePrimary, onClose, notify }) {
   const [code, setCode] = useState('')
-  const [res, setRes] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  // Adding a phone is a "sensitive" op — Clerk requires step-up reverification.
-  // useReverification pops Clerk's quick "verify it's you" prompt and retries.
-  const createPhone = useReverification((phoneNumber) => user.createPhoneNumber({ phoneNumber }))
-
-  const sendCode = async () => {
-    const phone = toE164(value)
-    if (!phone) { setErr('Enter a phone number'); return }
-    if (!/^\+\d{8,15}$/.test(phone)) { setErr('Use international format, e.g. +972 54 557 4094'); return }
-    setBusy(true); setErr('')
-    try {
-      const r = await createPhone(phone)
-      await r.prepareVerification()
-      setRes(r); setStep('code')
-    } catch (e) {
-      if (!isReverificationCancelledError(e)) setErr(clerkErr(e, 'Could not send the verification code.'))
-    } finally { setBusy(false) }
-  }
   const confirm = async () => {
     if (!code.trim()) { setErr('Enter the code we sent you'); return }
     setBusy(true); setErr('')
     try {
       await res.attemptVerification({ code: code.trim() })
+      if (makePrimary) { try { await user.update({ primaryPhoneNumberId: res.id }) } catch { /* keep as additional number */ } }
       await user.reload?.()
       notify('Phone number added', 'success')
       onClose()
     } catch (e) { setErr(clerkErr(e, 'That code didn’t match. Try again.')) }
     finally { setBusy(false) }
   }
-
   return (
     <div className="acc-modal-overlay" onClick={onClose}>
       <div className="acc-modal" onClick={e => e.stopPropagation()}>
         <div className="acc-modal-head">
-          <h3>Add phone number</h3>
+          <h3>Confirm your phone</h3>
           <button className="x" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="acc-modal-body">
-          {step === 'input' ? (
-            <div>
-              <label>Phone number (with country code)</label>
-              <input className="input" autoFocus value={value} onChange={e => setValue(e.target.value)}
-                placeholder="+972 50 123 4567" onKeyDown={e => e.key === 'Enter' && sendCode()} />
-            </div>
-          ) : (
-            <div>
-              <label>Enter the 6-digit code sent to {toE164(value)}</label>
-              <input className="input mono" autoFocus value={code} onChange={e => setCode(e.target.value)}
-                placeholder="123456" inputMode="numeric" onKeyDown={e => e.key === 'Enter' && confirm()} />
-            </div>
-          )}
+          <div>
+            <label>Enter the 6-digit code sent to {e164}</label>
+            <input className="input mono" autoFocus value={code} onChange={e => setCode(e.target.value)}
+              placeholder="123456" inputMode="numeric" onKeyDown={e => e.key === 'Enter' && confirm()} />
+          </div>
           {err && <div className="err">{err}</div>}
         </div>
         <div className="acc-modal-foot">
           <button className="btn sm" onClick={onClose} disabled={busy}>Cancel</button>
-          {step === 'input'
-            ? <button className="btn sm primary" onClick={sendCode} disabled={busy}>{busy ? 'Sending…' : 'Send code'}</button>
-            : <button className="btn sm primary" onClick={confirm} disabled={busy}>{busy ? 'Verifying…' : 'Verify'}</button>}
+          <button className="btn sm primary" onClick={confirm} disabled={busy}>{busy ? 'Verifying…' : 'Verify'}</button>
         </div>
       </div>
     </div>
@@ -294,8 +297,42 @@ function PasswordModal({ user, onClose, notify }) {
 function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
   const [name, setName] = useState(user?.fullName || '')
   const [savingName, setSavingName] = useState(false)
-  const [phoneModal, setPhoneModal] = useState(false)
+  const [country, setCountry] = useState(() => countryByIso('IL'))
+  const [national, setNational] = useState('')
+  const [sendingPhone, setSendingPhone] = useState(false)
+  const [pending, setPending] = useState(null)     // { res, e164, makePrimary }
+  const [replacing, setReplacing] = useState(false)
+  const countryTouched = useRef(false)
   useEffect(() => { setName(user?.fullName || '') }, [user?.fullName])
+  // Default the country to the user's location (IP geo), unless they pick one.
+  useEffect(() => {
+    let cancelled = false
+    fetch('https://ipapi.co/json/').then(r => r.json()).then(d => {
+      if (cancelled || countryTouched.current) return
+      const c = countryByIso(d?.country_code)
+      if (c) setCountry(c)
+    }).catch(() => { /* keep default */ })
+    return () => { cancelled = true }
+  }, [])
+  // Adding a phone is "sensitive" — Clerk requires step-up reverification.
+  const createPhone = useReverification((phoneNumber) => user.createPhoneNumber({ phoneNumber }))
+  const phone = user?.primaryPhoneNumber?.phoneNumber
+
+  const addPhone = async () => {
+    const digits = national.replace(/\D/g, '')
+    if (!digits) { notify('Enter a phone number', 'error'); return }
+    const e164 = buildE164(country.dial, national)
+    if (!/^\+\d{8,15}$/.test(e164)) { notify('Enter a valid phone number', 'error'); return }
+    setSendingPhone(true)
+    try {
+      const r = await createPhone(e164)
+      await r.prepareVerification()
+      setPending({ res: r, e164, makePrimary: replacing })
+    } catch (e) {
+      if (!isReverificationCancelledError(e)) notify(clerkErr(e, 'Could not send the verification code.'), 'error')
+    } finally { setSendingPhone(false) }
+  }
+  const closePending = () => { setPending(null); setNational(''); setReplacing(false) }
 
   const saveName = async () => {
     const trimmed = name.trim()
@@ -310,7 +347,6 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
     } catch (e) { notify(clerkErr(e, 'Could not update your name.'), 'error') }
     finally { setSavingName(false) }
   }
-  const phone = user?.primaryPhoneNumber?.phoneNumber
 
   return (
     <>
@@ -330,11 +366,23 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
         </div>
         <div className="field-row">
           <div className="field-label">Phone (optional)<small>For SMS alerts on critical signals</small></div>
-          <div className="field-value"><input className="input medium" value={phone || ''} readOnly placeholder="+972 50 123 4567" /></div>
-          <button className="btn sm" onClick={() => setPhoneModal(true)}>{phone ? 'Change' : 'Add'}</button>
+          <div className="field-value">
+            {phone && !replacing
+              ? <span className="email-plain">{phone}</span>
+              : (
+                <div className="phone-input">
+                  <CountrySelect value={country} onChange={c => { countryTouched.current = true; setCountry(c) }} />
+                  <input className="input" value={national} onChange={e => setNational(e.target.value)}
+                    placeholder="54 557 4094" inputMode="tel" onKeyDown={e => e.key === 'Enter' && addPhone()} />
+                </div>
+              )}
+          </div>
+          {phone && !replacing
+            ? <button className="btn sm" onClick={() => setReplacing(true)}>Change</button>
+            : <button className="btn sm" onClick={addPhone} disabled={sendingPhone}>{sendingPhone ? 'Sending…' : 'Add'}</button>}
         </div>
       </Card>
-      {phoneModal && <PhoneModal user={user} notify={notify} onClose={() => setPhoneModal(false)} />}
+      {pending && <PhoneCodeModal user={user} res={pending.res} e164={pending.e164} makePrimary={pending.makePrimary} notify={notify} onClose={closePending} />}
       <Card title="Display">
         <div className="field-row">
           <div className="field-label">Currency<small>Used across the platform for monetary values</small></div>
