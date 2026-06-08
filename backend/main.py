@@ -3561,11 +3561,20 @@ def _build_market_indices() -> dict:
     intraday = _get_indices_intraday_cached([t for t, _ in pairs])
     out = []
     with engine.connect() as conn:
+        # index_prices is populated by the daily pipeline's update_indices(); guard
+        # in case it hasn't run yet (e.g. a prod-synced DB predating this feature) so
+        # the endpoint still serves live-quote cards instead of 500-ing the page.
+        has_idx = conn.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_prices'"
+        )).fetchone() is not None
         for ticker in _INDICES_TICKERS:
-            rows = conn.execute(text(
-                "SELECT close FROM index_prices WHERE ticker=:t ORDER BY date DESC LIMIT 30"),
-                {"t": ticker}).fetchall()
-            closes = [r[0] for r in rows][::-1]
+            if has_idx:
+                rows = conn.execute(text(
+                    "SELECT close FROM index_prices WHERE ticker=:t ORDER BY date DESC LIMIT 30"),
+                    {"t": ticker}).fetchall()
+                closes = [r[0] for r in rows][::-1]
+            else:
+                closes = []
             out.append(_index_entry_live(ticker, closes, live.get(ticker), intraday.get(ticker)))
         vix_rows = conn.execute(text("SELECT close FROM vix ORDER BY date DESC LIMIT 30")).fetchall()
         vix_closes = [r[0] for r in vix_rows][::-1]
