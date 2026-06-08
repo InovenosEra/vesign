@@ -3654,8 +3654,21 @@ def _index_entry_live(ticker: str, closes: list, live_q: "dict | None",
         change_pct = round((price - prev) / prev * 100, 4) if prev else None
         if intraday:
             spark = ([prev] if prev else []) + intraday[:-1] + [price]
+        elif closes:
+            # Anchor the live point on prev_close (the baseline change% uses) so
+            # the final drawn segment's direction matches the sign of change%.
+            # closes[-1] is the latest STORED daily close: when the daily pipeline
+            # hasn't written today yet it IS prev_close (keep it, append live);
+            # when it has, it's today's stale close to be replaced (drop it so
+            # closes[-2]==prev anchors the live point). Replacing it unconditionally
+            # (the old behaviour) dropped prev_close on a fresh trading day, leaving
+            # the line to fall from the day-before's close even on an up day.
+            tol = max(1e-6, abs(prev) * 5e-4) if prev else 1e-6
+            base = closes if (prev is not None and closes[-1] is not None
+                              and abs(closes[-1] - prev) <= tol) else closes[:-1]
+            spark = base + [price]
         else:
-            spark = (closes[:-1] + [price]) if closes else [price]
+            spark = [price]
         return {"ticker": ticker, "close": price, "change_pct": change_pct, "sparkline": spark}
     if intraday:
         last = intraday[-1]

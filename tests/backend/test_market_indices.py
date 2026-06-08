@@ -152,3 +152,30 @@ def test_indices_latest_from_live_yf(indices_app):
     assert round(gspc["change_pct"], 4) == round((7150 - 7100) / 7100 * 100, 4)
     assert len(gspc["sparkline"]) >= 2                   # sparkline still from table
     assert gspc["sparkline"][-1] == 7150.0               # last point replaced with live price
+
+
+def test_sparkline_final_segment_matches_change_sign_on_fresh_day(indices_app):
+    """Regression: on a fresh trading day the latest STORED close IS prev_close.
+    The live point must anchor on that close (not the day before it) so the final
+    drawn segment rises on an up day. Previously the code dropped prev_close,
+    making the line fall from the day-before's higher close even when change% > 0."""
+    bm, client = indices_app
+    from sqlalchemy import text
+    # day-before close is HIGHER than today's live price; prev (latest stored) is lower.
+    with bm.engine.begin() as conn:
+        for d, c in [("2026-06-04 00:00:00", 7584.31),   # closes[-2] (higher)
+                     ("2026-06-05 00:00:00", 7383.74)]:   # closes[-1] == prev_close
+            conn.execute(text("INSERT INTO index_prices (date,ticker,close) VALUES (:d,'^GSPC',:c)"), {"d": d, "c": c})
+        conn.execute(text("INSERT INTO vix (date, close) VALUES ('2026-06-05 00:00:00', 18.0)"))
+    live = {"^GSPC": {"price": 7429.20, "prev_close": 7383.74},  # up vs Friday
+            "^NDX": {"price": 1.0, "prev_close": 1.0}, "^DJI": {"price": 1.0, "prev_close": 1.0},
+            "^RUT": {"price": 1.0, "prev_close": 1.0}, "^VIX": {"price": 18.5, "prev_close": 18.0}}
+    from unittest.mock import patch
+    with patch.object(bm, "_fetch_yf_quotes", return_value=live):
+        idx = client.get("/api/market/indices").json()["indices"]
+    g = next(i for i in idx if i["ticker"] == "^GSPC")
+    sp = g["sparkline"]
+    assert g["change_pct"] > 0                            # up day
+    assert sp[-2] == 7383.74                              # prev_close anchors the live point
+    assert sp[-1] == 7429.20
+    assert sp[-1] > sp[-2]                                # final segment rises, matching change%
