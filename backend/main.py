@@ -3558,7 +3558,12 @@ def _build_market_indices() -> dict:
     daily table entry when no live quote is available)."""
     pairs = [(t, t) for t in _INDICES_TICKERS] + [("^VIX", "^VIX")]
     live = _fetch_yf_quotes(pairs) or {}
-    intraday = _get_indices_intraday_cached([t for t, _ in pairs])
+    # Sparkline is the 30-day daily series for ALL cards (last point overlaid with
+    # the live price below), so every card shows a consistent window. Intraday is
+    # deliberately NOT used: cash indices (^GSPC/^NDX/^DJI/^RUT) only print during
+    # RTH, so early in the session they'd render a 4-7 bar stub while VIX (which
+    # prints in extended hours) showed a full ~79-bar day — an inconsistent mix.
+    intraday: dict = {}
     out = []
     with engine.connect() as conn:
         # index_prices is populated by the daily pipeline's update_indices(); guard
