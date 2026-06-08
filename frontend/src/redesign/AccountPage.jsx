@@ -93,10 +93,10 @@ function Toast({ toast, onDone }) {
 
 const clerkErr = (e, fallback) => e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || fallback
 
-/* In-app verification modal for changing email / adding phone — runs the real
- * Clerk create + code-verify flow inline (no redirect to the hosted Clerk page). */
-function VerifyModal({ kind, user, onClose, notify }) {
-  const isEmail = kind === 'email'
+/* In-app phone add/change — runs Clerk's create + SMS-code verify flow inline
+ * (no redirect to the hosted Clerk page). Email is intentionally NOT editable:
+ * it is the sign-in identity and unique account identifier. */
+function PhoneModal({ user, onClose, notify }) {
   const [step, setStep] = useState('input')      // 'input' → 'code'
   const [value, setValue] = useState('')
   const [code, setCode] = useState('')
@@ -105,12 +105,11 @@ function VerifyModal({ kind, user, onClose, notify }) {
   const [err, setErr] = useState('')
 
   const sendCode = async () => {
-    if (!value.trim()) { setErr(isEmail ? 'Enter an email address' : 'Enter a phone number'); return }
+    if (!value.trim()) { setErr('Enter a phone number'); return }
     setBusy(true); setErr('')
     try {
-      let r
-      if (isEmail) { r = await user.createEmailAddress({ email: value.trim() }); await r.prepareVerification({ strategy: 'email_code' }) }
-      else { r = await user.createPhoneNumber({ phoneNumber: value.trim() }); await r.prepareVerification() }
+      const r = await user.createPhoneNumber({ phoneNumber: value.trim() })
+      await r.prepareVerification()
       setRes(r); setStep('code')
     } catch (e) { setErr(clerkErr(e, 'Could not send the verification code.')) }
     finally { setBusy(false) }
@@ -120,9 +119,8 @@ function VerifyModal({ kind, user, onClose, notify }) {
     setBusy(true); setErr('')
     try {
       await res.attemptVerification({ code: code.trim() })
-      if (isEmail) await user.update({ primaryEmailAddressId: res.id })
       await user.reload?.()
-      notify(isEmail ? 'Email address updated' : 'Phone number added', 'success')
+      notify('Phone number added', 'success')
       onClose()
     } catch (e) { setErr(clerkErr(e, 'That code didn’t match. Try again.')) }
     finally { setBusy(false) }
@@ -132,16 +130,15 @@ function VerifyModal({ kind, user, onClose, notify }) {
     <div className="acc-modal-overlay" onClick={onClose}>
       <div className="acc-modal" onClick={e => e.stopPropagation()}>
         <div className="acc-modal-head">
-          <h3>{isEmail ? 'Change email address' : 'Add phone number'}</h3>
+          <h3>Add phone number</h3>
           <button className="x" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="acc-modal-body">
           {step === 'input' ? (
             <div>
-              <label>{isEmail ? 'New email address' : 'Phone number (with country code)'}</label>
+              <label>Phone number (with country code)</label>
               <input className="input" autoFocus value={value} onChange={e => setValue(e.target.value)}
-                placeholder={isEmail ? 'you@example.com' : '+972 50 123 4567'}
-                onKeyDown={e => e.key === 'Enter' && sendCode()} />
+                placeholder="+972 50 123 4567" onKeyDown={e => e.key === 'Enter' && sendCode()} />
             </div>
           ) : (
             <div>
@@ -275,7 +272,7 @@ function PasswordModal({ user, onClose, notify }) {
 function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
   const [name, setName] = useState(user?.fullName || '')
   const [savingName, setSavingName] = useState(false)
-  const [modal, setModal] = useState(null)   // 'email' | 'phone' | null
+  const [phoneModal, setPhoneModal] = useState(false)
   useEffect(() => { setName(user?.fullName || '') }, [user?.fullName])
 
   const saveName = async () => {
@@ -303,20 +300,23 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
           <button className="btn sm" onClick={saveName} disabled={savingName}>{savingName ? 'Saving…' : 'Update'}</button>
         </div>
         <div className="field-row">
-          <div className="field-label">Email address<small>Used for sign-in and signal alerts</small></div>
+          <div className="field-label">Email address<small>Your sign-in identity — can't be changed</small></div>
           <div className="field-value">
-            <input className="input medium" value={user?.primaryEmailAddress?.emailAddress || ''} readOnly />
+            <input className="input medium" value={user?.primaryEmailAddress?.emailAddress || ''} readOnly disabled />
             {user?.primaryEmailAddress?.verification?.status === 'verified' && <span className="verified-tag">✓ Verified</span>}
           </div>
-          <button className="btn sm" onClick={() => setModal('email')}>Change</button>
+          <span className="locked-tag" title="Email is your sign-in identity and can't be changed">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+            Locked
+          </span>
         </div>
         <div className="field-row">
           <div className="field-label">Phone (optional)<small>For SMS alerts on critical signals</small></div>
           <div className="field-value"><input className="input medium" value={phone || ''} readOnly placeholder="+972 50 123 4567" /></div>
-          <button className="btn sm" onClick={() => setModal('phone')}>{phone ? 'Change' : 'Add'}</button>
+          <button className="btn sm" onClick={() => setPhoneModal(true)}>{phone ? 'Change' : 'Add'}</button>
         </div>
       </Card>
-      {modal && <VerifyModal kind={modal} user={user} notify={notify} onClose={() => setModal(null)} />}
+      {phoneModal && <PhoneModal user={user} notify={notify} onClose={() => setPhoneModal(false)} />}
       <Card title="Display">
         <div className="field-row">
           <div className="field-label">Currency<small>Used across the platform for monetary values</small></div>
