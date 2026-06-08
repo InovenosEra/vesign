@@ -3503,15 +3503,44 @@ _snapshot_cache: dict = {}        # ticker -> live price
 _snapshot_ts: float = 0.0
 _snapshot_phase = None
 _snapshot_lock = threading.Lock()
+_snapshot_refreshing = False      # a whole-universe refresh is in flight (single-flight)
 _SNAPSHOT_TTL_SECONDS = 3          # seconds
+
+
+def _do_snapshot_refresh(phase: str, tickers: list) -> None:
+    """Fetch the whole-universe live prices OUTSIDE the lock (the ~3s network call
+    must never block request threads), then store under a brief lock. The previous
+    snapshot is kept on failure or an all-empty fetch, so the page never blanks."""
+    global _snapshot_cache, _snapshot_ts, _snapshot_refreshing
+    try:
+        if phase == "regular":
+            fresh = fetch_live_prices(tickers)
+        else:  # pre / post
+            quotes = fetch_aftermarket_quotes(tickers)
+            fresh = {t: live_snapshot.mid_price(q) for t, q in quotes.items()}
+        fresh = {t: p for t, p in fresh.items() if p}
+        with _snapshot_lock:
+            if fresh:
+                _snapshot_cache = fresh
+            _snapshot_ts = time.time()
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "live snapshot fetch failed; keeping previous snapshot", exc_info=True)
+    finally:
+        with _snapshot_lock:
+            _snapshot_refreshing = False
 
 
 def _get_live_snapshot() -> dict:
     """Shared whole-universe live prices. {"phase": str, "prices": {ticker: price}}.
-    Refreshed at most once per _SNAPSHOT_TTL_SECONDS; the lock makes it single-flight.
-    regular -> batch-quote; pre/post -> batched aftermarket mid; idle -> empty.
-    On fetch failure the previous snapshot is retained (page never blanks)."""
-    global _snapshot_cache, _snapshot_ts, _snapshot_phase
+
+    Serve-stale-while-refreshing: a fresh cache returns immediately; a stale cache
+    is ALSO returned immediately while a single background refresh runs, so a request
+    never waits on the ~3s whole-universe fetch (the build exceeds the TTL, which used
+    to make every other request block). Only the first call (no cache) or a phase
+    change blocks until data exists. Single-flight via the refreshing flag.
+    regular -> batch-quote; pre/post -> aftermarket mid; idle -> empty."""
+    global _snapshot_cache, _snapshot_ts, _snapshot_phase, _snapshot_refreshing
     phase = _phase_info()["phase"]
     now = time.time()
     with _snapshot_lock:
@@ -3524,18 +3553,21 @@ def _get_live_snapshot() -> dict:
             return {"phase": phase, "prices": {}}
         if _snapshot_ts and now - _snapshot_ts < _SNAPSHOT_TTL_SECONDS:
             return {"phase": phase, "prices": _snapshot_cache}
+        if _snapshot_refreshing:
+            # a refresh is already in flight — serve the stale cache, don't pile on
+            return {"phase": phase, "prices": _snapshot_cache}
+        have_cache = bool(_snapshot_cache)
+        _snapshot_refreshing = True
         tickers = list(_get_universe_baseline().keys())
-        try:
-            if phase == "regular":
-                fresh = fetch_live_prices(tickers)
-            else:  # pre / post
-                quotes = fetch_aftermarket_quotes(tickers)
-                fresh = {t: live_snapshot.mid_price(q) for t, q in quotes.items()}
-            _snapshot_cache = {t: p for t, p in fresh.items() if p}
-            _snapshot_ts = now
-        except Exception:
-            logging.getLogger(__name__).warning(
-                "live snapshot fetch failed; keeping previous snapshot", exc_info=True)
+        stale_prices = _snapshot_cache
+    if have_cache:
+        # Refresh in the background; serve the stale prices instantly (no blocking).
+        threading.Thread(target=_do_snapshot_refresh, args=(phase, tickers),
+                         daemon=True).start()
+        return {"phase": phase, "prices": stale_prices}
+    # First population (or just after a phase change): block once so callers get data.
+    _do_snapshot_refresh(phase, tickers)
+    with _snapshot_lock:
         return {"phase": phase, "prices": _snapshot_cache}
 
 
