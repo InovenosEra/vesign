@@ -94,6 +94,18 @@ function Toast({ toast, onDone }) {
 
 const clerkErr = (e, fallback) => e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || fallback
 
+/* Coerce a typed phone number to E.164, which Clerk requires. Handles +prefixed,
+ * 00-international, and bare national numbers. A single leading 0 (national trunk
+ * prefix) is assumed Israeli (+972) — the app's home country and placeholder. */
+function toE164(raw) {
+  const s = (raw || '').replace(/[\s\-().]/g, '')
+  if (s.startsWith('+')) return s
+  if (s.startsWith('00')) return '+' + s.slice(2)
+  if (s.startsWith('0')) return '+972' + s.slice(1)
+  if (/^\d{8,}$/.test(s)) return '+' + s
+  return s
+}
+
 /* In-app phone add/change — runs Clerk's create + SMS-code verify flow inline
  * (no redirect to the hosted Clerk page). Email is intentionally NOT editable:
  * it is the sign-in identity and unique account identifier. */
@@ -109,10 +121,12 @@ function PhoneModal({ user, onClose, notify }) {
   const createPhone = useReverification((phoneNumber) => user.createPhoneNumber({ phoneNumber }))
 
   const sendCode = async () => {
-    if (!value.trim()) { setErr('Enter a phone number'); return }
+    const phone = toE164(value)
+    if (!phone) { setErr('Enter a phone number'); return }
+    if (!/^\+\d{8,15}$/.test(phone)) { setErr('Use international format, e.g. +972 54 557 4094'); return }
     setBusy(true); setErr('')
     try {
-      const r = await createPhone(value.trim())
+      const r = await createPhone(phone)
       await r.prepareVerification()
       setRes(r); setStep('code')
     } catch (e) {
@@ -147,7 +161,7 @@ function PhoneModal({ user, onClose, notify }) {
             </div>
           ) : (
             <div>
-              <label>Enter the 6-digit code sent to {value}</label>
+              <label>Enter the 6-digit code sent to {toE164(value)}</label>
               <input className="input mono" autoFocus value={code} onChange={e => setCode(e.target.value)}
                 placeholder="123456" inputMode="numeric" onKeyDown={e => e.key === 'Enter' && confirm()} />
             </div>
