@@ -3571,6 +3571,24 @@ def _get_live_snapshot() -> dict:
         return {"phase": phase, "prices": _snapshot_cache}
 
 
+# Keep the whole-universe live snapshot warm so no REQUEST ever pays the one-time
+# cold populate (~11s after a restart) or the post-phase-change rebuild. The snapshot
+# is serve-stale-while-refreshing, so after the first populate this loop just triggers
+# the background refresh and never blocks. Skipped under pytest, where
+# test_get_live_snapshot asserts exact cold-cache state on the shared globals.
+def _warm_live_snapshot_bg():
+    while True:
+        try:
+            if not os.environ.get("PYTEST_CURRENT_TEST") and _phase_info()["phase"] != "idle":
+                _get_live_snapshot()
+        except Exception:
+            pass
+        time.sleep(2)
+
+if not os.environ.get("PYTEST_CURRENT_TEST"):
+    threading.Thread(target=_warm_live_snapshot_bg, daemon=True).start()
+
+
 def _overlay_live(rows: list, price_key: str = "close") -> list:
     """Return rows with each row's price_key replaced by the live snapshot price
     when present. Rows absent from the snapshot are returned unchanged. Does NOT
