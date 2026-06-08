@@ -300,7 +300,7 @@ function ProfilePane({ user, currency, setCurrency, i18n, notify }) {
           <button className="btn sm" onClick={saveName} disabled={savingName}>{savingName ? 'Saving…' : 'Update'}</button>
         </div>
         <div className="field-row">
-          <div className="field-label">Email address<small>Your sign-in identity — can't be changed</small></div>
+          <div className="field-label">Email address<small>Your sign-in identity</small></div>
           <div className="field-value"><span className="email-plain">{user?.primaryEmailAddress?.emailAddress || ''}</span></div>
           {user?.primaryEmailAddress?.verification?.status === 'verified'
             ? <span className="verified-tag">✓ Verified</span>
