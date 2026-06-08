@@ -8,15 +8,19 @@ export const LOGO = (t) => 'https://ve-sign.com/logos/' + encodeURIComponent(t) 
 
 export const dirClass = (v) => (v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '')
 
-/* Live overlay: endpoints return last stored close + change_pct (vs prior close).
- * Given a live quote, derive prev-close and recompute the live price + change so
- * the UI is live intraday. Falls back to the stored values when no live quote. */
+/* Live overlay: endpoints return the last stored close (latest COMPLETED session)
+ * + change_pct (that session vs its prior close). Given a live quote, the live
+ * intraday move is measured vs that last stored close — the SAME baseline the
+ * server's change_pct uses and that the movers/breadth/sector panels use. Falls
+ * back to the stored values when no live quote.
+ *
+ * NB: do NOT re-derive the session-before-last (close/(1+change)) and measure
+ * against it — that spans a 2-day window and can flip the sign vs everywhere else
+ * (the index-card / sector-modal anchor bug, June 2026). Anchor on `close`. */
 export function overlayLive(close, changePct, livePrice) {
   if (livePrice == null || !isFinite(livePrice)) return { price: close, change: changePct }
-  if (changePct == null || close == null) return { price: livePrice, change: changePct }
-  const prev = close / (1 + changePct / 100)
-  if (!isFinite(prev) || prev === 0) return { price: livePrice, change: changePct }
-  return { price: livePrice, change: (livePrice - prev) / prev * 100 }
+  if (close == null || close === 0) return { price: livePrice, change: changePct }
+  return { price: livePrice, change: (livePrice - close) / close * 100 }
 }
 
 /* Same idea for valuation rows: close + upside (vs analyst target). Live price
