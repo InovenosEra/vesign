@@ -9,7 +9,12 @@ const DAY_ABBR = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'T
 export default function EarningsWeek() {
   const open = useTickerModal()
   const { data } = useQuery({ queryKey: ['market-earnings-week'], queryFn: getEarningsWeek, refetchInterval: 600_000 })
-  const all = (data?.earnings || []).filter(r => r.company)
+  // FMP returns the week DESCENDING (Fri→Mon); sort ascending by date so the
+  // soonest earnings (incl. today's) show first instead of being cut off by the
+  // 8-row cap. `date` is an ISO YYYY-MM-DD string, safe to compare lexically.
+  const all = (data?.earnings || [])
+    .filter(r => r.company)
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
   const rows = all.slice(0, 8)
   return (
     <div className="cal-panel">

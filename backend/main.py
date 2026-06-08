@@ -4123,9 +4123,15 @@ def _build_market_sector_detail(sector: str) -> dict:
         mc = r["market_cap"] or 0
         close = r["close"]
         lp = live.get(r["ticker"])
-        if lp and r["prev_close"]:
+        if lp and r["close"]:
+            # Anchor the live move on t.close (the latest COMPLETED session), which
+            # is the same baseline the heatmap tile uses (_build_universe_baseline
+            # prev_close = MAX(date) close). Dividing by p.close (the session BEFORE
+            # that) measured a 2-day window and could flip the modal's sign/colour
+            # vs the tile the user clicked. Falls back to the stored 1-day move when
+            # no live price exists.
             close = lp
-            cp = (lp - r["prev_close"]) / r["prev_close"] * 100.0
+            cp = (lp - r["close"]) / r["close"] * 100.0
         else:
             cp = r["change_pct"]
         if mc > 0 and cp is not None:
