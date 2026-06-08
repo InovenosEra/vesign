@@ -154,6 +154,33 @@ def test_indices_latest_from_live_yf(indices_app):
     assert gspc["sparkline"][-1] == 7150.0               # last point replaced with live price
 
 
+def test_indices_hold_last_good_on_empty_fetch(indices_app):
+    """Regression: a transient EMPTY yfinance fetch must not drop the live overlay.
+    Before the per-ticker last-good cache, an empty fetch flipped every card to its
+    last STORED daily close + that completed day's move (e.g. 7100 / Fri-vs-Thu)
+    for a few seconds, then snapped back to live. It must hold the last good live
+    quote instead."""
+    bm = indices_app[0]
+    from unittest.mock import patch
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        for d, c in [("2026-05-21 00:00:00", 7000.0), ("2026-05-22 00:00:00", 7100.0)]:
+            conn.execute(text("INSERT INTO index_prices (date,ticker,close) VALUES (:d,'^GSPC',:c)"), {"d": d, "c": c})
+        conn.execute(text("INSERT INTO vix (date, close) VALUES ('2026-05-22 00:00:00', 18.0)"))
+    live = {"^GSPC": {"price": 7150.0, "prev_close": 7100.0},
+            "^NDX": {"price": 1.0, "prev_close": 1.0}, "^DJI": {"price": 1.0, "prev_close": 1.0},
+            "^RUT": {"price": 1.0, "prev_close": 1.0}, "^VIX": {"price": 18.5, "prev_close": 18.0}}
+    # 1) a good fetch populates last-good
+    with patch.object(bm, "_fetch_yf_quotes", return_value=live):
+        bm._build_market_indices()
+    # 2) a transient EMPTY fetch must still serve the live value, not the 7100 close
+    with patch.object(bm, "_fetch_yf_quotes", return_value={}):
+        out = bm._build_market_indices()
+    g = next(i for i in out["indices"] if i["ticker"] == "^GSPC")
+    assert g["close"] == 7150.0                                   # held live, not stored 7100
+    assert round(g["change_pct"], 4) == round((7150 - 7100) / 7100 * 100, 4)
+
+
 def test_sparkline_final_segment_matches_change_sign_on_fresh_day(indices_app):
     """Regression: on a fresh trading day the latest STORED close IS prev_close.
     The live point must anchor on that close (not the day before it) so the final

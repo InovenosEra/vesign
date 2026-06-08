@@ -3420,6 +3420,7 @@ _LIVE_PANEL_TTL = 3   # seconds — price-driven panels refresh fast (live snaps
 # has ever loaded never disappears. Accessed only under _market_cache_lock.
 _yf_ticker_last_good: dict[str, dict] = {}  # {strip_key: {ticker: {price, change_pct}}}
 _fx_last_good: dict[str, dict] = {}         # {base: {currency: {price, prev_close}}}
+_index_quote_last_good: dict[str, dict] = {}  # {ticker: {price, prev_close}} for index cards
 
 # --- Live universe baseline (rebuilt once per trading day) -------------------
 _baseline_cache: dict[str, dict] = {}
@@ -3608,6 +3609,21 @@ def _build_market_indices() -> dict:
     daily table entry when no live quote is available)."""
     pairs = [(t, t) for t in _INDICES_TICKERS] + [("^VIX", "^VIX")]
     live = _fetch_yf_quotes(pairs) or {}
+    # Per-ticker last-good: yfinance batch downloads return only a SUBSET (or none)
+    # of the requested tickers under concurrent load. Without this, a transient
+    # empty/partial fetch drops the live overlay and the card flips to the last
+    # STORED daily close + that completed day's move (e.g. S&P 7,383.74 / -2.64%)
+    # for a few seconds, then snaps back to live. Reuse the last good live quote
+    # per ticker so the overlay survives a blip. Same pattern as the yf strips.
+    merged = {}
+    for t, _ in pairs:
+        q = live.get(t)
+        if q and q.get("price"):
+            _index_quote_last_good[t] = q
+            merged[t] = q
+        elif t in _index_quote_last_good:
+            merged[t] = _index_quote_last_good[t]
+    live = merged
     # Sparkline is the 30-day daily series for ALL cards (last point overlaid with
     # the live price below), so every card shows a consistent window. Intraday is
     # deliberately NOT used: cash indices (^GSPC/^NDX/^DJI/^RUT) only print during
