@@ -35,7 +35,7 @@ const NAV = [
   { id: 'notifications', label: 'Notifications' },
   { id: 'trading', label: 'Trading preferences' },
   { id: 'security', label: 'Security' },
-  { id: 'api', label: 'API & integrations' },
+  { id: 'api', label: 'API & integrations', soon: true },
   { id: 'data', label: 'Data & privacy' },
 ]
 
@@ -495,9 +495,15 @@ export default function AccountPage() {
           </div>
           <nav className="acc-nav">
             {NAV.map(n => (
-              <a key={n.id} className={pane === n.id ? 'active' : ''} onClick={() => { setPane(n.id); window.scrollTo({ top: 0 }) }}>
-                {ICONS[n.id]}{n.label}
-              </a>
+              n.soon ? (
+                <a key={n.id} className="soon" aria-disabled="true" title="Coming soon">
+                  {ICONS[n.id]}{n.label}<span className="soon-tag">Soon</span>
+                </a>
+              ) : (
+                <a key={n.id} className={pane === n.id ? 'active' : ''} onClick={() => { setPane(n.id); window.scrollTo({ top: 0 }) }}>
+                  {ICONS[n.id]}{n.label}
+                </a>
+              )
             ))}
             <a className="logout" onClick={() => signOut({ redirectUrl: '/sign-in' })}>
               <svg className="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4 M16 17l5-5-5-5 M21 12H9" /></svg>
