@@ -584,7 +584,9 @@
 /* Reuse the canonical header popover (.hs-menu/.hs-row) so the account menu
    matches every other header dropdown. Only the open-toggle + danger row differ. */
 .rd .account-menu.open .hs-menu { display: block; }
-.rd .account-menu .hs-row.danger:hover { color: var(--red, #ff4d5c); }
+/* 'signout' (not 'danger' — that collides with the global button.danger fill).
+   Subtle red tint + red text on hover, matching .btn.danger. */
+.rd .account-menu .hs-row.signout:hover { background: rgba(255,77,92,0.08); color: var(--red, #ff4d5c); }
 
 /* Language + currency selectors */
 .rd .hdr-select { position: relative; }

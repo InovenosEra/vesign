@@ -111,7 +111,7 @@ function AccountMenu() {
       <div className="hs-menu" role="menu">
         <button type="button" role="menuitem" className="hs-row" onClick={() => go('picture')}>Edit Profile Picture</button>
         <button type="button" role="menuitem" className="hs-row" onClick={() => go('password')}>Change Password</button>
-        <button type="button" role="menuitem" className="hs-row danger"
+        <button type="button" role="menuitem" className="hs-row signout"
           onClick={() => { setOpen(false); signOut({ redirectUrl: '/sign-in' }) }}>Sign Out</button>
       </div>
     </div>
