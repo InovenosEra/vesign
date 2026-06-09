@@ -167,7 +167,10 @@ export default function SignalModalRd({ row, onClose }) {
           <div className="m-head-left">
             <img className={'m-logo' + (whiteBg ? '' : ' transparent')} src={LOGO(ticker)} alt={ticker || ''} />
             <div className="m-id">
-              <div className="tk">{r?.ticker || ticker || '—'}</div>
+              <div className="tk-row">
+                <span className="tk">{r?.ticker || ticker || '—'}</span>
+                <span className={'m-sig-tag ' + sigCls(r?.signal)}>{r?.signal || '—'}</span>
+              </div>
               <div className="co">{company}</div>
               <div className="meta">
                 <span className="pill">{sector}</span>
@@ -175,24 +178,9 @@ export default function SignalModalRd({ row, onClose }) {
               </div>
             </div>
           </div>
-          <div />
           <div className="m-price">
             <div className="px"><span className="s">{symbol}</span>{liveClose == null ? '—' : fmtPrice(liveClose).replace(symbol, '')}</div>
             <div className={'delta ' + dirClass(dc)}>{dc == null ? '—' : pct(dc)} <span className="abs">1D</span></div>
-          </div>
-          <div className="m-close" aria-label="Close" onClick={() => onClose?.()}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </div>
-        </div>
-
-        {/* SIGNAL STRIP */}
-        <div className="m-signal-strip">
-          <div className="strip-default" style={{ display: 'contents' }}>
-            <span className={'m-sig-tag ' + sigCls(r?.signal)}>{r?.signal || '—'}</span>
-            <div className="m-sig-note">
-              VQS <span className="vqs">{r?.vqs ?? '—'}</span> · Predicted upside <span className="hl" style={{ color: 'var(--green, #00d97e)' }}>{up == null ? '—' : pct(up)}</span> · Health <span className="hl">{r?.health_score ?? '—'} / 5</span>
-            </div>
-            <div className="m-sig-since">{r?.trade_count ? <>{r.trade_count} historical trade{r.trade_count === 1 ? '' : 's'}</> : ''}</div>
           </div>
         </div>
 
