@@ -22,7 +22,7 @@ function computeRows(holdings) {
     const yld = (pnl != null && cost) ? pnl / cost * 100 : null
     const day = (h.latest_close != null && h.prev_close) ? (h.latest_close - h.prev_close) / h.prev_close * 100 : null
     return { ...h, value, cost, pnl, yld, day }
-  }).sort((a, b) => (b.value || 0) - (a.value || 0))
+  }).sort((a, b) => a.ticker.localeCompare(b.ticker))
 
   const totalCost = rows.reduce((s, r) => s + (r.cost || 0), 0)
   const totalValue = rows.reduce((s, r) => s + (r.value || 0), 0)
@@ -34,8 +34,13 @@ function computeRows(holdings) {
 
   const best = rows.slice().sort((a, b) => (b.yld || -1e9) - (a.yld || -1e9))[0]
   const worst = rows.slice().sort((a, b) => (a.yld || 1e9) - (b.yld || 1e9))[0]
-  const largest = rows[0]
-    ? { ...rows[0], pctOfValue: totalValue ? rows[0].value / totalValue * 100 : 0 }
+  // Largest by value — computed explicitly so it doesn't depend on row order
+  // (rows are now sorted A→Z by ticker, not by value).
+  const largestRow = rows.length
+    ? rows.reduce((a, b) => ((b.value || 0) > (a.value || 0) ? b : a))
+    : null
+  const largest = largestRow
+    ? { ...largestRow, pctOfValue: totalValue ? largestRow.value / totalValue * 100 : 0 }
     : null
 
   return {
@@ -102,7 +107,7 @@ export default function PortfolioPage() {
                   <AllocationDonut rows={rows} totalValue={totals.totalValue} totalYld={totals.totalYld} />
                 </div>
                 <WatchlistComparison />
-                <HoldingsTable rows={rows} subhead={`${rows.length} positions · sorted by value`} />
+                <HoldingsTable rows={rows} subhead={`${rows.length} positions · sorted by ticker`} />
               </>
             )}
           </div>
