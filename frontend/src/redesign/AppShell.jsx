@@ -108,10 +108,10 @@ function AccountMenu() {
         <span className="greeting">Hello, {firstName}</span>
         <MenuCaret />
       </button>
-      <div className="account-menu-pop" role="menu">
-        <button type="button" role="menuitem" onClick={() => go('picture')}>Edit Profile Picture</button>
-        <button type="button" role="menuitem" onClick={() => go('password')}>Change Password</button>
-        <button type="button" role="menuitem" className="danger"
+      <div className="hs-menu" role="menu">
+        <button type="button" role="menuitem" className="hs-row" onClick={() => go('picture')}>Edit Profile Picture</button>
+        <button type="button" role="menuitem" className="hs-row" onClick={() => go('password')}>Change Password</button>
+        <button type="button" role="menuitem" className="hs-row danger"
           onClick={() => { setOpen(false); signOut({ redirectUrl: '/sign-in' }) }}>Sign Out</button>
       </div>
     </div>
