@@ -105,7 +105,7 @@ function AccountMenu() {
                 style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
             : initials}
         </span>
-        <span className="greeting">Hello, <strong>{firstName}</strong></span>
+        <span className="greeting">Hello, {firstName}</span>
         <MenuCaret />
       </button>
       <div className="account-menu-pop" role="menu">
