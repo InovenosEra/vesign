@@ -78,7 +78,7 @@ function PlanChip() {
 }
 
 const MenuCaret = () => (
-  <svg className="menu-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+  <svg className="menu-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
 )
 
 function AccountMenu() {
@@ -97,17 +97,21 @@ function AccountMenu() {
   const go = (m) => { setOpen(false); navigate(`/account?m=${m}`) }
   return (
     <div className={'account-menu' + (open ? ' open' : '')} ref={ref}>
-      <button type="button" className="account-trigger" aria-haspopup="true" aria-expanded={open}
-        onClick={() => setOpen(o => !o)} title={user?.firstName || 'Account'}>
-        <span className="avatar">
-          {user?.imageUrl
-            ? <img src={user.imageUrl} alt={initials}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-            : initials}
-        </span>
-        <span className="greeting">Hello, {firstName}</span>
-        <MenuCaret />
-      </button>
+      <div className="account-trigger">
+        <NavLink to="/account" className="account-id" title={user?.firstName || 'Account'} aria-label="Account">
+          <span className="avatar">
+            {user?.imageUrl
+              ? <img src={user.imageUrl} alt={initials}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              : initials}
+          </span>
+          <span className="greeting">Hello, {firstName}</span>
+        </NavLink>
+        <button type="button" className="account-caret" aria-haspopup="true" aria-expanded={open}
+          aria-label="Account menu" onClick={() => setOpen(o => !o)}>
+          <MenuCaret />
+        </button>
+      </div>
       <div className="hs-menu" role="menu">
         <button type="button" role="menuitem" className="hs-row" onClick={() => go('picture')}>Edit Profile Picture</button>
         <button type="button" role="menuitem" className="hs-row" onClick={() => go('password')}>Change Password</button>
