@@ -227,7 +227,7 @@ export default function SignalChart({ ticker, onPeriodChange }) {
       <g>
         <rect x={cx - bw / 2} y={by} width={bw} height={bh} rx={4} fill="var(--surface)" stroke={color} strokeWidth={1.5} />
         <text x={cx} y={by + bh / 2} textAnchor="middle" dominantBaseline="central"
-          fontSize={fs} style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+          fontSize={fs} style={{ fill: color, fontWeight: 700, fontFamily: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
           {value}
         </text>
       </g>
@@ -389,7 +389,7 @@ export default function SignalChart({ ticker, onPeriodChange }) {
                     <rect x={cx - bw / 2} y={lineY + 4} width={bw} height={bh} rx={3}
                       fill="var(--surface)" stroke={color} strokeWidth={1.5} />
                     <text x={cx} y={lineY + 4 + bh / 2} textAnchor="middle" dominantBaseline="central" fontSize={10}
-                      style={{ fill: color, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                      style={{ fill: color, fontWeight: 700, fontFamily: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                       {label}
                     </text>
                   </>
@@ -506,7 +506,7 @@ export default function SignalChart({ ticker, onPeriodChange }) {
                   <rect x={buyX - bw_gain / 2} y={gain_by} width={bw_gain} height={gain_bh} rx={4}
                     fill="var(--surface)" stroke={gainColor} strokeWidth={1.5} />
                   <text x={buyX} y={gain_by + gain_bh / 2} textAnchor="middle" dominantBaseline="central"
-                    fontSize={11} style={{ fill: gainColor, fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                    fontSize={11} style={{ fill: gainColor, fontWeight: 700, fontFamily: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                     {yieldText}
                   </text>
                 </>}
@@ -518,7 +518,7 @@ export default function SignalChart({ ticker, onPeriodChange }) {
                       <rect x={buyX - tw / 2} y={midY - th / 2} width={tw} height={th} rx={3}
                         fill="var(--surface)" opacity={0.85} />
                       <text x={buyX} y={midY} textAnchor="middle" dominantBaseline="central"
-                        fontSize={10} style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+                        fontSize={10} style={{ fill: 'var(--green)', fontWeight: 700, fontFamily: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                         {t('modal.open')}
                       </text>
                     </g>

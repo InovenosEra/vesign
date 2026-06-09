@@ -50,7 +50,7 @@ export default function CompleteProfilePage() {
           <h1 style={{
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
             gap: 2, fontWeight: 900, fontSize: '2.4rem', letterSpacing: '0.08em',
-            fontFamily: "'Segoe UI', system-ui, sans-serif", margin: '0 0 16px',
+            fontFamily: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif", margin: '0 0 16px',
           }}>
             <img src="/favicon.png" alt="V" style={{ height: '2.8rem', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 4px rgba(0,210,255,0.6))' }} />
             <span className="title-shimmer" style={{ letterSpacing: '0.08em' }}>esign</span>

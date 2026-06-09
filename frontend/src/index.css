@@ -1,2 +1,4 @@
 /* Minimal reset — all theme styles live in App.css */
-body { margin: 0; }
+/* Single-font baseline: Inter everywhere (self-hosted via @fontsource-variable/inter
+   in main.jsx). The redesign app sets the same via --sans/--mono tokens. */
+body { margin: 0; font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }

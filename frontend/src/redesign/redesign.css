@@ -25,8 +25,8 @@
     --green-bg:  rgba(0,217,126,0.10);
     --red-bg:    rgba(255,77,92,0.10);
 
-    --sans:      'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    --mono:      'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+    --sans:      'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono:      'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
   .rd * { box-sizing: border-box; }
   .rd html, .rd body { background: var(--bg); margin: 0; }
@@ -527,7 +527,10 @@
 
 /* body-level styles applied to the .rd wrapper */
 .rd { background: var(--bg); color: var(--ink); font-family: var(--sans);
-      font-size: 14px; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+      font-size: 14px; -webkit-font-smoothing: antialiased; min-height: 100vh;
+      /* single-font Inter everywhere: numbers/tickers (formerly mono) keep column
+         alignment via tabular figures instead of a monospace face */
+      font-variant-numeric: tabular-nums; }
 
 
 /* ---- shared app header ---- */
