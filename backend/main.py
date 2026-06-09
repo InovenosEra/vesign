@@ -4928,9 +4928,10 @@ _FX_BASES = ["ILS", "USD", "EUR", "GBP", "JPY", "CHF", "CNY", "AUD", "CAD"]  # s
 
 
 def _build_market_currencies(base: str) -> dict:
-    """5 key currencies' rate per 1 unit in `base` (e.g. base=ILS → USD/ILS, EUR/ILS …).
-    Fetches the full key list (minus the base) and keeps the first 5 with data, so a
-    missing cross (e.g. CNYILS=X) just falls through to the next currency.
+    """All key currencies' rate per 1 unit in `base` (e.g. base=ILS → USD/ILS, EUR/ILS …).
+    Fetches the full key list (minus the base). A pair yfinance can't return directly
+    (e.g. CNYILS=X) is derived as a USD-anchored cross, so every key currency still
+    shows a card.
 
     A currency missing from the current (possibly partial) fetch is served from its
     last-known-good rate with stale=true, so cards don't vanish under concurrent
@@ -4969,8 +4970,6 @@ def _build_market_currencies(base: str) -> dict:
             cards.append({"ticker": ticker, "label": label, "price": cross,
                           "change_pct": change_pct, "stale": True})
         # else: never seen yet — skip this currency
-        if len(cards) >= 5:
-            break
     return {"base": base, "bases": _FX_BASES, "currencies": cards}
 
 

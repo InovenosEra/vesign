@@ -352,7 +352,9 @@
   .rd .cm-cell:last-child { border-right: none; }
   .rd .cm-cell:hover { background: rgba(59,130,246,0.04); }
   .rd .cm-cell:hover::after { background: var(--blue-2); }
-  .rd .cm-cell .lbl { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+  .rd .cm-cell .lbl { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+  .rd .cm-cell .lbl .cm-flag { font-size: 13px; line-height: 1; letter-spacing: 0; }
+  .rd .cm-cell .lbl .cm-sym { color: var(--ink-4, #4b5563); text-transform: none; letter-spacing: 0; font-weight: 500; }
   .rd .cm-cell .val { font-family: var(--mono); font-size: 16px; color: var(--ink); margin-top: 3px; letter-spacing: -0.01em; }
   .rd .cm-cell .delta { font-family: var(--mono); font-size: 11px; margin-top: 2px; font-weight: 600; }
   .rd .cm-cell .delta.up { color: var(--green); }
