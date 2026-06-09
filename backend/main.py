@@ -2645,6 +2645,10 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             WHERE c.ticker IN ({ph})
         """), tp).fetchall()}
 
+    snap = _get_live_snapshot()
+    live_phase = snap["phase"] != "idle"
+    live_prices = snap["prices"]
+
     result = []
     for r in rows:
         ticker, total_qty, total_cost, first_buy_date = r
@@ -2652,8 +2656,21 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         m = meta.get(ticker)
         # Column order: ticker, company, logo_url, industry, domain, market_cap, latest_close, prev_close
         mc = m[5] if m else None
-        latest_close = m[6] if m else None
-        prev_close = m[7] if m else None
+        daily_latest = float(m[6]) if (m and m[6] is not None) else None   # rn=1: latest completed close
+        prior_close = float(m[7]) if (m and m[7] is not None) else None    # rn=2: prior session close
+
+        # The "today" baseline (prev_close) must match the price we SHOW. During a
+        # live session the shown price is the intraday live print and today's bar
+        # isn't in daily_prices yet, so its prior close is the latest COMPLETED
+        # daily close (rn=1) — NOT rn=2. When idle / no live print we show that
+        # daily close and the prior is rn=2 (the last completed session's move).
+        # Mirrors the Market panel baseline (_build_universe_baseline).
+        live_px = live_prices.get(ticker) if live_phase else None
+        if live_px:
+            shown_close, base_close = live_px, daily_latest
+        else:
+            shown_close, base_close = daily_latest, prior_close
+
         result.append({
             "ticker": ticker,
             "company": m[1] if m else None,
@@ -2664,11 +2681,11 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             "total_qty": total_qty,
             "total_cost": round(total_cost, 2) if total_cost is not None else None,
             "avg_price": round(avg_price, 4) if avg_price is not None else None,
-            "latest_close": round(float(latest_close), 4) if latest_close is not None else None,
-            "prev_close": round(float(prev_close), 4) if prev_close is not None else None,
+            "latest_close": round(shown_close, 4) if shown_close is not None else None,
+            "prev_close": round(base_close, 4) if base_close is not None else None,
             "first_buy_date": first_buy_date,
         })
-    return _overlay_live(result, price_key="latest_close")
+    return result
 
 
 @protected.get("/api/portfolio/holdings/lots")

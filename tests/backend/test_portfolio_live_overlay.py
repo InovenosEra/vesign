@@ -54,3 +54,36 @@ def test_holdings_fallback_to_daily_close(portfolio_app):
         body = client.get("/api/portfolio/holdings?market=US").json()
     h = next(x for x in body if x["ticker"] == "AAA")
     assert h["latest_close"] == 105.0      # no live -> daily close
+
+
+def _add_prior_days(bm):
+    from sqlalchemy import text
+    with bm.engine.begin() as conn:
+        conn.execute(text("INSERT INTO daily_prices (date,ticker,close,volume) VALUES ('2026-05-21 00:00:00','AAA',100,1)"))
+        conn.execute(text("INSERT INTO daily_prices (date,ticker,close,volume) VALUES ('2026-05-20 00:00:00','AAA',90,1)"))
+
+
+def test_today_baseline_is_latest_daily_close_during_live(portfolio_app):
+    """During a live session today's bar isn't in daily_prices yet, so latest_close
+    is overlaid with the live price. The 'today' baseline (prev_close) must then be
+    the latest COMPLETED session close (rn=1 = 105), NOT the session before it
+    (rn=2 = 100). Mirrors the Market panel baseline (_build_universe_baseline)."""
+    bm, client = portfolio_app
+    _add_prior_days(bm)   # daily closes: 05-22=105 (latest), 05-21=100, 05-20=90
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": {"AAA": 120.0}}):
+        body = client.get("/api/portfolio/holdings?market=US").json()
+    h = next(x for x in body if x["ticker"] == "AAA")
+    assert h["latest_close"] == 120.0      # live intraday price
+    assert h["prev_close"] == 105.0        # latest completed daily close, not 100
+
+
+def test_today_baseline_is_prior_close_when_idle(portfolio_app):
+    """Idle (no live overlay): latest_close = latest daily close (rn=1 = 105) and the
+    baseline is the prior session (rn=2 = 100) — the last completed session's move."""
+    bm, client = portfolio_app
+    _add_prior_days(bm)
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
+        body = client.get("/api/portfolio/holdings?market=US").json()
+    h = next(x for x in body if x["ticker"] == "AAA")
+    assert h["latest_close"] == 105.0      # daily close
+    assert h["prev_close"] == 100.0        # prior session (rn=2)
