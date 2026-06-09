@@ -580,7 +580,7 @@
    profile page; the caret on the right toggles the dropdown. */
 .rd .account-trigger { display: inline-flex; align-items: stretch; height: 38px; border: 1px solid var(--line, #2a2f37); border-radius: 999px; background: var(--bg-2, #11161f); overflow: hidden; transition: border-color .15s, box-shadow .15s; }
 .rd .account-trigger:hover { border-color: var(--line-2, #3a4150); }
-.rd .account-menu.open .account-trigger { border-color: var(--blue-2, #60a5fa); box-shadow: 0 0 0 2px rgba(96,165,250,0.18); }
+.rd .account-menu.open .account-trigger { border-color: var(--line-2, #3a4150); }
 .rd .account-id { display: inline-flex; align-items: center; gap: 9px; padding: 0 8px 0 5px; text-decoration: none; cursor: pointer; }
 .rd .account-id:hover { background: rgba(255,255,255,0.04); }
 .rd .account-trigger .greeting { font-size: 12px; font-weight: 500; color: var(--ink-2, #a8acb8); white-space: nowrap; }
