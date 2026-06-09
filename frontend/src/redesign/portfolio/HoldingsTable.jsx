@@ -45,14 +45,14 @@ export default function HoldingsTable({ rows, subhead }) {
   const live = phase === 'regular' || phase === 'pre' || phase === 'post'
 
   const exportCsv = () => {
-    const header = ['Ticker', 'Company', 'Health', 'Prediction', 'ML Score', 'Qty', 'Avg Price', 'Last Price', 'Invested', priceLabel, 'Market value', 'Yield']
+    const header = ['Ticker', 'Company', 'Health', 'Prediction', 'ML Score', 'Qty', 'Avg Price', 'Last Price', priceLabel, 'Invested', 'Market value', 'Yield']
     const lines = [header.join(',')]
     for (const r of rows) {
       const up = (r.target_mean_price != null && r.latest_close)
         ? ((r.target_mean_price - r.latest_close) / r.latest_close * 100).toFixed(1) : ''
       const ml = r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(1)
       lines.push([r.ticker, r.company || '', r.health_score, up, ml, r.total_qty, r.avg_price,
-        r.last_close, r.cost, r.latest_close, r.value, r.yld].map(csvCell).join(','))
+        r.last_close, r.latest_close, r.cost, r.value, r.yld].map(csvCell).join(','))
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -82,8 +82,8 @@ export default function HoldingsTable({ rows, subhead }) {
             <th className="r">Qty</th>
             <th className="r">Avg Price</th>
             <th className="r">Last Price</th>
-            <th className="r">Invested</th>
             <th className="r">{priceLabel}</th>
+            <th className="r">Invested</th>
             <th className="r">Market value</th>
             <th className="r" style={{ paddingRight: 18 }}>Yield</th>
           </tr>
@@ -119,7 +119,6 @@ export default function HoldingsTable({ rows, subhead }) {
                 <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 0 })}</td>
                 <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
                 <td className="r">{r.last_close == null ? '—' : fmtPrice(r.last_close)}</td>
-                <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
                 <td className={'r' + (live ? '' : ' muted')}>
                   {r.latest_close == null ? '—' : (
                     <>
@@ -132,6 +131,7 @@ export default function HoldingsTable({ rows, subhead }) {
                     </>
                   )}
                 </td>
+                <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
                 <td className="r">{r.value == null ? '—' : fmtPrice(r.value)}</td>
                 <td className={'r ' + dirClass(r.yld)} style={{ paddingRight: 18 }}><strong>{pct(r.yld)}</strong></td>
               </tr>
