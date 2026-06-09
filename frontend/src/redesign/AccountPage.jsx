@@ -7,7 +7,7 @@
  * trading toggles are mock UI (no backend yet) — interactive but not persisted. */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { useUser, useClerk, useReverification } from '@clerk/react'
@@ -639,8 +639,7 @@ function TradingPane() {
   )
 }
 
-function SecurityPane({ user, openUserProfile, notify }) {
-  const [pwModal, setPwModal] = useState(false)
+function SecurityPane({ user, openUserProfile, onChangePassword }) {
   return (
     <>
       <div className="acc-pane-head"><h2>Security</h2><span className="sub">Password, two-factor authentication, and sessions</span></div>
@@ -648,10 +647,9 @@ function SecurityPane({ user, openUserProfile, notify }) {
         <div className="field-row">
           <div className="field-label">Password<small>Change your sign-in password</small></div>
           <div className="field-value"><span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)' }}>••••••••••••</span></div>
-          <button className="btn sm primary" onClick={() => setPwModal(true)}>{user?.passwordEnabled ? 'Change password' : 'Set password'}</button>
+          <button className="btn sm primary" onClick={onChangePassword}>{user?.passwordEnabled ? 'Change password' : 'Set password'}</button>
         </div>
       </Card>
-      {pwModal && <PasswordModal user={user} notify={notify} onClose={() => setPwModal(false)} />}
       <Card title="Two-factor authentication" badge={{ label: 'Enabled' }}>
         <div className="field-row">
           <div className="field-label">Authenticator app<small>Time-based one-time password (TOTP)</small></div>
@@ -746,6 +744,16 @@ export default function AccountPage() {
   const [pane, setPane] = useState('profile')
   const [toast, setToast] = useState(null)
   const [picModal, setPicModal] = useState(false)
+  const [pwModal, setPwModal] = useState(false)
+  // Deep-link from the header account menu: ?m=picture|password auto-opens that
+  // editor, then the param is cleared so a refresh doesn't re-open it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const m = searchParams.get('m')
+    if (m === 'picture') setPicModal(true)
+    else if (m === 'password') { setPane('security'); setPwModal(true) }
+    if (m) setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
   const notify = useCallback((msg, type = 'success') => setToast({ msg, type, k: Date.now() }), [])
   const dismissToast = useCallback(() => setToast(null), [])
   const { user } = useUser()
@@ -808,13 +816,14 @@ export default function AccountPage() {
             {pane === 'wallet' && <WalletPane balanceCents={me.balance_cents} unlockCents={me.per_row_price_cents} />}
             {pane === 'notifications' && <NotificationsPane />}
             {pane === 'trading' && <TradingPane />}
-            {pane === 'security' && <SecurityPane user={user} openUserProfile={openUserProfile} notify={notify} />}
+            {pane === 'security' && <SecurityPane user={user} openUserProfile={openUserProfile} onChangePassword={() => setPwModal(true)} />}
             {pane === 'api' && <ApiPane />}
             {pane === 'data' && <DataPane />}
           </div>
         </main>
       </div>
       {picModal && <PictureModal user={user} notify={notify} onClose={() => setPicModal(false)} />}
+      {pwModal && <PasswordModal user={user} notify={notify} onClose={() => setPwModal(false)} />}
       <Toast toast={toast} onDone={dismissToast} />
     </>
   )

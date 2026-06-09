@@ -3,10 +3,10 @@
  * here, leaving un-ported pages on the old design. Wired to the REAL contexts:
  * market-status is live, search is the real GlobalSearch. (Currency + language
  * live in Account → Profile, not the header.) */
-import { useState, useEffect } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useUser } from '@clerk/react'
+import { useUser, useClerk } from '@clerk/react'
 import { getMarketStatus } from '../api'
 import { MeProvider, useMe } from '../context/MeContext'
 import { fmtCents } from './signals/gating'
@@ -77,21 +77,44 @@ function PlanChip() {
   )
 }
 
-function Avatar() {
+const MenuCaret = () => (
+  <svg className="menu-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+)
+
+function AccountMenu() {
   const { user } = useUser()
+  const { signOut } = useClerk()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
   const initials = ((user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')) || 'IL'
   const firstName = user?.firstName || 'there'
+  const go = (m) => { setOpen(false); navigate(`/account?m=${m}`) }
   return (
-    <NavLink to="/account" className="avatar-link" title={user?.firstName || 'Account'}
-      aria-label="Account">
-      <span className="avatar">
-        {user?.imageUrl
-          ? <img src={user.imageUrl} alt={initials}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-          : initials}
-      </span>
-      <span className="greeting">Hello, <strong>{firstName}</strong></span>
-    </NavLink>
+    <div className={'account-menu' + (open ? ' open' : '')} ref={ref}>
+      <button type="button" className="account-trigger" aria-haspopup="true" aria-expanded={open}
+        onClick={() => setOpen(o => !o)} title={user?.firstName || 'Account'}>
+        <span className="avatar">
+          {user?.imageUrl
+            ? <img src={user.imageUrl} alt={initials}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : initials}
+        </span>
+        <span className="greeting">Hello, <strong>{firstName}</strong></span>
+        <MenuCaret />
+      </button>
+      <div className="account-menu-pop" role="menu">
+        <button type="button" role="menuitem" onClick={() => go('picture')}>Edit Profile Picture</button>
+        <button type="button" role="menuitem" onClick={() => go('password')}>Change Password</button>
+        <button type="button" role="menuitem" className="danger"
+          onClick={() => { setOpen(false); signOut({ redirectUrl: '/sign-in' }) }}>Sign Out</button>
+      </div>
+    </div>
   )
 }
 
@@ -144,7 +167,7 @@ export default function AppShell({ children }) {
           <WalletChip />
           <MarketChip />
           <PlanChip />
-          <Avatar />
+          <AccountMenu />
         </div>
       </div>
       {children}
