@@ -63,6 +63,20 @@ function MarketChip() {
   )
 }
 
+const PLAN_LABELS = { free: 'Free', pro: 'Pro', pro_plus: 'Pro+', max: 'Max' }
+
+/* Plan-tier status chip (★ Free/Pro/Max) — read-only indicator next to the avatar. */
+function PlanChip() {
+  const me = useMe()
+  const plan = me.plan || 'free'
+  const label = PLAN_LABELS[plan] || (plan[0].toUpperCase() + plan.slice(1))
+  return (
+    <span className={'plan-chip ' + plan} title={`${label} plan`}>
+      <span className="star">★</span>{label}
+    </span>
+  )
+}
+
 function Avatar() {
   const { user } = useUser()
   const initials = ((user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')) || 'IL'
@@ -125,6 +139,7 @@ export default function AppShell({ children }) {
         <div className="topright">
           <WalletChip />
           <MarketChip />
+          <PlanChip />
           <Avatar />
         </div>
       </div>
