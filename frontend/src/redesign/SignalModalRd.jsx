@@ -328,7 +328,7 @@ export default function SignalModalRd({ row, onClose }) {
         {/* FOOT */}
         <div className="m-foot">
           <div className="actions">
-            <div className={'btn' + (inFirst ? ' primary' : '')}
+            <div className={'btn sm' + (inFirst ? ' primary' : '')}
               onClick={() => firstList && !toggleWatch.isPending && toggleWatch.mutate()}
               style={{ cursor: firstList ? 'pointer' : 'default', opacity: toggleWatch.isPending ? 0.6 : 1 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill={inFirst ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>

@@ -560,7 +560,7 @@
 .rd .header-search-slot { margin: 0 auto; }
 .rd .search { justify-self: center; display: flex; align-items: center; gap: 8px; padding: 6px 12px; height: 32px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; color: var(--ink-3); font-size: 12.5px; width: 380px; max-width: 100%; cursor: pointer; }
 .rd .search kbd { margin-left: auto; font-size: 10px; padding: 1px 6px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 3px; color: var(--ink-2); font-family: var(--mono); }
-.rd .status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; height: 32px; border-radius: 6px; background: var(--green-bg); border: 1px solid rgba(0,217,126,0.2); color: var(--green); font-size: 12px; font-weight: 600; }
+.rd .status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; height: 32px; border-radius: 6px; background: var(--green-bg); border: 1px solid rgba(0,217,126,0.2); color: var(--green); font-size: 12px; font-weight: 500; }
 .rd .status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 .rd .status .ct { color: var(--ink-3); font-family: var(--mono); font-weight: 400; }
@@ -619,3 +619,16 @@
 .ov-skel { display: flex; flex-direction: column; gap: 20px; }
 .ov-skel-h { height: 15px; width: 210px; opacity: 0.65; }
 .ov-skel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+
+/* ── Canonical button system ───────────────────────────────────────────────
+   ONE definition for all redesign pages (this file loads on every page via
+   AppShell). Variants: .primary, .danger, .sm. Page-scoped redefinitions were
+   removed — use .btn (+ .sm for compact rows like the modal footer / research
+   hero) instead of re-styling buttons per page. */
+.rd .btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; color: var(--ink-2); font-size: 12.5px; font-weight: 500; font-family: var(--sans); cursor: pointer; transition: all .15s; text-decoration: none; }
+.rd .btn:hover { border-color: var(--line-2); color: var(--ink); }
+.rd .btn.primary { background: var(--blue); border-color: var(--blue); color: white; }
+.rd .btn.primary:hover { background: #2563eb; }
+.rd .btn.danger { color: var(--red); border-color: rgba(255,77,92,0.3); }
+.rd .btn.danger:hover { background: rgba(255,77,92,0.06); border-color: rgba(255,77,92,0.5); }
+.rd .btn.sm { height: 30px; padding: 0 12px; font-size: 11.5px; gap: 6px; }

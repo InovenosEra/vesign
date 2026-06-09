@@ -211,16 +211,7 @@
   background: rgba(255,255,255,0.005);
 }
 .rd .m-foot .actions { display: flex; gap: 8px; }
-.rd .m-foot .btn {
-  height: 32px; padding: 0 14px;
-  background: var(--bg-2, #11161f); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px;
-  color: var(--ink-2, #a8acb8); font-size: 12px; font-weight: 500;
-  display: inline-flex; align-items: center; gap: 6px;
-  cursor: pointer; transition: all .15s;
-}
-.rd .m-foot .btn:hover { border-color: rgba(255,255,255,0.10); color: var(--ink, #e8eaf0); }
-.rd .m-foot .btn.primary { background: var(--blue, #3b82f6); border-color: var(--blue, #3b82f6); color: white; }
-.rd .m-foot .btn.primary:hover { background: #2563eb; }
+/* Buttons here use the canonical .btn / .btn.sm system (redesign.css). */
 .rd .m-foot .spacer { flex: 1; }
 .rd .m-foot .link { font-size: 12px; color: var(--blue-2, #60a5fa); cursor: pointer; transition: color .15s; text-decoration: none; }
 .rd .m-foot .link:hover { color: #93c5fd; }

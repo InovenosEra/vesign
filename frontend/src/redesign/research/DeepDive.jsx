@@ -225,7 +225,7 @@ export default function DeepDive({ ticker, setTicker }) {
           <div className="px"><span className="s">{symbol}</span><span>{close == null ? '—' : fmtPrice(close).replace(symbol, '')}</span></div>
           <div className={'delta ' + dirCls(ml)}>{ml == null ? '—' : pct(ml)}</div>
           <div className="dd-hero-actions">
-            <div className={'btn' + (inFirst ? ' primary' : '')}
+            <div className={'btn sm' + (inFirst ? ' primary' : '')}
               onClick={() => !toggleWatch.isPending && firstList && toggleWatch.mutate()}
               style={{ cursor: firstList ? 'pointer' : 'default', opacity: toggleWatch.isPending ? 0.6 : 1 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill={inFirst ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>

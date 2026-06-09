@@ -363,16 +363,7 @@
   .rd .dd-hero-price .delta.down { color: var(--red); }
 
   .rd .dd-hero-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
-  .rd .dd-hero-actions .btn {
-    height: 30px; padding: 0 12px;
-    background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px;
-    color: var(--ink-2); font-size: 11.5px; font-weight: 500;
-    display: inline-flex; align-items: center; gap: 6px;
-    cursor: pointer; transition: all .15s;
-  }
-  .rd .dd-hero-actions .btn:hover { border-color: var(--line-2); color: var(--ink); }
-  .rd .dd-hero-actions .btn.primary { background: var(--blue); border-color: var(--blue); color: white; }
-  .rd .dd-hero-actions .btn.primary:hover { background: #2563eb; }
+  /* Buttons here use the canonical .btn / .btn.sm system (redesign.css). */
 
   /* CHART + VERDICT TWO-UP */
   .rd .dd-chart-row {

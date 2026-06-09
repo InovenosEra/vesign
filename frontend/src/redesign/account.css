@@ -111,13 +111,7 @@
 .rd .toggle input:checked + .slider::before { transform: translateY(-50%) translateX(16px); background: white; }
 
 /* BUTTONS */
-.rd .btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; color: var(--ink-2); font-size: 12.5px; font-weight: 500; font-family: var(--sans); cursor: pointer; transition: all .15s; text-decoration: none; }
-.rd .btn:hover { border-color: var(--line-2); color: var(--ink); }
-.rd .btn.primary { background: var(--blue); border-color: var(--blue); color: white; }
-.rd .btn.primary:hover { background: #2563eb; }
-.rd .btn.danger { color: var(--red); border-color: rgba(255,77,92,0.3); }
-.rd .btn.danger:hover { background: rgba(255,77,92,0.06); border-color: rgba(255,77,92,0.5); }
-.rd .btn.sm { height: 30px; padding: 0 12px; font-size: 11.5px; }
+/* .btn system moved to redesign.css (canonical, loaded on every page). */
 
 /* PLAN CARD */
 .rd .plan-card { background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(59,130,246,0.06)); border: 1px solid rgba(168,85,247,0.35); border-radius: 12px; padding: 22px 26px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 22px; position: relative; overflow: hidden; }
