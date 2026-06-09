@@ -2706,6 +2706,9 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             "avg_price": round(avg_price, 4) if avg_price is not None else None,
             "latest_close": round(shown_close, 4) if shown_close is not None else None,
             "prev_close": round(base_close, 4) if base_close is not None else None,
+            # Last completed daily close (rn=1) — the "Last Price" column, distinct
+            # from latest_close which is the live/phase-aware shown price.
+            "last_close": round(daily_latest, 4) if daily_latest is not None else None,
             "first_buy_date": first_buy_date,
         })
     return result
