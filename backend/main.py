@@ -536,6 +536,10 @@ class PhoneBody(BaseModel):
     phone: str = ""                # E.164 (+972...), or "" to clear
 
 
+class PlanBody(BaseModel):
+    plan: str                      # free | pro | max
+
+
 class TickerAdd(BaseModel):
     ticker: str
     note: str = ""
@@ -2397,6 +2401,17 @@ def me_entitlements(user=Depends(get_current_user)):
         "see_all_price_cents": ent.SEE_ALL_PRICE_CENTS,
         "phone": _get_user_phone(uid),
     }
+
+
+@protected.post("/api/me/plan")
+def set_me_plan(body: PlanBody, user=Depends(get_current_user)):
+    """Switch the user's subscription tier. No payment processor yet — this just
+    writes the admin-controlled plan field (free | pro | max)."""
+    plan = (body.plan or "").strip().lower()
+    if plan not in ent.PLANS:
+        raise HTTPException(status_code=400, detail={"code": "BAD_PLAN"})
+    ent.set_plan(user["id"], plan)
+    return {"plan": plan}
 
 
 _PHONE_RE = re.compile(r"^\+\d{8,15}$")

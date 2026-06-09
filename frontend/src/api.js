@@ -258,5 +258,6 @@ export const getPortfolioComparison = (market = 'US') =>
 
 // --- Entitlements (plan + wallet) ------------------------------------------
 export const getMe = () => get('/me')
+export const setPlan = (plan) => post('/me/plan', { plan })
 export const savePhone = (phone) => put('/account/phone', { phone })
 export const unlockSignal = (body) => post('/signals/unlock', body)

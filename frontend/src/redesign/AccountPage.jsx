@@ -14,13 +14,26 @@ import { useUser, useClerk, useReverification } from '@clerk/react'
 import { isReverificationCancelledError } from '@clerk/react/errors'
 import { useCurrency } from '../context/CurrencyContext'
 import { useMe } from '../context/MeContext'
-import { savePhone } from '../api'
+import { savePhone, setPlan } from '../api'
 import { fmtCents } from './signals/gating'
 import { LOGO } from './fmt'
 import { COUNTRIES, flagEmoji, countryByIso } from './countries'
 import './account.css'
 
 const PLAN_LABELS = { free: 'Free', pro: 'Pro', max: 'Max', pro_plus: 'Pro+' }
+
+// Single source of truth for the plan card + Change-plan modal. Prices are
+// presentational — billing is not yet wired to a payment processor; switching
+// just writes the admin-controlled plan field (POST /api/me/plan).
+const PLAN_TIERS = [
+  { id: 'free', label: 'Free', price: 0, tagline: 'Get started',
+    features: ['Top-10 daily signals preview', 'Real-time market data', '1 watchlist', 'Market & Research pages'] },
+  { id: 'pro', label: 'Pro', price: 19, tagline: 'Pay as you go',
+    features: ['Everything in Free', 'Unlock any signal from your wallet ($0.10 each)', '5 watchlists', 'Full fundamentals & ML predictions'] },
+  { id: 'max', label: 'Max', price: 49, tagline: 'Everything unlocked',
+    features: ['Everything in Pro', 'All signals unlocked — no per-signal cost', 'Unlimited watchlists', 'API access · Priority support'] },
+]
+const TIER_BY_ID = Object.fromEntries(PLAN_TIERS.map(t => [t.id, t]))
 
 const ICONS = {
   profile: <svg className="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 10-16 0" /></svg>,
@@ -430,7 +443,79 @@ function ProfilePane({ user, phone, currency, setCurrency, i18n, notify }) {
   )
 }
 
-function PlanPane({ planLabel }) {
+function ChangePlanModal({ current, onClose, notify }) {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(null)        // id mid-switch, or null
+  const switchTo = async (id) => {
+    setBusy(id)
+    try {
+      await setPlan(id)
+      await qc.invalidateQueries({ queryKey: ['me'] })
+      notify(`Switched to ${TIER_BY_ID[id].label}`, 'success')
+      onClose()
+    } catch { notify('Could not change your plan', 'error'); setBusy(null) }
+  }
+  return (
+    <div className="acc-modal-overlay" onClick={onClose}>
+      <div className="acc-modal plan-modal" onClick={e => e.stopPropagation()}>
+        <div className="acc-modal-head"><h3>Change plan</h3><button className="x" onClick={onClose} aria-label="Close">✕</button></div>
+        <div className="acc-modal-body plan-tiers">
+          {PLAN_TIERS.map(t => {
+            const isCurrent = t.id === current
+            return (
+              <div key={t.id} className={'tier-card ' + t.id + (isCurrent ? ' current' : '')}>
+                <div className="tier-top">
+                  <span className="tname">{t.label}</span>
+                  <span className="tprice"><span className="s">$</span>{t.price}<small>/mo</small></span>
+                </div>
+                <div className="ttag">{t.tagline}</div>
+                <ul className="tfeat">{t.features.map((f, i) => <li key={i}>{f}</li>)}</ul>
+                {isCurrent
+                  ? <button className="btn sm tcur" disabled>Current plan</button>
+                  : <button className="btn sm primary" disabled={!!busy} onClick={() => switchTo(t.id)}>{busy === t.id ? 'Switching…' : `Switch to ${t.label}`}</button>}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CancelPlanModal({ onClose, notify }) {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const confirm = async () => {
+    setBusy(true)
+    try {
+      await setPlan('free')
+      await qc.invalidateQueries({ queryKey: ['me'] })
+      notify('Moved to the Free plan', 'info')
+      onClose()
+    } catch { notify('Could not cancel your plan', 'error'); setBusy(false) }
+  }
+  return (
+    <div className="acc-modal-overlay" onClick={onClose}>
+      <div className="acc-modal" onClick={e => e.stopPropagation()}>
+        <div className="acc-modal-head"><h3>Cancel subscription</h3><button className="x" onClick={onClose} aria-label="Close">✕</button></div>
+        <div className="acc-modal-body">
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>
+            You'll move to the <strong style={{ color: 'var(--ink)' }}>Free</strong> plan and lose access to paid signals. You can upgrade again anytime.
+          </p>
+        </div>
+        <div className="acc-modal-foot">
+          <button className="btn sm" onClick={onClose} disabled={busy}>Keep my plan</button>
+          <button className="btn sm danger" onClick={confirm} disabled={busy}>{busy ? 'Cancelling…' : 'Cancel subscription'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PlanPane({ plan, notify }) {
+  const [modal, setModal] = useState(null)       // 'change' | 'cancel' | null
+  const tier = TIER_BY_ID[plan] || PLAN_TIERS[0]
+  const isFree = tier.id === 'free'
   const INVOICES = [
     ['May 19, 2026', 'INV-2026-05-1934'], ['Apr 19, 2026', 'INV-2026-04-1934'],
     ['Mar 19, 2026', 'INV-2026-03-1934'], ['Feb 19, 2026', 'INV-2026-02-1934'],
@@ -439,27 +524,27 @@ function PlanPane({ planLabel }) {
   return (
     <>
       <div className="acc-pane-head"><h2>Plan &amp; billing</h2><span className="sub">Manage your subscription &amp; payment method</span></div>
-      <div className="plan-card">
+      <div className={'plan-card ' + tier.id}>
         <div className="info">
           <span className="tier">★ Current plan</span>
-          <div className="name">{planLabel}</div>
-          <div className="desc">Unlimited signals · Real-time data · ML predictions · 5 watchlists · API access · Priority support</div>
+          <div className="name">{tier.label}</div>
+          <div className="desc">{tier.features.join(' · ')}</div>
           <div className="meta">
-            <span><span className="v">Renews</span> Jun 19, 2026</span>
-            <span><span className="v">Billed</span> Monthly</span>
+            {!isFree && <span><span className="v">Renews</span> Jun 19, 2026</span>}
+            {!isFree && <span><span className="v">Billed</span> Monthly</span>}
             <span><span className="v">Member since</span> Aug 14, 2024</span>
           </div>
         </div>
         <div className="price">
-          <div className="amt"><span className="s">$</span>15</div>
+          <div className="amt"><span className="s">$</span>{tier.price}</div>
           <div className="unit">per month</div>
           <div className="actions">
-            <NavLink className="btn sm" to="/market">Change plan</NavLink>
-            <button className="btn sm danger">Cancel</button>
+            <button className="btn sm" onClick={() => setModal('change')}>Change plan</button>
+            {!isFree && <button className="btn sm danger" onClick={() => setModal('cancel')}>Cancel</button>}
           </div>
         </div>
       </div>
-      <Card title="Payment method" hint="Updated 4 months ago">
+      {!isFree && <Card title="Payment method" hint="Updated 4 months ago">
         <div className="field-row">
           <div className="field-label">Card on file<small>Charged on the 19th of each month</small></div>
           <div className="field-value">
@@ -469,20 +554,22 @@ function PlanPane({ planLabel }) {
           </div>
           <button className="btn sm">Update</button>
         </div>
-      </Card>
-      <div className="setting-card">
+      </Card>}
+      {!isFree && <div className="setting-card">
         <div className="setting-card-head"><h3>Billing history</h3><span className="hint">Last 6 invoices</span></div>
         <div className="setting-card-body" style={{ padding: 0 }}>
           <table className="invoices-table">
             <thead><tr><th>Date</th><th>Invoice</th><th>Amount</th><th>Status</th><th className="r">Download</th></tr></thead>
             <tbody>
               {INVOICES.map(([d, inv]) => (
-                <tr key={inv}><td>{d}</td><td>{inv}</td><td>$15.00</td><td><span className="status-pill paid">Paid</span></td><td className="r"><span className="dl">PDF ↓</span></td></tr>
+                <tr key={inv}><td>{d}</td><td>{inv}</td><td>${tier.price}.00</td><td><span className="status-pill paid">Paid</span></td><td className="r"><span className="dl">PDF ↓</span></td></tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
+      {modal === 'change' && <ChangePlanModal current={tier.id} notify={notify} onClose={() => setModal(null)} />}
+      {modal === 'cancel' && <CancelPlanModal notify={notify} onClose={() => setModal(null)} />}
     </>
   )
 }
@@ -812,7 +899,7 @@ export default function AccountPage() {
         <main className="acc-main">
           <div className="acc-pane">
             {pane === 'profile' && <ProfilePane user={user} phone={me.phone} currency={currency} setCurrency={setCurrency} i18n={i18n} notify={notify} />}
-            {pane === 'plan' && <PlanPane planLabel={planLabel} />}
+            {pane === 'plan' && <PlanPane plan={me.plan} notify={notify} />}
             {pane === 'wallet' && <WalletPane balanceCents={me.balance_cents} unlockCents={me.per_row_price_cents} />}
             {pane === 'notifications' && <NotificationsPane />}
             {pane === 'trading' && <TradingPane />}

@@ -270,6 +270,28 @@
 .rd .acc-modal-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid var(--line); }
 .rd .acc-modal.wide { max-width: 540px; }
 
+/* CHANGE-PLAN MODAL */
+.rd .acc-modal.plan-modal { max-width: 760px; }
+.rd .plan-tiers { flex-direction: row; align-items: stretch; gap: 12px; }
+.rd .tier-card { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--bg-3, #161c28); }
+.rd .tier-card.current { border-color: rgba(168,85,247,0.45); box-shadow: 0 0 0 1px rgba(168,85,247,0.2) inset; }
+.rd .tier-card.pro { border-color: rgba(245,158,11,0.28); }
+.rd .tier-card.max { border-color: rgba(168,85,247,0.3); }
+.rd .tier-card .tier-top { display: flex; align-items: baseline; justify-content: space-between; }
+.rd .tier-card .tname { font-size: 15px; font-weight: 600; color: var(--ink); }
+.rd .tier-card.pro .tname { color: var(--gold, #f59e0b); }
+.rd .tier-card.max .tname { color: var(--purple, #a855f7); }
+.rd .tier-card .tprice { font-family: var(--mono); font-size: 18px; font-weight: 500; color: var(--ink); font-feature-settings: 'tnum' 1; }
+.rd .tier-card .tprice .s { color: var(--ink-3); font-size: 13px; }
+.rd .tier-card .tprice small { color: var(--ink-3); font-size: 11px; font-weight: 400; }
+.rd .tier-card .ttag { font-size: 11.5px; color: var(--ink-3); margin-top: -4px; }
+.rd .tier-card .tfeat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.rd .tier-card .tfeat li { position: relative; padding-left: 16px; font-size: 12px; color: var(--ink-2); line-height: 1.4; }
+.rd .tier-card .tfeat li::before { content: '✓'; position: absolute; left: 0; top: 0; color: var(--purple, #a855f7); font-size: 11px; }
+.rd .tier-card .btn { width: 100%; justify-content: center; }
+.rd .tier-card .btn.tcur { opacity: 0.6; cursor: default; }
+@media (max-width: 640px) { .rd .plan-tiers { flex-direction: column; } }
+
 /* PICTURE MODAL */
 .rd .pic-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
 .rd .pic-tab { padding: 8px 16px; font-size: 13px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--ink-3); cursor: pointer; font-family: var(--sans); margin-bottom: -1px; }

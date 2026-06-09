@@ -108,6 +108,27 @@ def _seed_pro(bm, cents):
     e.credit("dev-bypass", cents, reason="test-seed")
 
 
+def test_set_plan_switches_plan(api):
+    bm, client = api
+    assert client.get("/api/me").json()["plan"] == "free"
+    r = client.post("/api/me/plan", json={"plan": "pro"})
+    assert r.status_code == 200
+    assert r.json()["plan"] == "pro"
+    assert client.get("/api/me").json()["plan"] == "pro"
+    assert client.post("/api/me/plan", json={"plan": "max"}).json()["plan"] == "max"
+    assert client.get("/api/me").json()["plan"] == "max"
+    # cancel == back to free
+    assert client.post("/api/me/plan", json={"plan": "free"}).json()["plan"] == "free"
+    assert client.get("/api/me").json()["plan"] == "free"
+
+
+def test_set_plan_rejects_invalid(api):
+    bm, client = api
+    r = client.post("/api/me/plan", json={"plan": "ultra"})
+    assert r.status_code == 400
+    assert client.get("/api/me").json()["plan"] == "free"      # unchanged
+
+
 def test_unlock_buy_row_deducts_and_reveals(api):
     bm, client = api
     _seed_pro(bm, 100)
