@@ -245,6 +245,7 @@
   .rd .data-table td.r { text-align: right; }
   .rd .data-table .tk { color: var(--ink); font-weight: 600; }
   .rd .data-table .co { font-family: var(--sans); color: var(--ink-3); font-size: 12px; margin-left: 8px; }
+  .rd .data-table td.co-cell { font-family: var(--sans); color: var(--ink-3); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rd .data-table .ticker-cell { display: flex; align-items: center; gap: 10px; }
   .rd .data-table .logo-mini { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: inline-block; flex-shrink: 0; }
   .rd .data-table .logo-mini.white-bg { background: #fff; padding: 2px; }
