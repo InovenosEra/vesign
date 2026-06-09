@@ -80,13 +80,17 @@ function PlanChip() {
 function Avatar() {
   const { user } = useUser()
   const initials = ((user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')) || 'IL'
+  const firstName = user?.firstName || 'there'
   return (
-    <NavLink to="/account" className="avatar" title={user?.firstName || 'Account'}
-      aria-label="Account" style={{ padding: 0, overflow: 'hidden', textDecoration: 'none' }}>
-      {user?.imageUrl
-        ? <img src={user.imageUrl} alt={initials}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-        : initials}
+    <NavLink to="/account" className="avatar-link" title={user?.firstName || 'Account'}
+      aria-label="Account">
+      <span className="avatar">
+        {user?.imageUrl
+          ? <img src={user.imageUrl} alt={initials}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+          : initials}
+      </span>
+      <span className="greeting">Hello, <strong>{firstName}</strong></span>
     </NavLink>
   )
 }

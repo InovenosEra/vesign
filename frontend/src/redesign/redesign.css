@@ -568,7 +568,11 @@
 /* Pre/Post-market — amber, pulsing dot */
 .rd .status.extended { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.3); color: var(--gold); }
 .rd .status.extended .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
-.rd .avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #00d97e); color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid var(--line-2); }
+.rd .avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #00d97e); color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid var(--line-2); overflow: hidden; flex-shrink: 0; }
+/* Avatar + greeting (links to /account). Circle style stays in .avatar above. */
+.rd .avatar-link { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; cursor: pointer; }
+.rd .avatar-link .greeting { font-size: 13px; font-weight: 500; color: var(--ink-2, #a8acb8); white-space: nowrap; }
+.rd .avatar-link .greeting strong { color: var(--ink, #e8eaf0); font-weight: 600; }
 
 /* Language + currency selectors */
 .rd .hdr-select { position: relative; }
