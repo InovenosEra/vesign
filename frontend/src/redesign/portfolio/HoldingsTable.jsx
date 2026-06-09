@@ -16,6 +16,9 @@ import HoldingLots from './HoldingLots'
 const healthDots = (n) =>
   [0, 1, 2, 3, 4].map(i => <span key={i} className={'s' + (i < (n || 0) ? '' : ' off')} />)
 
+// Production format for Prediction/ML Score: arrow + absolute value, 1 decimal.
+const arrowPct1 = (v) => (v == null ? '—' : `${v >= 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)}%`)
+
 const csvCell = (v) => {
   const s = v == null ? '' : String(v)
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
@@ -45,9 +48,10 @@ export default function HoldingsTable({ rows, subhead }) {
     const header = ['Ticker', 'Company', 'Health', 'Prediction', 'ML Score', 'Qty', 'Avg Price', 'Invested', priceLabel, 'Market value', 'Yield']
     const lines = [header.join(',')]
     for (const r of rows) {
-      const fvu = r.fair_value_upside == null ? '' : (r.fair_value_upside * 100).toFixed(2)
-      const ml = r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(2)
-      lines.push([r.ticker, r.company || '', r.health_score, fvu, ml, r.total_qty, r.avg_price,
+      const up = (r.target_mean_price != null && r.latest_close)
+        ? ((r.target_mean_price - r.latest_close) / r.latest_close * 100).toFixed(1) : ''
+      const ml = r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(1)
+      lines.push([r.ticker, r.company || '', r.health_score, up, ml, r.total_qty, r.avg_price,
         r.cost, r.latest_close, r.value, r.yld].map(csvCell).join(','))
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -87,6 +91,12 @@ export default function HoldingsTable({ rows, subhead }) {
           {rows.map(r => {
             const diff = (live && r.latest_close != null && r.prev_close != null)
               ? r.latest_close - r.prev_close : null
+            // Prediction = analyst-target upside vs the LIVE price, recomputed
+            // intraday like production's "Target" column (not the frozen
+            // fair_value_upside, which is stale during a session).
+            const upside = (r.target_mean_price != null && r.latest_close)
+              ? (r.target_mean_price - r.latest_close) / r.latest_close * 100 : null
+            const mlPct = r.prediction_score == null ? null : r.prediction_score * 100
             return (
             <Fragment key={r.ticker}>
               <tr onClick={() => open(r.ticker, r.company || '')}>
@@ -103,8 +113,8 @@ export default function HoldingsTable({ rows, subhead }) {
                 </td>
                 <td className="co-cell">{r.company || '—'}</td>
                 <td className="r">{r.health_score == null ? '—' : <span className="health">{healthDots(r.health_score)}</span>}</td>
-                <td className={'r ' + dirClass(r.fair_value_upside)}>{r.fair_value_upside == null ? '—' : pct(r.fair_value_upside * 100)}</td>
-                <td className={'r ' + dirClass(r.prediction_score)}>{r.prediction_score == null ? '—' : pct(r.prediction_score * 100)}</td>
+                <td className={'r ' + dirClass(upside)}>{arrowPct1(upside)}</td>
+                <td className={'r ' + dirClass(mlPct)}>{arrowPct1(mlPct)}</td>
                 <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 0 })}</td>
                 <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
                 <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
