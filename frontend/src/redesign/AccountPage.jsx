@@ -780,7 +780,7 @@ export default function AccountPage() {
             </div>
             <div className="name">{user?.fullName || 'Account'}</div>
             <div className="email">{user?.primaryEmailAddress?.emailAddress || ''}</div>
-            <div className="plan-badge">★ {planLabel}</div>
+            <div className={'plan-badge ' + (me.plan || 'free')}>★ {planLabel}</div>
           </div>
           <nav className="acc-nav">
             {NAV.map(n => (
