@@ -3497,10 +3497,14 @@ def _build_universe_baseline() -> dict:
             WHERE COALESCE(c.market, 'US') = 'US'
         ),
         ma50c AS (SELECT ticker, AVG(close) AS ma FROM last_n WHERE rn <= 50 GROUP BY ticker),
-        ma200c AS (SELECT ticker, AVG(close) AS ma FROM last_n WHERE rn <= 200 GROUP BY ticker)
+        ma200c AS (SELECT ticker, AVG(close) AS ma FROM last_n WHERE rn <= 200 GROUP BY ticker),
+        -- the ticker's previous completed-session close (rn=1 is prev_close);
+        -- powers the last-session move shown on the panels when the market is idle
+        priorc AS (SELECT ticker, close AS prior_close FROM last_n WHERE rn = 2)
         SELECT c.ticker, c.company, c.sector, c.logo_url,
                mc.market_cap AS market_cap,
                t.close AS prev_close, t.volume AS volume,
+               priorc.prior_close AS prior_close,
                hl.hi AS hi52, hl.lo AS lo52,
                ma50c.ma AS ma50, ma200c.ma AS ma200
         FROM daily_prices t
@@ -3510,6 +3514,7 @@ def _build_universe_baseline() -> dict:
         LEFT JOIN hl ON hl.ticker = c.ticker
         LEFT JOIN ma50c ON ma50c.ticker = c.ticker
         LEFT JOIN ma200c ON ma200c.ticker = c.ticker
+        LEFT JOIN priorc ON priorc.ticker = c.ticker
         WHERE COALESCE(c.market, 'US') = 'US' AND t.close > 0
     """)
     out = {}
@@ -3518,6 +3523,7 @@ def _build_universe_baseline() -> dict:
             out[r["ticker"]] = {
                 "company": r["company"], "sector": r["sector"], "logo_url": r["logo_url"],
                 "market_cap": r["market_cap"], "prev_close": r["prev_close"],
+                "prior_close": r["prior_close"],
                 "volume": r["volume"], "hi52": r["hi52"], "lo52": r["lo52"],
                 "ma50": r["ma50"], "ma200": r["ma200"],
             }
@@ -3611,6 +3617,24 @@ def _get_live_snapshot() -> dict:
     _do_snapshot_refresh(phase, tickers)
     with _snapshot_lock:
         return {"phase": phase, "prices": _snapshot_cache}
+
+
+def _display_universe_rows() -> list:
+    """Per-ticker rows for the market panels (breadth / sectors / movers / etc.).
+
+    During a live session (pre/regular/post) each row's price/change comes from
+    the live snapshot vs the daily baseline. When the market is idle (closed
+    overnight) there are no live prices, so instead of showing a flat 0% across
+    the board we surface the LAST COMPLETED session's move (latest close vs the
+    prior close) — what a closed-market dashboard should display.
+
+    The phase comes from the snapshot itself (not a separate _phase_info call) so
+    it stays the single source of truth across the panels."""
+    baseline = _get_universe_baseline()
+    snap = _get_live_snapshot()
+    if snap["phase"] == "idle":
+        return live_snapshot.last_session_rows(baseline)
+    return live_snapshot.compute_universe_rows(snap["prices"], baseline)
 
 
 # Keep the whole-universe live snapshot warm so no REQUEST ever pays the one-time
@@ -3800,8 +3824,7 @@ def _build_market_movers(mover_type: str, limit: int) -> dict:
     volume (active). change% = live price (snapshot) vs prev close; tickers with
     no live print sit at 0%. (Intraday volume is not in the snapshot, so 'active'
     ranks by the last completed session's volume.)"""
-    rows = live_snapshot.compute_universe_rows(
-        _get_live_snapshot()["prices"], _get_universe_baseline())
+    rows = _display_universe_rows()
     rows = [r for r in rows if r["ticker"] not in _MOVERS_EXCLUDE]
     if mover_type == "gainers":
         rows = [r for r in rows if r["change_pct"] is not None]
@@ -3848,8 +3871,7 @@ def _build_market_highs_lows(hl_type: str, limit: int) -> dict:
     """US stocks whose LIVE price is within _HL_NEAR_PCT% of their 52w high/low.
     ETFs excluded. Same {movers:[...]} shape as the movers panels so the frontend
     reuses the mover-row rendering. A live price making a fresh extreme counts."""
-    rows = live_snapshot.compute_universe_rows(
-        _get_live_snapshot()["prices"], _get_universe_baseline())
+    rows = _display_universe_rows()
     scored = []
     for r in rows:
         price, hi, lo, sector = r["price"], r["hi52"], r["lo52"], r["sector"]
@@ -3951,8 +3973,7 @@ def _build_market_breadth() -> dict:
     the live price vs the daily baseline (prev_close, hi52/lo52, ma50/ma200);
     up/down volume uses the last completed session's volume (intraday volume is
     not in the snapshot). 52w-high = live price at/above the baseline 52w high."""
-    rows = live_snapshot.compute_universe_rows(
-        _get_live_snapshot()["prices"], _get_universe_baseline())
+    rows = _display_universe_rows()
     advancers = decliners = 0
     up_volume = down_volume = 0
     week52_highs = week52_lows = 0
@@ -4068,8 +4089,7 @@ def _build_market_sectors() -> dict:
     # Live per-ticker change from the shared snapshot + baseline (was a two-row
     # daily_prices delta). Keep only US tickers that have a sector, a market cap,
     # and a computable change — matching the old query's WHERE clauses.
-    uni = live_snapshot.compute_universe_rows(
-        _get_live_snapshot()["prices"], _get_universe_baseline())
+    uni = _display_universe_rows()
     rows = [
         {"ticker": r["ticker"], "sector": r["sector"],
          "market_cap": r["market_cap"], "change_pct": r["change_pct"]}
@@ -4282,8 +4302,12 @@ def _build_market_tape() -> dict:
 
     # Price + change come from the shared live snapshot vs the daily baseline
     # (prev_close = latest completed session) — identical basis to the movers /
-    # breadth panels, so a ticker reads the same % everywhere.
-    snap = _get_live_snapshot()["prices"]
+    # breadth panels, so a ticker reads the same % everywhere. When idle (closed
+    # overnight) there are no live prices, so show the last completed session's
+    # move (latest close vs prior close) instead of a flat 0%.
+    snapshot = _get_live_snapshot()
+    idle = snapshot["phase"] == "idle"
+    snap = snapshot["prices"]
     base = _get_universe_baseline()
     out = []
     seen = set()
@@ -4296,9 +4320,14 @@ def _build_market_tape() -> dict:
             continue
         seen.add(key)
         prev = meta["prev_close"]
-        live = snap.get(ticker)
-        price = live if live else prev
-        change_pct = round((price - prev) / prev * 100, 4) if prev else None
+        if idle:
+            prior = meta.get("prior_close")
+            price = prev
+            change_pct = round((prev - prior) / prior * 100, 4) if prior else None
+        else:
+            live = snap.get(ticker)
+            price = live if live else prev
+            change_pct = round((price - prev) / prev * 100, 4) if prev else None
         out.append({"ticker": ticker, "close": price, "change_pct": change_pct})
         if len(out) >= _TAPE_LIMIT:
             break

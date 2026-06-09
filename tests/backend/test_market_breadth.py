@@ -78,15 +78,24 @@ def test_breadth_from_live_snapshot(breadth_app):
     assert body["above_200d_ma_pct"] == 0.75  # same data: ma200 == 95 for all tickers
 
 
-def test_breadth_idle_empty_snapshot(breadth_app):
+def test_breadth_idle_shows_last_completed_session(breadth_app):
+    """When the market is idle (no live prices), breadth falls back to the LAST
+    COMPLETED session's move: latest close vs the prior close."""
     bm, client = breadth_app
     from sqlalchemy import text
     with bm.engine.begin() as conn:
-        conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES ('AAA','AAA','US')"))
-        conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00','AAA',100,100,100,100,5)"))
+        # UP and DOWN have a prior (05-21) + latest (05-22) close; LONE has only one
+        # session, so no prior close -> no computable move -> excluded from breadth.
+        for t, prior, latest, vol in [("UP", 90, 100, 1000), ("DOWN", 100, 90, 500)]:
+            conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES (:t,:t,'US')"), {"t": t})
+            conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-21 00:00:00',:t,:p,:p,:p,:p,0)"), {"t": t, "p": prior})
+            conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00',:t,:c,:c,:c,:c,:v)"), {"t": t, "c": latest, "v": vol})
+        conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES ('LONE','LONE','US')"))
+        conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00','LONE',50,50,50,50,7)"))
     from unittest.mock import patch
     with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
         body = client.get("/api/market/breadth").json()
-    # No live price -> price == prev_close -> change 0 -> neither advancer nor decliner
-    assert body["advancers"] == 0
-    assert body["decliners"] == 0
+    assert body["advancers"] == 1          # UP (+11.1% vs prior)
+    assert body["decliners"] == 1          # DOWN (-10% vs prior); LONE has no prior -> excluded
+    assert body["up_volume"] == 1000       # UP latest-session volume
+    assert body["down_volume"] == 500      # DOWN

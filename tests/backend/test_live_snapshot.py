@@ -34,3 +34,25 @@ def test_compute_rows_none_change_when_prev_close_falsy():
     baseline = {"CCC": {"prev_close": 0}}
     rows = ls.compute_universe_rows({"CCC": 5.0}, baseline)
     assert rows[0]["change_pct"] is None
+
+
+def test_last_session_rows_uses_latest_close_and_change_vs_prior():
+    # When the market is idle (closed), the panels show the last COMPLETED
+    # session's move: price = latest close (prev_close), change = vs prior_close.
+    baseline = {"AAA": {"prev_close": 110.0, "prior_close": 100.0,
+                        "sector": "Tech", "market_cap": 5}}
+    rows = ls.last_session_rows(baseline)
+    r = rows[0]
+    assert r["ticker"] == "AAA"
+    assert r["price"] == 110.0          # latest completed-session close
+    assert r["change_pct"] == 10.0      # (110 - 100) / 100 * 100
+    assert r["sector"] == "Tech"
+    assert r["market_cap"] == 5
+
+
+def test_last_session_rows_none_change_when_prior_close_missing():
+    # A ticker with only one session of history has no prior close -> no move.
+    baseline = {"NEW": {"prev_close": 42.0, "prior_close": None}}
+    rows = ls.last_session_rows(baseline)
+    assert rows[0]["price"] == 42.0
+    assert rows[0]["change_pct"] is None

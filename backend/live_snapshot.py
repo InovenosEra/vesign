@@ -34,3 +34,23 @@ def compute_universe_rows(snapshot: dict, baseline: dict) -> list:
             change = None
         rows.append({"ticker": ticker, "price": price, "change_pct": change, **meta})
     return rows
+
+
+def last_session_rows(baseline: dict) -> list:
+    """One row per ticker showing the LAST COMPLETED session's move — used when
+    the market is idle (closed overnight) and there are no live prices.
+
+    price      = prev_close (the latest completed-session close)
+    change_pct = (prev_close - prior_close) / prior_close * 100, or None if
+                 prior_close is falsy (a ticker with only one session of history).
+    Same row shape as compute_universe_rows so every panel reads it identically."""
+    rows = []
+    for ticker, meta in baseline.items():
+        prev = meta.get("prev_close")
+        prior = meta.get("prior_close")
+        if prior:
+            change = round((prev - prior) / prior * 100, 4)
+        else:
+            change = None
+        rows.append({"ticker": ticker, "price": prev, "change_pct": change, **meta})
+    return rows
