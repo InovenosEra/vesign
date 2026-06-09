@@ -32,7 +32,7 @@ export default function HoldingsTable({ rows, subhead }) {
   const toggle = (t) => setExpanded(prev => {
     const n = new Set(prev); n.has(t) ? n.delete(t) : n.add(t); return n
   })
-  const COLS = 10  // chevron + the 9 data columns
+  const COLS = 12  // chevron + the 11 data columns
 
   // Phase-aware price-column header (matches production: pre/post, else "Live Price").
   const phase = mstat?.phase
@@ -42,10 +42,12 @@ export default function HoldingsTable({ rows, subhead }) {
   const live = phase === 'regular' || phase === 'pre' || phase === 'post'
 
   const exportCsv = () => {
-    const header = ['Ticker', 'Company', 'Health', 'Qty', 'Avg Price', 'Invested', priceLabel, 'Market value', 'Yield']
+    const header = ['Ticker', 'Company', 'Health', 'Prediction', 'ML Score', 'Qty', 'Avg Price', 'Invested', priceLabel, 'Market value', 'Yield']
     const lines = [header.join(',')]
     for (const r of rows) {
-      lines.push([r.ticker, r.company || '', r.health_score, r.total_qty, r.avg_price,
+      const fvu = r.fair_value_upside == null ? '' : (r.fair_value_upside * 100).toFixed(2)
+      const ml = r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(2)
+      lines.push([r.ticker, r.company || '', r.health_score, fvu, ml, r.total_qty, r.avg_price,
         r.cost, r.latest_close, r.value, r.yld].map(csvCell).join(','))
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -71,6 +73,8 @@ export default function HoldingsTable({ rows, subhead }) {
             <th>Ticker</th>
             <th>Company</th>
             <th className="r">Health</th>
+            <th className="r">Prediction</th>
+            <th className="r">ML Score</th>
             <th className="r">Qty</th>
             <th className="r">Avg Price</th>
             <th className="r">Invested</th>
@@ -99,6 +103,8 @@ export default function HoldingsTable({ rows, subhead }) {
                 </td>
                 <td className="co-cell">{r.company || '—'}</td>
                 <td className="r">{r.health_score == null ? '—' : <span className="health">{healthDots(r.health_score)}</span>}</td>
+                <td className={'r ' + dirClass(r.fair_value_upside)}>{r.fair_value_upside == null ? '—' : pct(r.fair_value_upside * 100)}</td>
+                <td className={'r ' + dirClass(r.prediction_score)}>{r.prediction_score == null ? '—' : pct(r.prediction_score * 100)}</td>
                 <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 0 })}</td>
                 <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
                 <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>

@@ -2624,11 +2624,22 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
                    f.market_cap,
                    lp.latest_close,
                    pp.prev_close,
-                   h.score AS health_score
+                   h.score AS health_score,
+                   sg.fair_value_upside,
+                   sg.prediction_score
             FROM companies c
             LEFT JOIN (SELECT ticker, MAX(market_cap) AS market_cap FROM fundamentals GROUP BY ticker) f
                 ON c.ticker = f.ticker
             LEFT JOIN company_health h ON c.ticker = h.ticker
+            LEFT JOIN (
+                SELECT ticker, fair_value_upside, prediction_score
+                FROM (
+                    SELECT ticker, fair_value_upside, prediction_score,
+                           ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+                    FROM signals
+                    WHERE ticker IN ({ph})
+                ) WHERE rn = 1
+            ) sg ON c.ticker = sg.ticker
             LEFT JOIN (
                 SELECT p1.ticker, p1.close AS latest_close, p2.max_date
                 FROM daily_prices p1
@@ -2656,9 +2667,12 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
         ticker, total_qty, total_cost, first_buy_date = r
         avg_price = (total_cost / total_qty) if total_qty else None
         m = meta.get(ticker)
-        # Column order: ticker, company, logo_url, industry, domain, market_cap, latest_close, prev_close, health_score
+        # Column order: ticker, company, logo_url, industry, domain, market_cap,
+        # latest_close, prev_close, health_score, fair_value_upside, prediction_score
         mc = m[5] if m else None
         hsc = m[8] if m else None
+        fvu = m[9] if m else None
+        pscore = m[10] if m else None
         daily_latest = float(m[6]) if (m and m[6] is not None) else None   # rn=1: latest completed close
         prior_close = float(m[7]) if (m and m[7] is not None) else None    # rn=2: prior session close
 
@@ -2682,6 +2696,8 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             "domain": m[4] if m else None,
             "market_cap": int(mc) if mc is not None and not (isinstance(mc, float) and math.isnan(mc)) else None,
             "health_score": int(hsc) if hsc is not None and not (isinstance(hsc, float) and math.isnan(hsc)) else None,
+            "fair_value_upside": float(fvu) if fvu is not None and not (isinstance(fvu, float) and math.isnan(fvu)) else None,
+            "prediction_score": float(pscore) if pscore is not None and not (isinstance(pscore, float) and math.isnan(pscore)) else None,
             "total_qty": total_qty,
             "total_cost": round(total_cost, 2) if total_cost is not None else None,
             "avg_price": round(avg_price, 4) if avg_price is not None else None,
