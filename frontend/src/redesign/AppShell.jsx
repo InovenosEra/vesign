@@ -1,15 +1,13 @@
 /* Redesign shared shell — the new top nav for redesigned routes.
  * Renders inside a <div className="rd"> so the scoped redesign.css applies only
  * here, leaving un-ported pages on the old design. Wired to the REAL contexts:
- * currency actually converts (useCurrency), language actually switches (i18n),
- * market-status is live, search is the real GlobalSearch. */
-import { useState, useRef, useEffect } from 'react'
+ * market-status is live, search is the real GlobalSearch. (Currency + language
+ * live in Account → Profile, not the header.) */
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useTranslation } from 'react-i18next'
 import { useUser } from '@clerk/react'
 import { getMarketStatus } from '../api'
-import { useCurrency } from '../context/CurrencyContext'
 import { MeProvider, useMe } from '../context/MeContext'
 import { fmtCents } from './signals/gating'
 import GlobalSearch from '../components/GlobalSearch'
@@ -17,24 +15,6 @@ import SignalModal from './SignalModalRd'
 import { TickerModalContext } from './TickerModalContext'
 import Tape from './market/Tape'
 import './redesign.css'
-
-const LANGS = [
-  { code: 'en', label: 'EN', flag: '🇬🇧', name: 'English' },
-  { code: 'he', label: 'HE', flag: '🇮🇱', name: 'עברית' },
-  { code: 'es', label: 'ES', flag: '🇪🇸', name: 'Español' },
-  { code: 'fr', label: 'FR', flag: '🇫🇷', name: 'Français' },
-  { code: 'de', label: 'DE', flag: '🇩🇪', name: 'Deutsch' },
-  { code: 'it', label: 'IT', flag: '🇮🇹', name: 'Italiano' },
-]
-const CCYS = [
-  { code: 'USD', sym: '$', name: 'US Dollar' },
-  { code: 'EUR', sym: '€', name: 'Euro' },
-  { code: 'ILS', sym: '₪', name: 'Israeli Shekel' },
-]
-
-const Caret = () => (
-  <svg className="hs-caret" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9" /></svg>
-)
 
 function fmtCountdown(ms) {
   if (ms <= 0) return '00:00:00'
@@ -80,60 +60,6 @@ function MarketChip() {
       <span>{view.label}</span>
       {cd && <span className="ct">{cd}</span>}
     </div>
-  )
-}
-
-/* Generic .hdr-select dropdown used by language + currency. */
-function HdrSelect({ items, current, onPick, renderBtn, renderRow }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  useEffect(() => {
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [])
-  const cur = items.find(i => i.code === current) || items[0]
-  return (
-    <div className={'hdr-select' + (open ? ' open' : '')} ref={ref}>
-      <button className="hs-btn" type="button" aria-haspopup="true" aria-expanded={open}
-        onClick={() => setOpen(o => !o)}>
-        {renderBtn(cur)}<Caret />
-      </button>
-      <div className="hs-menu" role="menu">
-        {items.map(i => (
-          <button key={i.code} type="button" role="menuitem"
-            className={'hs-row' + (i.code === current ? ' sel' : '')}
-            onClick={() => { onPick(i.code); setOpen(false) }}>
-            {renderRow(i)}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function LangSelect() {
-  const { i18n } = useTranslation()
-  const cur = (i18n.language || 'en').slice(0, 2)
-  const pick = (code) => {
-    i18n.changeLanguage(code)
-    try { localStorage.setItem('lang', code) } catch { /* ignore */ }
-    document.documentElement.dir = code === 'he' ? 'rtl' : 'ltr'
-    document.documentElement.lang = code
-  }
-  return (
-    <HdrSelect items={LANGS} current={cur} onPick={pick}
-      renderBtn={c => <><span className="hs-flag">{c.flag}</span><span className="hs-lbl">{c.label}</span></>}
-      renderRow={i => <><span className="hs-flag">{i.flag}</span><span className="hs-name">{i.name}</span></>} />
-  )
-}
-
-function CcySelect() {
-  const { currency, setCurrency } = useCurrency()
-  return (
-    <HdrSelect items={CCYS} current={currency} onPick={setCurrency}
-      renderBtn={c => <><span className="hs-sym">{c.sym}</span><span className="hs-lbl">{c.code}</span></>}
-      renderRow={i => <><span className="hs-sym">{i.sym}</span><span className="hs-name">{i.code}</span></>} />
   )
 }
 
@@ -199,8 +125,6 @@ export default function AppShell({ children }) {
         <div className="topright">
           <WalletChip />
           <MarketChip />
-          <LangSelect />
-          <CcySelect />
           <Avatar />
         </div>
       </div>
