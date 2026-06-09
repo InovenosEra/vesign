@@ -263,10 +263,6 @@ export default function DeepDive({ ticker, setTicker }) {
           </div>
           <div className="dd-verdict-body">
             <div className="dd-vstat">
-              <div className="lbl">VQS score <span className="desc">Vesign quality score (1–10)</span></div>
-              <div className="val purple"><span>{r?.vqs ?? '—'}</span> <small style={{ color: 'var(--ink-3)', fontSize: 11 }}>/10</small></div>
-            </div>
-            <div className="dd-vstat">
               <div className="lbl">Predicted upside <span className="desc">to analyst mean target</span></div>
               <div className={'val ' + dirCls(up)}>{up == null ? '—' : pct(up)}</div>
             </div>
@@ -346,7 +342,6 @@ export default function DeepDive({ ticker, setTicker }) {
             <div className="dd-an-rec">
               <div className="cell"><div className="l">Upside to mean</div><div className={'v ' + dirCls(up)}>{up == null ? '—' : pct(up)}</div></div>
               <div className="cell"><div className="l">Analysts</div><div className="v">{r?.number_of_analysts ? Math.round(r.number_of_analysts) : '—'}</div></div>
-              <div className="cell"><div className="l">VQS</div><div className="v">{r?.vqs ?? '—'}<span className="sub">/10</span></div></div>
             </div>
           </div>
         </div>
@@ -402,7 +397,6 @@ export default function DeepDive({ ticker, setTicker }) {
                   <div className={'sig ' + sigCls(s)}>{s}</div>
                   <div className="date">{dateFmt(m.date)}</div>
                   <div className="note">
-                    {m.vqs != null && <>VQS <span className="vqs">{m.vqs}</span> · </>}
                     {m.fair_value_upside != null && `Pred upside ${pct(m.fair_value_upside * 100)} · `}
                     {m.health_score != null ? `Health ${m.health_score}/5` : ''}
                   </div>

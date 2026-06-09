@@ -218,7 +218,6 @@ export default function SignalModalRd({ row, onClose }) {
               </div>
 
               <div className="m-verdict">
-                <div className="m-vrow"><div className="lbl">VQS score<small>Vesign quality (1–10)</small></div><div className="val purple">{r?.vqs ?? '—'} / 10</div></div>
                 <div className="m-vrow"><div className="lbl">Predicted upside<small>to analyst mean</small></div><div className={'val ' + dirClass(up)}>{up == null ? '—' : pct(up)}</div></div>
                 <div className="m-vrow"><div className="lbl">Health<small>5-point score</small></div><div className="val"><span className="health">{healthDots(r?.health_score)}</span></div></div>
                 <div className="m-vrow"><div className="lbl">ML 5-day<small>walk-forward model</small></div><div className={'val ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)}</div></div>
@@ -274,7 +273,6 @@ export default function SignalModalRd({ row, onClose }) {
                     <div className={'sig ' + sigCls(s)}>{s}</div>
                     <div className="date">{dateFmt(m.date)}</div>
                     <div className="note">
-                      {m.vqs != null && <>VQS <span className="vqs">{m.vqs}</span> · </>}
                       {mu != null && `Pred upside ${pct(mu)} · `}
                       {m.health_score != null ? `Health ${m.health_score}/5` : ''}
                     </div>

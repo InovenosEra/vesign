@@ -490,10 +490,10 @@ function PlanPane({ planLabel }) {
 function WalletPane({ balanceCents, unlockCents }) {
   const unlocks = unlockCents ? Math.floor(balanceCents / unlockCents) : 0
   const TXN = [
-    { ico: 'unlock', ttl: 'BUY signal unlocked', tk: 'MTD', sub: 'Mettler-Toledo · VQS 9', date: 'May 19, 14:32', amt: '−$0.10', cls: 'debit', run: '$8.40' },
-    { ico: 'unlock', ttl: 'BUY signal unlocked', tk: 'YELP', sub: 'Yelp · VQS 9', date: 'May 19, 14:32', amt: '−$0.10', cls: 'debit', run: '$8.50' },
+    { ico: 'unlock', ttl: 'BUY signal unlocked', tk: 'MTD', sub: 'Mettler-Toledo', date: 'May 19, 14:32', amt: '−$0.10', cls: 'debit', run: '$8.40' },
+    { ico: 'unlock', ttl: 'BUY signal unlocked', tk: 'YELP', sub: 'Yelp', date: 'May 19, 14:32', amt: '−$0.10', cls: 'debit', run: '$8.50' },
     { ico: 'deep', ttl: 'Deep-dive unlocked', tk: 'NVDA', sub: 'NVIDIA · full report', date: 'May 18, 09:14', amt: '−$0.50', cls: 'debit', run: '$8.60' },
-    { ico: 'unlock', ttl: 'BUY signal unlocked', tk: 'PANW', sub: 'Palo Alto Networks · VQS 8', date: 'May 16, 11:08', amt: '−$0.10', cls: 'debit', run: '$9.10' },
+    { ico: 'unlock', ttl: 'BUY signal unlocked', tk: 'PANW', sub: 'Palo Alto Networks', date: 'May 16, 11:08', amt: '−$0.10', cls: 'debit', run: '$9.10' },
     { ico: 'topup', ttl: 'Auto-reload', tk: null, sub: 'Mastercard •••• 4831', date: 'May 12, 09:00', amt: '+$10.00', cls: 'credit', run: '$9.30' },
   ]
   const TopupIco = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
@@ -622,11 +622,6 @@ function TradingPane() {
         <div className="field-row">
           <div className="field-label">Trailing stop %<small>Triggers SELL when price falls this much from peak</small></div>
           <div className="field-value"><Range min={10} max={50} value={25} fmt={v => `${v}%`} /></div>
-          <span />
-        </div>
-        <div className="field-row">
-          <div className="field-label">Min VQS score<small>Filter out signals below this conviction</small></div>
-          <div className="field-value"><Range min={1} max={10} value={6} fmt={v => `${v} / 10`} /></div>
           <span />
         </div>
         <div className="field-row">

@@ -80,7 +80,7 @@ const DEFAULTS = {
   caps: new Set(CAP_PILLS.map(([v]) => v)),
   health: 1,
   dir: 'any',
-  vqs: { lo: 0, hi: 10 }, upside: { lo: -50, hi: 100 }, pe: { lo: 0, hi: 100 },
+  upside: { lo: -50, hi: 100 }, pe: { lo: 0, hi: 100 },
   search: '',
 }
 
@@ -106,8 +106,6 @@ const COLUMNS = [
   { key: 'market_cap', label: 'Mkt cap', align: 'r', sortable: true, cell: (r) => capB(r.market_cap) },
   { key: 'signal', label: 'Signal', sortable: true,
     cell: (r) => <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
-  { key: 'vqs', label: 'VQS', align: 'r', sortable: true,
-    cell: (r) => <span className={'vqs-pill ' + (r.vqs >= 8 ? 'high' : r.vqs >= 6 ? 'mid' : '')}>{r.vqs ?? '—'}</span> },
   { key: 'fair_value_upside', label: 'Pred. upside', align: 'r', sortable: true,
     cell: (r, c) => {
       if (r.fair_value_upside == null) return <span className="muted">—</span>
@@ -153,7 +151,6 @@ export default function Screener({ onCount }) {
   const [caps, setCaps] = useState(() => initSet('caps'))
   const [health, setHealth] = useState(() => initVal('health'))
   const [dir, setDir] = useState(() => initVal('dir'))
-  const [vqs, setVqs] = useState(() => ({ ...(saved?.vqs || DEFAULTS.vqs) }))
   const [upside, setUpside] = useState(() => ({ ...(saved?.upside || DEFAULTS.upside) }))
   const [pe, setPe] = useState(() => ({ ...(saved?.pe || DEFAULTS.pe) }))
   const [search, setSearch] = useState(() => initVal('search'))
@@ -181,13 +178,13 @@ export default function Screener({ onCount }) {
   const reset = () => {
     setSignals(new Set(DEFAULTS.signals)); setSectors(new Set(DEFAULTS.sectors))
     setCaps(new Set(DEFAULTS.caps)); setHealth(DEFAULTS.health); setDir(DEFAULTS.dir)
-    setVqs({ ...DEFAULTS.vqs }); setUpside({ ...DEFAULTS.upside }); setPe({ ...DEFAULTS.pe })
+    setUpside({ ...DEFAULTS.upside }); setPe({ ...DEFAULTS.pe })
     setSearch('')
   }
   const saveFilters = () => {
     const payload = {
       signals: [...signals], sectors: [...sectors], caps: [...caps],
-      health, dir, vqs, upside, pe, search,
+      health, dir, upside, pe, search,
     }
     try { localStorage.setItem(FILTER_LS, JSON.stringify(payload)) } catch { /* ignore */ }
     setSavedFlag(true); setTimeout(() => setSavedFlag(false), 1600)
@@ -203,8 +200,6 @@ export default function Screener({ onCount }) {
     : { key, dir: key === 'ticker' || key === 'signal' || key === 'sector' ? 'asc' : 'desc' })
 
   // Treat slider extremes as unbounded (matches mockup's -Infinity/Infinity).
-  const vqsLo = vqs.lo <= 0 ? -Infinity : vqs.lo
-  const vqsHi = vqs.hi >= 10 ? Infinity : vqs.hi
   const upLo = upside.lo <= -50 ? -Infinity : upside.lo
   const upHi = upside.hi >= 100 ? Infinity : upside.hi
   const peLo = pe.lo <= 0 ? -Infinity : pe.lo
@@ -222,8 +217,6 @@ export default function Screener({ onCount }) {
       if (!b || !caps.has(b)) return false
     }
     if (health > 1 && (r.health_score || 0) < health) return false
-    const v = r.vqs == null ? 0 : r.vqs
-    if (v < vqsLo || v > vqsHi) return false
     if (r.fair_value_upside != null) {
       const up = r.fair_value_upside * 100
       if (up < upLo || up > upHi) return false
@@ -234,7 +227,7 @@ export default function Screener({ onCount }) {
     if (dir === 'down' && !(ml < 0)) return false
     if (q && !(`${r.ticker} ${r.company || ''}`.toUpperCase().includes(q))) return false
     return true
-  }), [all, signals, sectors, caps, health, dir, vqsLo, vqsHi, upLo, upHi, peLo, peHi, q])
+  }), [all, signals, sectors, caps, health, dir, upLo, upHi, peLo, peHi, q])
 
   useEffect(() => { onCount && onCount(filtered.length) }, [filtered.length, onCount])
 
@@ -327,13 +320,6 @@ export default function Screener({ onCount }) {
               <span key={v} className={'pill' + (sectors.has(v) ? ' active' : '')} onClick={() => togSector(v)}>{lbl}</span>
             ))}
           </div>
-        </div>
-
-        <div className="fg">
-          <div className="fg-label">VQS score</div>
-          <RangeSlider min={0} max={10} lo={vqs.lo} hi={vqs.hi}
-            ticks={['1', '3', '5', '7', '10']} fmt={(v) => String(v)}
-            onChange={(w, val) => setVqs(p => ({ ...p, [w]: val }))} />
         </div>
 
         <div className="fg">
