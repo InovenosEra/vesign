@@ -41,6 +41,7 @@
   .rd .tape-item .tk:hover { color: var(--blue-2); }
   .rd .tape-item .up { color: var(--green); margin-left: 6px; }
   .rd .tape-item .down { color: var(--red); margin-left: 6px; }
+  .rd .tape-item .tape-arrow { font-size: 8px; margin-right: 3px; vertical-align: middle; }
 
   /* TOP NAV — shared, see assets/app-header.css */
 
