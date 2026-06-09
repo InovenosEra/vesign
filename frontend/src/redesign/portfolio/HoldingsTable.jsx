@@ -97,7 +97,7 @@ export default function HoldingsTable({ rows, subhead }) {
                   </div>
                 </td>
                 <td className="co-cell">{r.company || '—'}</td>
-                <td className="r muted">{mcapB(r.market_cap)}</td>
+                <td className="r">{mcapB(r.market_cap)}</td>
                 <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 0 })}</td>
                 <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
                 <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
