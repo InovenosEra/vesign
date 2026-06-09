@@ -1,7 +1,7 @@
 /* Holdings table — one row per ticker; click opens the SignalModal.
- * Columns mirror the production (ve-sign.com) holdings table:
- *   logo · Ticker · Company · Market cap · Shares · Avg cost · Invested ·
- *   <phase-aware price> · Current value · Yield%
+ * Columns + formatting mirror the production (ve-sign.com) holdings table:
+ *   logo · Ticker · Company · M. Cap (B) · Qty · Avg Price · Invested ·
+ *   <phase-aware price + live change> · Market value · Yield
  * Plus the redesign-only chevron (expand per-lot detail) and CSV export. */
 import { useState, Fragment } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -12,10 +12,8 @@ import { getWatchlists, getMarketStatus } from '../../api'
 import AddHoldingForm from './AddHoldingForm'
 import HoldingLots from './HoldingLots'
 
-const capB = (mc) => mc == null ? '—'
-  : mc >= 1e12 ? '$' + (mc / 1e12).toFixed(2) + 'T'
-  : mc >= 1e9 ? '$' + (mc / 1e9).toFixed(1) + 'B'
-  : '$' + (mc / 1e6).toFixed(0) + 'M'
+// Production format: plain billions, 1 decimal, comma-grouped — no $/suffix.
+const mcapB = (n) => (n == null ? '—' : num(n / 1e9, { fd: 1 }))
 
 const csvCell = (v) => {
   const s = v == null ? '' : String(v)
@@ -35,15 +33,15 @@ export default function HoldingsTable({ rows, subhead }) {
   })
   const COLS = 10  // chevron + the 9 data columns
 
-  // Phase-aware label for the price column (matches production + the app header).
+  // Phase-aware price-column header (matches production: pre/post, else "Live Price").
   const phase = mstat?.phase
-  const priceLabel = phase === 'pre' ? 'Pre-market'
-    : phase === 'post' ? 'Post-market'
-    : phase === 'regular' ? 'Live price'
-    : 'Last close'
+  const priceLabel = phase === 'pre' ? 'Pre-Market'
+    : phase === 'post' ? 'Post-Market'
+    : 'Live Price'
+  const live = phase === 'regular' || phase === 'pre' || phase === 'post'
 
   const exportCsv = () => {
-    const header = ['Ticker', 'Company', 'Market cap', 'Shares', 'Avg cost', 'Invested', priceLabel, 'Current value', 'Yield %']
+    const header = ['Ticker', 'Company', 'M. Cap (B)', 'Qty', 'Avg Price', 'Invested', priceLabel, 'Market value', 'Yield']
     const lines = [header.join(',')]
     for (const r of rows) {
       lines.push([r.ticker, r.company || '', r.market_cap, r.total_qty, r.avg_price,
@@ -71,17 +69,20 @@ export default function HoldingsTable({ rows, subhead }) {
             <th style={{ width: 28 }}></th>
             <th>Ticker</th>
             <th>Company</th>
-            <th className="r">Market cap</th>
-            <th className="r">Shares</th>
-            <th className="r">Avg cost</th>
+            <th className="r">M. Cap (B)</th>
+            <th className="r">Qty</th>
+            <th className="r">Avg Price</th>
             <th className="r">Invested</th>
             <th className="r">{priceLabel}</th>
-            <th className="r">Current value</th>
+            <th className="r">Market value</th>
             <th className="r" style={{ paddingRight: 18 }}>Yield</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => (
+          {rows.map(r => {
+            const diff = (live && r.latest_close != null && r.prev_close != null)
+              ? r.latest_close - r.prev_close : null
+            return (
             <Fragment key={r.ticker}>
               <tr onClick={() => open(r.ticker, r.company || '')}>
                 <td style={{ width: 28 }}>
@@ -96,11 +97,22 @@ export default function HoldingsTable({ rows, subhead }) {
                   </div>
                 </td>
                 <td className="co-cell">{r.company || '—'}</td>
-                <td className="r muted">{capB(r.market_cap)}</td>
-                <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 2 })}</td>
+                <td className="r muted">{mcapB(r.market_cap)}</td>
+                <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 0 })}</td>
                 <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
-                <td className="r muted">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
-                <td className="r">{r.latest_close == null ? '—' : fmtPrice(r.latest_close)}</td>
+                <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
+                <td className={'r' + (live ? '' : ' muted')}>
+                  {r.latest_close == null ? '—' : (
+                    <>
+                      <div>{fmtPrice(r.latest_close)}</div>
+                      {diff != null && (
+                        <div className={dirClass(diff)} style={{ fontSize: 11 }}>
+                          {diff >= 0 ? '▲' : '▼'} {fmtPrice(Math.abs(diff))} ({Math.abs(r.day).toFixed(2)}%)
+                        </div>
+                      )}
+                    </>
+                  )}
+                </td>
                 <td className="r">{r.value == null ? '—' : fmtPrice(r.value)}</td>
                 <td className={'r ' + dirClass(r.yld)} style={{ paddingRight: 18 }}><strong>{pct(r.yld)}</strong></td>
               </tr>
@@ -108,7 +120,8 @@ export default function HoldingsTable({ rows, subhead }) {
                 <HoldingLots ticker={r.ticker} latestClose={r.latest_close} watchlists={watchlists} colSpan={COLS} />
               )}
             </Fragment>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </>
