@@ -423,7 +423,7 @@
   }
 
 /* Add-holding form + lot management */
-.row-chevron { cursor: pointer; color: var(--ink-3); user-select: none; padding: 0 4px; }
+.row-chevron { cursor: pointer; color: var(--ink-3); user-select: none; padding: 0 4px; font-size: 15px; line-height: 1; }
 .add-holding-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 8px; margin: 8px 0; position: relative; }
 .ahf-field { position: relative; }
 .ahf-input { background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; color: var(--ink); padding: 7px 10px; font-size: 13px; max-width: 140px; }
