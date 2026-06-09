@@ -246,6 +246,9 @@
   .rd .data-table .tk { color: var(--ink); font-weight: 600; }
   .rd .data-table .co { font-family: var(--sans); color: var(--ink-3); font-size: 12px; margin-left: 8px; }
   .rd .data-table td.co-cell { font-family: var(--sans); color: var(--ink); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rd .data-table .health { display: inline-flex; gap: 2px; }
+  .rd .data-table .health .s { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .rd .data-table .health .s.off { background: rgba(255,255,255,0.10); }
   .rd .data-table .ticker-cell { display: flex; align-items: center; gap: 10px; }
   .rd .data-table .logo-mini { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: inline-block; flex-shrink: 0; }
   .rd .data-table .logo-mini.white-bg { background: #fff; padding: 2px; }

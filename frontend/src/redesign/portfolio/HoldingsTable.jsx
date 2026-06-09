@@ -12,8 +12,9 @@ import { getWatchlists, getMarketStatus } from '../../api'
 import AddHoldingForm from './AddHoldingForm'
 import HoldingLots from './HoldingLots'
 
-// Production format: plain billions, 1 decimal, comma-grouped — no $/suffix.
-const mcapB = (n) => (n == null ? '—' : num(n / 1e9, { fd: 1 }))
+// 5-point company-health score rendered as filled/empty dots (matches Screener).
+const healthDots = (n) =>
+  [0, 1, 2, 3, 4].map(i => <span key={i} className={'s' + (i < (n || 0) ? '' : ' off')} />)
 
 const csvCell = (v) => {
   const s = v == null ? '' : String(v)
@@ -41,10 +42,10 @@ export default function HoldingsTable({ rows, subhead }) {
   const live = phase === 'regular' || phase === 'pre' || phase === 'post'
 
   const exportCsv = () => {
-    const header = ['Ticker', 'Company', 'M. Cap (B)', 'Qty', 'Avg Price', 'Invested', priceLabel, 'Market value', 'Yield']
+    const header = ['Ticker', 'Company', 'Health', 'Qty', 'Avg Price', 'Invested', priceLabel, 'Market value', 'Yield']
     const lines = [header.join(',')]
     for (const r of rows) {
-      lines.push([r.ticker, r.company || '', r.market_cap, r.total_qty, r.avg_price,
+      lines.push([r.ticker, r.company || '', r.health_score, r.total_qty, r.avg_price,
         r.cost, r.latest_close, r.value, r.yld].map(csvCell).join(','))
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -69,7 +70,7 @@ export default function HoldingsTable({ rows, subhead }) {
             <th style={{ width: 28 }}></th>
             <th>Ticker</th>
             <th>Company</th>
-            <th className="r">M. Cap (B)</th>
+            <th className="r">Health</th>
             <th className="r">Qty</th>
             <th className="r">Avg Price</th>
             <th className="r">Invested</th>
@@ -97,7 +98,7 @@ export default function HoldingsTable({ rows, subhead }) {
                   </div>
                 </td>
                 <td className="co-cell">{r.company || '—'}</td>
-                <td className="r">{mcapB(r.market_cap)}</td>
+                <td className="r">{r.health_score == null ? '—' : <span className="health">{healthDots(r.health_score)}</span>}</td>
                 <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 0 })}</td>
                 <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
                 <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
