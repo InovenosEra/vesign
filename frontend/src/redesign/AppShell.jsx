@@ -83,6 +83,8 @@ const MenuCaret = () => (
 
 function AccountMenu() {
   const { user } = useUser()
+  const me = useMe()
+  const plan = me.plan || 'free'
   const { signOut } = useClerk()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -99,7 +101,7 @@ function AccountMenu() {
     <div className={'account-menu' + (open ? ' open' : '')} ref={ref}>
       <div className="account-trigger">
         <NavLink to="/account" className="account-id" title={user?.firstName || 'Account'} aria-label="Account">
-          <span className="avatar">
+          <span className={'avatar tier-' + plan}>
             {user?.imageUrl
               ? <img src={user.imageUrl} alt={initials}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
