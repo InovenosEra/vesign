@@ -56,3 +56,20 @@ def test_last_session_rows_none_change_when_prior_close_missing():
     rows = ls.last_session_rows(baseline)
     assert rows[0]["price"] == 42.0
     assert rows[0]["change_pct"] is None
+
+
+def test_day_change_pct_live_measures_intraday_vs_latest_close():
+    # With a live price, the move is live vs the latest completed close.
+    assert ls.day_change_pct(latest_close=100.0, prior_close=90.0, live_price=110.0) == 10.0
+
+
+def test_day_change_pct_no_live_falls_back_to_last_session():
+    # No live price -> latest close vs prior close (last completed session).
+    assert ls.day_change_pct(latest_close=99.0, prior_close=90.0) == 10.0
+
+
+def test_day_change_pct_none_when_prices_missing_or_zero():
+    assert ls.day_change_pct(latest_close=None, prior_close=90.0) is None
+    assert ls.day_change_pct(latest_close=100.0, prior_close=None) is None
+    assert ls.day_change_pct(latest_close=100.0, prior_close=0) is None
+    assert ls.day_change_pct(latest_close=0, prior_close=90.0, live_price=0) is None

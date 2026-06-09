@@ -54,3 +54,18 @@ def last_session_rows(baseline: dict) -> list:
             change = None
         rows.append({"ticker": ticker, "price": prev, "change_pct": change, **meta})
     return rows
+
+
+def day_change_pct(latest_close, prior_close, live_price=None) -> "float | None":
+    """1-day % price move, anchored the same way as the market panels.
+
+    With a live price it's the intraday move vs the latest completed-session
+    close (NOT the prior close — anchoring on the session-before-last would span
+    two days and could flip the sign vs everywhere else). Without a live price
+    it's the latest close vs the prior close (the last completed session). None
+    when the prices needed for the chosen path are missing or zero."""
+    if live_price and latest_close:
+        return round((live_price - latest_close) / latest_close * 100, 4)
+    if latest_close and prior_close:
+        return round((latest_close - prior_close) / prior_close * 100, 4)
+    return None

@@ -146,6 +146,7 @@ export default function SignalModalRd({ row, onClose }) {
   const liveClose = livePx[ticker] ?? close
   const up = r?.fair_value_upside == null ? null : r.fair_value_upside * 100
   const ml = r?.prediction_score == null ? null : r.prediction_score * 100
+  const dc = r?.day_change_pct ?? null   // 1-day price move, shown in the header
   const lo = r?.target_low_price, mean = r?.target_mean_price, hi = r?.target_high_price
   const posFn = (lo != null && hi != null && hi > lo)
     ? (v) => Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100)) : null
@@ -177,7 +178,7 @@ export default function SignalModalRd({ row, onClose }) {
           <div />
           <div className="m-price">
             <div className="px"><span className="s">{symbol}</span>{liveClose == null ? '—' : fmtPrice(liveClose).replace(symbol, '')}</div>
-            <div className={'delta ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)} <span className="abs">ML 5-day</span></div>
+            <div className={'delta ' + dirClass(dc)}>{dc == null ? '—' : pct(dc)} <span className="abs">1D</span></div>
           </div>
           <div className="m-close" aria-label="Close" onClick={() => onClose?.()}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>

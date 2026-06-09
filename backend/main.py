@@ -3091,7 +3091,8 @@ def research_ticker(
                    f.market_cap, f.pe_ttm, f.eps_ttm, f.revenue_ttm, f.revenue_growth,
                    f.gross_margin, f.op_margin, f.net_margin, f.roe, f.de_ratio,
                    CAST(COALESCE(s.health_score, ch.score) AS INTEGER) AS health_score,
-                   ch.reason AS health_reason
+                   ch.reason AS health_reason,
+                   pp.lc AS day_latest_close, pp.pc AS day_prior_close
             FROM signals s
             INNER JOIN (
                 SELECT MAX(date) AS max_date FROM signals WHERE ticker = :t
@@ -3113,6 +3114,18 @@ def research_ticker(
                 INNER JOIN (SELECT ticker, MAX(date) AS max_date FROM daily_prices GROUP BY ticker) p2
                     ON p1.ticker = p2.ticker AND p1.date = p2.max_date
             ) lp ON s.ticker = lp.ticker
+            LEFT JOIN (
+                -- two most recent daily closes for this ticker -> 1-day % move
+                SELECT ticker,
+                       MAX(CASE WHEN rn = 1 THEN close END) AS lc,
+                       MAX(CASE WHEN rn = 2 THEN close END) AS pc
+                FROM (
+                    SELECT ticker, close,
+                           ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+                    FROM daily_prices WHERE ticker = :t
+                )
+                GROUP BY ticker
+            ) pp ON s.ticker = pp.ticker
         """), {"t": ticker}).fetchone()
 
         if not row:
@@ -3148,6 +3161,13 @@ def research_ticker(
     live_px = _get_live_snapshot()["prices"].get(ticker)
     if live_px:
         close = live_px
+    # 1-day price move: live intraday vs latest close, or last completed session
+    # when closed — same anchoring as the movers/breadth panels and signals/today.
+    day_change = live_snapshot.day_change_pct(
+        latest_close=_v(row.get("day_latest_close")),
+        prior_close=_v(row.get("day_prior_close")),
+        live_price=live_px,
+    )
     # Compute fair_value_upside freshly from (live) close + analyst target
     target_mean = row.get("target_mean_price")
     if close and target_mean and float(close) > 0:
@@ -3183,6 +3203,7 @@ def research_ticker(
         "de_ratio":            _v(row.get("de_ratio")),
         "signal":              _v(row.get("signal")),
         "close":               _v(close),
+        "day_change_pct":      day_change,
         "vqs":                 _v(row.get("vqs")),
         "vesign_score":        int(row["vesign_score"]) if row.get("vesign_score") is not None else None,
         "rsi":                 _v(row.get("rsi")),
