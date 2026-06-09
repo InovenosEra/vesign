@@ -29,7 +29,6 @@
     --mono:      'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
   .rd * { box-sizing: border-box; }
-  .rd html, .rd body { background: var(--bg); margin: 0; }
   .rd body { color: var(--ink); font-family: var(--sans); font-size: 14px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
   /* TAPE */

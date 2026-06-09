@@ -129,6 +129,15 @@ function WalletChip() {
 export default function AppShell({ children }) {
   const [modalRow, setModalRow] = useState(null)
   const openTicker = (ticker, company) => { if (ticker) setModalRow({ ticker, company }) }
+  // Make the document canvas match the redesign --bg (#0a0e15) while the app is
+  // mounted, so overscroll / lazy-load / partial-paint never reveal the legacy
+  // html background (#0b0e18). Restored on unmount so marketing pages keep theirs.
+  useEffect(() => {
+    const html = document.documentElement
+    const prev = html.style.background
+    html.style.background = '#0a0e15'
+    return () => { html.style.background = prev }
+  }, [])
   return (
     <TickerModalContext.Provider value={openTicker}>
     <MeProvider>

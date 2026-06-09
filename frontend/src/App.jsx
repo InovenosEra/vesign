@@ -30,11 +30,11 @@ const ContactPage = lazy(() => import('./pages/ContactPage'))
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
-// Suspense fallback while a page's lazy JS chunk downloads (sub-second). Render
-// nothing rather than a bare "Loading…" label flashing in the corner — the page
-// (and its own skeletons) takes over the instant the chunk resolves.
+// Suspense fallback while a page's lazy JS chunk downloads (sub-second). A
+// full-bleed fill in the redesign base color (--bg #0a0e15) so the canvas
+// matches the .rd app that takes over — no light/legacy-bg flash in between.
 function PageFallback() {
-  return null
+  return <div style={{ position: 'fixed', inset: 0, background: '#0a0e15' }} aria-hidden="true" />
 }
 
 // gcTime must be ≥ persistOptions.maxAge so persisted entries aren't dropped
