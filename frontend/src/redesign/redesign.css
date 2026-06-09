@@ -587,7 +587,7 @@
 .rd .account-id { display: inline-flex; align-items: center; gap: 9px; padding: 0 8px 0 5px; text-decoration: none; cursor: pointer; }
 .rd .account-id:hover { background: rgba(255,255,255,0.04); }
 .rd .account-trigger .greeting { font-size: 12px; font-weight: 500; color: var(--ink-2, #a8acb8); white-space: nowrap; }
-.rd .account-caret { display: inline-flex; align-items: center; justify-content: center; padding: 0 11px; background: none; border: none; border-left: 1px solid var(--line, #2a2f37); color: var(--ink-3, #6b7280); cursor: pointer; }
+.rd .account-caret { display: inline-flex; align-items: center; justify-content: center; padding: 0 11px; background: none; border: none; color: var(--ink-3, #6b7280); cursor: pointer; }
 .rd .account-caret:hover { background: rgba(255,255,255,0.05); color: var(--ink-2, #a8acb8); }
 .rd .account-caret .menu-caret { transition: transform .15s; }
 .rd .account-menu.open .account-caret .menu-caret { transform: rotate(180deg); }
