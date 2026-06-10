@@ -51,7 +51,7 @@ export function SignalCard({ s }) {
               ? <><span className="sc-caret">▲</span>Hide rationale</>
               : <><span className="sc-caret">▼</span>Show rationale</>}
           </button>
-          <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>
+          {expanded && <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>}
         </div>
       </div>
     </div>
