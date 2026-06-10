@@ -47,7 +47,9 @@ export function SignalCard({ s }) {
         <SignalExplanation ticker={s.ticker} collapsed={!expanded} />
         <div className="sc-foot">
           <button className="sc-toggle" onClick={() => setExpanded(v => !v)}>
-            {expanded ? '▴ Hide rationale' : '▾ Show rationale'}
+            {expanded
+              ? <><span className="sc-caret">▲</span>Hide rationale</>
+              : <><span className="sc-caret">▼</span>Show rationale</>}
           </button>
           <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>
         </div>
