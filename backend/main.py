@@ -935,11 +935,16 @@ def signal_explanation(ticker: str, date: str = Query(...),
     per ticker+date. Narrates existing model data only — never a new signal."""
     if ent.get_plan(user["id"]) not in ("pro", "max"):
         raise HTTPException(status_code=403, detail="Pro or Max plan required")
+    ticker = ticker.upper()
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker")
     if not _ISO_DATE_RE.match(date):
         raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
     try:
-        payload = explanations.get_or_create(ticker.upper(), date)
+        payload = explanations.get_or_create(ticker, date)
     except Exception:
+        logging.getLogger(__name__).exception(
+            "signal_explanation failed: ticker=%s date=%s", ticker, date)
         raise HTTPException(status_code=503, detail="Explanation unavailable")
     if payload is None:
         raise HTTPException(status_code=404, detail="No signal for ticker/date")
