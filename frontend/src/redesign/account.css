@@ -24,7 +24,7 @@
 .rd .acc-user-card .email { font-family: var(--mono); font-size: 11px; color: var(--ink-3); word-break: break-all; }
 .rd .acc-user-card .plan-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 100px; border: 1px solid var(--line, #2a2f37); font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; align-self: center; }
 .rd .acc-user-card .plan-badge.free { background: var(--bg-3, #161c28); border-color: var(--line, #2a2f37); color: var(--ink-2, #a8acb8); }
-.rd .acc-user-card .plan-badge.pro { background: linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05)); border-color: rgba(245,158,11,0.3); color: var(--gold, #f59e0b); }
+.rd .acc-user-card .plan-badge.pro { background: linear-gradient(135deg, rgba(96,165,250,0.16), rgba(96,165,250,0.05)); border-color: rgba(96,165,250,0.3); color: var(--blue-2, #60a5fa); }
 .rd .acc-user-card .plan-badge.max, .rd .acc-user-card .plan-badge.pro_plus { background: linear-gradient(135deg, rgba(168,85,247,0.16), rgba(168,85,247,0.05)); border-color: rgba(168,85,247,0.3); color: var(--purple, #a855f7); }
 .rd .acc-nav { padding: 8px 0; display: flex; flex-direction: column; }
 .rd .acc-nav a { display: flex; align-items: center; gap: 12px; padding: 9px 18px; font-size: 13px; color: var(--ink-2); text-decoration: none; border-left: 2px solid transparent; transition: all .15s; cursor: pointer; background: none; border-top: none; border-right: none; border-bottom: none; text-align: left; font-family: var(--sans); }
@@ -275,11 +275,11 @@
 .rd .plan-tiers { flex-direction: row; align-items: stretch; gap: 12px; }
 .rd .tier-card { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--bg-3, #161c28); }
 .rd .tier-card.current { border-color: rgba(168,85,247,0.45); box-shadow: 0 0 0 1px rgba(168,85,247,0.2) inset; }
-.rd .tier-card.pro { border-color: rgba(245,158,11,0.28); }
+.rd .tier-card.pro { border-color: rgba(96,165,250,0.28); }
 .rd .tier-card.max { border-color: rgba(168,85,247,0.3); }
 .rd .tier-card .tier-top { display: flex; align-items: baseline; justify-content: space-between; }
 .rd .tier-card .tname { font-size: 15px; font-weight: 600; color: var(--ink); }
-.rd .tier-card.pro .tname { color: var(--gold, #f59e0b); }
+.rd .tier-card.pro .tname { color: var(--blue-2, #60a5fa); }
 .rd .tier-card.max .tname { color: var(--purple, #a855f7); }
 .rd .tier-card .tprice { font-family: var(--mono); font-size: 18px; font-weight: 500; color: var(--ink); font-feature-settings: 'tnum' 1; }
 .rd .tier-card .tprice .s { color: var(--ink-3); font-size: 13px; }

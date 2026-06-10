@@ -556,7 +556,7 @@
 .rd .plan-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--line, #2a2f37); white-space: nowrap; }
 .rd .plan-chip .star { font-size: 10px; line-height: 1; }
 .rd .plan-chip.free { background: var(--bg-3, #161c28); border-color: var(--line, #2a2f37); color: var(--ink-2, #a8acb8); }
-.rd .plan-chip.pro { background: linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05)); border-color: rgba(245,158,11,0.3); color: var(--gold, #f59e0b); }
+.rd .plan-chip.pro { background: linear-gradient(135deg, rgba(96,165,250,0.16), rgba(96,165,250,0.05)); border-color: rgba(96,165,250,0.3); color: var(--blue-2, #60a5fa); }
 .rd .plan-chip.max, .rd .plan-chip.pro_plus { background: linear-gradient(135deg, rgba(168,85,247,0.16), rgba(168,85,247,0.05)); border-color: rgba(168,85,247,0.3); color: var(--purple, #a855f7); }
 /* Search sits exactly midway between the left (logo+nav) and right groups:
    equal auto-margins absorb the free space on each side. */
@@ -577,7 +577,7 @@
 .rd .status .status-icon { flex: none; filter: drop-shadow(0 0 4px var(--gold)); animation: pulse 2s ease-in-out infinite; }
 .rd .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--bg-3, #161c28); color: var(--ink, #e8eaf0); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid var(--line-2); overflow: hidden; flex-shrink: 0; }
 /* avatar ring matches the plan tier (Free grey / Pro gold / Max purple) */
-.rd .avatar.tier-pro { border-color: var(--gold, #f59e0b); }
+.rd .avatar.tier-pro { border-color: var(--blue-2, #60a5fa); }
 .rd .avatar.tier-max, .rd .avatar.tier-pro_plus { border-color: var(--purple, #a855f7); }
 /* Account menu: framed avatar+greeting trigger with a 3-item dropdown.
    Circle style stays in .avatar above. */
