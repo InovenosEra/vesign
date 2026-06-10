@@ -200,3 +200,7 @@
 .rd .buy-card-more { margin-top: 10px; background: none; border: none; color: var(--blue-2, #60a5fa); font-size: 12px; font-weight: 500; cursor: pointer; padding: 0; }
 .rd .buy-card-more:hover { text-decoration: underline; }
 .rd .buy-card-cta { margin-top: 12px; display: flex; justify-content: center; }
+
+.rd .signals-stack { display: flex; flex-direction: column; gap: 28px; }
+.rd .signals-section { min-width: 0; }
+.rd .signals-empty { padding: 24px; color: var(--ink-3, #6b7280); font-size: 13px; }

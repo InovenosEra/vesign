@@ -1,6 +1,5 @@
-/* BUY + SELL signal lists, side by side. Ported from the trades-v5.html
- * .signals-split block + its signalRow()/healthDots() renderers.
- * Data: getSignalsToday(signal,'US'). */
+/* Signals page body: BUY signals as full-width cards (metrics + inline AI
+ * explanation), stacked above the compact SELL table. Data: getSignalsToday. */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSignalsToday, unlockSignal } from '../../api'
 import { num, pct, dirClass, dateFmt, LOGO } from '../fmt'
@@ -9,6 +8,7 @@ import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents } from './gating'
 import { logoCls } from './util'
 import PagedTable from './Pager'
+import { BuySignalCard, LockedBuyCard } from './BuySignalCard'
 
 function healthDots(score) {
   const n = score == null ? 0 : Math.max(0, Math.min(5, score))
@@ -25,15 +25,12 @@ const HEAD = (
   </tr>
 )
 
-// Decoy values for locked rows — never real data. The cells are CSS-blurred so
-// they read as "real but obscured"; the actual ticker/numbers are placeholders,
-// so nothing identifiable is in the DOM even with the blur removed.
 const FAKE_SIG = [
-  { tk: 'ABCD',  co: 'Holdings Inc',     price: '182.40', up: '+14.2%', ml: '+6.1%', h: 4 },
-  { tk: 'ABC',   co: 'Capital Group',    price: '88.10',  up: '+9.7%',  ml: '+3.4%', h: 5 },
-  { tk: 'ABCDE', co: 'Technologies',     price: '245.30', up: '+5.6%',  ml: '+2.2%', h: 3 },
-  { tk: 'ABCD',  co: 'Industries Ltd',   price: '57.90',  up: '+11.8%', ml: '+4.9%', h: 4 },
-  { tk: 'ABCD',  co: 'Global Partners',  price: '134.05', up: '+7.3%',  ml: '+5.5%', h: 5 },
+  { tk: 'ABCD', co: 'Holdings Inc', price: '182.40', up: '+14.2%', ml: '+6.1%', h: 4 },
+  { tk: 'ABC', co: 'Capital Group', price: '88.10', up: '+9.7%', ml: '+3.4%', h: 5 },
+  { tk: 'ABCDE', co: 'Technologies', price: '245.30', up: '+5.6%', ml: '+2.2%', h: 3 },
+  { tk: 'ABCD', co: 'Industries Ltd', price: '57.90', up: '+11.8%', ml: '+4.9%', h: 4 },
+  { tk: 'ABCD', co: 'Global Partners', price: '134.05', up: '+7.3%', ml: '+5.5%', h: 5 },
 ]
 
 function LockedRow({ s, kind, onUnlock, idx = 0 }) {
@@ -42,12 +39,9 @@ function LockedRow({ s, kind, onUnlock, idx = 0 }) {
   const canPayRow = s.reason === 'pay' && kind === 'BUY'
   return (
     <tr className="locked-row">
-      <td>
-        <div className="ticker-cell lock-blur" aria-hidden="true">
-          <span className="logo-skel" />
-          <span className="tk">{f.tk}</span><span className="co">{f.co}</span>
-        </div>
-      </td>
+      <td><div className="ticker-cell lock-blur" aria-hidden="true">
+        <span className="logo-skel" /><span className="tk">{f.tk}</span><span className="co">{f.co}</span>
+      </div></td>
       <td className="r"><span className="lock-blur" aria-hidden="true">{f.price}</span></td>
       <td className="r up"><span className="lock-blur" aria-hidden="true">{f.up}</span></td>
       <td className="r"><span className="health lock-blur" aria-hidden="true">{healthDots(f.h)}</span></td>
@@ -78,8 +72,8 @@ function FullRow({ s }) {
   )
 }
 
-function SignalColumn({ kind }) {
-  const isBuy = kind === 'BUY'
+// Shared: query a side + provide unlock handlers + header bits.
+function useSignalSection(kind) {
   const me = useMe()
   const qc = useQueryClient()
   const { data } = useQuery({
@@ -88,51 +82,70 @@ function SignalColumn({ kind }) {
     refetchInterval: 3_000,
   })
   const rows = Array.isArray(data) ? data : []
-
   async function unlockRow(s) {
     try {
       await unlockSignal({ kind: kind.toLowerCase(), scope: 'row', lock_token: s.lock_token, market: 'US' })
       qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
       qc.invalidateQueries({ queryKey: ['me'] })
-    } catch (e) {
-      if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
-    }
+    } catch (e) { if (String(e.message).startsWith('402')) alert('Not enough wallet balance.') }
   }
   async function unlockAll() {
     try {
       await unlockSignal({ kind: kind.toLowerCase(), scope: 'all', market: 'US' })
       qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
       qc.invalidateQueries({ queryKey: ['me'] })
-    } catch (e) {
-      if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
-    }
+    } catch (e) { if (String(e.message).startsWith('402')) alert('Not enough wallet balance.') }
   }
-
   const dateStr = rows.length ? dateFmt((rows[0].signal_date || rows[0].date || '').split(' ')[0]) : ''
   const sub = rows.length ? `${dateStr} · ${rows.length} ${rows.length === 1 ? 'signal' : 'signals'}` : '—'
   const showSeeAll = me.plan === 'pro' && hasMoreLocked(rows)
+  return { me, rows, unlockRow, unlockAll, sub, showSeeAll }
+}
 
+function SectionHead({ kind, sub, showSeeAll, onSeeAll, seeAllPrice }) {
+  const isBuy = kind === 'BUY'
   return (
-    <div>
-      <div className="section-h" style={{ marginTop: 0 }}>
-        <h2>
-          <span className={'sig-tag ' + (isBuy ? 'buy' : 'sell')} style={{ marginRight: 8 }}>{kind}</span>
-          {isBuy ? 'Buy signals' : 'Sell signals'}
-        </h2>
-        <span className="sub">{sub}</span>
-        {showSeeAll && (
-          <button className="see-all-cta" onClick={unlockAll}>
-            {isBuy ? 'Unlock all today' : 'See all'} · {fmtCents(me.see_all_price_cents)}
-          </button>
-        )}
-      </div>
+    <div className="section-h" style={{ marginTop: 0 }}>
+      <h2>
+        <span className={'sig-tag ' + (isBuy ? 'buy' : 'sell')} style={{ marginRight: 8 }}>{kind}</span>
+        {isBuy ? 'Buy signals' : 'Sell signals'}
+      </h2>
+      <span className="sub">{sub}</span>
+      {showSeeAll && (
+        <button className="see-all-cta" onClick={onSeeAll}>
+          {isBuy ? 'Unlock all today' : 'See all'} · {fmtCents(seeAllPrice)}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function BuySection() {
+  const { me, rows, unlockRow, unlockAll, sub, showSeeAll } = useSignalSection('BUY')
+  return (
+    <div className="signals-section">
+      <SectionHead kind="BUY" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={me.see_all_price_cents} />
+      {rows.length === 0
+        ? <div className="signals-empty">No buy signals today.</div>
+        : rows.map((s, i) => isLocked(s)
+          ? <LockedBuyCard key={i} s={s} onUnlock={unlockRow} idx={i} />
+          : <BuySignalCard key={s.ticker || i} s={s} />)}
+    </div>
+  )
+}
+
+function SellSection() {
+  const { me, rows, unlockRow, unlockAll, sub, showSeeAll } = useSignalSection('SELL')
+  return (
+    <div className="signals-section">
+      <SectionHead kind="SELL" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={me.see_all_price_cents} />
       <PagedTable
         head={HEAD}
         rows={rows}
         row={(s, i) => isLocked(s)
-          ? <LockedRow key={i} s={s} kind={kind} onUnlock={unlockRow} idx={i} />
+          ? <LockedRow key={i} s={s} kind="SELL" onUnlock={unlockRow} idx={i} />
           : <FullRow key={i} s={s} />}
-        emptyLabel={isBuy ? 'No buy signals today.' : 'No sell signals today.'}
+        emptyLabel="No sell signals today."
         colspan={5}
       />
     </div>
@@ -141,9 +154,9 @@ function SignalColumn({ kind }) {
 
 export default function SignalsSplit() {
   return (
-    <div className="signals-split">
-      <SignalColumn kind="BUY" />
-      <SignalColumn kind="SELL" />
+    <div className="signals-stack">
+      <BuySection />
+      <SellSection />
     </div>
   )
 }
