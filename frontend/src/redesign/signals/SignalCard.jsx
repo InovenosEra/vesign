@@ -39,12 +39,14 @@ export function SignalCard({ s }) {
   const target = (s.close != null && upFrac != null) ? s.close * (1 + upFrac) : null
   const upPct = upFrac == null ? null : upFrac * 100
   const mlPct = s.prediction_score == null ? null : s.prediction_score * 100
+  // Projected 5-day price = current close grown by the model's 5-day prediction.
+  const mlPrice = (s.close != null && s.prediction_score != null) ? s.close * (1 + s.prediction_score) : null
   return (
     <div className={'sigcard ' + kind}>
       <div className="sc-head">
         <img className={'sc-logo ' + logoCls(s.ticker)} src={LOGO(s.ticker)} alt={s.ticker} />
         <div className="sc-id">
-          <div className="trow"><span className="tk">{s.ticker}</span><span className={'pill ' + kind}>{kind.toUpperCase()}</span></div>
+          <div className="trow"><span className="tk">{s.ticker}</span></div>
           <div className="co">{s.company || ''}</div>
         </div>
       </div>
@@ -54,7 +56,7 @@ export function SignalCard({ s }) {
       <div className="sc-cockpit">
         <div className="cell"><div className="l">Current Price</div><div className="v num">{s.close == null ? '—' : '$' + num(s.close)}</div></div>
         <div className="cell"><div className="l">Price Target</div><div className="v num">{target == null ? '—' : '$' + num(target)}</div><div className={'sub2 num ' + dirClass(upPct)}>{pct(upPct)}</div></div>
-        <div className="cell"><div className="l">5D ML</div><div className={'v num ' + dirClass(mlPct)}>{pct(mlPct)}</div></div>
+        <div className="cell"><div className="l">5D ML</div><div className="v num">{mlPrice == null ? '—' : '$' + num(mlPrice)}</div><div className={'sub2 num ' + dirClass(mlPct)}>{pct(mlPct)}</div></div>
         <div className="cell"><div className="l">Health</div>{healthDots(s.health_score)}</div>
         <div className="more-cell">
           <button className="more-btn" onClick={() => setExpanded(v => !v)}>
@@ -94,7 +96,7 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0 }) {
       <div className="sc-cockpit lock-blur" aria-hidden="true">
         <div className="cell"><div className="l">Current Price</div><div className="v num">${f.price}</div></div>
         <div className="cell"><div className="l">Price Target</div><div className="v num">${fakeTarget}</div><div className="sub2 num up">{f.up}</div></div>
-        <div className="cell"><div className="l">5D ML</div><div className="v num up">{f.ml}</div></div>
+        <div className="cell"><div className="l">5D ML</div><div className="v num">${(parseFloat(f.price) * 1.01).toFixed(2)}</div><div className="sub2 num up">{f.ml}</div></div>
         <div className="cell"><div className="l">Health</div>{healthDots(f.h)}</div>
       </div>
       <div className="sc-cta">
