@@ -217,8 +217,9 @@
 
 .rd .sc-head { display: flex; align-items: center; gap: 10px; }
 .rd .sc-logo { width: 34px; height: 34px; border-radius: 6px; object-fit: contain; background: #fff; flex: none; }
-/* locked placeholder: keep the 34px shape but a muted grey skeleton, not white */
-.rd .sc-logo.logo-skel { background: rgba(255,255,255,0.07); }
+/* locked placeholder: a soft grey block; lock-blur (added in JSX) hazes it to
+   match the blurred text around it instead of a crisp white/grey square */
+.rd .sc-logo.logo-skel { background: rgba(255,255,255,0.13); }
 .rd .sc-id { min-width: 0; }
 .rd .sc-id .trow { display: flex; align-items: center; gap: 7px; }
 .rd .sc-id .tk { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }

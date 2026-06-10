@@ -84,7 +84,7 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0 }) {
   return (
     <div className={'sigcard locked ' + k}>
       <div className="sc-head">
-        <span className="sc-logo logo-skel" aria-hidden="true" />
+        <span className="sc-logo logo-skel lock-blur" aria-hidden="true" />
         <div className="sc-id lock-blur" aria-hidden="true">
           <div className="trow"><span className="tk">{f.tk}</span></div>
           <div className="co">{f.co}</div>
