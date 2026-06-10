@@ -75,13 +75,13 @@ def assemble_evidence(ticker: str, signal_date: str) -> dict | None:
             FROM fundamentals WHERE ticker = :t
         """), {"t": ticker}).fetchone()
 
-    close, pred, vqs, action, health, tmp, company = s
+    close, pred, vqs, action, health, target_mean, company = s
     fundamentals = {}
     if f:
         for k, v in zip(_FUND_FIELDS, f):
             if v is not None:
                 fundamentals[k] = v
-    upside = round((tmp - close) / close * 100, 1) if (tmp and close) else None
+    upside = round((target_mean - close) / close * 100, 1) if (target_mean and close) else None
 
     ev = {
         "ticker": ticker,
