@@ -24,10 +24,14 @@ export default function SignalExplanation({ ticker, collapsed = false }) {
     <div className="sig-why">
       {expl.headline && <div className="sig-why-head">{expl.headline}</div>}
       {(expl.strengths?.length > 0 || expl.risks?.length > 0) && (
-        <ul className="sig-why-pts">
-          {(expl.strengths || []).map((x, i) => <li className="p" key={'s' + i}>{x}</li>)}
-          {(expl.risks || []).map((x, i) => <li className="n" key={'r' + i}>{x}</li>)}
-        </ul>
+        <div className="sig-why-cols">
+          <ul className="sig-why-pts pos">
+            {(expl.strengths || []).map((x, i) => <li key={'s' + i}>{x}</li>)}
+          </ul>
+          <ul className="sig-why-pts neg">
+            {(expl.risks || []).map((x, i) => <li key={'r' + i}>{x}</li>)}
+          </ul>
+        </div>
       )}
       {expl.key_numbers?.length > 0 && (
         <div className="sig-why-nums">

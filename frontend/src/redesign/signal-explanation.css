@@ -2,13 +2,15 @@
  * provides the container. Headline + ✓/⚠ two-column points + inline key numbers. */
 .rd .sig-why-note { font-size: 12px; color: var(--ink-3, #6b7280); }
 .rd .sig-why-head { font-size: 12.5px; font-weight: 700; line-height: 1.38; color: var(--ink, #e8eaf0); }
-.rd .sig-why-pts { list-style: none; margin: 9px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 16px; }
+/* Strengths (✓) in the left column, warnings (⚠) in the right column. */
+.rd .sig-why-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 9px; align-items: start; }
+.rd .sig-why-pts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
 .rd .sig-why-pts li { position: relative; padding-left: 17px; font-size: 11.5px; line-height: 1.45; color: var(--ink-2, #a8acb8); }
 .rd .sig-why-pts li::before { position: absolute; left: 0; top: 0; font-size: 10px; }
-.rd .sig-why-pts li.p::before { content: '✓'; color: var(--green, #00d97e); }
-.rd .sig-why-pts li.n::before { content: '⚠'; color: var(--gold, #f59e0b); }
+.rd .sig-why-pts.pos li::before { content: '✓'; color: var(--green, #00d97e); }
+.rd .sig-why-pts.neg li::before { content: '⚠'; color: var(--gold, #f59e0b); }
 .rd .sig-why-nums { margin-top: 9px; font-size: 10.5px; color: var(--ink-3, #6b7280); }
 .rd .sig-why-nums span { margin-right: 12px; white-space: nowrap; }
 .rd .sig-why-nums b { color: var(--ink-2, #a8acb8); font-weight: 700; margin-right: 3px; }
-/* single-column points when the card is in a narrow / two-up grid */
-@media (max-width: 720px) { .rd .sig-why-pts { grid-template-columns: 1fr; } }
+/* stack strengths above warnings on narrow screens */
+@media (max-width: 720px) { .rd .sig-why-cols { grid-template-columns: 1fr; } }
