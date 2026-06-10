@@ -8,18 +8,12 @@ import { useMe } from '../../context/MeContext'
 import { fmtCents } from './gating'
 import { logoCls } from './util'
 import SignalExplanation from '../SignalExplanation'
+import { FAKE_SIG } from './locked-fixtures'
 
 function healthDots(score) {
   const n = score == null ? 0 : Math.max(0, Math.min(5, score))
   return [0, 1, 2, 3, 4].map(i => <span key={i} className={'s' + (i < n ? '' : ' off')} />)
 }
-
-// Placeholder values for locked cards — never real data (blurred + aria-hidden).
-const FAKE_SIG = [
-  { tk: 'ABCD', co: 'Holdings Inc', price: '182.40', up: '+14.2%', ml: '+6.1%', h: 4 },
-  { tk: 'ABC', co: 'Capital Group', price: '88.10', up: '+9.7%', ml: '+3.4%', h: 5 },
-  { tk: 'ABCDE', co: 'Technologies', price: '245.30', up: '+5.6%', ml: '+2.2%', h: 3 },
-]
 
 // Real metrics (unlocked card only). The locked card renders fake strings
 // directly (below) — never through num()/pct(), which expect numbers.

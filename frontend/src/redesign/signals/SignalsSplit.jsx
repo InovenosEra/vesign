@@ -9,6 +9,7 @@ import { isLocked, hasMoreLocked, fmtCents } from './gating'
 import { logoCls } from './util'
 import PagedTable from './Pager'
 import { BuySignalCard, LockedBuyCard } from './BuySignalCard'
+import { FAKE_SIG } from './locked-fixtures'
 
 function healthDots(score) {
   const n = score == null ? 0 : Math.max(0, Math.min(5, score))
@@ -24,14 +25,6 @@ const HEAD = (
     <th className="r" style={{ paddingRight: 18 }}>ML</th>
   </tr>
 )
-
-const FAKE_SIG = [
-  { tk: 'ABCD', co: 'Holdings Inc', price: '182.40', up: '+14.2%', ml: '+6.1%', h: 4 },
-  { tk: 'ABC', co: 'Capital Group', price: '88.10', up: '+9.7%', ml: '+3.4%', h: 5 },
-  { tk: 'ABCDE', co: 'Technologies', price: '245.30', up: '+5.6%', ml: '+2.2%', h: 3 },
-  { tk: 'ABCD', co: 'Industries Ltd', price: '57.90', up: '+11.8%', ml: '+4.9%', h: 4 },
-  { tk: 'ABCD', co: 'Global Partners', price: '134.05', up: '+7.3%', ml: '+5.5%', h: 5 },
-]
 
 function LockedRow({ s, kind, onUnlock, idx = 0 }) {
   const me = useMe()
