@@ -573,6 +573,8 @@
 /* Pre/Post-market — amber, pulsing dot */
 .rd .status.extended { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.3); color: var(--gold); }
 .rd .status.extended .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+/* Pre = sun, Post = moon: inherits the amber color, glows + pulses like the dot */
+.rd .status .status-icon { flex: none; filter: drop-shadow(0 0 4px var(--gold)); animation: pulse 2s ease-in-out infinite; }
 .rd .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--bg-3, #161c28); color: var(--ink, #e8eaf0); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid var(--line-2); overflow: hidden; flex-shrink: 0; }
 /* avatar ring matches the plan tier (Free grey / Pro gold / Max purple) */
 .rd .avatar.tier-pro { border-color: var(--gold, #f59e0b); }
