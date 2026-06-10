@@ -8,7 +8,7 @@ import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 
-const SELL_PAGE = 12
+const SELL_PAGE = 5
 
 // Query one side + the unlock handlers + header counts.
 function useSignalSection(kind) {
