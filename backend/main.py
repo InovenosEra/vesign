@@ -31,6 +31,7 @@ from backend.auth import get_current_user
 from backend import entitlements as ent
 from backend.yield_calcs import avg_cost_dollar_weighted, Lot, simulate_bank_hand
 from backend import live_snapshot
+from data import explanations
 
 # ---------------------------------------------------------------------------
 # Config  (.env overrides defaults; .env is gitignored)
@@ -925,6 +926,24 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
         unlocks = ent.get_unlocks(user["id"])
         rows = ent.gate_signals(rows, kind=signal.upper(), plan=plan, unlocks=unlocks)
     return rows
+
+
+@protected.get("/api/signals/{ticker}/explanation")
+def signal_explanation(ticker: str, date: str = Query(...),
+                       user=Depends(get_current_user)):
+    """AI explanation for a signal (Pro/Max). Generated on first view, cached
+    per ticker+date. Narrates existing model data only — never a new signal."""
+    if ent.get_plan(user["id"]) not in ("pro", "max"):
+        raise HTTPException(status_code=403, detail="Pro or Max plan required")
+    if not _ISO_DATE_RE.match(date):
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    try:
+        payload = explanations.get_or_create(ticker.upper(), date)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Explanation unavailable")
+    if payload is None:
+        raise HTTPException(status_code=404, detail="No signal for ticker/date")
+    return {**payload, "model": explanations.MODEL}
 
 
 _SORTABLE = {"date", "ticker", "company", "close", "rsi", "fair_value_upside", "signal", "target_mean_price", "market_cap", "prediction_score"}
