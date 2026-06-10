@@ -226,7 +226,7 @@ export default function SignalModalRd({ row, onClose }) {
               </div>
             </div>
 
-            {r?.signal === 'BUY' && (
+            {(r?.signal === 'BUY' || r?.signal === 'SELL') && (
               <>
                 <h4 className="m-section-h">Why this signal</h4>
                 <SignalExplanation ticker={ticker} />
