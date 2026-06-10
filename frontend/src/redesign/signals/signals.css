@@ -187,3 +187,16 @@
   .rd button.lock-pill:hover { background: var(--green); color: var(--bg, #0b0e13); }
   .rd .see-all-cta { margin-left: auto; font-family: var(--mono); font-size: 12px; border: 1px solid var(--green); color: var(--green); background: transparent; border-radius: 6px; padding: 3px 10px; cursor: pointer; transition: background .12s ease, color .12s ease; }
   .rd .see-all-cta:hover { background: var(--green); color: var(--bg, #0b0e13); }
+
+/* Inline BUY cards (stacked Signals layout) */
+.rd .buy-card { background: var(--bg-2, #11161f); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+.rd .buy-card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.rd .buy-card-metrics { display: flex; gap: 22px; flex: none; }
+.rd .buy-card-metrics .m { display: flex; flex-direction: column; gap: 2px; text-align: right; align-items: flex-end; }
+.rd .buy-card-metrics .l { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3, #6b7280); font-weight: 600; }
+.rd .buy-card-metrics .v { font-family: var(--mono, monospace); font-size: 14px; font-weight: 600; color: var(--ink, #e8eaf0); font-feature-settings: 'tnum' 1; }
+.rd .buy-card-metrics .v.up { color: var(--green, #00d97e); }
+.rd .buy-card-metrics .v.down { color: var(--red, #ff4d5c); }
+.rd .buy-card-more { margin-top: 10px; background: none; border: none; color: var(--blue-2, #60a5fa); font-size: 12px; font-weight: 500; cursor: pointer; padding: 0; }
+.rd .buy-card-more:hover { text-decoration: underline; }
+.rd .buy-card-cta { margin-top: 12px; display: flex; justify-content: center; }
