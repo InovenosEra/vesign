@@ -149,7 +149,11 @@ def generate_explanation(evidence: dict, *, client=None) -> dict:
         messages=[{"role": "user", "content": json.dumps(evidence)}],
         output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
     )
-    body = next(b.text for b in resp.content if getattr(b, "type", None) == "text")
+    body = next((b.text for b in resp.content if getattr(b, "type", None) == "text"), None)
+    if body is None:
+        # e.g. a safety refusal returns no text block — surface it clearly so the
+        # endpoint maps it to a 503 with a useful log line rather than a bare error.
+        raise ValueError("Claude returned no text block")
     data = json.loads(body)
     # Structured outputs can't enforce array maxItems — trim server-side.
     data["strengths"] = list(data.get("strengths", []))[:3]
