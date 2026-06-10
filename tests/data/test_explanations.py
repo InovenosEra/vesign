@@ -138,3 +138,41 @@ def test_generate_explanation_trims_overlong_arrays(mod):
     assert len(out["strengths"]) == 3
     assert len(out["risks"]) == 2
     assert len(out["key_numbers"]) == 4
+
+
+def _canned_client():
+    return _FakeClient(json.dumps({
+        "headline": "h", "strengths": ["a"], "risks": ["x"],
+        "key_numbers": [{"label": "P/E", "value": "28.0"}],
+    }))
+
+
+def test_get_or_create_miss_generates_and_caches(mod):
+    client = _canned_client()
+    out = mod.get_or_create("AAPL", "2026-05-26", client=client)
+    assert out["headline"] == "h"
+    assert len(client.calls) == 1
+    from sqlalchemy import text
+    from data.loaders import engine
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT payload, model FROM signal_explanations "
+            "WHERE ticker='AAPL' AND signal_date='2026-05-26'")).fetchone()
+    assert row is not None
+    assert json.loads(row[0])["headline"] == "h"
+    assert row[1] == mod.MODEL
+
+
+def test_get_or_create_hit_does_not_call_model(mod):
+    first = _canned_client()
+    mod.get_or_create("AAPL", "2026-05-26", client=first)
+    second = _canned_client()
+    out = mod.get_or_create("AAPL", "2026-05-26", client=second)
+    assert out["headline"] == "h"
+    assert len(second.calls) == 0          # served from cache
+
+
+def test_get_or_create_unknown_signal_returns_none(mod):
+    client = _canned_client()
+    assert mod.get_or_create("ZZZZ", "2026-05-26", client=client) is None
+    assert len(client.calls) == 0

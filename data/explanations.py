@@ -160,3 +160,27 @@ def generate_explanation(evidence: dict, *, client=None) -> dict:
     data["risks"] = list(data.get("risks", []))[:2]
     data["key_numbers"] = list(data.get("key_numbers", []))[:4]
     return data
+
+
+def get_or_create(ticker: str, signal_date: str, *, client=None) -> dict | None:
+    """Cache-aside: return cached payload, else assemble->generate->store. None if
+    no signal exists for (ticker, signal_date)."""
+    _ensure_table()
+    with engine.begin() as conn:
+        row = conn.execute(text("""
+            SELECT payload FROM signal_explanations
+            WHERE ticker = :t AND signal_date = :d
+        """), {"t": ticker, "d": signal_date}).fetchone()
+    if row:
+        return json.loads(row[0])
+
+    evidence = assemble_evidence(ticker, signal_date)
+    if evidence is None:
+        return None
+    payload = generate_explanation(evidence, client=client)
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT OR IGNORE INTO signal_explanations (ticker, signal_date, payload, model)
+            VALUES (:t, :d, :p, :m)
+        """), {"t": ticker, "d": signal_date, "p": json.dumps(payload), "m": MODEL})
+    return payload
