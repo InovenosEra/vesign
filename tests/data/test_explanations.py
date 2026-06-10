@@ -90,3 +90,51 @@ def test_assemble_evidence_news_titles(mod):
 
 def test_assemble_evidence_unknown_returns_none(mod):
     assert mod.assemble_evidence("ZZZZ", "2026-05-26") is None
+
+
+class _FakeBlock:
+    type = "text"
+    def __init__(self, txt): self.text = txt
+
+class _FakeResp:
+    def __init__(self, txt): self.content = [_FakeBlock(txt)]
+
+class _FakeClient:
+    """Records the create() kwargs and returns a canned JSON body."""
+    def __init__(self, body):
+        self._body = body
+        self.calls = []
+        self.messages = self
+    def create(self, **kw):
+        self.calls.append(kw)
+        return _FakeResp(self._body)
+
+
+def test_generate_explanation_returns_validated_dict(mod):
+    body = json.dumps({
+        "headline": "Strong fundamentals, cheap vs peers",
+        "strengths": ["High ROE", "Analyst upside 20%", "Healthy balance sheet"],
+        "risks": ["Elevated P/E"],
+        "key_numbers": [{"label": "P/E", "value": "28.0"}],
+    })
+    client = _FakeClient(body)
+    out = mod.generate_explanation({"ticker": "AAPL"}, client=client)
+    assert out["headline"].startswith("Strong fundamentals")
+    assert len(out["strengths"]) == 3
+    assert out["key_numbers"][0]["label"] == "P/E"
+    kw = client.calls[0]
+    assert kw["model"] == mod.MODEL
+    assert kw["output_config"]["format"]["type"] == "json_schema"
+
+
+def test_generate_explanation_trims_overlong_arrays(mod):
+    body = json.dumps({
+        "headline": "h",
+        "strengths": ["a", "b", "c", "d", "e"],
+        "risks": ["x", "y", "z"],
+        "key_numbers": [{"label": str(i), "value": str(i)} for i in range(8)],
+    })
+    out = mod.generate_explanation({"ticker": "AAPL"}, client=_FakeClient(body))
+    assert len(out["strengths"]) == 3
+    assert len(out["risks"]) == 2
+    assert len(out["key_numbers"]) == 4

@@ -98,3 +98,61 @@ def assemble_evidence(ticker: str, signal_date: str) -> dict | None:
     }
     # Drop top-level nulls so the prompt never sees a field to fill in.
     return {k: v for k, v in ev.items() if v is not None}
+
+
+_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "headline": {"type": "string"},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "risks": {"type": "array", "items": {"type": "string"}},
+        "key_numbers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string"},
+                    "value": {"type": "string"},
+                },
+                "required": ["label", "value"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["headline", "strengths", "risks", "key_numbers"],
+    "additionalProperties": False,
+}
+
+_SYSTEM = (
+    "You explain why Vesign's model flagged a stock, for a retail investor. "
+    "You are given a JSON evidence packet of data Vesign already computed. "
+    "Rules you must never break:\n"
+    "1. Use ONLY numbers present in the packet. Never invent data or figures.\n"
+    "2. Never predict a future price and never contradict the 'action'.\n"
+    "3. If a field is absent from the packet, do not mention it or guess it.\n"
+    "4. Never output an internal score named VQS or any 0-9/0-10 quality number; "
+    "'strong_buy: true' may be phrased as a strong signal, without a number.\n"
+    "Write a one-line headline, up to 3 strengths, up to 2 risks, and up to 4 "
+    "key_numbers (label + short value) drawn from the packet. Be concise and factual."
+)
+
+
+def generate_explanation(evidence: dict, *, client=None) -> dict:
+    """Call Claude with structured outputs; return the validated, trimmed dict."""
+    if client is None:
+        from anthropic import Anthropic
+        client = Anthropic()
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=600,
+        system=_SYSTEM,
+        messages=[{"role": "user", "content": json.dumps(evidence)}],
+        output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
+    )
+    body = next(b.text for b in resp.content if getattr(b, "type", None) == "text")
+    data = json.loads(body)
+    # Structured outputs can't enforce array maxItems — trim server-side.
+    data["strengths"] = list(data.get("strengths", []))[:3]
+    data["risks"] = list(data.get("risks", []))[:2]
+    data["key_numbers"] = list(data.get("key_numbers", []))[:4]
+    return data
