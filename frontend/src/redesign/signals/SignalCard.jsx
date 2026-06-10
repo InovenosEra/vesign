@@ -1,9 +1,9 @@
 /* Inline signal cards for the Signals page — one card per signal, BUY (green) or
- * SELL (red), each with metrics + the AI explanation inline.
- *  - SignalCard: unlocked → header (Current Price / Price Target / Health / 5D ML)
- *    + <SignalExplanation> + "Full analysis →" (opens the modal).
- *  - LockedSignalCard: locked → blurred card shape + unlock CTA. No data or model
- *    call is made for locked cards (placeholder text only). */
+ * SELL (red). Cockpit layout: identity + the AI headline on top, a bottom
+ * "cockpit" strip of indicators (Current Price / Price Target / 5D ML / Health)
+ * with a "More details" button that drops the ✓/⚠ rationale + numbers below it.
+ *  - SignalCard: unlocked, fully interactive.
+ *  - LockedSignalCard: locked → blurred shape + unlock CTA, no data/model call. */
 import { useState } from 'react'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
@@ -13,9 +13,20 @@ import { logoCls } from './util'
 import { FAKE_SIG } from './locked-fixtures'
 import SignalExplanation from '../SignalExplanation'
 
+// Health dot colour by 5-point score: 1 red → 2 dark-orange → 3 bright-orange
+// → 4 bright-green → 5 dark-green. Empty dots stay grey (CSS).
+const HEALTH_COLOR = { 1: '#ff4d5c', 2: '#c2660c', 3: '#ff9500', 4: '#00d97e', 5: '#0a8f54' }
+
 function healthDots(score) {
   const n = score == null ? 0 : Math.max(0, Math.min(5, score))
-  return [0, 1, 2, 3, 4].map(i => <span key={i} className={'d' + (i < n ? '' : ' off')} />)
+  const c = HEALTH_COLOR[n] || '#6b7280'
+  return (
+    <span className="health">
+      {[0, 1, 2, 3, 4].map(i => (
+        <span key={i} className={'d' + (i < n ? '' : ' off')} style={i < n ? { background: c } : undefined} />
+      ))}
+    </span>
+  )
 }
 
 export function SignalCard({ s }) {
@@ -36,26 +47,28 @@ export function SignalCard({ s }) {
           <div className="trow"><span className="tk">{s.ticker}</span><span className={'pill ' + kind}>{kind.toUpperCase()}</span></div>
           <div className="co">{s.company || ''}</div>
         </div>
-        <div className="sc-metrics">
-          <div className="m"><div className="l">Current Price</div><div className="v num">{s.close == null ? '—' : '$' + num(s.close)}</div></div>
-          <div className="m"><div className="l">Price Target</div><div className="v num">{target == null ? '—' : '$' + num(target)}</div><div className={'sub2 num ' + dirClass(upPct)}>{pct(upPct)}</div></div>
-          <div className="m"><div className="l">Health</div><div className="v"><span className="health">{healthDots(s.health_score)}</span></div></div>
-          <div className="m"><div className="l">5D ML</div><div className={'v num ' + dirClass(mlPct)}>{pct(mlPct)}</div></div>
+      </div>
+
+      <SignalExplanation ticker={s.ticker} part="headline" />
+
+      <div className="sc-cockpit">
+        <div className="cell"><div className="l">Current Price</div><div className="v num">{s.close == null ? '—' : '$' + num(s.close)}</div></div>
+        <div className="cell"><div className="l">Price Target</div><div className="v num">{target == null ? '—' : '$' + num(target)}</div><div className={'sub2 num ' + dirClass(upPct)}>{pct(upPct)}</div></div>
+        <div className="cell"><div className="l">5D ML</div><div className={'v num ' + dirClass(mlPct)}>{pct(mlPct)}</div></div>
+        <div className="cell"><div className="l">Health</div>{healthDots(s.health_score)}</div>
+        <div className="more-cell">
+          <button className="more-btn" onClick={() => setExpanded(v => !v)}>
+            <span className="caret">{expanded ? '▲' : '▼'}</span>{expanded ? 'Less details' : 'More details'}
+          </button>
         </div>
       </div>
-      <div className="sc-why">
-        <button className="sc-toggle" onClick={() => setExpanded(v => !v)}>
-          {expanded
-            ? <><span className="sc-caret">▲</span>Less details</>
-            : <><span className="sc-caret">▼</span>More details</>}
-        </button>
-        <SignalExplanation ticker={s.ticker} collapsed={!expanded} />
-        {expanded && (
-          <div className="sc-foot">
-            <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>
-          </div>
-        )}
-      </div>
+
+      {expanded && (
+        <div className="sc-detail">
+          <SignalExplanation ticker={s.ticker} part="body" />
+          <div className="sc-full"><button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button></div>
+        </div>
+      )}
     </div>
   )
 }
@@ -74,12 +87,15 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0 }) {
           <div className="trow"><span className="tk">{f.tk}</span></div>
           <div className="co">{f.co}</div>
         </div>
-        <div className="sc-metrics lock-blur" aria-hidden="true">
-          <div className="m"><div className="l">Current Price</div><div className="v num">${f.price}</div></div>
-          <div className="m"><div className="l">Price Target</div><div className="v num">${fakeTarget}</div><div className="sub2 num up">{f.up}</div></div>
-          <div className="m"><div className="l">Health</div><div className="v"><span className="health">{healthDots(f.h)}</span></div></div>
-          <div className="m"><div className="l">5D ML</div><div className="v num up">{f.ml}</div></div>
-        </div>
+      </div>
+      <div className="sig-why lock-blur" aria-hidden="true">
+        <div className="sig-why-head">AI rationale available after unlock — strong analyst upside and healthy fundamentals.</div>
+      </div>
+      <div className="sc-cockpit lock-blur" aria-hidden="true">
+        <div className="cell"><div className="l">Current Price</div><div className="v num">${f.price}</div></div>
+        <div className="cell"><div className="l">Price Target</div><div className="v num">${fakeTarget}</div><div className="sub2 num up">{f.up}</div></div>
+        <div className="cell"><div className="l">5D ML</div><div className="v num up">{f.ml}</div></div>
+        <div className="cell"><div className="l">Health</div>{healthDots(f.h)}</div>
       </div>
       <div className="sc-cta">
         {canPayRow

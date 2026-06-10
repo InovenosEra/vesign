@@ -2,27 +2,32 @@
  * the signal modal (SignalModalRd). Self-fetching by ticker; the parent only
  * mounts it for signals that have an explanation. Ticker-centric: no date → the
  * backend uses the ticker's latest signal and frames the rationale by its action
- * (BUY vs SELL). Compact layout: headline + ✓/⚠ two-column points + inline key
- * numbers. */
+ * (BUY vs SELL).
+ *
+ * `part` controls which slice renders (same query → one fetch, cached):
+ *   - 'full'     (default, modal): headline + ✓/⚠ columns + key numbers
+ *   - 'headline' (card top): just the one-line "why"
+ *   - 'body'     (card expanded): ✓/⚠ columns + key numbers (no headline) */
 import { useQuery } from '@tanstack/react-query'
 import { getSignalExplanation } from '../api'
 import './signal-explanation.css'
 
-export default function SignalExplanation({ ticker, collapsed = false }) {
+export default function SignalExplanation({ ticker, part = 'full' }) {
   const { data: expl, isLoading, isError } = useQuery({
     queryKey: ['signal-explanation', ticker],
     queryFn: () => getSignalExplanation(ticker),
     enabled: !!ticker,
     staleTime: 600_000,
   })
-  if (isLoading) return <div className="sig-why"><div className="sig-why-note">Generating…</div></div>
-  if (expl?.locked) return <div className="sig-why"><div className="sig-why-note">Upgrade to Pro or Max to see AI explanations.</div></div>
-  if (isError || !expl) return <div className="sig-why"><div className="sig-why-note">Explanation unavailable — please try again.</div></div>
-  // Collapsed: headline only (the one-line "why"); the card's toggle expands the rest.
-  if (collapsed) return <div className="sig-why">{expl.headline && <div className="sig-why-head">{expl.headline}</div>}</div>
-  return (
-    <div className="sig-why">
-      {expl.headline && <div className="sig-why-head">{expl.headline}</div>}
+  const note = isLoading ? 'Generating…'
+    : expl?.locked ? 'Upgrade to Pro or Max to see AI explanations.'
+    : (isError || !expl) ? 'Explanation unavailable — please try again.'
+    : null
+  if (note) return <div className="sig-why"><div className="sig-why-note">{note}</div></div>
+
+  const headline = expl.headline && <div className="sig-why-head">{expl.headline}</div>
+  const body = (
+    <>
       {(expl.strengths?.length > 0 || expl.risks?.length > 0) && (
         <div className="sig-why-cols">
           <ul className="sig-why-pts pos">
@@ -38,6 +43,10 @@ export default function SignalExplanation({ ticker, collapsed = false }) {
           {expl.key_numbers.map((k, i) => <span key={i}><b>{k.label}</b> {k.value}</span>)}
         </div>
       )}
-    </div>
+    </>
   )
+
+  if (part === 'headline') return <div className="sig-why">{headline}</div>
+  if (part === 'body') return <div className="sig-why">{body}</div>
+  return <div className="sig-why">{headline}{body}</div>
 }
