@@ -489,6 +489,16 @@ def run_daily():
     _repair_fundamentals()
     _download_missing_logos()
 
+    # ── Precompute AI signal explanations (BUY/SELL) so the Signals page is
+    #    instant. Chained here (not a standalone cron) so it always runs AFTER
+    #    today's signals exist. Non-fatal: a failure must never break the pipeline.
+    try:
+        from data import explanations
+        res = explanations.precompute_today()
+        print(f"Signal explanations precomputed: {res}")
+    except Exception as e:
+        print(f"Signal explanations precompute skipped (non-fatal): {e}")
+
 
 if __name__ == "__main__":
     run_daily()

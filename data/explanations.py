@@ -18,6 +18,7 @@ Design notes (mirrors data/fundamentals.py):
 from __future__ import annotations
 
 import json
+import logging
 
 from sqlalchemy import text
 
@@ -209,3 +210,44 @@ def get_or_create(ticker: str, signal_date: str | None = None, *, client=None) -
             VALUES (:t, :d, :p, :m)
         """), {"t": ticker, "d": signal_date, "p": json.dumps(payload), "m": MODEL})
     return payload
+
+
+def precompute_today(*, limit: int | None = None, client=None) -> dict:
+    """Generate + cache explanations for every BUY/SELL signal on the latest
+    signal date, so the Signals page loads instantly. Idempotent: already-cached
+    tickers are skipped (no model call). Per-ticker failures are logged and
+    skipped — the batch never aborts. Run daily after the pipeline writes signals.
+    Returns counts: {date, total, generated, cached, failed}."""
+    log = logging.getLogger(__name__)
+    _ensure_table()
+    with engine.begin() as conn:
+        day = conn.execute(text("SELECT max(substr(date,1,10)) FROM signals")).scalar()
+        if not day:
+            return {"date": None, "total": 0, "generated": 0, "cached": 0, "failed": 0}
+        tickers = [r[0] for r in conn.execute(text("""
+            SELECT DISTINCT ticker FROM signals
+            WHERE substr(date,1,10) = :d AND signal IN ('BUY','SELL')
+            ORDER BY ticker
+        """), {"d": day})]
+        done = {r[0] for r in conn.execute(text(
+            "SELECT ticker FROM signal_explanations WHERE signal_date = :d"), {"d": day})}
+    if limit is not None:
+        tickers = tickers[:limit]
+    generated = cached = failed = 0
+    for t in tickers:
+        if t in done:
+            cached += 1
+            continue
+        try:
+            payload = get_or_create(t, day, client=client)
+            if payload is None:
+                failed += 1
+            else:
+                generated += 1
+        except Exception:
+            failed += 1
+            log.exception("precompute_today: explanation failed for %s @ %s", t, day)
+    result = {"date": day, "total": len(tickers),
+              "generated": generated, "cached": cached, "failed": failed}
+    log.info("precompute_today: %s", result)
+    return result
