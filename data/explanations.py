@@ -162,10 +162,24 @@ def generate_explanation(evidence: dict, *, client=None) -> dict:
     return data
 
 
-def get_or_create(ticker: str, signal_date: str, *, client=None) -> dict | None:
+def latest_signal_date(ticker: str) -> str | None:
+    """Most recent signal date (YYYY-MM-DD) for a ticker, or None if it has none."""
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT max(substr(date, 1, 10)) FROM signals WHERE ticker = :t"
+        ), {"t": ticker}).fetchone()
+    return row[0] if row and row[0] else None
+
+
+def get_or_create(ticker: str, signal_date: str | None = None, *, client=None) -> dict | None:
     """Cache-aside: return cached payload, else assemble->generate->store. None if
-    no signal exists for (ticker, signal_date)."""
+    no signal exists for (ticker, signal_date). When signal_date is omitted, the
+    ticker's latest signal date is used (the redesign modal is ticker-centric)."""
     _ensure_table()
+    if signal_date is None:
+        signal_date = latest_signal_date(ticker)
+        if signal_date is None:
+            return None
     with engine.begin() as conn:
         row = conn.execute(text("""
             SELECT payload FROM signal_explanations

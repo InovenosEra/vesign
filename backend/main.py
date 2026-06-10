@@ -929,16 +929,18 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
 
 
 @protected.get("/api/signals/{ticker}/explanation")
-def signal_explanation(ticker: str, date: str = Query(...),
+def signal_explanation(ticker: str, date: Optional[str] = Query(None),
                        user=Depends(get_current_user)):
     """AI explanation for a signal (Pro/Max). Generated on first view, cached
-    per ticker+date. Narrates existing model data only — never a new signal."""
+    per ticker+date. Narrates existing model data only — never a new signal.
+    `date` is optional — omit it to use the ticker's latest signal date (the
+    redesign modal is ticker-centric and has no specific date)."""
     if ent.get_plan(user["id"]) not in ("pro", "max"):
         raise HTTPException(status_code=403, detail="Pro or Max plan required")
     ticker = ticker.upper()
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker")
-    if not _ISO_DATE_RE.match(date):
+    if date is not None and not _ISO_DATE_RE.match(date):
         raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
     try:
         payload = explanations.get_or_create(ticker, date)

@@ -11,7 +11,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getResearch, getPriceHistory, getSignalMarkers, getNews, WHITE_BG_LOGOS,
-  getWatchlists, getWatchlistTickers, addTicker, removeTicker } from '../api'
+  getWatchlists, getWatchlistTickers, addTicker, removeTicker, getSignalExplanation } from '../api'
 import { num, pct, dateFmt, ago, dirClass, LOGO } from './fmt'
 import { useCurrency } from '../context/CurrencyContext'
 import { useLivePrices } from '../hooks/useLivePrices'
@@ -114,6 +114,14 @@ export default function SignalModalRd({ row, onClose }) {
   const { data: news } = useQuery({
     queryKey: ['news', ticker], queryFn: () => getNews(ticker, 8),
     enabled: !!ticker && tab === 'm-news',
+  })
+  // AI "Why this signal" — BUY only. Ticker-centric (no date → backend uses the
+  // ticker's latest signal). Cached server-side per ticker/day; Pro/Max gated.
+  const { data: expl, isLoading: explLoading, isError: explError } = useQuery({
+    queryKey: ['signal-explanation', ticker],
+    queryFn: () => getSignalExplanation(ticker),
+    enabled: !!ticker && r?.signal === 'BUY',
+    staleTime: 600_000,
   })
 
   // Watchlist membership → powers the "Add to watchlist" footer button.
@@ -224,6 +232,36 @@ export default function SignalModalRd({ row, onClose }) {
                 <div className="m-vrow"><div className="lbl">Entry price<small>Vesign target</small></div><div className="val">{close == null ? '—' : fmtPrice(close)}</div></div>
               </div>
             </div>
+
+            {r?.signal === 'BUY' && (
+              <>
+                <h4 className="m-section-h">Why this signal</h4>
+                <div className="m-why">
+                  {explLoading && <div className="m-why-note">Generating…</div>}
+                  {!explLoading && expl?.locked && <div className="m-why-note">Upgrade to Pro or Max to see AI explanations.</div>}
+                  {!explLoading && explError && <div className="m-why-note">Explanation unavailable — please try again.</div>}
+                  {expl && !expl.locked && !explError && (
+                    <>
+                      {expl.headline && <p className="m-why-headline">{expl.headline}</p>}
+                      {expl.strengths?.length > 0 && (
+                        <ul className="m-why-list str">{expl.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                      )}
+                      {expl.risks?.length > 0 && (
+                        <ul className="m-why-list rsk">{expl.risks.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                      )}
+                      {expl.key_numbers?.length > 0 && (
+                        <div className="m-why-nums">
+                          {expl.key_numbers.map((k, i) => (
+                            <div className="m-why-num" key={i}><span className="l">{k.label}</span><span className="v">{k.value}</span></div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="m-why-disc">AI summary of model data, not new analysis.</p>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
 
             <h4 className="m-section-h">Fundamentals</h4>
             <div className="m-fund-mini">
