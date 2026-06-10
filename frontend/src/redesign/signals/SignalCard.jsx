@@ -4,6 +4,7 @@
  *    + <SignalExplanation> + "Full analysis →" (opens the modal).
  *  - LockedSignalCard: locked → blurred card shape + unlock CTA. No data or model
  *    call is made for locked cards (placeholder text only). */
+import { useState } from 'react'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
@@ -19,6 +20,7 @@ function healthDots(score) {
 
 export function SignalCard({ s }) {
   const open = useTickerModal()
+  const [expanded, setExpanded] = useState(false)
   const kind = (s.signal || '').toUpperCase() === 'SELL' ? 'sell' : 'buy'
   // Price target = current close grown by the analyst-upside fraction; the % is
   // that same upside (positive = below target, negative = above it).
@@ -42,8 +44,13 @@ export function SignalCard({ s }) {
         </div>
       </div>
       <div className="sc-why">
-        <SignalExplanation ticker={s.ticker} />
-        <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>
+        <SignalExplanation ticker={s.ticker} collapsed={!expanded} />
+        <div className="sc-foot">
+          <button className="sc-toggle" onClick={() => setExpanded(v => !v)}>
+            {expanded ? '▴ Hide rationale' : '▾ Show rationale'}
+          </button>
+          <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>
+        </div>
       </div>
     </div>
   )

@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getSignalExplanation } from '../api'
 import './signal-explanation.css'
 
-export default function SignalExplanation({ ticker }) {
+export default function SignalExplanation({ ticker, collapsed = false }) {
   const { data: expl, isLoading, isError } = useQuery({
     queryKey: ['signal-explanation', ticker],
     queryFn: () => getSignalExplanation(ticker),
@@ -18,6 +18,8 @@ export default function SignalExplanation({ ticker }) {
   if (isLoading) return <div className="sig-why"><div className="sig-why-note">Generating…</div></div>
   if (expl?.locked) return <div className="sig-why"><div className="sig-why-note">Upgrade to Pro or Max to see AI explanations.</div></div>
   if (isError || !expl) return <div className="sig-why"><div className="sig-why-note">Explanation unavailable — please try again.</div></div>
+  // Collapsed: headline only (the one-line "why"); the card's toggle expands the rest.
+  if (collapsed) return <div className="sig-why">{expl.headline && <div className="sig-why-head">{expl.headline}</div>}</div>
   return (
     <div className="sig-why">
       {expl.headline && <div className="sig-why-head">{expl.headline}</div>}
