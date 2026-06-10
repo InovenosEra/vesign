@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getSignalsByTickers, getNews, WHITE_BG_LOGOS } from '../api'
+import { getSignalsByTickers, getNews, getSignalExplanation, WHITE_BG_LOGOS } from '../api'
 import { MarketContext } from '../context/MarketContext'
 import { useCurrency } from '../context/CurrencyContext'
 import SignalChart, { PERIOD_LABEL } from './SignalChart'
@@ -39,6 +39,15 @@ export default function SignalModal({ row: rowProp, onClose }) {
     queryFn: () => getNews(row.ticker, 5),
     enabled: descTab === 'news',
     staleTime: 300_000,
+  })
+
+  const isBuy = row.signal === 'BUY'
+  const sigDate = String(row.date || '').slice(0, 10)
+  const { data: expl, isLoading: explLoading, isError: explError } = useQuery({
+    queryKey: ['signal-explanation', row.ticker, sigDate],
+    queryFn: () => getSignalExplanation(row.ticker, sigDate),
+    enabled: isBuy && !!row.ticker && !!sigDate,
+    staleTime: 600_000,
   })
 
   useEffect(() => {
@@ -149,6 +158,54 @@ export default function SignalModal({ row: rowProp, onClose }) {
                     </div>
                   </>)
                 })()}
+                {isBuy && (<>
+                  <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.whyTitle')}</div>
+                  <div style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, lineHeight: 1.6, overflowY: 'auto' }}>
+                    {explLoading
+                      ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('table.loading')}</div>
+                      : expl?.locked
+                        ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.whyLocked')}</div>
+                        : explError
+                          ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('modal.whyUnavailable')}</div>
+                          : expl
+                            ? (<>
+                                {expl.headline && <div style={{ fontWeight: 600, marginBottom: 6 }}>{expl.headline}</div>}
+                                {expl.strengths?.length > 0 && (
+                                  <ul style={{ margin: '0 0 6px 0', padding: 0, listStyle: 'none' }}>
+                                    {expl.strengths.map((s, i) => (
+                                      <li key={i} style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
+                                        <span style={{ color: '#2ecc71', flexShrink: 0 }}>✓</span>
+                                        <span>{s}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {expl.risks?.length > 0 && (
+                                  <ul style={{ margin: '0 0 6px 0', padding: 0, listStyle: 'none' }}>
+                                    {expl.risks.map((r, i) => (
+                                      <li key={i} style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
+                                        <span style={{ color: '#e67e22', flexShrink: 0 }}>⚠</span>
+                                        <span>{r}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {expl.key_numbers?.length > 0 && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 6 }}>
+                                    {expl.key_numbers.map((kn, i) => (
+                                      <div key={i} style={{ display: 'flex', gap: 8 }}>
+                                        <span style={{ color: 'var(--muted)', minWidth: 80 }}>{kn.label}</span>
+                                        <span style={{ fontWeight: 600 }}>{kn.value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>{t('modal.whyDisclaimer')}</div>
+                              </>)
+                            : null
+                    }
+                  </div>
+                </>)}
               </>)}
 
               {/* News tab */}

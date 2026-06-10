@@ -179,6 +179,10 @@
   "modal.downgrade": "Downgrade",
   "modal.initiate": "Initiated",
   "modal.reiterate": "Reiterate",
+  "modal.whyTitle": "Why this signal",
+  "modal.whyDisclaimer": "AI summary of model data, not new analysis.",
+  "modal.whyLocked": "Upgrade to Pro or Max to see AI explanations.",
+  "modal.whyUnavailable": "Explanation unavailable — please try again.",
 
   "nav.portfolio": "Portfolio",
   "portfolio.title": "Portfolio",

@@ -256,6 +256,15 @@ export const getPortfolioPerformance = (market = 'US', months = 12) =>
 export const getPortfolioComparison = (market = 'US') =>
   get(`/portfolio/comparison?market=${market}`)
 
+// --- Signal explanation (AI "Why this signal") -----------------------------
+export async function getSignalExplanation(ticker, date) {
+  const res = await fetch(`${BASE}/signals/${encodeURIComponent(ticker)}/explanation?date=${encodeURIComponent(date)}`,
+    { headers: { ...NGROK_HEADERS, ...await authHeaders() }, cache: 'no-store' })
+  if (res.status === 403) return { locked: true }
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.json()
+}
+
 // --- Entitlements (plan + wallet) ------------------------------------------
 export const getMe = () => get('/me')
 export const setPlan = (plan) => post('/me/plan', { plan })
