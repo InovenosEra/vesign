@@ -56,3 +56,37 @@ def test_ensure_table_creates_signal_explanations(mod):
         names = {r[0] for r in conn.execute(text(
             "SELECT name FROM sqlite_master WHERE type='table'"))}
     assert "signal_explanations" in names
+
+
+def test_assemble_evidence_full(mod):
+    ev = mod.assemble_evidence("AAPL", "2026-05-26")
+    assert ev["ticker"] == "AAPL"
+    assert ev["company"] == "Apple Inc."
+    assert ev["action"] == "BUY"
+    assert ev["close"] == 100.0
+    assert ev["ml_score"] == 0.30
+    assert ev["strong_buy"] is True            # vqs == 9
+    assert ev["health_score"] == 4
+    assert ev["fundamentals"]["pe_ttm"] == 28.0
+    assert ev["fundamentals"]["roe"] == 0.15
+    assert ev["analyst_upside_pct"] == 20.0     # (120-100)/100*100
+    assert ev["news"] == []                      # stubbed offline
+
+
+def test_assemble_evidence_omits_nulls(mod):
+    # NEW has no analyst target and no fundamentals row
+    ev = mod.assemble_evidence("NEW", "2026-05-26")
+    assert ev["ticker"] == "NEW"
+    assert "analyst_upside_pct" not in ev        # null omitted, not guessed
+    assert ev["fundamentals"] == {}              # no row → empty, not None
+
+
+def test_assemble_evidence_news_titles(mod):
+    mod.fmp.stock_news = lambda ticker, limit=3: [
+        {"title": "Apple beats earnings"}, {"title": "New product launch"}, {"title": None}]
+    ev = mod.assemble_evidence("AAPL", "2026-05-26")
+    assert ev["news"] == ["Apple beats earnings", "New product launch"]
+
+
+def test_assemble_evidence_unknown_returns_none(mod):
+    assert mod.assemble_evidence("ZZZZ", "2026-05-26") is None
