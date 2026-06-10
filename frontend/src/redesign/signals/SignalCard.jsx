@@ -44,15 +44,17 @@ export function SignalCard({ s }) {
         </div>
       </div>
       <div className="sc-why">
+        <button className="sc-toggle" onClick={() => setExpanded(v => !v)}>
+          {expanded
+            ? <><span className="sc-caret">▲</span>Hide rationale</>
+            : <><span className="sc-caret">▼</span>Show rationale</>}
+        </button>
         <SignalExplanation ticker={s.ticker} collapsed={!expanded} />
-        <div className="sc-foot">
-          <button className="sc-toggle" onClick={() => setExpanded(v => !v)}>
-            {expanded
-              ? <><span className="sc-caret">▲</span>Hide rationale</>
-              : <><span className="sc-caret">▼</span>Show rationale</>}
-          </button>
-          {expanded && <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>}
-        </div>
+        {expanded && (
+          <div className="sc-foot">
+            <button className="sc-more" onClick={() => open(s.ticker, s.company)}>Full analysis →</button>
+          </div>
+        )}
       </div>
     </div>
   )
