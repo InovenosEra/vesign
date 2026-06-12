@@ -28,6 +28,7 @@ const CompleteProfilePage = lazy(() => import('./pages/CompleteProfilePage'))
 const AboutPage = lazy(() => import('./pages/AboutPage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
 const LandingPage = lazy(() => import('./redesign/LandingPage'))
+const SignUpPage = lazy(() => import('./redesign/SignUpPage'))
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
@@ -637,7 +638,7 @@ function AppLayout() {
   if (disabledReason) return <AccountDisabledScreen reason={disabledReason} />
 
   if (!isLoaded) return null
-  const PUBLIC_PATHS = ['/', '/about', '/contact']
+  const PUBLIC_PATHS = ['/', '/about', '/contact', '/sign-up']
   if (!userId && !PUBLIC_PATHS.includes(location.pathname)) return <RedirectToSignIn />
   // Public landing at / for logged-out visitors; signed-in users fall through
   // to the authed routes below, where / redirects to /market.
@@ -746,12 +747,13 @@ function ScrollToTop() {
 
 export default function App() {
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/sign-in">
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/sign-in" signUpUrl="/sign-up">
       <BrowserRouter>
         <ScrollToTop />
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/sign-in" element={<LoginPage />} />
+            <Route path="/sign-up" element={<SignUpPage />} />
             <Route path="/*" element={<AppLayout />} />
           </Routes>
         </Suspense>

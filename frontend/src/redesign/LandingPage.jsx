@@ -97,11 +97,8 @@ function LandingNav() {
         <a href="#faq">FAQ</a>
       </nav>
       <div className="ld-nav-ctas">
-        {/* Existing auth flow: /sign-in hosts both sign-in and request-access.
-            TODO: point "Sign up free" at a dedicated Clerk sign-up flow when
-            self-serve signup is enabled. */}
         <Link to="/sign-in" className="ld-btn ghost">Log in</Link>
-        <Link to="/sign-in" className="ld-btn primary">Sign up free</Link>
+        <Link to="/sign-up" className="ld-btn primary">Sign up free</Link>
       </div>
     </header>
   )
@@ -154,7 +151,7 @@ function Hero() {
           platform built around them.
         </p>
         <div className="ld-hero-ctas">
-          <Link to="/sign-in" className="ld-btn primary lg">Sign up free</Link>
+          <Link to="/sign-up" className="ld-btn primary lg">Sign up free</Link>
           <a href="#proof" className="ld-btn ghost lg">See the track record</a>
         </div>
         {/* TODO: wire to backend — placeholder proof numbers */}
@@ -204,7 +201,7 @@ function Proof() {
           model-portfolio results, not a managed account.
         </span>
         {/* TODO: link to the real /performance page when it ships */}
-        <Link to="/sign-in" className="ld-btn ghost">Browse the full ledger</Link>
+        <Link to="/sign-up" className="ld-btn ghost">Browse the full ledger</Link>
       </div>
     </section>
   )
@@ -303,7 +300,7 @@ function Pricing() {
             <ul>
               {p.features.map(f => <li key={f}>{f}</li>)}
             </ul>
-            <Link to="/sign-in" className={'ld-btn ' + (p.featured ? 'primary' : 'ghost')}>{p.cta}</Link>
+            <Link to="/sign-up" className={'ld-btn ' + (p.featured ? 'primary' : 'ghost')}>{p.cta}</Link>
           </div>
         ))}
       </div>
@@ -336,7 +333,7 @@ function FinalCta() {
     <section className="ld-final">
       <h2>Read tomorrow’s signals<br />with the reasoning attached.</h2>
       <p>Free plan, no credit card. The ledger is open either way.</p>
-      <Link to="/sign-in" className="ld-btn primary lg">Sign up free</Link>
+      <Link to="/sign-up" className="ld-btn primary lg">Sign up free</Link>
     </section>
   )
 }

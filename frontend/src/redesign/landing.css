@@ -145,6 +145,18 @@
 .rd .ld-disclaimer { margin: 0; max-width: 640px; font-size: 11.5px; line-height: 1.6; color: var(--ink-3); }
 .rd .ld-copy { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
 
+/* ── Auth pages (/sign-up) — centered Clerk card under the marketing nav ── */
+.rd.ld-auth { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+/* .rd.ld prefix beats the generic `.rd.ld main { display: block }` above */
+.rd.ld .ld-auth-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 48px 24px 64px; }
+.rd .ld-auth-head { text-align: center; }
+.rd .ld-auth-head h1 { margin: 0 0 8px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.rd .ld-auth-head p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.rd .ld-auth-hint { font-size: 12.5px; color: var(--ink-3); }
+.rd .ld-auth-legal { max-width: 380px; margin: 0; text-align: center; font-size: 11.5px; line-height: 1.55; color: var(--ink-3); }
+/* Clerk mounts its card inside .cl-rootBox; keep it centered in the column. */
+.rd .ld-auth-main .cl-rootBox { margin: 0 auto; width: auto; }
+
 /* ── Responsive (basic only — desktop-first) ────────────────────────────── */
 @media (max-width: 1020px) {
   .rd .ld-hero { grid-template-columns: 1fr; padding-top: 64px; gap: 56px; }

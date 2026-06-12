@@ -152,6 +152,12 @@ function SignInForm({ onRequestAccess }) {
       }}>
         {t('login.requestAccess')}
       </button>
+      <p style={{ margin: 0, textAlign: 'center', fontSize: 13, color: 'var(--text-muted, #999)' }}>
+        {t('login.newHere', 'New to VeSign?')}{' '}
+        <Link to="/sign-up" style={{ color: '#53e5ef', fontWeight: 600 }}>
+          {t('login.signUpFree', 'Sign up free')}
+        </Link>
+      </p>
     </form>
   )
 }
@@ -350,6 +356,12 @@ function LandingContent({ onSignIn, onRequest }) {
             {t('login.requestAccess')}
           </button>
         </div>
+        <p style={{ margin: '22px 0 0', fontSize: 14, color: 'rgba(180,195,220,0.65)' }}>
+          {t('login.newHere', 'New to VeSign?')}{' '}
+          <Link to="/sign-up" style={{ color: '#53e5ef', fontWeight: 600, textDecoration: 'none' }}>
+            {t('login.signUpFree', 'Sign up free')} →
+          </Link>
+        </p>
       </section>
 
       {/* Stats row */}
