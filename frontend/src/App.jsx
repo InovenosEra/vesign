@@ -27,6 +27,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'))
 const CompleteProfilePage = lazy(() => import('./pages/CompleteProfilePage'))
 const AboutPage = lazy(() => import('./pages/AboutPage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
+const LandingPage = lazy(() => import('./redesign/LandingPage'))
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
@@ -636,8 +637,11 @@ function AppLayout() {
   if (disabledReason) return <AccountDisabledScreen reason={disabledReason} />
 
   if (!isLoaded) return null
-  const PUBLIC_PATHS = ['/about', '/contact']
+  const PUBLIC_PATHS = ['/', '/about', '/contact']
   if (!userId && !PUBLIC_PATHS.includes(location.pathname)) return <RedirectToSignIn />
+  // Public landing at / for logged-out visitors; signed-in users fall through
+  // to the authed routes below, where / redirects to /market.
+  if (!userId && location.pathname === '/') return <LandingPage />
   if (!userId && location.pathname === '/about') return <AboutPage standalone />
   if (!userId) return <ContactPage standalone />
   if (user && (!user.firstName || !user.lastName)) return <CompleteProfilePage />
