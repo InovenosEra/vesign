@@ -6,6 +6,9 @@ __pycache__/
 *.db-shm
 *.db-wal
 *.sqlite
+# Working files of the local prod→dev DB autosync (~/bin/vesign-daily-sync.sh)
+vesign.db.syncing*
+vesign.db.synclock/
 .idea/
 .env
 .claude/settings.local.json
