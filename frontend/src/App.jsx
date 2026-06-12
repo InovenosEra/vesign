@@ -23,7 +23,7 @@ const SignalsPage = lazy(() => import('./pages/SignalsPage'))
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'))
 const TradesPage = lazy(() => import('./pages/TradesPage'))
 const ResearchPage = lazy(() => import('./pages/ResearchPage'))
-const LoginPage = lazy(() => import('./pages/LoginPage'))
+const SignInPage = lazy(() => import('./redesign/SignInPage'))
 const CompleteProfilePage = lazy(() => import('./pages/CompleteProfilePage'))
 const AboutPage = lazy(() => import('./pages/AboutPage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
@@ -752,7 +752,7 @@ export default function App() {
         <ScrollToTop />
         <Suspense fallback={<PageFallback />}>
           <Routes>
-            <Route path="/sign-in" element={<LoginPage />} />
+            <Route path="/sign-in" element={<SignInPage />} />
             <Route path="/sign-up" element={<SignUpPage />} />
             <Route path="/*" element={<AppLayout />} />
           </Routes>

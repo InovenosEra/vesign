@@ -157,6 +157,28 @@
 /* Clerk mounts its card inside .cl-rootBox; keep it centered in the column. */
 .rd .ld-auth-main .cl-rootBox { margin: 0 auto; width: auto; }
 
+/* Sign-up two-column: plan explainer left, Clerk form right. */
+.rd .ld-auth-grid { display: grid; grid-template-columns: minmax(0, 420px) auto; gap: 56px; align-items: start; justify-content: center; }
+.rd .ld-auth-form { display: flex; justify-content: center; }
+.rd .ld-auth-plans h2 { margin: 0 0 8px; font-size: 19px; font-weight: 700; letter-spacing: -0.015em; color: var(--ink); line-height: 1.3; }
+.rd .ld-auth-plans-sub { margin: 0 0 18px; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+.rd .ld-auth-tier { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.rd .ld-auth-tier.featured { background: var(--panel-2); border-color: rgba(59,130,246,0.45); }
+.rd .ld-auth-tier-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rd .ld-auth-tier-head .nm { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
+.rd .ld-auth-tier.featured .ld-auth-tier-head .nm { color: var(--blue-2); }
+.rd .ld-auth-tier-head .pr { font-size: 17px; font-weight: 600; color: var(--ink); }
+.rd .ld-auth-tier-head .pr em { font-style: normal; margin-left: 4px; font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.rd .ld-auth-tier .bl { margin-top: 3px; font-size: 12px; color: var(--ink-2); }
+.rd .ld-auth-tier ul { margin: 9px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.rd .ld-auth-tier li { position: relative; padding-left: 18px; font-size: 11.5px; line-height: 1.45; color: var(--ink-2); }
+.rd .ld-auth-tier li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 700; font-size: 10.5px; }
+@media (max-width: 980px) {
+  .rd .ld-auth-grid { grid-template-columns: 1fr; gap: 40px; }
+  .rd .ld-auth-plans { order: 2; max-width: 420px; margin: 0 auto; }
+  .rd .ld-auth-form { order: 1; }
+}
+
 /* ── Responsive (basic only — desktop-first) ────────────────────────────── */
 @media (max-width: 1020px) {
   .rd .ld-hero { grid-template-columns: 1fr; padding-top: 64px; gap: 56px; }
