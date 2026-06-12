@@ -734,6 +734,100 @@ def public_stats():
     }
 
 
+@app.get("/api/performance/equity-curve")
+def performance_equity_curve():
+    """Public historical equity curve: the model's strategy vs SPY buy-and-hold.
+
+    Unauthenticated by design — drives the public /performance page.
+
+    Method (model series): the site's canonical bank/hand compounding model
+    (backend/yield_calcs.simulate_bank_hand) over every closed US trade —
+    $1,000 allocated per BUY signal, sale proceeds recycled into later BUYs.
+    At each weekly point the value is the running yield:
+    (equity / cumulative capital drawn so far) − 1, where equity = cash in
+    hand + mark-to-market of open lots. This matches the aggregation used by
+    the in-app Trades chart, applied to the full trade history.
+
+    Benchmark series: SPY buy-and-hold cumulative return from daily_prices,
+    normalized to the same start date. Both series are percentages.
+    """
+    from datetime import timedelta
+
+    cache = _get_vesign_cache("US")
+    lots = cache["lots"]
+    if not lots:
+        return {"start": None, "end": None, "points": []}
+
+    start = min(l.buy_date for l in lots)
+    end = date.today() - timedelta(days=1)
+    weeks = []
+    d = start
+    while d < end:
+        weeks.append(d)
+        d += timedelta(days=7)
+    weeks.append(end)
+
+    sim = simulate_bank_hand(lots, cache["price_at"], weeks)
+
+    with engine.connect() as conn:
+        spy_rows = conn.execute(text("""
+            SELECT DATE(date) AS d, close FROM daily_prices
+            WHERE ticker = 'SPY' AND DATE(date) >= :cutoff
+            ORDER BY date
+        """), {"cutoff": (start - timedelta(days=14)).isoformat()}).fetchall()
+    spy_series = []
+    for d_str, close in spy_rows:
+        try:
+            spy_series.append((date.fromisoformat(str(d_str)[:10]), float(close)))
+        except (TypeError, ValueError):
+            pass
+
+    def spy_at(target):
+        for d_obj, close in reversed(spy_series):
+            if d_obj <= target:
+                return close
+        return None
+
+    spy_base = spy_at(weeks[0])
+    points = []
+    for d_obj, eq, bd in sim.equity_curve:
+        model = round(((eq / bd) - 1) * 100, 2) if bd > 0 else None
+        spy_close = spy_at(d_obj)
+        spy_ret = (
+            round(((spy_close / spy_base) - 1) * 100, 2)
+            if spy_close is not None and spy_base else None
+        )
+        points.append({"date": d_obj.isoformat(), "model": model, "spy": spy_ret})
+
+    return {"start": weeks[0].isoformat(), "end": end.isoformat(), "points": points}
+
+
+@app.get("/api/performance/ledger")
+def performance_ledger(
+    limit: int = Query(default=500, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
+):
+    """Public full closed-trade ledger (US-only), winners and losers, newest
+    exits first. Unauthenticated by design — drives the public /performance
+    page. Paginated via limit/offset; `total` lets clients fetch everything.
+    """
+    with engine.connect() as conn:
+        total = conn.execute(text(
+            "SELECT COUNT(*) FROM trade_log WHERE ticker NOT LIKE '%.TA'"
+        )).scalar()
+        rows = conn.execute(text("""
+            SELECT ticker,
+                   DATE(buy_date)  AS buy_date,
+                   DATE(sell_date) AS sell_date,
+                   buy_price, sell_price, return_pct
+            FROM trade_log
+            WHERE ticker NOT LIKE '%.TA'
+            ORDER BY sell_date DESC, ticker
+            LIMIT :lim OFFSET :off
+        """), {"lim": limit, "off": offset}).mappings().all()
+    return {"total": int(total or 0), "trades": [dict(r) for r in rows]}
+
+
 # --- Market status ----------------------------------------------------------
 
 @protected.get("/api/market/status")

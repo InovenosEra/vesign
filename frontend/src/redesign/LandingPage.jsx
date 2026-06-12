@@ -3,20 +3,37 @@
  * scoped redesign tokens apply. ALL stats / prices / screenshots are
  * PLACEHOLDERS, clearly marked with TODOs — nothing here calls the backend.
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import './redesign.css'
 import './landing.css'
 
-/* ── Placeholder data ──────────────────────────────────────────────────────── */
-/* TODO: wire to backend — replace every value below with /api/stats (or a new
- * public landing endpoint) at integration time. Numbers are illustrative only. */
-const PROOF_STATS = [
-  { k: 'Win rate, closed trades', v: '65%' },
-  { k: 'Closed trades on the ledger', v: '1,700+' },
-  { k: 'Avg return per closed trade', v: '+18%' },
-  { k: 'US stocks screened daily', v: '1,800+' },
-]
+/* ── Real public stats (/api/stats — unauthenticated) ─────────────────────── */
+function useStats() {
+  const [stats, setStats] = useState(null)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/stats')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (alive) setStats(d) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+  return stats
+}
+
+const fmtInt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'))
+const fmtPct = (n) => (n == null ? '—' : `${n}%`)
+const fmtSignedPct = (n) => (n == null ? '—' : `${n >= 0 ? '+' : ''}${n}%`)
+
+function proofStats(stats) {
+  return [
+    { k: 'Win rate, closed trades', v: fmtPct(stats?.win_rate) },
+    { k: 'Closed trades', v: fmtInt(stats?.closed_trades) },
+    { k: 'Avg return per closed trade', v: fmtSignedPct(stats?.avg_yield) },
+    { k: 'Avg holding period', v: stats?.avg_hold_days == null ? '—' : `${stats.avg_hold_days} days` },
+  ]
+}
 
 /* Free/Pro/Max tier copy is shared with the sign-up plan explainer — single
  * source in ./tiers (placeholder data, see TODO there). */
@@ -32,8 +49,8 @@ const FAQS = [
     a: 'A daily systematic process screens 1,800+ US-listed stocks and combines technical indicators, a machine-learning price model, analyst consensus, and company financial health into a single decision. When the evidence lines up, a BUY or SELL is published — with the reasoning written out in plain language.',
   },
   {
-    q: 'Can I verify the track record?',
-    a: 'Yes — that is the point. Every signal ever published is kept on a public ledger, including the losers, with entry, exit, and outcome. Nothing is edited after the fact.',
+    q: 'Where do the performance numbers come from?',
+    a: 'They are the results of running the model’s strategy on historical US market data. The full list of trades the model generated — entries, exits, winners and losers — is published on the performance page, alongside an equity curve against the S&P 500. They are not live-traded or real-money returns, and past performance does not guarantee future results.',
   },
   {
     q: 'Where does the data come from?',
@@ -66,7 +83,7 @@ function LogoMark({ className }) {
 }
 
 /* ── Nav ───────────────────────────────────────────────────────────────────── */
-function LandingNav() {
+export function LandingNav() {
   return (
     <header className="ld-nav">
       <a href="#top" className="ld-nav-logo">
@@ -74,9 +91,10 @@ function LandingNav() {
         <span className="ld-logo-text">VeSign</span>
       </a>
       <nav className="ld-nav-links">
-        <a href="#how">How it works</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#faq">FAQ</a>
+        <a href="/#how">How it works</a>
+        <Link to="/performance">Performance</Link>
+        <a href="/#pricing">Pricing</a>
+        <a href="/#faq">FAQ</a>
       </nav>
       <div className="ld-nav-ctas">
         <Link to="/sign-in" className="ld-btn ghost">Log in</Link>
@@ -120,7 +138,7 @@ function HeroSignalCard() {
   )
 }
 
-function Hero() {
+function Hero({ stats }) {
   return (
     <section className="ld-hero" id="top">
       <div className="ld-hero-copy">
@@ -134,11 +152,10 @@ function Hero() {
         </p>
         <div className="ld-hero-ctas">
           <Link to="/sign-up" className="ld-btn primary lg">Sign up free</Link>
-          <a href="#proof" className="ld-btn ghost lg">See the track record</a>
+          <Link to="/performance" className="ld-btn ghost lg">See the results</Link>
         </div>
-        {/* TODO: wire to backend — placeholder proof numbers */}
         <div className="ld-hero-proof">
-          {PROOF_STATS.slice(0, 3).map(s => (
+          {proofStats(stats).slice(0, 3).map(s => (
             <div className="ld-proof-stat" key={s.k}>
               <span className="v">{s.v}</span>
               <span className="k">{s.k}</span>
@@ -146,9 +163,9 @@ function Hero() {
           ))}
         </div>
         <p className="ld-verify-line">
-          {/* TODO: route /performance once the public performance page exists */}
-          Every number above comes from a public, append-only trade ledger.{' '}
-          <a href="#proof">Verify it yourself →</a>
+          Results from running the model's strategy on historical data —
+          every trade, winners and losers, is published.{' '}
+          <Link to="/performance">See the full results →</Link>
         </p>
       </div>
       <HeroSignalCard />
@@ -156,21 +173,21 @@ function Hero() {
   )
 }
 
-/* ── Proof / track record ──────────────────────────────────────────────────── */
-function Proof() {
+/* ── Proof / model results ─────────────────────────────────────────────────── */
+function Proof({ stats }) {
   return (
     <section className="ld-section" id="proof">
       <div className="ld-section-head">
-        <h2>The track record is the product</h2>
+        <h2>How the model has performed</h2>
         <p>
-          We publish every signal — entries, exits, winners and losers — to a
-          ledger nothing gets removed from. Skeptical is the right way to read
-          any performance claim; here, you can check ours line by line.
+          These are the results our model produced on historical US market
+          data — every trade it generated, winners and losers, with nothing
+          cherry-picked. The full list and an equity curve against the
+          S&amp;P 500 are public.
         </p>
       </div>
-      {/* TODO: wire to backend — all four values are placeholders */}
       <div className="ld-proof-grid">
-        {PROOF_STATS.map(s => (
+        {proofStats(stats).map(s => (
           <div className="ld-proof-cell" key={s.k}>
             <div className="v">{s.v}</div>
             <div className="k">{s.k}</div>
@@ -179,11 +196,13 @@ function Proof() {
       </div>
       <div className="ld-proof-foot">
         <span className="note">
-          Past performance does not guarantee future results. Figures are
-          model-portfolio results, not a managed account.
+          Results from running the model's strategy on historical data — not
+          live-traded or real-money returns. Past performance does not
+          guarantee future results.
         </span>
-        {/* TODO: link to the real /performance page when it ships */}
-        <Link to="/sign-up" className="ld-btn ghost">Browse the full ledger</Link>
+        <Link to="/performance" className="ld-btn ghost">
+          Browse all {stats?.closed_trades ? fmtInt(stats.closed_trades) : ''} trades
+        </Link>
       </div>
     </section>
   )
@@ -205,7 +224,7 @@ const STEPS = [
   },
   {
     n: '04', t: 'Track',
-    d: 'Every open position is stop-managed, every close is logged to the public ledger. The system grades its own homework, in public.',
+    d: 'Every open position is stop-managed, and every closed trade — winner or loser — lands in the published results.',
   },
 ]
 
@@ -214,7 +233,7 @@ function HowItWorks() {
     <section className="ld-section" id="how">
       <div className="ld-section-head">
         <h2>How a signal is made</h2>
-        <p>A systematic daily process. No discretion, no hindsight edits.</p>
+        <p>A systematic daily process. No discretion, no cherry-picking.</p>
       </div>
       <div className="ld-steps">
         {STEPS.map(s => (
@@ -314,13 +333,13 @@ function FinalCta() {
   return (
     <section className="ld-final">
       <h2>Read tomorrow’s signals<br />with the reasoning attached.</h2>
-      <p>Free plan, no credit card. The ledger is open either way.</p>
+      <p>Free plan, no credit card. The model’s full results are public either way.</p>
       <Link to="/sign-up" className="ld-btn primary lg">Sign up free</Link>
     </section>
   )
 }
 
-function LandingFooter() {
+export function LandingFooter() {
   return (
     <footer className="ld-footer">
       <div className="ld-footer-top">
@@ -329,9 +348,10 @@ function LandingFooter() {
           <span className="ld-logo-text">VeSign</span>
         </div>
         <nav className="ld-footer-links">
-          <a href="#how">How it works</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#faq">FAQ</a>
+          <a href="/#how">How it works</a>
+          <Link to="/performance">Performance</Link>
+          <a href="/#pricing">Pricing</a>
+          <a href="/#faq">FAQ</a>
           <Link to="/contact">Contact</Link>
           <Link to="/sign-in">Log in</Link>
         </nav>
@@ -359,12 +379,13 @@ export default function LandingPage() {
     return () => { html.style.background = prev }
   }, [])
 
+  const stats = useStats()
   return (
     <div className="rd ld">
       <LandingNav />
       <main>
-        <Hero />
-        <Proof />
+        <Hero stats={stats} />
+        <Proof stats={stats} />
         <HowItWorks />
         <Screenshots />
         <Pricing />

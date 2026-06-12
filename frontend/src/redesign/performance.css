@@ -1,0 +1,51 @@
+/* VeSign public Performance page — every rule scoped under .rd (tokens from
+ * redesign.css; section scaffolding shared with landing.css). */
+
+.rd.pf .pf-head-section { border-top: none; padding-top: 56px; }
+
+/* ── Headline stats ─────────────────────────────────────────────────────── */
+.rd .pf-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.rd .pf-stat { background: var(--panel); padding: 22px 24px; }
+.rd .pf-stat .v { font-size: 28px; font-weight: 600; letter-spacing: -0.015em; color: var(--ink); }
+.rd .pf-stat .k { margin-top: 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; color: var(--ink-3); }
+
+/* ── Equity curve ───────────────────────────────────────────────────────── */
+.rd .pf-chart { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px 14px; }
+.rd .pf-chart-empty { padding: 60px 0; text-align: center; color: var(--ink-3); font-size: 13px; }
+.rd .pf-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.rd .pf-legend { display: flex; gap: 18px; }
+.rd .pf-leg { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.rd .pf-leg i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.rd .pf-leg.model i { background: var(--green); }
+.rd .pf-leg.spy i { background: var(--blue-2); }
+.rd .pf-hover-vals { display: flex; gap: 14px; font-size: 12px; font-weight: 600; }
+.rd .pf-hover-vals .d { color: var(--ink-3); font-weight: 500; }
+.rd .pf-hover-vals .m { color: var(--green); }
+.rd .pf-hover-vals .s { color: var(--blue-2); }
+.rd .pf-chart-body { display: flex; gap: 10px; }
+.rd .pf-yaxis { display: flex; flex-direction: column; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); text-align: right; min-width: 42px; padding: 0 0 2px; }
+.rd .pf-chart-body svg { flex: 1; height: 320px; display: block; cursor: crosshair; }
+.rd .pf-xaxis { position: relative; height: 18px; margin-top: 6px; margin-left: 52px; }
+.rd .pf-xaxis span { position: absolute; transform: translateX(-50%); font-size: 10.5px; color: var(--ink-3); }
+.rd .pf-method { margin: 16px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--ink-3); max-width: 860px; }
+
+/* ── Ledger ─────────────────────────────────────────────────────────────── */
+.rd .pf-ledger table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.rd .pf-ledger th { padding: 11px 14px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); text-align: left; border-bottom: 1px solid var(--line-2); cursor: pointer; user-select: none; white-space: nowrap; }
+.rd .pf-ledger th:hover { color: var(--ink-2); }
+.rd .pf-ledger th .arrow { margin-left: 5px; font-size: 8px; color: var(--blue-2); }
+.rd .pf-ledger th.num, .rd .pf-ledger td.num { text-align: right; }
+.rd .pf-ledger td { padding: 9px 14px; font-size: 12.5px; color: var(--ink-2); border-bottom: 1px solid var(--line); }
+.rd .pf-ledger tr:last-child td { border-bottom: none; }
+.rd .pf-ledger tbody tr:hover { background: var(--bg-2); }
+.rd .pf-ledger td.tk { display: flex; align-items: center; gap: 9px; font-weight: 600; color: var(--ink); }
+.rd .pf-ledger td.ret.up { color: var(--green); font-weight: 600; }
+.rd .pf-ledger td.ret.down { color: var(--red); font-weight: 600; }
+.rd .pf-pager { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; }
+.rd .pf-pager .count { font-size: 12px; color: var(--ink-3); }
+.rd .pf-pager .btns { display: flex; gap: 8px; }
+.rd .pf-pager .ld-btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+@media (max-width: 1020px) {
+  .rd .pf-stats { grid-template-columns: repeat(2, 1fr); }
+}
