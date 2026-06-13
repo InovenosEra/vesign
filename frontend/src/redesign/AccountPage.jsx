@@ -798,16 +798,6 @@ function DataPane() {
       <div className="acc-pane-head"><h2>Data &amp; privacy</h2><span className="sub">Export your data or close your account</span></div>
       <Card title="Export">
         <div className="field-row">
-          <div className="field-label">Trade history<small>All closed + open positions · CSV</small></div>
-          <div className="field-value"><span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>Full trade log since 2024-08-14</span></div>
-          <button className="btn sm">Download CSV</button>
-        </div>
-        <div className="field-row">
-          <div className="field-label">Portfolio snapshot<small>Current holdings &amp; cost basis · XLSX</small></div>
-          <div className="field-value"><span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>Holdings across your watchlists</span></div>
-          <button className="btn sm">Download XLSX</button>
-        </div>
-        <div className="field-row">
           <div className="field-label">Full account data<small>Everything we have on you · JSON, GDPR-compliant</small></div>
           <div className="field-value"><span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>Sent to your email, takes up to 24h</span></div>
           <button className="btn sm">Request export</button>

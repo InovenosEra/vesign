@@ -261,26 +261,6 @@ export default function Screener({ onCount }) {
   const visibleCols = COLUMNS.filter(c => !hidden.has(c.key))
   const ctx = { fmtPrice, maxUp }
 
-  const exportCsv = () => {
-    const header = visibleCols.map(c => c.label)
-    const lines = [header.join(',')]
-    for (const r of sorted) {
-      const cells = visibleCols.map(c => {
-        const raw = c.csv ? c.csv(r) : r[c.key]
-        const s = raw == null ? '' : String(raw)
-        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
-      })
-      lines.push(cells.join(','))
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `vesign-screener-${sorted.length}.csv`
-    document.body.appendChild(a); a.click(); a.remove()
-    URL.revokeObjectURL(url)
-  }
-
   const sortLabel = COL_BY_KEY[sort.key]?.label || 'Predicted upside'
   const pages = pagerPages(curPage, pageCount)
   const from = sorted.length ? (curPage - 1) * PAGE_SIZE + 1 : 0
@@ -392,10 +372,6 @@ export default function Screener({ onCount }) {
               </div>
             )}
           </span>
-          <div className="pill-btn" onClick={exportCsv}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12 M7 10l5 5 5-5 M5 21h14" /></svg>
-            Export CSV
-          </div>
         </div>
 
         <table className="data-table">

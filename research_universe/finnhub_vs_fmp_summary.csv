@@ -1,0 +1,11 @@
+field,coverage_n,coverage_pct,median_abs_diff,p90_abs_diff,unit,material_threshold,n_material,n_compared,backing_endpoint,endpoint_access,verdict
+Analyst target mean,0,0.0,,,pct,15.0,0,0,/stock/price-target,premium,not accessible on free tier
+Analyst target high,0,0.0,,,pct,15.0,0,0,/stock/price-target,premium,not accessible on free tier
+Analyst target low,0,0.0,,,pct,15.0,0,0,/stock/price-target,premium,not accessible on free tier
+Analyst count,18,62.1,9.0,19.0,count,2,18,18,/stock/price-target,premium,materially different
+Price (last close),29,100.0,0.011,0.033,pct,5.0,0,29,/quote,ok,matches closely
+Market cap,28,96.6,0.0,0.826,pct,15.0,3,28,/stock/profile2,ok,matches closely
+P/E (TTM),25,86.2,0.991,5.234,pct,15.0,2,25,/stock/metric,ok,matches closely
+EPS (TTM),28,96.6,1.003,13.411,pct,15.0,3,28,/stock/metric,ok,matches closely
+ROE,28,96.6,0.013,19.103,pct,15.0,4,28,/stock/metric,ok,matches closely
+Net margin,28,96.6,0.019,23.145,pct,15.0,4,28,/stock/metric,ok,matches closely

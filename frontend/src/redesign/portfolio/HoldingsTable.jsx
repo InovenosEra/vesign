@@ -26,11 +26,6 @@ const healthDots = (score) => {
 // Production format for Prediction/ML Score: arrow + absolute value, 1 decimal.
 const arrowPct1 = (v) => (v == null ? '—' : `${v >= 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)}%`)
 
-const csvCell = (v) => {
-  const s = v == null ? '' : String(v)
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
-}
-
 export default function HoldingsTable({ rows, subhead }) {
   const open = useTickerModal()
   const { fmtPrice } = useCurrency()
@@ -51,30 +46,12 @@ export default function HoldingsTable({ rows, subhead }) {
     : 'Live Price'
   const live = phase === 'regular' || phase === 'pre' || phase === 'post'
 
-  const exportCsv = () => {
-    const header = ['Ticker', 'Company', 'Health', 'Prediction', 'ML Score', 'Qty', 'Avg Price', 'Last Price', priceLabel, 'Invested', 'Market value', 'Total P&L', 'Yield %']
-    const lines = [header.join(',')]
-    for (const r of rows) {
-      const up = (r.target_mean_price != null && r.latest_close)
-        ? ((r.target_mean_price - r.latest_close) / r.latest_close * 100).toFixed(1) : ''
-      const ml = r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(1)
-      lines.push([r.ticker, r.company || '', r.health_score, up, ml, r.total_qty, r.avg_price,
-        r.last_close, r.latest_close, r.cost, r.value, r.pnl, r.yld].map(csvCell).join(','))
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `vesign-holdings-${rows.length}.csv`
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
-  }
-
   return (
     <>
       <div className="section-h">
         <h2>Holdings</h2>
         <span className="sub">{subhead}</span>
         <a className="right" style={{ cursor: 'pointer' }} onClick={() => setAdding(a => !a)}>+ Add holding</a>
-        <a className="right" style={{ cursor: 'pointer', marginRight: 12 }} onClick={exportCsv}>Export CSV →</a>
       </div>
       {adding && <AddHoldingForm watchlists={watchlists} onDone={() => setAdding(false)} />}
       <table className="data-table">
