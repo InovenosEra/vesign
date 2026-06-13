@@ -12,9 +12,16 @@ import { getWatchlists, getMarketStatus } from '../../api'
 import AddHoldingForm from './AddHoldingForm'
 import HoldingLots from './HoldingLots'
 
-// 5-point company-health score rendered as filled/empty dots (matches Screener).
-const healthDots = (n) =>
-  [0, 1, 2, 3, 4].map(i => <span key={i} className={'s' + (i < (n || 0) ? '' : ' off')} />)
+// 5-point company-health score rendered as filled/empty dots, color-coded by
+// score to match the Signals page (1 red → 5 deep green).
+const HEALTH_COLOR = { 1: '#ff4d5c', 2: '#c2660c', 3: '#ff9500', 4: '#00d97e', 5: '#0a8f54' }
+const healthDots = (score) => {
+  const n = score == null ? 0 : Math.max(0, Math.min(5, score))
+  const c = HEALTH_COLOR[n] || '#6b7280'
+  return [0, 1, 2, 3, 4].map(i => (
+    <span key={i} className={'s' + (i < n ? '' : ' off')} style={i < n ? { background: c } : undefined} />
+  ))
+}
 
 // Production format for Prediction/ML Score: arrow + absolute value, 1 decimal.
 const arrowPct1 = (v) => (v == null ? '—' : `${v >= 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)}%`)
@@ -120,7 +127,8 @@ export default function HoldingsTable({ rows, subhead }) {
                 <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
                 <td className="r">{r.last_close == null ? '—' : fmtPrice(r.last_close)}</td>
                 <td className={'r' + (live ? '' : ' muted')}>
-                  {r.latest_close == null ? '—' : (
+                  {!live ? <span className="muted">Closed</span>
+                    : r.latest_close == null ? '—' : (
                     <>
                       <div>{fmtPrice(r.latest_close)}</div>
                       {diff != null && (

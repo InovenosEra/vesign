@@ -143,7 +143,7 @@ export default function SignalModal({ row: rowProp, onClose }) {
                 </>)}
                 {row.health_score && (() => {
                   const labels = ['', t('health.weak'), t('health.fair'), t('health.good'), t('health.great'), t('health.excellent')]
-                  const colors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
+                  const colors = ['', '#ff4d5c', '#c2660c', '#ff9500', '#00d97e', '#0a8f54']
                   const score  = row.health_score
                   return (<>
                     <div style={{ fontSize: 14, color: 'var(--muted)', paddingLeft: 13, fontWeight: 'bold' }}>{t('modal.companyHealth')}</div>

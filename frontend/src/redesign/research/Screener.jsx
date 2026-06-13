@@ -33,7 +33,14 @@ const capB = (mc) => mc == null ? '—'
   : mc >= 1e9 ? '$' + (mc / 1e9).toFixed(1) + 'B'
   : '$' + (mc / 1e6).toFixed(0) + 'M'
 const capBucket = (mc) => mc == null ? null : mc >= 200e9 ? 'mega' : mc >= 10e9 ? 'large' : mc >= 2e9 ? 'mid' : 'small'
-const healthDots = (n) => [0, 1, 2, 3, 4].map(i => <span key={i} className={'s' + (i < (n || 0) ? '' : ' off')} />)
+const HEALTH_COLOR = { 1: '#ff4d5c', 2: '#c2660c', 3: '#ff9500', 4: '#00d97e', 5: '#0a8f54' }
+const healthDots = (score) => {
+  const n = score == null ? 0 : Math.max(0, Math.min(5, score))
+  const c = HEALTH_COLOR[n] || '#6b7280'
+  return [0, 1, 2, 3, 4].map(i => (
+    <span key={i} className={'s' + (i < n ? '' : ' off')} style={i < n ? { background: c } : undefined} />
+  ))
+}
 
 /* Dual-handle range slider — pointer-drag, same math as the mockup's initSlider. */
 function RangeSlider({ min, max, lo, hi, ticks, fmt, onChange }) {

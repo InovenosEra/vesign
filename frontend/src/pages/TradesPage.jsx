@@ -168,7 +168,7 @@ function TradeModal({ row: rowProp, dcaView = false, onClose }) {
   })
 
   const healthLabels = ['', t('health.weak'), t('health.fair'), t('health.good'), t('health.great'), t('health.excellent')]
-  const healthColors = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
+  const healthColors = ['', '#ff4d5c', '#c2660c', '#ff9500', '#00d97e', '#0a8f54']
 
   const periodLabel = (() => {
     const labels = { 3:'3M', 6:'6M', 'ytd':'YTD', 12:'1Y', 24:'2Y', 36:'3Y', 60:'5Y' }

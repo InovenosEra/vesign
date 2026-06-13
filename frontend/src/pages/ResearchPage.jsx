@@ -684,7 +684,8 @@ export default function ResearchPage() {
                     <div key={i} style={{
                       flex: 1, height: 8, borderRadius: 4,
                       background: research.health_score != null && i <= research.health_score
-                        ? '#3fb0de' : 'var(--border)',
+                        ? ({ 1: '#ff4d5c', 2: '#c2660c', 3: '#ff9500', 4: '#00d97e', 5: '#0a8f54' }[research.health_score] || '#6b7280')
+                        : 'var(--border)',
                       transition: 'background 0.3s',
                     }} />
                   ))}

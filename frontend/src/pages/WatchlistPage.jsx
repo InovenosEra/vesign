@@ -57,7 +57,7 @@ const _SHORT_INDUSTRY = {
   'Oil & Gas Exploration & Production': 'Oil & Gas E&P',
   'Real Estate Investment Trusts': 'REITs',
 }
-const _HEALTH_COLORS = ['', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1a9e55']
+const _HEALTH_COLORS = ['', '#ff4d5c', '#c2660c', '#ff9500', '#00d97e', '#0a8f54']
 const _HEALTH_KEYS = ['', 'health.weak', 'health.fair', 'health.good', 'health.great', 'health.excellent']
 
 function HealthCell({ score }) {
