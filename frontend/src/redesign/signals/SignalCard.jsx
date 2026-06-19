@@ -83,25 +83,28 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false })
   const k = (kind || '').toUpperCase() === 'SELL' ? 'sell' : 'buy'
   const fakeTarget = (parseFloat(f.price) * 1.1).toFixed(2)
   const canPayRow = s.reason === 'pay'
-  // On a successful slide, fade out the slider + blur before the real card swaps in.
+  // On a successful slide, fade the card out before the real one swaps in.
   const handleUnlock = async () => {
     const ok = await onUnlock(s)
     if (ok) setUnlocking(true)
     return ok
   }
+  // Frosted "real data you can't quite read" — hazed via text-shadow, NOT
+  // filter:blur (filter leaves a "ghost" smear on the page background in Chrome).
+  // aria-hidden + fake values, so nothing identifiable is in the DOM.
   return (
     <div className={'sigcard locked ' + k + (unlocking ? ' unlocking' : '')}>
       <div className="sc-head">
-        <span className="sc-logo logo-skel lock-blur" aria-hidden="true" />
-        <div className="sc-id lock-blur" aria-hidden="true">
+        <span className="sc-logo logo-skel" aria-hidden="true" />
+        <div className="sc-id lock-haze" aria-hidden="true">
           <div className="trow"><span className="tk">{f.tk}</span></div>
           <div className="co">{f.co}</div>
         </div>
       </div>
-      <div className="sig-why lock-blur" aria-hidden="true">
+      <div className="sig-why lock-haze" aria-hidden="true">
         <div className="sig-why-head">AI rationale available after unlock — strong analyst upside and healthy fundamentals.</div>
       </div>
-      <div className="sc-cockpit lock-blur" aria-hidden="true">
+      <div className="sc-cockpit lock-haze" aria-hidden="true">
         <div className="cell"><div className="l">Current Price</div><div className="v num">${f.price}</div></div>
         <div className="cell"><div className="l">Price Target</div><div className="v num">${fakeTarget}</div><div className="sub2 num up">{f.up}</div></div>
         <div className="cell"><div className="l">5D ML</div><div className="v num">${(parseFloat(f.price) * 1.01).toFixed(2)}</div><div className="sub2 num up">{f.ml}</div></div>

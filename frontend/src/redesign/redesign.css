@@ -4,6 +4,7 @@
  * Cutover: when all pages are ported, flatten .rd -> :root and delete App.css. */
 
 
+
   .rd {
     --bg:        #0a0e15;
     --bg-2:      #11161f;
@@ -467,7 +468,7 @@
   @media (max-width: 900px) { .rd .nh-list { grid-template-columns: 1fr; } }
 
   /* NEWS READER — right-side reading drawer */
-  .rd .news-reader-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(5,8,14,0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: nr-fade .18s ease; }
+  .rd .news-reader-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(5,8,14,0.78); animation: nr-fade .18s ease; }
   @keyframes nr-fade { from { opacity: 0; } to { opacity: 1; } }
   .rd .news-reader { position: relative; width: 460px; max-width: 92vw; height: 100%; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); box-shadow: -20px 0 60px -20px rgba(0,0,0,0.7); padding: 28px 30px 48px; animation: nr-slide .26s cubic-bezier(0.16,1,0.3,1); }
   @keyframes nr-slide { from { transform: translateX(40px); opacity: 0.4; } to { transform: translateX(0); opacity: 1; } }

@@ -4,9 +4,9 @@
 
 .rd .modal-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(5, 8, 14, 0.74);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* solid scrim, no backdrop-filter — keeps this surface off the filter/blur
+     class that caused the Chrome compositing ghost-smear. */
+  background: rgba(5, 8, 14, 0.86);
   display: flex; align-items: flex-start; justify-content: center;
   padding: 48px 24px;
   overflow-y: auto;
@@ -230,7 +230,6 @@
 
 /* =================== PAYWALL =================== */
 .rd .m-locked-zone { position: relative; min-height: 280px; }
-.rd .m-locked-zone .locked-content { filter: blur(6px); opacity: 0.4; pointer-events: none; user-select: none; }
 
 .rd .m-paywall {
   position: absolute; inset: 0;

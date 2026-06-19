@@ -9,8 +9,11 @@ const DEFAULTS = { plan: 'free', balance_cents: 0, per_row_price_cents: 10, see_
 const MeContext = createContext(DEFAULTS)
 
 export function MeProvider({ children }) {
-  const { data } = useQuery({ queryKey: ['me'], queryFn: getMe, staleTime: 30_000 })
-  const value = data ? { ...data, ready: true } : DEFAULTS
+  const { data, isLoading } = useQuery({ queryKey: ['me'], queryFn: getMe, staleTime: 30_000 })
+  // `ready` = the query has SETTLED (success or error). On error we fall back to
+  // DEFAULTS but still mark ready, so a failing /api/me degrades to the free view
+  // instead of hanging the page forever on the loading skeleton.
+  const value = data ? { ...data, ready: true } : { ...DEFAULTS, ready: !isLoading }
   return <MeContext.Provider value={value}>{children}</MeContext.Provider>
 }
 

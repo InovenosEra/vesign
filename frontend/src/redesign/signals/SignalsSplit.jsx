@@ -25,9 +25,10 @@ function useSignalSection(kind) {
   async function unlockRow(s) {
     try {
       await unlockSignal({ kind: kind.toLowerCase(), scope: 'row', lock_token: s.lock_token, market: 'US' })
+      // Refetch now; react-query keeps the previous rows during the refetch, so the
+      // card stays mounted long enough for its fade-out before the real card swaps in.
+      qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
       qc.invalidateQueries({ queryKey: ['me'] })
-      // Defer the reveal so the locked card can fade out before it's replaced.
-      setTimeout(() => qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] }), 300)
       return true
     } catch (e) {
       if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
@@ -64,7 +65,7 @@ function SectionHead({ kind, sub, showSeeAll, onSeeAll, seeAllPrice }) {
 
 function renderCard(s, i, kind, unlockRow, isFree) {
   return isLocked(s)
-    ? <LockedSignalCard key={i} s={s} kind={kind} onUnlock={unlockRow} idx={i} isFree={isFree} />
+    ? <LockedSignalCard key={s.lock_token || 'L' + i} s={s} kind={kind} onUnlock={unlockRow} idx={i} isFree={isFree} />
     : <SignalCard key={s.ticker || i} s={s} />
 }
 

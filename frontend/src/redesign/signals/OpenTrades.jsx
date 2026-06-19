@@ -40,8 +40,9 @@ function LockedOpenRow({ p }) {
   )
 }
 
-// Free teaser row: the real Yield stays sharp, every other column is blurred
-// decoy (same blur effect as the locked signal cards). No lock glyph/pill.
+// Free teaser row: the real Yield stays sharp; every other column is frosted
+// fake data hazed via text-shadow (NOT filter:blur, which smears the page
+// background in Chrome). aria-hidden + fake values — nothing identifying.
 function BlurredOpenRow({ p, idx = 0 }) {
   const f = FAKE_SIG[idx % FAKE_SIG.length]
   const yld = p.reveal?.includes('yield') ? p.unrealized_pct : null   // server reveals yield for the top teaser rows
@@ -49,15 +50,15 @@ function BlurredOpenRow({ p, idx = 0 }) {
   const fakeDays = [12, 34, 7, 21, 45][idx % 5]
   return (
     <tr className="locked-row">
-      <td><div className="ticker-cell lock-blur" aria-hidden="true">
+      <td><div className="ticker-cell lock-haze" aria-hidden="true">
         <span className="logo-skel" />
         <span className="tk">{f.tk}</span><span className="co">{f.co}</span>
       </div></td>
-      <td className="r lock-blur" aria-hidden="true">2026-05-12</td>
-      <td className="r lock-blur" aria-hidden="true">{fakeEntry}</td>
-      <td className="r lock-blur" aria-hidden="true">{f.price}</td>
-      <td className="r lock-blur" aria-hidden="true">{fakeDays}</td>
-      <td className="r lock-blur" aria-hidden="true">+$120</td>
+      <td className="r lock-haze" aria-hidden="true">2026-05-12</td>
+      <td className="r lock-haze" aria-hidden="true">{fakeEntry}</td>
+      <td className="r lock-haze" aria-hidden="true">{f.price}</td>
+      <td className="r lock-haze" aria-hidden="true">{fakeDays}</td>
+      <td className="r lock-haze" aria-hidden="true">+$120</td>
       <td className={'r ' + (yld != null ? dirClass(yld) : '')} style={{ paddingRight: 18 }}>
         {yld == null ? '—' : <strong>{pct(yld)}</strong>}
       </td>
