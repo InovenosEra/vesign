@@ -247,8 +247,14 @@
   /* default: transparent — matches production. Add .white-bg for tickers in the WHITE_BG_LOGOS allowlist (CTVA, COTY, etc.) */
   .rd .logo-mini { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: inline-block; flex-shrink: 0; }
   .rd .logo-mini.white-bg { background: #fff; padding: 2px; }
-  .rd .mover-row .tk { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); }
-  .rd .mover-row .co { font-size: 10.5px; color: var(--ink-3); margin-top: 1px; font-family: var(--sans); }
+  /* min-width:0 lets the 1fr grid cell shrink so its children can ellipsis instead of wrapping */
+  .rd .mover-row .mname { min-width: 0; }
+  .rd .mover-row .tk { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rd .mover-row .co { font-size: 10.5px; color: var(--ink-3); margin-top: 1px; font-family: var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rd .mover-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--line); }
+  .rd .pg-btn { background: transparent; border: 1px solid var(--line); color: var(--ink-2); font-family: var(--sans); font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background .12s, color .12s, border-color .12s; }
+  .rd .pg-btn:hover:not(:disabled) { background: var(--bg-2); color: var(--ink); border-color: var(--blue-2); }
+  .rd .pg-btn:disabled { opacity: .35; cursor: default; }
   .rd .mover-row .px { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--ink-2); }
   .rd .mover-row .ch { font-family: var(--mono); font-size: 12px; font-weight: 600; text-align: right; min-width: 56px; }
   .rd .up { color: var(--green); }
