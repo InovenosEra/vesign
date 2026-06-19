@@ -181,7 +181,11 @@
      repaint (e.g. dragging the devtools divider) — the same compositing bug the
      locked signal cards were already moved off of. Nothing identifiable in the DOM. */
   .rd tr.locked-row td { background: rgba(255,255,255,0.012); }
-  .rd .logo-skel { width: 24px; height: 24px; border-radius: 5px; background: rgba(255,255,255,0.08); display: inline-block; flex-shrink: 0; }
+  /* Frosted logo placeholder: a grey block, blurred so it reads "real logo you
+     can't make out" like yesterday. filter:blur is scoped to ONLY this tiny box
+     (24/36px) — never the text, card bg, or a fading element — so it doesn't
+     bring back the page-background ghost-smear the other blur triggers caused. */
+  .rd .logo-skel { width: 24px; height: 24px; border-radius: 5px; background: rgba(255,255,255,0.16); filter: blur(2.5px); display: inline-block; flex-shrink: 0; }
   .rd .lock-pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.13); color: var(--ink-3); white-space: nowrap; }
   .rd button.lock-pill { cursor: pointer; border-color: var(--green); color: var(--green); background: transparent; transition: background .12s ease, color .12s ease; }
   .rd button.lock-pill:hover { background: var(--green); color: var(--bg, #0b0e13); }
@@ -234,8 +238,9 @@
 
 .rd .sc-head { display: flex; align-items: center; gap: 10px; }
 .rd .sc-logo { width: 34px; height: 34px; border-radius: 6px; object-fit: contain; background: #fff; flex: none; }
-/* locked placeholder: a soft grey block instead of a crisp white/grey square */
-.rd .sc-logo.logo-skel { background: rgba(255,255,255,0.13); }
+/* locked placeholder (card): grey block, blurred like yesterday's lock-blur.
+   filter:blur scoped to this box only (see .logo-skel note) — ticker is redacted. */
+.rd .sc-logo.logo-skel { background: rgba(255,255,255,0.18); filter: blur(3.5px); }
 .rd .sc-id { min-width: 0; }
 .rd .sc-id .trow { display: flex; align-items: center; gap: 7px; }
 .rd .sc-id .tk { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
@@ -281,6 +286,9 @@
 .rd .lock-haze, .rd .lock-haze * { color: transparent !important; }
 /* grey the health dots too, so the score can't be read through the haze */
 .rd .sigcard.locked .lock-haze .health .d { background: rgba(255,255,255,0.16) !important; }
+/* Health dots are solid circles, so lock-haze's text-shadow can't blur them —
+   blur the dot row itself (scoped, same as the logo box) so it reads frosted too. */
+.rd .sigcard.locked .lock-haze .health { filter: blur(2.5px); }
 /* unlock reveal: fade the WHOLE locked card out as one composited layer, then the
    real card fades in. (Fading the filter:blur decoy element directly can leave a
    blur "ghost" smear on the page background — Chrome compositing bug.) */
