@@ -557,13 +557,16 @@
 .rd .nav a:hover { color: var(--ink-2); }
 .rd .nav a.active { color: var(--ink); border-bottom-color: var(--blue); }
 .rd .topright { display: flex; align-items: center; gap: 10px; }
-.rd .wallet-chip { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border: 1px solid var(--line, #2a2f37); border-radius: 999px; }
-/* Plan-tier status chip (★ Free/Pro/Max) — colour keyed to the tier. */
-.rd .plan-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--line, #2a2f37); white-space: nowrap; }
-.rd .plan-chip .star { font-size: 10px; line-height: 1; }
-.rd .plan-chip.free { background: var(--bg-3, #161c28); border-color: var(--line, #2a2f37); color: var(--ink-2, #a8acb8); }
-.rd .plan-chip.pro { background: linear-gradient(135deg, rgba(96,165,250,0.16), rgba(96,165,250,0.05)); border-color: rgba(96,165,250,0.3); color: var(--blue-2, #60a5fa); }
-.rd .plan-chip.max, .rd .plan-chip.pro_plus { background: linear-gradient(135deg, rgba(168,85,247,0.16), rgba(168,85,247,0.05)); border-color: rgba(168,85,247,0.3); color: var(--purple, #a855f7); }
+/* Wallet pill — wallet glyph + balance, links to the Wallet pane. */
+.rd .wallet-chip {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px;
+  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink, #e8eaf0);
+  background: linear-gradient(180deg, rgba(96,165,250,0.12), rgba(96,165,250,0.03)), var(--bg-3, #161c28);
+  border: 1px solid rgba(96,165,250,0.30); border-radius: 9px;
+  cursor: pointer; white-space: nowrap; transition: border-color .15s ease, background .15s ease;
+}
+.rd .wallet-chip:hover { border-color: rgba(96,165,250,0.55); background: linear-gradient(180deg, rgba(96,165,250,0.18), rgba(96,165,250,0.05)), var(--bg-3, #161c28); }
+.rd .wallet-chip svg { color: var(--blue-2, #60a5fa); flex: none; }
 /* Search sits exactly midway between the left (logo+nav) and right groups:
    equal auto-margins absorb the free space on each side. */
 .rd .header-search-slot { margin: 0 auto; }
@@ -585,6 +588,16 @@
 /* avatar ring matches the plan tier (Free grey / Pro gold / Max purple) */
 .rd .avatar.tier-pro { border-color: var(--blue-2, #60a5fa); }
 .rd .avatar.tier-max, .rd .avatar.tier-pro_plus { border-color: var(--purple, #a855f7); }
+/* Plan badge on the avatar's upper-right corner (Pro = blue, Max = purple) */
+.rd .avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.rd .avatar-badge {
+  position: absolute; top: -5px; right: -7px; z-index: 2;
+  padding: 1.5px 5px; border-radius: 999px;
+  font-size: 8px; font-weight: 800; letter-spacing: 0.03em; line-height: 1.2; text-transform: uppercase;
+  color: #fff; border: 1.5px solid var(--bg, #0b0e13); box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.rd .avatar-badge.pro { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
+.rd .avatar-badge.max, .rd .avatar-badge.pro_plus { background: linear-gradient(135deg, #c084fc, #a855f7); }
 /* Account menu: framed avatar+greeting trigger with a 3-item dropdown.
    Circle style stays in .avatar above. */
 .rd .account-menu { position: relative; }

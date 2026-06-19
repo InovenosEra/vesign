@@ -443,6 +443,15 @@ function ProfilePane({ user, phone, currency, setCurrency, i18n, notify }) {
   )
 }
 
+// These queries are gated server-side by plan. Drop their cache on a plan switch
+// so the Signals/Open-trades views can't briefly show the old (free/pro) gating
+// before the next refetch.
+function resetPlanGatedData(qc) {
+  qc.removeQueries({ queryKey: ['signals-today'] })
+  qc.removeQueries({ queryKey: ['signals'] })
+  qc.removeQueries({ queryKey: ['open-trades'] })
+}
+
 function ChangePlanModal({ current, onClose, notify }) {
   const qc = useQueryClient()
   const [busy, setBusy] = useState(null)        // id mid-switch, or null
@@ -450,6 +459,7 @@ function ChangePlanModal({ current, onClose, notify }) {
     setBusy(id)
     try {
       await setPlan(id)
+      resetPlanGatedData(qc)
       await qc.invalidateQueries({ queryKey: ['me'] })
       notify(`Switched to ${TIER_BY_ID[id].label}`, 'success')
       onClose()
@@ -489,6 +499,7 @@ function CancelPlanModal({ onClose, notify }) {
     setBusy(true)
     try {
       await setPlan('free')
+      resetPlanGatedData(qc)
       await qc.invalidateQueries({ queryKey: ['me'] })
       notify('Moved to the Free plan', 'info')
       onClose()

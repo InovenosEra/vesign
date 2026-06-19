@@ -95,19 +95,6 @@ function MarketChip() {
 
 const PLAN_LABELS = { free: 'Free', pro: 'Pro', pro_plus: 'Pro+', max: 'Max' }
 
-/* Plan-tier status chip (★ Free/Pro/Max) — read-only indicator next to the avatar. */
-function PlanChip() {
-  const me = useMe()
-  if (!me.ready) return null      // don't flash "Free" before /api/me resolves
-  const plan = me.plan || 'free'
-  const label = PLAN_LABELS[plan] || (plan[0].toUpperCase() + plan.slice(1))
-  return (
-    <span className={'plan-chip ' + plan} title={`${label} plan`}>
-      <span className="star">★</span>{label}
-    </span>
-  )
-}
-
 const MenuCaret = () => (
   <svg className="menu-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
 )
@@ -133,11 +120,16 @@ function AccountMenu() {
     <div className={'account-menu' + (open ? ' open' : '')} ref={ref}>
       <div className="account-trigger">
         <NavLink to="/account" className="account-id" title={user?.firstName || 'Account'} aria-label="Account">
-          <span className={'avatar tier-' + plan}>
-            {user?.imageUrl
-              ? <img src={user.imageUrl} alt={initials}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-              : initials}
+          <span className="avatar-wrap">
+            <span className={'avatar tier-' + plan}>
+              {user?.imageUrl
+                ? <img src={user.imageUrl} alt={initials}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                : initials}
+            </span>
+            {me.ready && plan !== 'free' && (
+              <span className={'avatar-badge ' + plan}>{PLAN_LABELS[plan] || plan}</span>
+            )}
           </span>
           <span className="greeting">Hello, {firstName}</span>
         </NavLink>
@@ -158,9 +150,17 @@ function AccountMenu() {
 
 function WalletChip() {
   const me = useMe()
+  const navigate = useNavigate()
   if (!me.ready || me.plan === 'free') return null
   return (
-    <span className="wallet-chip" title="Wallet balance">{fmtCents(me.balance_cents)}</span>
+    <button type="button" className="wallet-chip" title="Wallet balance" onClick={() => navigate('/account/wallet')}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+      </svg>
+      <span className="wb-amt">{fmtCents(me.balance_cents)}</span>
+    </button>
   )
 }
 
@@ -211,9 +211,8 @@ export default function AppShell({ children }) {
           <GlobalSearch />
         </div>
         <div className="topright">
-          <WalletChip />
           <MarketChip />
-          <PlanChip />
+          <WalletChip />
           <AccountMenu />
         </div>
       </div>

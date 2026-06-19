@@ -13,8 +13,14 @@ from sqlalchemy import text
 from data.loaders import engine
 
 PLANS = ("free", "pro", "max")
-PER_ROW_PRICE_CENTS = 10
-SEE_ALL_PRICE_CENTS = 50
+PER_ROW_PRICE_CENTS = 20
+SEE_ALL_PRICE_CENTS = 50        # legacy default exposed via /api/me; live charge is dynamic
+
+
+def see_all_price_cents(n_signals: int) -> int:
+    """Bulk 'See all' price: 50% of (n_signals × per-row), rounded DOWN to a
+    whole dollar. e.g. 51 SELL × $0.20 = $10.20 → 50% = $5.10 → $5.00."""
+    return ((max(0, n_signals) * PER_ROW_PRICE_CENTS) // 2 // 100) * 100
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
 PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
 
@@ -307,7 +313,7 @@ def gate_signals(rows, *, kind, plan, unlocks):
         if k == "sell" and i < PRO_SELL_PREVIEW_ROWS:
             out.append(r)               # free SELL preview (Pro), then pay-to-unlock
             continue
-        price = PER_ROW_PRICE_CENTS if k == "buy" else None   # SELL is bulk-only
-        out.append(_locked_row(k, date, "pay", price_cents=price,
+        # Per-row unlock allowed for BUY and SELL; "See all" is the bulk option.
+        out.append(_locked_row(k, date, "pay", price_cents=PER_ROW_PRICE_CENTS,
                                token=lock_token(k, ticker, date)))
     return out

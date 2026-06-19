@@ -111,15 +111,16 @@ def test_pro_buy_row_unlocked_is_full(ent):
     assert out[0]["ticker"] == "AAPL" and not out[0].get("locked")
 
 
-def test_pro_sell_previews_first_ten_then_locks_bulk_only(ent):
-    rows = [_sig(f"T{i}", ) for i in range(12)]
+def test_pro_sell_preview_then_per_row_unlock(ent):
+    n = ent.PRO_SELL_PREVIEW_ROWS
+    rows = [_sig(f"T{i}") for i in range(n + 3)]
     for r in rows: r["signal"] = "SELL"
     out = ent.gate_signals(rows, kind="SELL", plan="pro", unlocks=set())
-    assert out[0]["ticker"] == "T0"            # first 10 visible
-    assert out[9]["ticker"] == "T9"
-    assert out[10]["locked"] is True and out[10]["reason"] == "pay"
-    assert "unlock_price_cents" not in out[10] # SELL is bulk-only (no per-row price)
-    assert "lock_token" in out[10]
+    assert out[0]["ticker"] == "T0"                       # preview visible
+    assert out[n - 1]["ticker"] == f"T{n - 1}" and not out[n - 1].get("locked")
+    assert out[n]["locked"] is True and out[n]["reason"] == "pay"
+    assert out[n]["unlock_price_cents"] == ent.PER_ROW_PRICE_CENTS   # per-row unlock allowed
+    assert "lock_token" in out[n]
 
 
 def test_free_sell_rows_all_locked(ent):

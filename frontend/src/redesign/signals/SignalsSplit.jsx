@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSignalsToday, unlockSignal } from '../../api'
 import { useMe } from '../../context/MeContext'
-import { isLocked, hasMoreLocked, fmtCents } from './gating'
+import { isLocked, hasMoreLocked, fmtCents, seeAllCents } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 
 const SELL_PAGE = 5
@@ -25,9 +25,14 @@ function useSignalSection(kind) {
   async function unlockRow(s) {
     try {
       await unlockSignal({ kind: kind.toLowerCase(), scope: 'row', lock_token: s.lock_token, market: 'US' })
-      qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
       qc.invalidateQueries({ queryKey: ['me'] })
-    } catch (e) { if (String(e.message).startsWith('402')) alert('Not enough wallet balance.') }
+      // Defer the reveal so the locked card can fade out before it's replaced.
+      setTimeout(() => qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] }), 300)
+      return true
+    } catch (e) {
+      if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
+      return false
+    }
   }
   async function unlockAll() {
     try {
@@ -38,7 +43,8 @@ function useSignalSection(kind) {
   }
   const sub = rows.length ? `${rows.length} ${rows.length === 1 ? 'signal' : 'signals'}` : '—'
   const showSeeAll = me.plan === 'pro' && hasMoreLocked(rows)
-  return { me, rows, unlockRow, unlockAll, sub, showSeeAll }
+  const seeAllPrice = seeAllCents(rows.length, me.per_row_price_cents)
+  return { me, rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice }
 }
 
 function SectionHead({ kind, sub, showSeeAll, onSeeAll, seeAllPrice }) {
@@ -63,11 +69,11 @@ function renderCard(s, i, kind, unlockRow, isFree) {
 }
 
 function BuyColumn({ isFree }) {
-  const { me, rows, unlockRow, unlockAll, sub, showSeeAll } = useSignalSection('BUY')
+  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice } = useSignalSection('BUY')
   const shown = isFree ? rows.slice(0, FREE_PREVIEW) : rows
   return (
     <div className="sig-col">
-      <SectionHead kind="BUY" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={me.see_all_price_cents} />
+      <SectionHead kind="BUY" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={seeAllPrice} />
       <div className="sig-cards">
         {rows.length === 0
           ? <div className="sig-empty">No buy signals today.</div>
@@ -78,7 +84,7 @@ function BuyColumn({ isFree }) {
 }
 
 function SellColumn({ isFree }) {
-  const { me, rows, unlockRow, unlockAll, sub, showSeeAll } = useSignalSection('SELL')
+  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice } = useSignalSection('SELL')
   const [page, setPage] = useState(0)
   const pages = Math.max(1, Math.ceil(rows.length / SELL_PAGE))
   const safePage = Math.min(page, pages - 1)
@@ -88,7 +94,7 @@ function SellColumn({ isFree }) {
     : rows.slice(safePage * SELL_PAGE, safePage * SELL_PAGE + SELL_PAGE)
   return (
     <div className="sig-col">
-      <SectionHead kind="SELL" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={me.see_all_price_cents} />
+      <SectionHead kind="SELL" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={seeAllPrice} />
       <div className="sig-cards">
         {rows.length === 0
           ? <div className="sig-empty">No sell signals today.</div>

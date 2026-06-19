@@ -2579,8 +2579,8 @@ def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
         date_key = "buy_date"
 
     if scope == "row":
-        if kind != "buy" or not body.lock_token:
-            raise HTTPException(status_code=400, detail="row unlock is BUY-only and needs a token")
+        if kind not in ("buy", "sell") or not body.lock_token:
+            raise HTTPException(status_code=400, detail="row unlock needs a BUY/SELL token")
         match = ent.resolve_token(body.lock_token, kind, candidates, date_key=date_key)
         if not match:
             raise HTTPException(status_code=404, detail="signal not found")
@@ -2588,7 +2588,7 @@ def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
         price = ent.PER_ROW_PRICE_CENTS
     elif scope == "all":
         occurrences = [(r["ticker"], ent._norm_date(r.get(date_key))) for r in candidates if r.get("ticker")]
-        price = ent.SEE_ALL_PRICE_CENTS
+        price = ent.see_all_price_cents(len(candidates))   # 50% of count × per-row, floored to $1
     else:
         raise HTTPException(status_code=400, detail="bad scope")
 

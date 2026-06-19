@@ -1,15 +1,15 @@
 /* Slide-to-unlock control — drag the knob left→right to confirm a per-row
- * unlock purchase. Replaces the old click "Unlock · $price" button. On a full
- * slide it calls onUnlock() (which charges the wallet + invalidates the query;
- * a successful unlock unmounts this card). On failure (or short slide) the knob
- * snaps back. Pointer events → works for mouse and touch. */
+ * unlock purchase. The circular knob is the full height of the track and sits
+ * flush on the left edge, so the blue fill is hidden under it at rest and only
+ * reveals in its wake as you slide. On a full slide it calls onUnlock() (charges
+ * the wallet + invalidates the query; a successful unlock unmounts this card).
+ * On failure / short slide the knob snaps back. Pointer events → mouse + touch. */
 import { useRef, useState, useEffect } from 'react'
 
-const KNOB = 38   // knob size (px), keep in sync with CSS
-const PAD = 4     // track inner padding (px), keep in sync with CSS
+const KNOB = 50   // knob diameter (px) = track height, keep in sync with CSS
 
 export default function SlideToUnlock({ priceLabel, onUnlock }) {
-  const trackRef = useRef(null)
+  const rootRef = useRef(null)
   const maxRef = useRef(0)
   const mounted = useRef(true)
   const [x, setX] = useState(0)
@@ -19,8 +19,8 @@ export default function SlideToUnlock({ priceLabel, onUnlock }) {
   useEffect(() => () => { mounted.current = false }, [])
 
   const measure = () => {
-    const w = trackRef.current?.clientWidth || 0
-    maxRef.current = Math.max(0, w - KNOB - PAD * 2)
+    const w = rootRef.current?.clientWidth || 0
+    maxRef.current = Math.max(0, w - KNOB)
   }
 
   const onDown = (e) => {
@@ -31,8 +31,8 @@ export default function SlideToUnlock({ priceLabel, onUnlock }) {
   }
   const onMove = (e) => {
     if (!drag) return
-    const rect = trackRef.current.getBoundingClientRect()
-    const nx = Math.max(0, Math.min(e.clientX - rect.left - PAD - KNOB / 2, maxRef.current))
+    const rect = rootRef.current.getBoundingClientRect()
+    const nx = Math.max(0, Math.min(e.clientX - rect.left - KNOB / 2, maxRef.current))
     setX(nx)
   }
   const onUp = async () => {
@@ -41,19 +41,19 @@ export default function SlideToUnlock({ priceLabel, onUnlock }) {
     if (x < maxRef.current - 6) { setX(0); return }   // didn't reach the end → snap back
     setX(maxRef.current)
     setBusy(true)
-    try {
-      await onUnlock?.()
-    } finally {
-      // On success the row unlocks and this card unmounts; on failure we're
-      // still mounted, so reset for another try.
-      if (mounted.current) { setBusy(false); setX(0) }
-    }
+    const ok = await onUnlock?.()
+    // Success → stay at the end; the card fades out and unmounts. Only reset on failure.
+    if (ok === false && mounted.current) { setBusy(false); setX(0) }
   }
 
   return (
-    <div className="slide-unlock" ref={trackRef}>
-      <span className="slide-fill" style={{ width: x + KNOB + PAD }} aria-hidden="true" />
-      <span className="slide-label">{busy ? 'Unlocking…' : `Slide to unlock · ${priceLabel}`}</span>
+    <div className="slide-unlock" ref={rootRef}>
+      <span className="slide-track" aria-hidden="true">
+        {/* 0 at rest (no blue); once sliding, the fill reaches the knob's CENTER so
+            it sits behind the circle with no uncovered gap where they meet */}
+        <span className="slide-fill" style={{ width: x > 0 ? x + KNOB / 2 : 0 }} />
+        <span className="slide-label">{busy ? 'Unlocking…' : 'Slide to unlock'}</span>
+      </span>
       <span
         className="slide-knob"
         role="button" tabIndex={0} aria-label={`Slide to unlock for ${priceLabel}`}
@@ -61,8 +61,8 @@ export default function SlideToUnlock({ priceLabel, onUnlock }) {
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
       >
         {busy
-          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-          : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>}
+          ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+          : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M7 6l6 6-6 6" /><path d="M13 6l6 6-6 6" /></svg>}
       </span>
     </div>
   )

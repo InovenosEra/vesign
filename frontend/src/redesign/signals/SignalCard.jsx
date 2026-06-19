@@ -78,12 +78,19 @@ export function SignalCard({ s }) {
 
 export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false }) {
   const me = useMe()
+  const [unlocking, setUnlocking] = useState(false)
   const f = FAKE_SIG[idx % FAKE_SIG.length]
   const k = (kind || '').toUpperCase() === 'SELL' ? 'sell' : 'buy'
   const fakeTarget = (parseFloat(f.price) * 1.1).toFixed(2)
   const canPayRow = s.reason === 'pay'
+  // On a successful slide, fade out the slider + blur before the real card swaps in.
+  const handleUnlock = async () => {
+    const ok = await onUnlock(s)
+    if (ok) setUnlocking(true)
+    return ok
+  }
   return (
-    <div className={'sigcard locked ' + k}>
+    <div className={'sigcard locked ' + k + (unlocking ? ' unlocking' : '')}>
       <div className="sc-head">
         <span className="sc-logo logo-skel lock-blur" aria-hidden="true" />
         <div className="sc-id lock-blur" aria-hidden="true">
@@ -106,7 +113,7 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false })
       {!isFree && (
         <div className="sc-cta">
           {canPayRow
-            ? <SlideToUnlock priceLabel={fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)} onUnlock={() => onUnlock(s)} />
+            ? <SlideToUnlock priceLabel={fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)} onUnlock={handleUnlock} />
             : <span className="lock-pill"><svg className="lock-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>{s.reason === 'pay' ? 'See all' : 'Upgrade'}</span>}
         </div>
       )}

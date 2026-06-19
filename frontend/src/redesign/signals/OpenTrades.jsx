@@ -4,7 +4,7 @@ import { num, pct, dirClass, LOGO } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
-import { isLocked, hasMoreLocked, fmtCents } from './gating'
+import { isLocked, hasMoreLocked, fmtCents, seeAllCents } from './gating'
 import { logoCls, ymd } from './util'
 import { FAKE_SIG } from './locked-fixtures'
 import PagedTable from './Pager'
@@ -132,7 +132,7 @@ export default function OpenTrades() {
       <div className="section-h">
         <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
         {showSeeAll && (
-          <button className="see-all-cta" onClick={unlockAll}>See all · {fmtCents(me.see_all_price_cents)}</button>
+          <button className="see-all-cta" onClick={unlockAll}>See all · {fmtCents(seeAllCents(rows.length, me.per_row_price_cents))}</button>
         )}
       </div>
       <PagedTable

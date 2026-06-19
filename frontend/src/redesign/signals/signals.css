@@ -275,6 +275,13 @@
 /* locked card CTA */
 /* locked card: the unlock CTA floats centered over the blurred content */
 .rd .sigcard.locked { min-height: 138px; }
+/* unlock reveal: fade out the slider + blurred decoy, then the real card fades in */
+.rd .sigcard.locked .sc-cta { transition: opacity .25s ease; }
+.rd .sigcard.locked .lock-blur { transition: opacity .25s ease; }
+.rd .sigcard.locked.unlocking .sc-cta { opacity: 0; pointer-events: none; }
+.rd .sigcard.locked.unlocking .lock-blur { opacity: 0; }
+.rd .sigcard:not(.locked) { animation: sigCardReveal .28s ease both; }
+@keyframes sigCardReveal { from { opacity: 0; } to { opacity: 1; } }
 .rd .sigcard.locked .sc-cta { position: absolute; inset: 0; z-index: 2; margin: 0; display: flex; align-items: center; justify-content: center; }
 .rd .sigcard.locked .lock-pill {
   font-family: var(--sans, 'Inter', sans-serif); font-size: 14px; font-weight: 700; letter-spacing: 0.01em;
@@ -288,34 +295,63 @@
 .rd .sigcard.locked button.lock-pill:hover { transform: translateY(-1px); color: var(--green, #00d97e); background: linear-gradient(180deg, rgba(0,217,126,0.28), rgba(0,217,126,0.14)), rgba(11,15,22,0.55); box-shadow: 0 14px 32px -10px rgba(0,217,126,0.7), inset 0 1px 0 rgba(255,255,255,0.10); }
 .rd .sigcard.locked .lock-ico { flex: none; }
 
-/* slide-to-unlock control (replaces the click unlock button) */
+/* slide-to-unlock control — premium pill + glossy circular knob (Vesign cyan→blue) */
 .rd .sigcard.locked .sc-cta .slide-unlock {
-  position: relative; width: min(290px, 80%); height: 46px;
-  border-radius: 12px; overflow: hidden;
-  border: 1px solid rgba(0,217,126,0.45);
-  background: linear-gradient(180deg, rgba(0,217,126,0.10), rgba(0,217,126,0.045)), rgba(11,15,22,0.6);
-  box-shadow: 0 10px 26px -10px rgba(0,217,126,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
-  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  position: relative; width: min(228px, 68%); height: 50px;
+  overflow: visible;            /* let the knob's glow spill past the track */
   user-select: none; touch-action: none;
 }
+/* clipped track holds the fill + label so they respect the rounded ends */
+.rd .slide-unlock .slide-track {
+  position: absolute; inset: 0; border-radius: 999px; overflow: hidden;
+  border: 1px solid rgba(96,165,250,0.40);
+  background:
+    radial-gradient(130% 160% at 100% 50%, rgba(59,130,246,0.10), transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0)),
+    rgba(10,14,22,0.74);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+/* gradient reveal — hidden under the knob at rest, grows in the knob's wake */
 .rd .slide-unlock .slide-fill {
   position: absolute; left: 0; top: 0; bottom: 0; z-index: 1; pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,217,126,0.28), rgba(0,217,126,0.14));
+  background: linear-gradient(90deg, rgba(165,243,252,0.22), rgba(34,211,238,0.28) 55%, rgba(59,130,246,0.40));
+  box-shadow: inset 0 0 14px rgba(34,211,238,0.25);
 }
 .rd .slide-unlock .slide-label {
-  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
-  padding-left: 30px; pointer-events: none; white-space: nowrap;
-  font-family: var(--sans, 'Inter', sans-serif); font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
-  color: var(--green, #00d97e);
+  position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+  padding-left: 50px; pointer-events: none; white-space: nowrap;
+  font-family: var(--sans, 'Inter', sans-serif); font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em;
+  color: rgba(186,230,253,0.92); text-shadow: 0 1px 10px rgba(34,211,238,0.30);
 }
+/* faint sheen sweeping right — directional hint */
+.rd .slide-unlock .slide-track::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.09) 50%, transparent 62%);
+  background-size: 260% 100%; animation: slideSheen 3s linear infinite;
+}
+/* glossy circular knob — full track height, flush at the left */
 .rd .slide-unlock .slide-knob {
-  position: absolute; left: 4px; top: 4px; z-index: 2;
-  width: 38px; height: 38px; border-radius: 9px;
+  position: absolute; left: 0; top: 0; z-index: 3;
+  width: 50px; height: 50px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--green, #00d97e); color: #07120c;
+  color: #07131f;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,0.92), rgba(255,255,255,0) 46%),
+    linear-gradient(150deg, #a5f3fc, #22d3ee 48%, #3b82f6);
+  box-shadow:
+    0 0 0 1px rgba(165,243,252,0.45),
+    0 6px 18px rgba(34,211,238,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    inset 0 -5px 8px rgba(29,78,216,0.45);
   cursor: grab; touch-action: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+  animation: slideKnobPulse 2.1s ease-in-out infinite;
 }
-.rd .slide-unlock .slide-knob:active { cursor: grabbing; }
+.rd .slide-unlock .slide-knob:hover { filter: brightness(1.06); }
+.rd .slide-unlock .slide-knob:active { cursor: grabbing; animation: none; filter: brightness(1.08); }
+@keyframes slideKnobPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(165,243,252,0.40), 0 6px 18px rgba(34,211,238,0.45), inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -5px 8px rgba(29,78,216,0.45); }
+  50%      { box-shadow: 0 0 0 1px rgba(165,243,252,0.55), 0 6px 26px rgba(34,211,238,0.9),  inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -5px 8px rgba(29,78,216,0.45); }
+}
+@keyframes slideSheen { from { background-position: 160% 0; } to { background-position: -160% 0; } }
 
 @media (max-width: 980px) { .rd .sig-twocol { grid-template-columns: 1fr; } }
