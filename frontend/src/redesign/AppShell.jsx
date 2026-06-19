@@ -127,7 +127,7 @@ function AccountMenu() {
                     style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                 : initials}
             </span>
-            {me.ready && plan !== 'free' && (
+            {me.ready && (
               <span className={'avatar-badge ' + plan}>{PLAN_LABELS[plan] || plan}</span>
             )}
           </span>

@@ -589,7 +589,7 @@
 /* avatar ring matches the plan tier (Free grey / Pro gold / Max purple) */
 .rd .avatar.tier-pro { border-color: var(--blue-2, #60a5fa); }
 .rd .avatar.tier-max, .rd .avatar.tier-pro_plus { border-color: var(--purple, #a855f7); }
-/* Plan badge on the avatar's upper-right corner (Pro = blue, Max = purple) */
+/* Plan badge on the avatar's upper-right corner (Free = grey, Pro = blue, Max = purple) */
 .rd .avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
 .rd .avatar-badge {
   position: absolute; top: -5px; right: -7px; z-index: 2;
@@ -597,6 +597,7 @@
   font-size: 8px; font-weight: 800; letter-spacing: 0.03em; line-height: 1.2; text-transform: uppercase;
   color: #fff; border: 1.5px solid var(--bg, #0b0e13); box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
+.rd .avatar-badge.free { background: linear-gradient(135deg, #8b909c, #5b6170); }
 .rd .avatar-badge.pro { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
 .rd .avatar-badge.max, .rd .avatar-badge.pro_plus { background: linear-gradient(135deg, #c084fc, #a855f7); }
 /* Account menu: framed avatar+greeting trigger with a 3-item dropdown.
