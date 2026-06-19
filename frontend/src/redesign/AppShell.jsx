@@ -98,6 +98,7 @@ const PLAN_LABELS = { free: 'Free', pro: 'Pro', pro_plus: 'Pro+', max: 'Max' }
 /* Plan-tier status chip (★ Free/Pro/Max) — read-only indicator next to the avatar. */
 function PlanChip() {
   const me = useMe()
+  if (!me.ready) return null      // don't flash "Free" before /api/me resolves
   const plan = me.plan || 'free'
   const label = PLAN_LABELS[plan] || (plan[0].toUpperCase() + plan.slice(1))
   return (
@@ -157,7 +158,7 @@ function AccountMenu() {
 
 function WalletChip() {
   const me = useMe()
-  if (me.plan === 'free') return null
+  if (!me.ready || me.plan === 'free') return null
   return (
     <span className="wallet-chip" title="Wallet balance">{fmtCents(me.balance_cents)}</span>
   )

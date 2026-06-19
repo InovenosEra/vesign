@@ -10,6 +10,7 @@ import OpenTrades from './signals/OpenTrades'
 import ClosedTrades from './signals/ClosedTrades'
 import { tradeWindow } from './signals/util'
 import { useReady, PageSkeleton } from './LoadGate'
+import { useMe } from '../context/MeContext'
 import { getSignalsToday, getOpenTrades, getStats, getTrades } from '../api'
 
 // URL slug <-> internal tab key. The slug is the last path segment so the URL
@@ -22,14 +23,17 @@ export default function SignalsPage() {
   const navigate = useNavigate()
   const tab = TAB_BY_SLUG[slug] || 'today'
   const setTab = (t) => navigate('/signals/' + (SLUG_BY_TAB[t] || 'active-trades'))
+  const me = useMe()
   const { start, end } = tradeWindow()
   // Both panes mount (display toggled), so all their queries fire on load. Gate
   // each pane so its sections appear together instead of popping in piecemeal.
-  const todayReady = useReady(true, [
+  // Also wait for `me` so the free/pro gating is decided once — no free→pro flash.
+  const todayDataReady = useReady(true, [
     [['signals-today', 'BUY', 'US'], () => getSignalsToday('BUY', 'US')],
     [['signals-today', 'SELL', 'US'], () => getSignalsToday('SELL', 'US')],
     [['open-trades', 'US'], () => getOpenTrades('US')],
   ])
+  const todayReady = me.ready && todayDataReady
   const closedReady = useReady(true, [
     [['stats'], getStats],
     [['trades', start, end, 'US'], () => getTrades({ start, end, market: 'US' })],

@@ -11,6 +11,7 @@ import { useMe } from '../../context/MeContext'
 import { fmtCents } from './gating'
 import { logoCls } from './util'
 import { FAKE_SIG } from './locked-fixtures'
+import SlideToUnlock from './SlideToUnlock'
 import SignalExplanation from '../SignalExplanation'
 
 // Health dot colour by 5-point score: 1 red → 2 dark-orange → 3 bright-orange
@@ -105,12 +106,7 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false })
       {!isFree && (
         <div className="sc-cta">
           {canPayRow
-            ? <button className="lock-pill" onClick={() => onUnlock(s)} title="Unlock this signal">
-                <svg className="lock-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
-                </svg>
-                Unlock · {fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)}
-              </button>
+            ? <SlideToUnlock priceLabel={fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)} onUnlock={() => onUnlock(s)} />
             : <span className="lock-pill"><svg className="lock-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>{s.reason === 'pay' ? 'See all' : 'Upgrade'}</span>}
         </div>
       )}

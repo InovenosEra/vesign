@@ -288,4 +288,34 @@
 .rd .sigcard.locked button.lock-pill:hover { transform: translateY(-1px); color: var(--green, #00d97e); background: linear-gradient(180deg, rgba(0,217,126,0.28), rgba(0,217,126,0.14)), rgba(11,15,22,0.55); box-shadow: 0 14px 32px -10px rgba(0,217,126,0.7), inset 0 1px 0 rgba(255,255,255,0.10); }
 .rd .sigcard.locked .lock-ico { flex: none; }
 
+/* slide-to-unlock control (replaces the click unlock button) */
+.rd .sigcard.locked .sc-cta .slide-unlock {
+  position: relative; width: min(290px, 80%); height: 46px;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(0,217,126,0.45);
+  background: linear-gradient(180deg, rgba(0,217,126,0.10), rgba(0,217,126,0.045)), rgba(11,15,22,0.6);
+  box-shadow: 0 10px 26px -10px rgba(0,217,126,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  user-select: none; touch-action: none;
+}
+.rd .slide-unlock .slide-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,217,126,0.28), rgba(0,217,126,0.14));
+}
+.rd .slide-unlock .slide-label {
+  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
+  padding-left: 30px; pointer-events: none; white-space: nowrap;
+  font-family: var(--sans, 'Inter', sans-serif); font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
+  color: var(--green, #00d97e);
+}
+.rd .slide-unlock .slide-knob {
+  position: absolute; left: 4px; top: 4px; z-index: 2;
+  width: 38px; height: 38px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--green, #00d97e); color: #07120c;
+  cursor: grab; touch-action: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.rd .slide-unlock .slide-knob:active { cursor: grabbing; }
+
 @media (max-width: 980px) { .rd .sig-twocol { grid-template-columns: 1fr; } }

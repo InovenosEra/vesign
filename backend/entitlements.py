@@ -15,7 +15,8 @@ from data.loaders import engine
 PLANS = ("free", "pro", "max")
 PER_ROW_PRICE_CENTS = 10
 SEE_ALL_PRICE_CENTS = 50
-PRO_PREVIEW_ROWS = 10
+PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
+PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
 
 _UNLOCK_SECRET = (
     os.getenv("UNLOCK_SECRET")
@@ -303,8 +304,8 @@ def gate_signals(rows, *, kind, plan, unlocks):
         if (k, ticker, date) in unlocks:
             out.append(r)
             continue
-        if k == "sell" and i < PRO_PREVIEW_ROWS:
-            out.append(r)               # free 10-row preview (SELL only)
+        if k == "sell" and i < PRO_SELL_PREVIEW_ROWS:
+            out.append(r)               # free SELL preview (Pro), then pay-to-unlock
             continue
         price = PER_ROW_PRICE_CENTS if k == "buy" else None   # SELL is bulk-only
         out.append(_locked_row(k, date, "pay", price_cents=price,
