@@ -2,6 +2,7 @@
  * a card with metrics + the AI explanation inline (SignalCard). SELL is paginated
  * so only a page of explanations is fetched at a time. Data: getSignalsToday. */
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSignalsToday, unlockSignal } from '../../api'
 import { useMe } from '../../context/MeContext'
@@ -9,6 +10,7 @@ import { isLocked, hasMoreLocked, fmtCents } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 
 const SELL_PAGE = 5
+const FREE_PREVIEW = 4   // free users see a short locked teaser per column (no pager)
 
 // Query one side + the unlock handlers + header counts.
 function useSignalSection(kind) {
@@ -54,41 +56,45 @@ function SectionHead({ kind, sub, showSeeAll, onSeeAll, seeAllPrice }) {
   )
 }
 
-function renderCard(s, i, kind, unlockRow) {
+function renderCard(s, i, kind, unlockRow, isFree) {
   return isLocked(s)
-    ? <LockedSignalCard key={i} s={s} kind={kind} onUnlock={unlockRow} idx={i} />
+    ? <LockedSignalCard key={i} s={s} kind={kind} onUnlock={unlockRow} idx={i} isFree={isFree} />
     : <SignalCard key={s.ticker || i} s={s} />
 }
 
-function BuyColumn() {
+function BuyColumn({ isFree }) {
   const { me, rows, unlockRow, unlockAll, sub, showSeeAll } = useSignalSection('BUY')
+  const shown = isFree ? rows.slice(0, FREE_PREVIEW) : rows
   return (
     <div className="sig-col">
       <SectionHead kind="BUY" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={me.see_all_price_cents} />
       <div className="sig-cards">
         {rows.length === 0
           ? <div className="sig-empty">No buy signals today.</div>
-          : rows.map((s, i) => renderCard(s, i, 'BUY', unlockRow))}
+          : shown.map((s, i) => renderCard(s, i, 'BUY', unlockRow, isFree))}
       </div>
     </div>
   )
 }
 
-function SellColumn() {
+function SellColumn({ isFree }) {
   const { me, rows, unlockRow, unlockAll, sub, showSeeAll } = useSignalSection('SELL')
   const [page, setPage] = useState(0)
   const pages = Math.max(1, Math.ceil(rows.length / SELL_PAGE))
   const safePage = Math.min(page, pages - 1)
-  const slice = rows.slice(safePage * SELL_PAGE, safePage * SELL_PAGE + SELL_PAGE)
+  // Free: a short locked teaser (no paging — everything is locked anyway).
+  const slice = isFree
+    ? rows.slice(0, FREE_PREVIEW)
+    : rows.slice(safePage * SELL_PAGE, safePage * SELL_PAGE + SELL_PAGE)
   return (
     <div className="sig-col">
       <SectionHead kind="SELL" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={me.see_all_price_cents} />
       <div className="sig-cards">
         {rows.length === 0
           ? <div className="sig-empty">No sell signals today.</div>
-          : slice.map((s, i) => renderCard(s, safePage * SELL_PAGE + i, 'SELL', unlockRow))}
+          : slice.map((s, i) => renderCard(s, isFree ? i : safePage * SELL_PAGE + i, 'SELL', unlockRow, isFree))}
       </div>
-      {pages > 1 && (
+      {!isFree && pages > 1 && (
         <div className="sig-pager">
           <button disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>‹ Prev</button>
           <span><b>{safePage + 1}</b> / {pages}</span>
@@ -99,11 +105,36 @@ function SellColumn() {
   )
 }
 
-export default function SignalsSplit() {
+// Single page-level CTA for free users — replaces the per-card unlock pills
+// (which did nothing for free users since the whole feed is upgrade-gated).
+function UpgradeBanner() {
+  const navigate = useNavigate()
   return (
-    <div className="sig-twocol">
-      <BuyColumn />
-      <SellColumn />
-    </div>
+    <button className="sig-upsell" onClick={() => navigate('/account?pane=plan')}>
+      <span className="lk" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+        </svg>
+      </span>
+      <span className="txt">
+        <span className="t1">Upgrade to unlock signals</span>
+        <span className="t2">Get every BUY &amp; SELL signal, same-day, with full AI explanations.</span>
+      </span>
+      <span className="cta-arrow" aria-hidden="true">→</span>
+    </button>
+  )
+}
+
+export default function SignalsSplit() {
+  const me = useMe()
+  const isFree = me.plan === 'free'
+  return (
+    <>
+      {isFree && <UpgradeBanner />}
+      <div className="sig-twocol">
+        <BuyColumn isFree={isFree} />
+        <SellColumn isFree={isFree} />
+      </div>
+    </>
   )
 }

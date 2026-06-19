@@ -6,7 +6,10 @@ import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents } from './gating'
 import { logoCls, ymd } from './util'
+import { FAKE_SIG } from './locked-fixtures'
 import PagedTable from './Pager'
+
+const FREE_PREVIEW = 10   // free users see the top-10 by yield, yield-only, no pager
 
 const HEAD = (
   <tr>
@@ -32,6 +35,31 @@ function LockedOpenRow({ p }) {
       <td className="r" />
       <td className={'r ' + (yld != null ? dirClass(yld) : '')} style={{ paddingRight: 18 }}>
         {yld == null ? <span className="lock-pill">🔒</span> : <strong>{pct(yld)}</strong>}
+      </td>
+    </tr>
+  )
+}
+
+// Free teaser row: the real Yield stays sharp, every other column is blurred
+// decoy (same blur effect as the locked signal cards). No lock glyph/pill.
+function BlurredOpenRow({ p, idx = 0 }) {
+  const f = FAKE_SIG[idx % FAKE_SIG.length]
+  const yld = p.reveal?.includes('yield') ? p.unrealized_pct : null   // server reveals yield for the top teaser rows
+  const fakeEntry = (parseFloat(f.price) * 0.9).toFixed(2)
+  const fakeDays = [12, 34, 7, 21, 45][idx % 5]
+  return (
+    <tr className="locked-row">
+      <td><div className="ticker-cell lock-blur" aria-hidden="true">
+        <span className="logo-skel" />
+        <span className="tk">{f.tk}</span><span className="co">{f.co}</span>
+      </div></td>
+      <td className="r lock-blur" aria-hidden="true">2026-05-12</td>
+      <td className="r lock-blur" aria-hidden="true">{fakeEntry}</td>
+      <td className="r lock-blur" aria-hidden="true">{f.price}</td>
+      <td className="r lock-blur" aria-hidden="true">{fakeDays}</td>
+      <td className="r lock-blur" aria-hidden="true">+$120</td>
+      <td className={'r ' + (yld != null ? dirClass(yld) : '')} style={{ paddingRight: 18 }}>
+        {yld == null ? '—' : <strong>{pct(yld)}</strong>}
       </td>
     </tr>
   )
@@ -63,9 +91,30 @@ function FullOpenRow({ p }) {
 
 export default function OpenTrades() {
   const me = useMe()
+  const isFree = me.plan === 'free'
   const qc = useQueryClient()
   const { data } = useQuery({ queryKey: ['open-trades', 'US'], queryFn: () => getOpenTrades('US') })
   const rows = Array.isArray(data) ? data : []          // server-sorted by yield desc
+
+  // Free: top-10 by yield, yield-only teaser, no pager, no per-row CTA.
+  if (isFree) {
+    const shown = rows.slice(0, FREE_PREVIEW)
+    return (
+      <>
+        <div className="section-h">
+          <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
+        </div>
+        <table className="data-table">
+          <thead>{HEAD}</thead>
+          <tbody>
+            {shown.length
+              ? shown.map((p, i) => <BlurredOpenRow key={i} p={p} idx={i} />)
+              : <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 24 }}>No open positions.</td></tr>}
+          </tbody>
+        </table>
+      </>
+    )
+  }
 
   async function unlockAll() {
     try {

@@ -829,7 +829,10 @@ export default function AccountPage() {
     const m = searchParams.get('m')
     if (m === 'picture') setPicModal(true)
     else if (m === 'password') { setPane('security'); setPwModal(true) }
-    if (m) setSearchParams({}, { replace: true })
+    // Deep-link to a specific pane, e.g. ?pane=plan from the Signals upgrade CTA.
+    const p = searchParams.get('pane')
+    if (p && NAV.some(n => n.id === p)) setPane(p)
+    if (m || p) setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
   const notify = useCallback((msg, type = 'success') => setToast({ msg, type, k: Date.now() }), [])
   const dismissToast = useCallback(() => setToast(null), [])

@@ -75,7 +75,7 @@ export function SignalCard({ s }) {
   )
 }
 
-export function LockedSignalCard({ s, kind, onUnlock, idx = 0 }) {
+export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false }) {
   const me = useMe()
   const f = FAKE_SIG[idx % FAKE_SIG.length]
   const k = (kind || '').toUpperCase() === 'SELL' ? 'sell' : 'buy'
@@ -99,16 +99,21 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0 }) {
         <div className="cell"><div className="l">5D ML</div><div className="v num">${(parseFloat(f.price) * 1.01).toFixed(2)}</div><div className="sub2 num up">{f.ml}</div></div>
         <div className="cell"><div className="l">Health</div>{healthDots(f.h)}</div>
       </div>
-      <div className="sc-cta">
-        {canPayRow
-          ? <button className="lock-pill" onClick={() => onUnlock(s)} title="Unlock this signal">
-              <svg className="lock-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
-              </svg>
-              Unlock · {fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)}
-            </button>
-          : <span className="lock-pill"><svg className="lock-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>{s.reason === 'pay' ? 'See all' : 'Upgrade'}</span>}
-      </div>
+      {/* Free users get a single page-level upgrade CTA (in SignalsSplit) instead
+          of a per-card pill, so skip the card CTA here. Pro/Max keep the
+          wallet pay-per-row unlock button. */}
+      {!isFree && (
+        <div className="sc-cta">
+          {canPayRow
+            ? <button className="lock-pill" onClick={() => onUnlock(s)} title="Unlock this signal">
+                <svg className="lock-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+                </svg>
+                Unlock · {fmtCents(s.unlock_price_cents ?? me.per_row_price_cents)}
+              </button>
+            : <span className="lock-pill"><svg className="lock-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>{s.reason === 'pay' ? 'See all' : 'Upgrade'}</span>}
+        </div>
+      )}
     </div>
   )
 }
