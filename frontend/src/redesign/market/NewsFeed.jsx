@@ -12,6 +12,34 @@ import NewsRow from './NewsRow'
 import NewsReader from './NewsReader'
 import { newsSrc, bgImg } from './newsUtil'
 
+function NewsSkeleton() {
+  return (
+    <div className="news-feed" aria-busy="true">
+      <div className="rd-skel ov-skel-h" style={{ marginBottom: 24 }} />
+      <div className="news-hero" style={{ cursor: 'default' }}>
+        <div className="rd-skel" style={{ height: 270 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="rd-skel" style={{ height: 13, width: 90 }} />
+          <div className="rd-skel" style={{ height: 26, width: '95%' }} />
+          <div className="rd-skel" style={{ height: 26, width: '70%' }} />
+          <div className="rd-skel" style={{ height: 13, width: '100%', marginTop: 8 }} />
+          <div className="rd-skel" style={{ height: 13, width: '100%' }} />
+          <div className="rd-skel" style={{ height: 13, width: '85%' }} />
+        </div>
+      </div>
+      <div className="news-cards" style={{ overflow: 'hidden' }}>
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className="news-card" style={{ cursor: 'default' }}>
+            <div className="rd-skel" style={{ height: 190 }} />
+            <div className="rd-skel" style={{ height: 13, width: '100%', marginTop: 10 }} />
+            <div className="rd-skel" style={{ height: 13, width: '60%', marginTop: 6 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function NewsFeed() {
   const [limit, setLimit] = useState(100)
   const [listCount, setListCount] = useState(20)  // More Headlines rows (10 per column)
@@ -64,6 +92,7 @@ export default function NewsFeed() {
   }, [news, cat, ticker, q, mySet])
 
   const isFiltered = Boolean(ticker) || cat !== 'all' || Boolean(q.trim())
+  const loading = data === undefined
 
   const catchUp = () => {
     setSeenTs(newestTs)
@@ -81,6 +110,11 @@ export default function NewsFeed() {
     if (13 + next > limit) setLimit(13 + next + 13)        // keep enough fetched ahead
   }
 
+  // While the feed is loading, paint a skeleton — NOT null. An empty .body lets
+  // the header's pulsing GPU layers (status dot/icon) leave a Chrome compositing
+  // ghost-smear on the bare page background; the skeleton covers it (matches the
+  // Overview tab, which never renders a bare body during load).
+  if (loading) return <NewsSkeleton />
   if (!news.length) return null
 
   const [hero, ...rest] = filtered
