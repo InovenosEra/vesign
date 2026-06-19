@@ -5,8 +5,8 @@
  *   • Deep dive — per-ticker in-page detail (hero, chart, fundamentals, analyst,
  *     ML, signal history, news). Tab state lives here; the selected deep-dive
  *     ticker lives in DeepDive itself. */
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import ResearchHead from './research/ResearchHead'
 import Screener from './research/Screener'
 import DeepDive from './research/DeepDive'
@@ -15,24 +15,21 @@ import { getSignalsToday } from '../api'
 import './research/research.css'
 
 export default function ResearchPage() {
-  // Deep-link: /research?ticker=XYZ (e.g. from the modal's "Open full research").
+  // Sub-page is in the URL: /research = screener, /research/AAPL = deep dive.
+  // ?ticker= is kept as a fallback for any older deep-links.
+  const { ticker: pathTicker } = useParams()
   const [params] = useSearchParams()
-  const urlTicker = params.get('ticker')
-  const [tab, setTab] = useState(urlTicker ? 'deep-dive' : 'screener')   // 'screener' | 'deep-dive'
+  const navigate = useNavigate()
+  const urlTicker = pathTicker || params.get('ticker')
+  const tab = urlTicker ? 'deep-dive' : 'screener'
+  const deepTicker = (urlTicker || 'NVDA').toUpperCase()
+  const setTab = (t) => navigate(t === 'deep-dive' ? '/research/' + deepTicker : '/research')
+  const setDeepTicker = (v) => navigate('/research/' + String(v).toUpperCase())
   const [count, setCount] = useState(null)
   // Gate the screener so its filter rail + ranked table appear together.
   const screenerReady = useReady(true, [
     [['signals-today', 'US'], () => getSignalsToday(null, 'US')],
   ])
-  // Lets a screener row "drill into" the deep dive instead of opening the modal,
-  // mirroring the mockup's per-ticker detail intent. Optional — rows still open
-  // the shared SignalModal (matching the mockup's body click handler), but a
-  // deep-dive jump is wired for the search/recent pills.
-  const [deepTicker, setDeepTicker] = useState(urlTicker ? urlTicker.toUpperCase() : 'NVDA')
-  // If the deep-link param arrives while already mounted, jump to that ticker.
-  useEffect(() => {
-    if (urlTicker) { setDeepTicker(urlTicker.toUpperCase()); setTab('deep-dive') }
-  }, [urlTicker])
 
   return (
     <>

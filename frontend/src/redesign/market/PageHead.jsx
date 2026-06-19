@@ -11,7 +11,7 @@ export default function PageHead({ tab, setTab }) {
     <div className="page-head">
       <div className="ph-tabs">
         {TABS.map(t => (
-          <a key={t.id} href="#" className={'ph-tab' + (tab === t.id ? ' active' : '')}
+          <a key={t.id} href={'/market/' + t.id} className={'ph-tab' + (tab === t.id ? ' active' : '')}
             onClick={(e) => { e.preventDefault(); setTab(t.id) }}>{t.label}</a>
         ))}
         <span className="day ph-inline-day">{day}</span>

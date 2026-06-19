@@ -7,7 +7,7 @@
  * trading toggles are mock UI (no backend yet) — interactive but not persisted. */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, useSearchParams } from 'react-router-dom'
+import { NavLink, useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { useUser, useClerk, useReverification } from '@clerk/react'
@@ -818,21 +818,24 @@ function DataPane() {
 }
 
 export default function AccountPage() {
-  const [pane, setPane] = useState('profile')
+  // Active pane comes from the URL (/account/:pane) so the URL reflects the
+  // sub-page; default to profile for an unknown/blank slug.
+  const { pane: paneParam } = useParams()
+  const navigate = useNavigate()
+  const pane = NAV.some(n => n.id === paneParam) ? paneParam : 'profile'
+  const setPane = (id) => { navigate('/account/' + id); window.scrollTo({ top: 0 }) }
   const [toast, setToast] = useState(null)
   const [picModal, setPicModal] = useState(false)
   const [pwModal, setPwModal] = useState(false)
   // Deep-link from the header account menu: ?m=picture|password auto-opens that
-  // editor, then the param is cleared so a refresh doesn't re-open it.
+  // editor (the target pane is in the path), then the param is cleared so a
+  // refresh doesn't re-open it.
   const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
     const m = searchParams.get('m')
     if (m === 'picture') setPicModal(true)
-    else if (m === 'password') { setPane('security'); setPwModal(true) }
-    // Deep-link to a specific pane, e.g. ?pane=plan from the Signals upgrade CTA.
-    const p = searchParams.get('pane')
-    if (p && NAV.some(n => n.id === p)) setPane(p)
-    if (m || p) setSearchParams({}, { replace: true })
+    else if (m === 'password') setPwModal(true)
+    if (m) setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
   const notify = useCallback((msg, type = 'success') => setToast({ msg, type, k: Date.now() }), [])
   const dismissToast = useCallback(() => setToast(null), [])
@@ -877,7 +880,7 @@ export default function AccountPage() {
                   {ICONS[n.id]}{n.label}<span className="soon-tag">Soon</span>
                 </a>
               ) : (
-                <a key={n.id} className={pane === n.id ? 'active' : ''} onClick={() => { setPane(n.id); window.scrollTo({ top: 0 }) }}>
+                <a key={n.id} className={pane === n.id ? 'active' : ''} href={'/account/' + n.id} onClick={(e) => { e.preventDefault(); setPane(n.id) }}>
                   {ICONS[n.id]}{n.label}
                 </a>
               )

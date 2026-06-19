@@ -662,13 +662,18 @@ function AppLayout() {
               <main className={isRedesignRoute ? undefined : 'app-main'}>
                 <Suspense fallback={<PageFallback />}>
                   <Routes>
-                    <Route path="/market" element={<AppShell><MarketPage /></AppShell>} />
-                    <Route path="/" element={<Navigate to="/market" replace />} />
-                    <Route path="/signals" element={<AppShell><RdSignalsPage /></AppShell>} />
-                    <Route path="/portfolio" element={<AppShell><RdPortfolioPage /></AppShell>} />
-                    <Route path="/research" element={<AppShell><RdResearchPage /></AppShell>} />
-                    <Route path="/research/:ticker" element={<AppShell><RdResearchPage /></AppShell>} />
-                    <Route path="/account" element={<AppShell><RdAccountPage /></AppShell>} />
+                    <Route path="/market" element={<Navigate to="/market/overview" replace />} />
+                    <Route path="/market/:tab" element={<AppShell><MarketPage /></AppShell>} />
+                    <Route path="/" element={<Navigate to="/market/overview" replace />} />
+                    <Route path="/signals" element={<Navigate to="/signals/active-trades" replace />} />
+                    <Route path="/signals/:tab" element={<AppShell><RdSignalsPage /></AppShell>} />
+                    <Route path="/portfolio" element={<Navigate to="/portfolio/holdings" replace />} />
+                    <Route path="/portfolio/:tab" element={<AppShell><RdPortfolioPage /></AppShell>} />
+                    {/* optional :ticker — /research = screener, /research/AAPL = deep dive.
+                        One route (not two) so toggling tabs doesn't remount the page. */}
+                    <Route path="/research/:ticker?" element={<AppShell><RdResearchPage /></AppShell>} />
+                    <Route path="/account" element={<Navigate to="/account/profile" replace />} />
+                    <Route path="/account/:pane" element={<AppShell><RdAccountPage /></AppShell>} />
                     {/* Old pages kept reachable during the port (not in redesign nav). */}
                     <Route path="/signals-old" element={<SignalsPage />} />
                     <Route path="/trades" element={<TradesPage />} />

@@ -1,6 +1,7 @@
 /* Redesign Market page. Renders inside <AppShell> (.rd wrapper, tape, header,
  * ticker-modal context). Tabbed: Overview / Market Trend / News / Calendar. */
 import { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
 import {
   getIndices, getCommodities, getCurrencies, getMovers,
@@ -70,8 +71,13 @@ function OverviewSkeleton() {
   )
 }
 
+const MARKET_TABS = ['overview', 'news']   // URL slug == tab id
+
 export default function MarketPage() {
-  const [tab, setTab] = useState('overview')
+  const { tab: slug } = useParams()
+  const navigate = useNavigate()
+  const tab = MARKET_TABS.includes(slug) ? slug : 'overview'
+  const setTab = (t) => navigate('/market/' + t)
   const [sector, setSector] = useState(null)
   const ovReady = useOverviewReady(tab === 'overview')
   return (

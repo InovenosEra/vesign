@@ -9,11 +9,11 @@ export default function ResearchHead({ tab, setTab, count }) {
     <div className="page-head">
       <div className="ph-tabs">
         <a className={'ph-tab' + (tab === 'screener' ? ' active' : '')}
-          href="#screener" onClick={(e) => { e.preventDefault(); setTab('screener') }}>
+          href="/research" onClick={(e) => { e.preventDefault(); setTab('screener') }}>
           Screener {count != null && <span className="count">{count}</span>}
         </a>
         <a className={'ph-tab' + (tab === 'deep-dive' ? ' active' : '')}
-          href="#deep-dive" onClick={(e) => { e.preventDefault(); setTab('deep-dive') }}>
+          href="/research" onClick={(e) => { e.preventDefault(); setTab('deep-dive') }}>
           Deep dive
         </a>
         <span className="day ph-inline-day">{day}</span>

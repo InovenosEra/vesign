@@ -126,7 +126,8 @@ function AccountMenu() {
   }, [])
   const initials = ((user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')) || 'IL'
   const firstName = user?.firstName || 'there'
-  const go = (m) => { setOpen(false); navigate(`/account?m=${m}`) }
+  // Password lives in the Security pane; picture editor opens on Profile.
+  const go = (m) => { setOpen(false); navigate(m === 'password' ? '/account/security?m=password' : '/account/profile?m=picture') }
   return (
     <div className={'account-menu' + (open ? ' open' : '')} ref={ref}>
       <div className="account-trigger">

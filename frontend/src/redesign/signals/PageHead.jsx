@@ -22,12 +22,12 @@ export default function PageHead({ tab, setTab }) {
       <div className="ph-tabs">
         <a
           className={'ph-tab' + (tab === 'today' ? ' active' : '')}
-          href="#"
+          href="/signals/active-trades"
           onClick={(e) => { e.preventDefault(); setTab('today') }}
-        >Signals <span className="count">{sigList.length ? todayCount : '—'}</span></a>
+        >Active trades <span className="count">{sigList.length ? todayCount : '—'}</span></a>
         <a
           className={'ph-tab' + (tab === 'closed' ? ' active' : '')}
-          href="#"
+          href="/signals/closed-trades"
           onClick={(e) => { e.preventDefault(); setTab('closed') }}
         >Closed trades <span className="count">{Array.isArray(trades) ? closedCount.toLocaleString() : '—'}</span></a>
         <span className="day ph-inline-day">{day}</span>

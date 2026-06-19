@@ -2,7 +2,7 @@
  * wrapper, tape, header, and the ticker-modal context). Ported from
  * trades-v5.html: a context+tabs page-head, a Signals pane (BUY/SELL split +
  * open trades) and a Closed-trades pane (stats cards + historical table). */
-import { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import './signals/signals.css'
 import PageHead from './signals/PageHead'
 import SignalsSplit from './signals/SignalsSplit'
@@ -12,8 +12,16 @@ import { tradeWindow } from './signals/util'
 import { useReady, PageSkeleton } from './LoadGate'
 import { getSignalsToday, getOpenTrades, getStats, getTrades } from '../api'
 
+// URL slug <-> internal tab key. The slug is the last path segment so the URL
+// reflects the active sub-page (/signals/active-trades, /signals/closed-trades).
+const TAB_BY_SLUG = { 'active-trades': 'today', 'closed-trades': 'closed' }
+const SLUG_BY_TAB = { today: 'active-trades', closed: 'closed-trades' }
+
 export default function SignalsPage() {
-  const [tab, setTab] = useState('today')
+  const { tab: slug } = useParams()
+  const navigate = useNavigate()
+  const tab = TAB_BY_SLUG[slug] || 'today'
+  const setTab = (t) => navigate('/signals/' + (SLUG_BY_TAB[t] || 'active-trades'))
   const { start, end } = tradeWindow()
   // Both panes mount (display toggled), so all their queries fire on load. Gate
   // each pane so its sections appear together instead of popping in piecemeal.

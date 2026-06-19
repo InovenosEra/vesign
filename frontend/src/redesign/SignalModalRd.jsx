@@ -352,7 +352,7 @@ export default function SignalModalRd({ row, onClose }) {
           </div>
           <div className="spacer" />
           <a className="link" style={{ cursor: 'pointer' }}
-            onClick={() => { if (ticker) { onClose?.(); navigate(`/research?ticker=${encodeURIComponent(ticker)}`) } }}>Open full research →</a>
+            onClick={() => { if (ticker) { onClose?.(); navigate(`/research/${encodeURIComponent(ticker)}`) } }}>Open full research →</a>
         </div>
 
       </div>

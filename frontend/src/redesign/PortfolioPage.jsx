@@ -2,7 +2,7 @@
  * wrapper, tape, header, and the ticker-modal context). Ported from
  * portfolio-v1.html — Holdings tab (KPIs, performance+allocation, watchlist
  * comparison, holdings table) + a Watchlists tab. */
-import { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getPortfolioHoldings, getPortfolioComparison, getPortfolioPerformance } from '../api'
 import KpiStrip from './portfolio/KpiStrip'
@@ -50,8 +50,13 @@ function computeRows(holdings) {
   }
 }
 
+const PORTFOLIO_TABS = ['holdings', 'watchlists']   // URL slug == tab id
+
 export default function PortfolioPage() {
-  const [tab, setTab] = useState('holdings')
+  const { tab: slug } = useParams()
+  const navigate = useNavigate()
+  const tab = PORTFOLIO_TABS.includes(slug) ? slug : 'holdings'
+  const setTab = (t) => { navigate('/portfolio/' + t); window.scrollTo({ top: 0, behavior: 'instant' }) }
   const { data: holdings } = useQuery({ queryKey: ['portfolio-holdings'], queryFn: () => getPortfolioHoldings('US'), refetchInterval: 3_000 })
   const { data: cmp } = useQuery({ queryKey: ['portfolio-comparison'], queryFn: () => getPortfolioComparison('US') })
   // Gate the holdings tab so KPIs + performance chart + allocation + comparison +
@@ -80,12 +85,12 @@ export default function PortfolioPage() {
     <>
       <div className="page-head">
         <div className="ph-tabs">
-          <a className={'ph-tab' + (tab === 'holdings' ? ' active' : '')}
-            onClick={(e) => { e.preventDefault(); setTab('holdings'); window.scrollTo({ top: 0, behavior: 'instant' }) }}>
+          <a className={'ph-tab' + (tab === 'holdings' ? ' active' : '')} href="/portfolio/holdings"
+            onClick={(e) => { e.preventDefault(); setTab('holdings') }}>
             Holdings <span className="count">{rows.length || '—'}</span>
           </a>
-          <a className={'ph-tab' + (tab === 'watchlists' ? ' active' : '')}
-            onClick={(e) => { e.preventDefault(); setTab('watchlists'); window.scrollTo({ top: 0, behavior: 'instant' }) }}>
+          <a className={'ph-tab' + (tab === 'watchlists' ? ' active' : '')} href="/portfolio/watchlists"
+            onClick={(e) => { e.preventDefault(); setTab('watchlists') }}>
             Watchlists <span className="count">{wlCount || '—'}</span>
           </a>
           <span className="day ph-inline-day">{day}</span>
