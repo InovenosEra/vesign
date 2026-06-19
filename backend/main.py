@@ -2588,7 +2588,9 @@ def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
         price = ent.PER_ROW_PRICE_CENTS
     elif scope == "all":
         occurrences = [(r["ticker"], ent._norm_date(r.get(date_key))) for r in candidates if r.get("ticker")]
-        price = ent.see_all_price_cents(len(candidates))   # 50% of count × per-row, floored to $1
+        # Open trades unlock as ONE flat-$2 bundle (no per-row). BUY/SELL keep the
+        # dynamic 50%-of-count price.
+        price = ent.OPEN_UNLOCK_ALL_CENTS if kind == "open" else ent.see_all_price_cents(len(candidates))
     else:
         raise HTTPException(status_code=400, detail="bad scope")
 

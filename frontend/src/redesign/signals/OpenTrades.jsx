@@ -4,12 +4,13 @@ import { num, pct, dirClass, LOGO } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
-import { isLocked, hasMoreLocked, fmtCents, seeAllCents } from './gating'
+import { isLocked, hasMoreLocked, fmtCents } from './gating'
 import { logoCls, ymd } from './util'
 import { FAKE_SIG } from './locked-fixtures'
 import PagedTable from './Pager'
 
-const FREE_PREVIEW = 10   // free users see the top-10 by yield, yield-only, no pager
+const FREE_PREVIEW = 10           // free users see the top-10 by yield, yield-only, no pager
+const OPEN_UNLOCK_ALL_CENTS = 200 // flat $2 to unlock ALL open trades — mirrors backend ent.OPEN_UNLOCK_ALL_CENTS
 
 const HEAD = (
   <tr>
@@ -20,34 +21,16 @@ const HEAD = (
   </tr>
 )
 
-// Locked open row: ONLY the Yield is ever shown. Every other column is hidden
-// (no decoy, no blur) — Free's top-10 reveal the real yield (sharp) as the
-// teaser; deeper/locked rows show a lock glyph. Nothing identifying is rendered.
-function LockedOpenRow({ p }) {
-  const yld = p.reveal?.includes('yield') ? p.unrealized_pct : null
-  return (
-    <tr className="locked-row">
-      <td><span className="lock-pill">🔒 Locked</span></td>
-      <td className="r" />
-      <td className="r" />
-      <td className="r" />
-      <td className="r" />
-      <td className="r" />
-      <td className={'r ' + (yld != null ? dirClass(yld) : '')} style={{ paddingRight: 18 }}>
-        {yld == null ? <span className="lock-pill">🔒</span> : <strong>{pct(yld)}</strong>}
-      </td>
-    </tr>
-  )
-}
-
-// Free teaser row: the real Yield stays sharp; every other column is frosted
-// fake data hazed via text-shadow (NOT filter:blur, which smears the page
-// background in Chrome). aria-hidden + fake values — nothing identifying.
+// Frosted locked row: every column is fake data hazed via text-shadow (NOT
+// filter:blur, which smears the page background in Chrome). aria-hidden + fake
+// values — nothing identifying. Free's top-10 reveal the real Yield (sharp) as
+// the teaser; Pro's locked rows haze the Yield too (no revealed value).
 function BlurredOpenRow({ p, idx = 0 }) {
   const f = FAKE_SIG[idx % FAKE_SIG.length]
   const yld = p.reveal?.includes('yield') ? p.unrealized_pct : null   // server reveals yield for the top teaser rows
   const fakeEntry = (parseFloat(f.price) * 0.9).toFixed(2)
   const fakeDays = [12, 34, 7, 21, 45][idx % 5]
+  const fakeYld = [18.4, 9.2, 31.7, 5.6, 22.1][idx % 5]   // hazed when the row has no revealed yield (Pro)
   return (
     <tr className="locked-row">
       <td><div className="ticker-cell lock-haze" aria-hidden="true">
@@ -59,9 +42,9 @@ function BlurredOpenRow({ p, idx = 0 }) {
       <td className="r lock-haze" aria-hidden="true">{f.price}</td>
       <td className="r lock-haze" aria-hidden="true">{fakeDays}</td>
       <td className="r lock-haze" aria-hidden="true">+$120</td>
-      <td className={'r ' + (yld != null ? dirClass(yld) : '')} style={{ paddingRight: 18 }}>
-        {yld == null ? '—' : <strong>{pct(yld)}</strong>}
-      </td>
+      {yld == null
+        ? <td className="r lock-haze" aria-hidden="true" style={{ paddingRight: 18 }}><strong>+{fakeYld}%</strong></td>
+        : <td className={'r ' + dirClass(yld)} style={{ paddingRight: 18 }}><strong>{pct(yld)}</strong></td>}
     </tr>
   )
 }
@@ -132,15 +115,17 @@ export default function OpenTrades() {
     <>
       <div className="section-h">
         <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
+        {/* One flat-$2 bundle for ALL locked open trades (no per-row unlock).
+            $2.00 must match backend ent.OPEN_UNLOCK_ALL_CENTS. */}
         {showSeeAll && (
-          <button className="see-all-cta" onClick={unlockAll}>See all · {fmtCents(seeAllCents(rows.length, me.per_row_price_cents))}</button>
+          <button className="see-all-cta" onClick={unlockAll}>Unlock all · {fmtCents(OPEN_UNLOCK_ALL_CENTS)}</button>
         )}
       </div>
       <PagedTable
         head={HEAD}
         rows={rows}
         row={(p, i) => isLocked(p)
-          ? <LockedOpenRow key={i} p={p} />
+          ? <BlurredOpenRow key={i} p={p} idx={i} />
           : <FullOpenRow key={i} p={p} />}
         emptyLabel="No open positions."
         colspan={7}

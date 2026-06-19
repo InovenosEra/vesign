@@ -23,6 +23,7 @@ def see_all_price_cents(n_signals: int) -> int:
     return ((max(0, n_signals) * PER_ROW_PRICE_CENTS) // 2 // 100) * 100
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
 PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
+OPEN_UNLOCK_ALL_CENTS = 200    # Pro: flat $2 to unlock ALL open trades (one bundle, no per-row)
 
 _UNLOCK_SECRET = (
     os.getenv("UNLOCK_SECRET")
