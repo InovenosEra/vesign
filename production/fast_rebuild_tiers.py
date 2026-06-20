@@ -116,6 +116,34 @@ def fast_signal_pass():
     return len(up)
 
 
+def build_trade_log_fast():
+    """Memory-light rebuild of trade_log from the fast signals. The fast pass
+    already wrote the stop/RSI/365d exits as SELL rows, so a trade is just a
+    BUY-sequence terminated by the next SELL — no 3.5M-row price merge or
+    iterrows (which OOMs build_trade_log on the widened gate's volume).
+    return_pct uses the first-buy price, matching backtesting.engine.build_trade_log."""
+    df = pd.read_sql(
+        "SELECT ticker, DATE(date) d, signal, close FROM signals "
+        "WHERE signal IN ('BUY','SELL') ORDER BY ticker, date", engine)
+    rows = []
+    for ticker, g in df.groupby("ticker", sort=False):
+        open_t = None
+        for r in g.itertuples(index=False):
+            if r.signal == "BUY":
+                if open_t is None and r.close:
+                    open_t = (r.d, r.close)          # (buy_date, first buy_price)
+            elif r.signal == "SELL" and open_t is not None and r.close:
+                bd, bp = open_t
+                rows.append((ticker, bd, bp, r.d, r.close, (r.close - bp) / bp))
+                open_t = None
+    out = pd.DataFrame(rows, columns=["ticker", "buy_date", "buy_price",
+                                      "sell_date", "sell_price", "return_pct"])
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS trade_log"))
+    out.to_sql("trade_log", engine, if_exists="replace", index=False)
+    return len(out)
+
+
 def build_trade_lots():
     """(Re)build the trade_lots table from BUY signal rows paired to closed
     trades in trade_log. One row per lot: every BUY between a trade's buy_date
@@ -136,10 +164,10 @@ def build_trade_lots():
 
 
 def main():
-    from backtesting.engine import build_trade_log
     n = fast_signal_pass()
     print(f"Fast signal pass: {n:,} rows relabeled.")
-    build_trade_log()
+    nt = build_trade_log_fast()
+    print(f"trade_log: {nt:,} closed trades.")
     build_trade_lots()
     print("Fast tier rebuild complete (signals + trade_log + trade_lots).")
 
