@@ -665,9 +665,11 @@ def public_stats():
                             THEN (tl.sell_price - l.avg_cost) / l.avg_cost
                         ELSE tl.return_pct
                     END AS yield_frac,
-                    tl.return_pct AS return_pct,
                     julianday(tl.sell_date) - julianday(tl.buy_date) AS held_days
                 FROM trade_log tl
+                JOIN signals s
+                  ON s.ticker = tl.ticker AND DATE(s.date) = DATE(tl.buy_date)
+                 AND s.signal = 'BUY' AND s.tier = 1
                 LEFT JOIN lots l
                   ON l.ticker = tl.ticker
                  AND l.bd = DATE(tl.buy_date)
@@ -676,8 +678,8 @@ def public_stats():
             )
             SELECT
                 COUNT(*) AS n,
-                -- Win rate is canonically return_pct-based (matches /api/trades).
-                AVG(CASE WHEN return_pct > 0 THEN 1.0 ELSE 0.0 END) AS win_frac,
+                -- Win rate is yield-based for DCA-aware Prime scope.
+                AVG(CASE WHEN yield_frac > 0 THEN 1.0 ELSE 0.0 END) AS win_frac,
                 -- Avg yield is the DCA-aware per-trade yield (matches TradesPage).
                 AVG(yield_frac) AS avg_ret,
                 AVG(held_days) AS avg_days
@@ -799,7 +801,7 @@ def _build_signals_today(mkt: str) -> list[dict]:
                    {_ANALYST_UPSIDE_SQL},
                    COALESCE(ae.target_mean_price, s.target_mean_price) AS target_mean_price, COALESCE(ae.target_low_price, s.target_low_price) AS target_low_price, COALESCE(ae.target_high_price, s.target_high_price) AS target_high_price,
                    s.prediction_score,
-                   s.vqs,
+                   s.vqs, s.tier,
                    s.signal, s.lot_seq, c.company, c.logo_url, c.industry, c.domain, c.description, c.description_short, CAST(COALESCE(h.score, s.health_score) AS INTEGER) AS health_score, h.reason AS health_reason,
                    f.market_cap
             FROM signals s
