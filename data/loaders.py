@@ -13,8 +13,8 @@ config_path = os.path.join(BASE_DIR, "config", "settings.yaml")
 with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
-DB_NAME = config["database"]["name"]
-DB_PATH = os.path.join(BASE_DIR, DB_NAME)
+DB_NAME = os.environ.get("VESIGN_DB") or config["database"]["name"]
+DB_PATH = DB_NAME if os.path.isabs(DB_NAME) else os.path.join(BASE_DIR, DB_NAME)
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 
