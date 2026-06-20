@@ -13,8 +13,11 @@ config_path = os.path.join(BASE_DIR, "config", "settings.yaml")
 with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
-DB_NAME = config["database"]["name"]
-DB_PATH = os.environ.get("DB_PATH") or os.path.join(BASE_DIR, DB_NAME)
+# DB path resolution honors both overrides: VESIGN_DB (a db name or absolute
+# path, used by the tier rebuild/verify scripts) and DB_PATH (an explicit full
+# path). Falls back to the configured name. Either env var unset → prior behavior.
+DB_NAME = os.environ.get("VESIGN_DB") or config["database"]["name"]
+DB_PATH = os.environ.get("DB_PATH") or (DB_NAME if os.path.isabs(DB_NAME) else os.path.join(BASE_DIR, DB_NAME))
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 

@@ -1,4 +1,13 @@
-"""Tests for GET /api/stats — public marketing stats (no auth)."""
+"""Tests for GET /api/stats — public marketing stats (no auth).
+
+NOTE (2026-06-20): /api/stats was scoped to Prime (tier=1) signals only.
+All existing tests now insert a matching tier-1 BUY signal alongside each
+trade_log row so the JOIN in public_stats finds them.  The *semantic intent*
+of every test is unchanged — they still verify aggregation arithmetic, DCA
+avg-cost, auth, and empty-db behaviour — the only structural change is that
+test data must now satisfy the Prime filter.  If a trade lacks a tier-1 signal
+it is intentionally excluded (see test_tiers_api.py for that assertion).
+"""
 import os
 import tempfile
 import pytest
@@ -26,6 +35,11 @@ def stats_app():
             CREATE TABLE trade_lots (
                 ticker TEXT, buy_date TEXT, sell_date TEXT,
                 lot_seq INTEGER, lot_date TEXT, lot_price REAL
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE signals (
+                date TEXT, ticker TEXT, signal TEXT, tier INTEGER
             )
         """))
         conn.execute(text("""
@@ -58,7 +72,12 @@ def stats_app():
         pass
 
 
-def _insert_trade(bm, *, ticker, buy_date, sell_date, return_pct):
+def _insert_trade(bm, *, ticker, buy_date, sell_date, return_pct, tier=1):
+    """Insert a trade_log row and a matching BUY signal with the given tier.
+
+    Defaults to tier=1 (Prime) so existing call-sites need no change; tests
+    that want non-Prime trades can pass tier=2 or tier=3.
+    """
     from sqlalchemy import text
     with bm.engine.begin() as conn:
         conn.execute(text("""
@@ -66,6 +85,10 @@ def _insert_trade(bm, *, ticker, buy_date, sell_date, return_pct):
             VALUES (:t, :bd, 100.0, :sd, :sp, :r)
         """), {"t": ticker, "bd": buy_date, "sd": sell_date,
                "sp": 100.0 * (1 + return_pct), "r": return_pct})
+        conn.execute(text("""
+            INSERT INTO signals (date, ticker, signal, tier)
+            VALUES (:bd, :t, 'BUY', :tier)
+        """), {"bd": buy_date, "t": ticker, "tier": tier})
 
 
 def _insert_company(bm, ticker, market="US"):
@@ -87,7 +110,7 @@ def _insert_lots(bm, *, ticker, buy_date, sell_date, lot_prices):
 
 def test_stats_is_public_and_aggregates(stats_app):
     bm, client = stats_app
-    # 4 trades: 3 wins, 1 loss → win_rate 75%
+    # 4 Prime trades: 3 wins, 1 loss → win_rate 75% (yield-based)
     _insert_trade(bm, ticker="AAA", buy_date="2025-01-01 00:00:00", sell_date="2025-01-11 00:00:00", return_pct=0.10)  # +10%, 10d
     _insert_trade(bm, ticker="BBB", buy_date="2025-01-01 00:00:00", sell_date="2025-01-21 00:00:00", return_pct=0.20)  # +20%, 20d
     _insert_trade(bm, ticker="CCC", buy_date="2025-01-01 00:00:00", sell_date="2025-01-31 00:00:00", return_pct=0.30)  # +30%, 30d

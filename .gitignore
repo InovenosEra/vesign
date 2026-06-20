@@ -57,6 +57,16 @@ analysis/
 docs/research/
 docs/superpowers/plans/
 
+# research_universe: keep scripts in git, ignore the (large) downloaded data
+research_universe/prices/
+research_universe/*.parquet
+research_universe/*.csv
+research_universe/*.log
+
+# Ad-hoc data exports
+*_export.csv
+vesign_research.zip
+
 # Local design-prototype playground (not part of the real app)
 redesign-demo/
 

@@ -254,6 +254,31 @@ img.logo-white-bg, img.modal-logo-white-bg {
   border-radius: 4px;
 }
 
+/* BUY-signal quality-tier stars: Prime (purple, shining) / Strong (gold) / Potential (silver) */
+.tier-star {
+  font-style: normal;
+  line-height: 1;
+  display: inline-block;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, .55));
+}
+.tier-star--prime {
+  color: #c084fc;
+  text-shadow: 0 0 4px #a855f7, 0 0 9px #7c3aed, 0 0 15px rgba(124, 58, 237, .6);
+  animation: tierShine 2.4s ease-in-out infinite;
+}
+.tier-star--strong {
+  color: #fcd34d;
+  text-shadow: 0 0 4px #f59e0b, 0 0 9px rgba(245, 158, 11, .75);
+}
+.tier-star--potential {
+  color: #eef2f7;
+  text-shadow: 0 0 3px #94a3b8, 0 0 7px rgba(148, 163, 184, .55);
+}
+@keyframes tierShine {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 1px rgba(0, 0, 0, .55)); }
+  50%      { filter: brightness(1.45) drop-shadow(0 0 1px rgba(0, 0, 0, .55)); }
+}
+
 /* ── Signal badge ── */
 .badge {
   display: inline-block;

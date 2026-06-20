@@ -20,7 +20,7 @@ def api():
     with eng.begin() as conn:
         conn.execute(text("""CREATE TABLE signals (date TEXT, ticker TEXT, close REAL,
             rsi REAL, target_mean_price REAL, target_low_price REAL, target_high_price REAL,
-            prediction_score REAL, vqs INTEGER, signal TEXT, lot_seq INTEGER,
+            prediction_score REAL, vqs INTEGER, tier INTEGER, signal TEXT, lot_seq INTEGER,
             health_score INTEGER, fair_value_upside REAL,
             rsi_3day_flag INTEGER, bb_condition INTEGER, analyst_condition INTEGER,
             volume_flag INTEGER, week52_condition INTEGER, health_condition INTEGER,
