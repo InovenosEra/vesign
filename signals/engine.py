@@ -363,9 +363,16 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
     _ensure_signals_columns()
 
     # ---------- Load open positions for trailing stop ----------
-    # For backfill: only consider positions opened before target_date
+    # Only consider positions opened BEFORE the date being scored. For backfill
+    # that's target_date; for the daily run (target_date=None) it's the latest
+    # data date. Without this, re-scoring an already-scored date (e.g. Monday
+    # re-running Friday — no weekend market data) would see that date's own fresh
+    # BUYs as "already open" and suppress them to HOLD, silently wiping signals.
     if open_positions is None:
-        open_positions = _get_open_positions(as_of_date=target_date)
+        _asof = target_date
+        if _asof is None:
+            _asof = pd.read_sql("SELECT MAX(DATE(date)) AS d FROM features", engine).iloc[0]["d"]
+        open_positions = _get_open_positions(as_of_date=_asof)
 
     # ---------- Load data ----------
     # V2 needs 65+ trading days of price history per call to compute mom_60d
