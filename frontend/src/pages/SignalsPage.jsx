@@ -12,40 +12,38 @@ import DownloadButton from '../components/DownloadButton'
 
 
 // BUY-signal quality tiers (from signals.tier): Prime = vqs 8-9, Strong = vqs 7, Potential = vqs 6.
-// Rendered as a small star on the upper-right of the ticker logo + a legend by the heading.
+// Rendered as a glowing star to the LEFT of the ticker logo + a legend by the heading.
+// Star colors/glow live in App.css (.tier-star--prime/strong/potential).
 const TIER_STAR = {
-  1: { label: 'Prime',     color: '#c084fc', glow: '0 0 3px #a855f7, 0 0 7px #7c3aed' }, // purple, shining
-  2: { label: 'Strong',    color: '#fbbf24', glow: '0 0 3px rgba(245,158,11,.85)' },     // gold
-  3: { label: 'Potential', color: '#cbd5e1', glow: '0 0 2px rgba(148,163,184,.6)' },     // silver
+  1: { label: 'Prime',     cls: 'prime' },     // purple, shining
+  2: { label: 'Strong',    cls: 'strong' },    // gold
+  3: { label: 'Potential', cls: 'potential' }, // silver
 };
 
-function TierStar({ tier, size = 12 }) {
+function TierStar({ tier, size = 16 }) {
   const s = TIER_STAR[tier];
   if (!s) return null;
   return (
-    <span aria-hidden="true"
-      style={{ color: s.color, fontSize: size, lineHeight: 1, textShadow: s.glow }}>★</span>
+    <span aria-hidden="true" className={`tier-star tier-star--${s.cls}`} style={{ fontSize: size }}>★</span>
   );
 }
 
-// Star overlaid on the upper-right corner of a ticker logo.
+// Fixed-width star slot to the left of a logo (keeps logos aligned across BUY/SELL rows).
 function TierLogoStar({ tier }) {
-  const s = TIER_STAR[tier];
-  if (!s) return null;
   return (
-    <span title={`${s.label} signal`}
-      style={{ position: 'absolute', top: -5, right: -6, pointerEvents: 'none' }}>
-      <TierStar tier={tier} size={13} />
+    <span title={tier ? `${TIER_STAR[tier].label} signal` : undefined}
+      style={{ width: 16, display: 'inline-flex', justifyContent: 'center', flex: '0 0 auto' }}>
+      {tier ? <TierStar tier={tier} size={16} /> : null}
     </span>
   );
 }
 
 function TierLegend() {
   return (
-    <div style={{ display: 'flex', gap: 14, alignItems: 'center', fontSize: 12, color: 'var(--muted)' }}>
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center', fontSize: 12, color: 'var(--muted)' }}>
       {[1, 2, 3].map((tr) => (
         <span key={tr} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <TierStar tier={tr} size={12} /> {TIER_STAR[tr].label}
+          <TierStar tier={tr} size={13} /> {TIER_STAR[tr].label}
         </span>
       ))}
     </div>
@@ -192,7 +190,7 @@ function Pagination({ page, pages, onChange }) {
 
 // Shared fixed widths so BUY and SELL tables align column-by-column
 // Columns: logo, ticker, company, mktcap, price, rsi, low, base, high, health, analyst target, ml score, live
-const COL_WIDTHS = ['44px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '75px', '85px', '75px', '100px']
+const COL_WIDTHS = ['58px', '70px', '150px', '90px', '70px', '55px', '80px', '80px', '80px', '75px', '85px', '75px', '100px']
 
 function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
   const { t } = useTranslation()
@@ -224,9 +222,9 @@ function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
         {rows.map((r, i) => (
           <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
             <td>
-              <span style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <TierLogoStar tier={r.tier} />
                 {r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}
-                {r.tier ? <TierLogoStar tier={r.tier} /> : null}
               </span>
             </td>
             <td>
@@ -368,9 +366,9 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
               <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
                 <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
                 <td>
-              <span style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <TierLogoStar tier={r.tier} />
                 {r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}
-                {r.tier ? <TierLogoStar tier={r.tier} /> : null}
               </span>
             </td>
                 <td><strong>{displayTicker(r.ticker)}</strong></td>
