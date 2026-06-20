@@ -43,7 +43,7 @@ Each signal is labeled by its `vqs` value. A signal belongs to exactly one tier.
 |---|---|---|--:|--:|--:|
 | **① Prime** | "Prime" *(public)* | `vqs == 9` | 1,244 | 74.6% | +40.5% |
 | **② Strong** | "Strong" | `vqs == 8` | 4,151 | 72.2% | +30.5% |
-| **③ Emerging** | "Emerging" | `vqs 6–7` | 11,309 | 72.2% | +21.5% |
+| **③ Potential** | "Potential" | `vqs 6–7` | 11,309 | 72.2% | +21.5% |
 
 - Volume steps are smooth: ×3.3 then ×2.7 (no cliff).
 - Yield ladder is clean and monotonic: **+40.5% → +30.5% → +21.5%**.
@@ -54,7 +54,7 @@ Each signal is labeled by its `vqs` value. A signal belongs to exactly one tier.
 ### 3.2 What is shown where
 
 - **Public / marketing pages:** only **Tier 1 (Prime)** statistics (74.6% win rate, +40.5% avg yield). This is the flagship number.
-- **In-app signal lists:** all three tiers, each rendered with its **label/badge** only. "Strong" and "Emerging" do **not** display win-rate/yield headline stats — they are presented as quality labels, not as performance claims.
+- **In-app signal lists:** all three tiers, each rendered with its **label/badge** only. "Strong" and "Potential" do **not** display win-rate/yield headline stats — they are presented as quality labels, not as performance claims.
 
 ### 3.3 Year-by-year (Tier 1 "Prime", the public face)
 
@@ -106,7 +106,7 @@ Tiers are defined by disjoint `vqs` bands (9 / 8 / 6–7), so a given signal row
 
 ### 5.4 UI
 
-- BUY signal cards/rows: a **tier badge** ("Prime" / "Strong" / "Emerging") with distinct styling. Prime visually dominant.
+- BUY signal cards/rows: a **tier badge** ("Prime" / "Strong" / "Potential") with distinct styling. Prime visually dominant.
 - Strong & Emerging show the **label only**, no per-tier headline win-rate/yield.
 - Public/marketing pages: flagship stats = Prime (74.6% / +40.5%).
 - (Interaction with the existing Free/Pro/Max access tiers — see `project_signals_tiered_access` — is a separate axis; tier-label gating to be decided then.)
