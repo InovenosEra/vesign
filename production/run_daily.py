@@ -14,7 +14,7 @@ from features.technical import compute_features
 from models.predict import run_prediction_engine
 from signals.engine import run_scoring
 
-from backtesting.engine import build_trade_log
+from production.fast_rebuild_tiers import build_trade_log_fast, build_trade_lots
 
 # ---------- Portfolio ----------
 from portfolio.ranking import run_ranking
@@ -389,7 +389,12 @@ def run_daily():
         print(f"News gate skipped: {e}")
     gc.collect()
 
-    build_trade_log()
+    # Memory-light trade tables: build_trade_log_fast pairs run_scoring's BUY/SELL
+    # rows (no 3.5M-row price merge → no OOM on the widened gate), and build_trade_lots
+    # maintains trade_lots, which the canonical build_trade_log never did — without
+    # this the DCA-aware /api/stats Prime yield decays after deploy day.
+    build_trade_log_fast()
+    build_trade_lots()
     gc.collect()
 
     run_ranking()

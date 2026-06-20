@@ -2006,7 +2006,7 @@ _open_trades_cache_lock = threading.Lock()
 _DCA_V1 = ("(rsi_3day_flag = 3 AND bb_condition = 1 AND analyst_condition = 1 "
            "AND volume_flag = 1 AND week52_condition = 1 AND health_condition = 1 "
            "AND ml_condition = 1)")
-_DCA_V2 = "(vqs = 9)"
+_DCA_V2 = "(vqs >= 6)"   # matches the widened BUY gate (engine.py: vqs>=6); was vqs==9
 
 
 def _compute_open_trade_lots(open_positions: list[dict]) -> dict[str, list[dict]]:

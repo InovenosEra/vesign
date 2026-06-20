@@ -16,7 +16,7 @@ from models.predict import run_prediction_engine
 from models.walk_forward import maybe_retrain_for_today
 from signals.engine import run_scoring
 
-from backtesting.engine import build_trade_log
+from production.fast_rebuild_tiers import build_trade_log_fast, build_trade_lots
 
 # ---------- Portfolio ----------
 from portfolio.ranking import run_ranking
@@ -70,7 +70,8 @@ def run_daily_fast():
     run_prediction_engine()
     run_scoring()
 
-    build_trade_log()
+    build_trade_log_fast()   # memory-light; also maintains trade_lots below
+    build_trade_lots()
     gc.collect()
 
     run_ranking()
