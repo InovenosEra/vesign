@@ -12,11 +12,45 @@ import DownloadButton from '../components/DownloadButton'
 
 
 // BUY-signal quality tiers (from signals.tier): Prime = vqs 8-9, Strong = vqs 7, Potential = vqs 6.
-const TIER_BADGE = {
-  1: { label: 'Prime',     bg: '#ede9fe', fg: '#6d28d9' },  // purple
-  2: { label: 'Strong',    bg: '#dbeafe', fg: '#1d4ed8' },  // blue
-  3: { label: 'Potential', bg: '#f1f5f9', fg: '#475569' },  // slate
+// Rendered as a small star on the upper-right of the ticker logo + a legend by the heading.
+const TIER_STAR = {
+  1: { label: 'Prime',     color: '#c084fc', glow: '0 0 3px #a855f7, 0 0 7px #7c3aed' }, // purple, shining
+  2: { label: 'Strong',    color: '#fbbf24', glow: '0 0 3px rgba(245,158,11,.85)' },     // gold
+  3: { label: 'Potential', color: '#cbd5e1', glow: '0 0 2px rgba(148,163,184,.6)' },     // silver
 };
+
+function TierStar({ tier, size = 12 }) {
+  const s = TIER_STAR[tier];
+  if (!s) return null;
+  return (
+    <span aria-hidden="true"
+      style={{ color: s.color, fontSize: size, lineHeight: 1, textShadow: s.glow }}>★</span>
+  );
+}
+
+// Star overlaid on the upper-right corner of a ticker logo.
+function TierLogoStar({ tier }) {
+  const s = TIER_STAR[tier];
+  if (!s) return null;
+  return (
+    <span title={`${s.label} signal`}
+      style={{ position: 'absolute', top: -5, right: -6, pointerEvents: 'none' }}>
+      <TierStar tier={tier} size={13} />
+    </span>
+  );
+}
+
+function TierLegend() {
+  return (
+    <div style={{ display: 'flex', gap: 14, alignItems: 'center', fontSize: 12, color: 'var(--muted)' }}>
+      {[1, 2, 3].map((tr) => (
+        <span key={tr} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <TierStar tier={tr} size={12} /> {TIER_STAR[tr].label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Shared primitives
@@ -189,7 +223,12 @@ function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
-            <td>{r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
+            <td>
+              <span style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+                {r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}
+                {r.tier ? <TierLogoStar tier={r.tier} /> : null}
+              </span>
+            </td>
             <td>
               <strong>{displayTicker(r.ticker)}</strong>
               {r.signal === 'BUY' && r.lot_seq > 1 && (
@@ -201,22 +240,7 @@ function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
                 </span>
               )}
             </td>
-            <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {r.tier && (
-                <span
-                  title={TIER_BADGE[r.tier].label}
-                  aria-label={TIER_BADGE[r.tier].label}
-                  style={{
-                    marginRight: 6, padding: '1px 6px', borderRadius: 999,
-                    background: TIER_BADGE[r.tier].bg, color: TIER_BADGE[r.tier].fg,
-                    fontSize: 10, fontWeight: 700, verticalAlign: 'middle',
-                  }}
-                >
-                  {TIER_BADGE[r.tier].label}
-                </span>
-              )}
-              {r.company ?? '—'}
-            </td>
+            <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
             <td>{fmtMktCap(r.market_cap)}</td>
             <td><PriceCell value={r.close} ticker={r.ticker} /></td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
@@ -343,7 +367,12 @@ function AllSignalsTable({ result, sortBy, sortDir, onSort, page, onPage, onRowC
             {rows.map((r, i) => (
               <tr key={i} className="clickable-row" onClick={() => onRowClick?.(r)}>
                 <td>{r.date ? (() => { const [y,m,d] = r.date.slice(0,10).split('-'); return `${d}/${m}/${y.slice(2)}` })() : '—'}</td>
-                <td>{r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
+                <td>
+              <span style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+                {r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}
+                {r.tier ? <TierLogoStar tier={r.tier} /> : null}
+              </span>
+            </td>
                 <td><strong>{displayTicker(r.ticker)}</strong></td>
                 <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
                 <td>{fmtMktCap(r.market_cap, market)}</td>
@@ -522,9 +551,12 @@ export default function SignalsPage() {
   return (
     <div>
       <div className="section">
-        <p className="section-title">
-          {t('signals.todayBuy', { count: loadingBuy ? '…' : (todayBuy?.length ?? 0) })}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <p className="section-title" style={{ margin: 0 }}>
+            {t('signals.todayBuy', { count: loadingBuy ? '…' : (todayBuy?.length ?? 0) })}
+          </p>
+          <TierLegend />
+        </div>
         {loadingBuy
           ? <p className="loading">{t('table.loading')}</p>
           : <TodayTable rows={todayBuy} prices={prices} phase={phase} onRowClick={setSelected} market={market} />}
