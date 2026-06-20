@@ -4,6 +4,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, getTrades } from '../../api'
 import { tradeWindow } from './util'
+import { TierLegend } from './tierStar'
 
 export default function PageHead({ tab, setTab }) {
   const { data: signals } = useQuery({ queryKey: ['signals-today', 'US'], queryFn: () => getSignalsToday(undefined, 'US') })
@@ -32,6 +33,7 @@ export default function PageHead({ tab, setTab }) {
         >Closed trades <span className="count">{Array.isArray(trades) ? closedCount.toLocaleString() : '—'}</span></a>
         <span className="day ph-inline-day">{day}</span>
       </div>
+      {tab === 'today' && <TierLegend />}
     </div>
   )
 }

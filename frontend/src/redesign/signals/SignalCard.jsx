@@ -10,6 +10,7 @@ import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
 import { fmtCents } from './gating'
 import { logoCls } from './util'
+import { TierStar } from './tierStar'
 import { FAKE_SIG } from './locked-fixtures'
 import SlideToUnlock from './SlideToUnlock'
 import SignalExplanation from '../SignalExplanation'
@@ -47,7 +48,7 @@ export function SignalCard({ s }) {
       <div className="sc-head">
         <img className={'sc-logo ' + logoCls(s.ticker)} src={LOGO(s.ticker)} alt={s.ticker} />
         <div className="sc-id">
-          <div className="trow"><span className="tk">{s.ticker}</span></div>
+          <div className="trow"><span className="tk">{s.ticker}</span><TierStar tier={s.tier} size={15} /></div>
           <div className="co">{s.company || ''}</div>
         </div>
       </div>
