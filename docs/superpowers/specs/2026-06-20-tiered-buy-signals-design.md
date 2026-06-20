@@ -41,9 +41,9 @@ Each signal is labeled by its `vqs` value. A signal belongs to exactly one tier.
 
 | Tier | Public label | Rule | Trades (8y backtest) | Win Rate | Avg Yield |
 |---|---|---|--:|--:|--:|
-| **① Strongest** | "Strongest" *(public)* | `vqs == 9` | 1,244 | 74.6% | +40.5% |
-| **② Recommended** | "Recommended" | `vqs == 8` | 4,151 | 72.2% | +30.5% |
-| **③ High Potential** | "High Potential" | `vqs 6–7` | 11,309 | 72.2% | +21.5% |
+| **① Prime** | "Prime" *(public)* | `vqs == 9` | 1,244 | 74.6% | +40.5% |
+| **② Strong** | "Strong" | `vqs == 8` | 4,151 | 72.2% | +30.5% |
+| **③ Emerging** | "Emerging" | `vqs 6–7` | 11,309 | 72.2% | +21.5% |
 
 - Volume steps are smooth: ×3.3 then ×2.7 (no cliff).
 - Yield ladder is clean and monotonic: **+40.5% → +30.5% → +21.5%**.
@@ -53,10 +53,10 @@ Each signal is labeled by its `vqs` value. A signal belongs to exactly one tier.
 
 ### 3.2 What is shown where
 
-- **Public / marketing pages:** only **Tier 1** statistics (74.6% win rate, +40.5% avg yield). This is the flagship number.
-- **In-app signal lists:** all three tiers, each rendered with its **label/badge** only. Tiers 2 and 3 do **not** display win-rate/yield headline stats — they are presented as quality labels ("Recommended", "High Potential"), not as performance claims.
+- **Public / marketing pages:** only **Tier 1 (Prime)** statistics (74.6% win rate, +40.5% avg yield). This is the flagship number.
+- **In-app signal lists:** all three tiers, each rendered with its **label/badge** only. "Strong" and "Emerging" do **not** display win-rate/yield headline stats — they are presented as quality labels, not as performance claims.
 
-### 3.3 Year-by-year (Tier 1, the public face)
+### 3.3 Year-by-year (Tier 1 "Prime", the public face)
 
 | Year | Trades | Win Rate | Avg Yield |
 |---:|---:|---:|---:|
@@ -106,9 +106,9 @@ Tiers are defined by disjoint `vqs` bands (9 / 8 / 6–7), so a given signal row
 
 ### 5.4 UI
 
-- BUY signal cards/rows: a **tier badge** ("Strongest" / "Recommended" / "High Potential") with distinct styling. Tier 1 visually dominant.
-- Tiers 2–3 show the **label only**, no per-tier headline win-rate/yield.
-- Public/marketing pages: flagship stats = Tier 1 (74.6% / +40.5%).
+- BUY signal cards/rows: a **tier badge** ("Prime" / "Strong" / "Emerging") with distinct styling. Prime visually dominant.
+- Strong & Emerging show the **label only**, no per-tier headline win-rate/yield.
+- Public/marketing pages: flagship stats = Prime (74.6% / +40.5%).
 - (Interaction with the existing Free/Pro/Max access tiers — see `project_signals_tiered_access` — is a separate axis; tier-label gating to be decided then.)
 
 ### 5.5 Position-sizing guidance (product)
