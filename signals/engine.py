@@ -22,6 +22,7 @@ def _ensure_signals_columns():
         "news_block_reason":"TEXT",
         "vqs":              "INTEGER",
         "lot_seq":          "INTEGER",  # Path B: 1=first BUY, 2+=DCA add-on lots
+        "tier":             "INTEGER",  # BUY tier: 1=Prime,2=Strong,3=Potential; NULL otherwise
     }
     inspector = inspect(engine)
     if "signals" in inspector.get_table_names():
@@ -152,6 +153,23 @@ def _isna(v):
         return math.isnan(float(v))
     except (TypeError, ValueError):
         return False
+
+
+def _vqs_to_tier(vqs):
+    """Map a vqs score to a BUY tier. Called only for BUY rows.
+    9 -> 1 (Prime), 8 -> 2 (Strong), 6-7 -> 3 (Potential).
+    Anything lower (a V1-gate BUY with vqs <= 5, or missing) floors to 3."""
+    if vqs is None:
+        return 3
+    try:
+        v = int(vqs)
+    except (TypeError, ValueError):
+        return 3
+    if v == 9:
+        return 1
+    if v == 8:
+        return 2
+    return 3
 
 
 def _compute_vqs(row):
@@ -653,8 +671,8 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
         & today_df["health_condition"]
         & today_df["ml_condition"]
     )
-    v2_strong_buy_cond = today_df["vqs"] == 9
-    buy_cond = v1_buy_cond | v2_strong_buy_cond
+    v2_buy_cond = today_df["vqs"] >= 6   # widened from ==9 (vqs9-only) to >=6
+    buy_cond = v1_buy_cond | v2_buy_cond
 
     # Path B: allow BUY for either fresh entries OR DCA add-on lots.
     # An add-on lot is allowed when the ticker is already open AND today's close
@@ -692,6 +710,11 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
     )
     today_df.drop(columns=["last_lot_price", "current_lot_count"], errors="ignore", inplace=True)
 
+    today_df["tier"] = pd.NA
+    today_df.loc[buy_mask, "tier"] = (
+        today_df.loc[buy_mask, "vqs"].apply(_vqs_to_tier).astype("Int64")
+    )
+
     # ETFs (SPY, VOO, ...) live in `companies` so the daily pipeline keeps their
     # prices/fundamentals fresh — but they should never fire BUY/SELL: the
     # technical conditions (RSI, BB, etc.) trigger on ETFs as easily as on
@@ -702,7 +725,9 @@ def run_scoring(target_date=None, open_positions=None, fast_v2=False, tickers=No
             "SELECT ticker FROM companies WHERE sector = 'ETF'", engine
         )["ticker"].tolist()
         if etf_tickers:
-            today_df.loc[today_df["ticker"].isin(etf_tickers), "signal"] = "HOLD"
+            etf_mask = today_df["ticker"].isin(etf_tickers)
+            today_df.loc[etf_mask, "signal"] = "HOLD"
+            today_df.loc[etf_mask, "tier"] = pd.NA
     except Exception:
         pass
 
