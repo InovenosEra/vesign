@@ -11,6 +11,13 @@ import SignalModal from '../components/SignalModal'
 import DownloadButton from '../components/DownloadButton'
 
 
+// BUY-signal quality tiers (from signals.tier): Prime = vqs 8-9, Strong = vqs 7, Potential = vqs 6.
+const TIER_BADGE = {
+  1: { label: 'Prime',     bg: '#ede9fe', fg: '#6d28d9' },  // purple
+  2: { label: 'Strong',    bg: '#dbeafe', fg: '#1d4ed8' },  // blue
+  3: { label: 'Potential', bg: '#f1f5f9', fg: '#475569' },  // slate
+};
+
 // ---------------------------------------------------------------------------
 // Shared primitives
 // ---------------------------------------------------------------------------
@@ -185,13 +192,17 @@ function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
             <td>{r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
             <td>
               <strong>{displayTicker(r.ticker)}</strong>
-              {r.vqs === 9 && (
+              {r.tier && (
                 <span
-                  title="Strong BUY"
-                  aria-label="Strong BUY"
-                  style={{ marginLeft: 6, color: '#f1c40f', fontSize: 14 }}
+                  title={TIER_BADGE[r.tier].label}
+                  aria-label={TIER_BADGE[r.tier].label}
+                  style={{
+                    marginLeft: 6, padding: '1px 6px', borderRadius: 999,
+                    background: TIER_BADGE[r.tier].bg, color: TIER_BADGE[r.tier].fg,
+                    fontSize: 10, fontWeight: 700, verticalAlign: 'middle',
+                  }}
                 >
-                  ★
+                  {TIER_BADGE[r.tier].label}
                 </span>
               )}
               {r.signal === 'BUY' && r.lot_seq > 1 && (
