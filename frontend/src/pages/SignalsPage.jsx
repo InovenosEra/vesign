@@ -17,7 +17,7 @@ import DownloadButton from '../components/DownloadButton'
 const TIER_STAR = {
   1: { label: 'Prime',     cls: 'prime' },     // purple, shining
   2: { label: 'Strong',    cls: 'strong' },    // gold
-  3: { label: 'Potential', cls: 'potential' }, // silver
+  3: { label: 'High Potential', cls: 'potential' }, // silver
 };
 
 function TierStar({ tier, size = 16 }) {
