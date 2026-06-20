@@ -185,7 +185,7 @@
      can't make out" like yesterday. filter:blur is scoped to ONLY this tiny box
      (24/36px) — never the text, card bg, or a fading element — so it doesn't
      bring back the page-background ghost-smear the other blur triggers caused. */
-  .rd .logo-skel { width: 24px; height: 24px; border-radius: 5px; background: rgba(255,255,255,0.16); filter: blur(2.5px); display: inline-block; flex-shrink: 0; }
+  .rd .logo-skel { width: 24px; height: 24px; border-radius: 5px; background: rgba(255,255,255,0.16); filter: blur(2.5px); transform: translateZ(0); display: inline-block; flex-shrink: 0; }
   .rd .lock-pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.13); color: var(--ink-3); white-space: nowrap; }
   .rd button.lock-pill { cursor: pointer; border-color: var(--green); color: var(--green); background: transparent; transition: background .12s ease, color .12s ease; }
   .rd button.lock-pill:hover { background: var(--green); color: var(--bg, #0b0e13); }
@@ -198,16 +198,19 @@
   margin: 0 0 22px; padding: 16px 22px; border-radius: 14px; cursor: pointer; text-align: left;
   background: linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.04));
   border: 1px solid rgba(245,158,11,0.35); color: var(--ink, #e8eaed);
-  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  transition: background .15s ease, border-color .15s ease;
 }
-.rd .sig-upsell:hover { transform: translateY(-1px); border-color: rgba(245,158,11,0.6); box-shadow: 0 8px 28px rgba(245,158,11,0.18); }
+/* Paint-only hover (no transform / no lift-shadow): a transform here promotes a
+   layer and recomposites the whole stack, which flashes the filter:blur cards'
+   ghost-smear onto the page background each time the cursor crosses the border. */
+.rd .sig-upsell:hover { border-color: rgba(245,158,11,0.65); background: linear-gradient(135deg, rgba(245,158,11,0.24), rgba(245,158,11,0.07)); }
 .rd .sig-upsell:focus-visible { outline: 2px solid var(--gold, #f59e0b); outline-offset: 2px; }
 .rd .sig-upsell .lk { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; background: rgba(245,158,11,0.16); color: var(--gold, #f59e0b); }
 .rd .sig-upsell .txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .rd .sig-upsell .t1 { font-size: 15px; font-weight: 700; color: var(--gold, #f59e0b); }
 .rd .sig-upsell .t2 { font-size: 12px; color: var(--ink-3, #9aa0aa); }
-.rd .sig-upsell .cta-arrow { font-size: 18px; font-weight: 700; color: var(--gold, #f59e0b); flex-shrink: 0; transition: transform .15s ease; }
-.rd .sig-upsell:hover .cta-arrow { transform: translateX(3px); }
+.rd .sig-upsell .cta-arrow { font-size: 18px; font-weight: 700; color: var(--gold, #f59e0b); flex-shrink: 0; transition: margin .15s ease; }
+.rd .sig-upsell:hover .cta-arrow { margin-left: 3px; margin-right: -3px; }
 
 /* ===== Signals: two columns (BUY | SELL) of explained cards ===== */
 .rd .sig-twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
@@ -287,8 +290,10 @@
 /* grey the health dots too, so the score can't be read through the haze */
 .rd .sigcard.locked .lock-haze .health .d { background: rgba(255,255,255,0.16) !important; }
 /* Health dots are solid circles, so lock-haze's text-shadow can't blur them —
-   blur the dot row itself (scoped, same as the logo box) so it reads frosted too. */
-.rd .sigcard.locked .lock-haze .health { filter: blur(2.5px); }
+   blur the dot row itself (scoped, same as the logo box) so it reads frosted too.
+   translateZ(0) puts the blur on its own compositor layer so it can't smear the
+   page background when a hover (e.g. the upgrade CTA's transform) recomposites. */
+.rd .sigcard.locked .lock-haze .health { filter: blur(2.5px); transform: translateZ(0); }
 /* unlock reveal: fade the WHOLE locked card out as one composited layer, then the
    real card fades in. (Fading the filter:blur decoy element directly can leave a
    blur "ghost" smear on the page background — Chrome compositing bug.) */
