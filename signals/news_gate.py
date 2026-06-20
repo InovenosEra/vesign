@@ -136,7 +136,7 @@ def apply_news_gate(target_date: str | None = None, *, verbose: bool = True) -> 
                 "SELECT ticker FROM signals "
                 "WHERE DATE(date) = :d AND signal = 'BUY' "
                 "AND news_block_reason IS NULL "
-                "AND tier <= 2 "
+                "AND tier = 1 "
                 "ORDER BY ticker"
             ),
             {"d": target_date},

@@ -156,20 +156,18 @@ def _isna(v):
 
 
 def _vqs_to_tier(vqs):
-    """Map a vqs score to a BUY tier. Called only for BUY rows.
-    9 -> 1 (Prime), 8 -> 2 (Strong), 6-7 -> 3 (Potential).
-    Anything lower (a V1-gate BUY with vqs <= 5, or missing) floors to 3."""
+    """Map a vqs score to a BUY tier (2-tier model). Called only for BUY rows.
+    vqs 8-9 -> 1 (Prime), vqs 6-7 -> 2 (Potential).
+    Anything lower (a V1-gate BUY with vqs <= 5, or missing) floors to 2."""
     if vqs is None:
-        return 3
+        return 2
     try:
         v = int(vqs)
     except (TypeError, ValueError):
-        return 3
-    if v == 9:
-        return 1
-    if v == 8:
         return 2
-    return 3
+    if v >= 8:
+        return 1
+    return 2
 
 
 def _compute_vqs(row):

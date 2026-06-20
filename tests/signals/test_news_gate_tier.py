@@ -9,9 +9,9 @@ def _seed(engine):
             "CREATE TABLE signals (ticker TEXT, date TEXT, signal TEXT, "
             "tier INTEGER, news_block_reason TEXT)"))
         rows = [
-            ("AAA", "2026-06-19", "BUY", 1, None),   # Prime  -> checked
-            ("BBB", "2026-06-19", "BUY", 2, None),   # Strong -> checked
-            ("CCC", "2026-06-19", "BUY", 3, None),   # Potential -> skipped
+            ("AAA", "2026-06-19", "BUY", 1, None),   # Prime     -> checked
+            ("BBB", "2026-06-19", "BUY", 2, None),   # Potential -> skipped
+            ("CCC", "2026-06-19", "BUY", 2, None),   # Potential -> skipped
             ("DDD", "2026-06-19", "HOLD", None, None),  # not a BUY -> skipped
         ]
         for r in rows:
@@ -20,7 +20,7 @@ def _seed(engine):
                 {"t": r[0], "d": r[1], "s": r[2], "tier": r[3], "n": r[4]})
 
 
-def test_news_gate_only_checks_prime_and_strong(monkeypatch, tmp_path):
+def test_news_gate_only_checks_prime(monkeypatch, tmp_path):
     eng = sa.create_engine(f"sqlite:///{tmp_path}/t.db")
     _seed(eng)
     monkeypatch.setattr(ng, "engine", eng)
@@ -32,5 +32,5 @@ def test_news_gate_only_checks_prime_and_strong(monkeypatch, tmp_path):
 
     result = ng.apply_news_gate(target_date="2026-06-19", verbose=False)
 
-    assert sorted(checked) == ["AAA", "BBB"]   # tier 3 (CCC) and HOLD (DDD) skipped
-    assert result["checked"] == 2
+    assert sorted(checked) == ["AAA"]   # only Prime (tier 1); Potential + HOLD skipped
+    assert result["checked"] == 1
