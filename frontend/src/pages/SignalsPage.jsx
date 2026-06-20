@@ -192,19 +192,6 @@ function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
             <td>{r.logo_url ? <img className={`logo${WHITE_BG_LOGOS.has(r.ticker) ? ' logo-white-bg' : ''}`} src={r.logo_url} alt="" onError={e => e.target.style.display = 'none'} /> : null}</td>
             <td>
               <strong>{displayTicker(r.ticker)}</strong>
-              {r.tier && (
-                <span
-                  title={TIER_BADGE[r.tier].label}
-                  aria-label={TIER_BADGE[r.tier].label}
-                  style={{
-                    marginLeft: 6, padding: '1px 6px', borderRadius: 999,
-                    background: TIER_BADGE[r.tier].bg, color: TIER_BADGE[r.tier].fg,
-                    fontSize: 10, fontWeight: 700, verticalAlign: 'middle',
-                  }}
-                >
-                  {TIER_BADGE[r.tier].label}
-                </span>
-              )}
               {r.signal === 'BUY' && r.lot_seq > 1 && (
                 <span
                   title={`Add-on lot — strengthens the existing position (lot ${r.lot_seq})`}
@@ -214,7 +201,22 @@ function TodayTableBody({ rows, prices, phase, onRowClick, market }) {
                 </span>
               )}
             </td>
-            <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company ?? '—'}</td>
+            <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {r.tier && (
+                <span
+                  title={TIER_BADGE[r.tier].label}
+                  aria-label={TIER_BADGE[r.tier].label}
+                  style={{
+                    marginRight: 6, padding: '1px 6px', borderRadius: 999,
+                    background: TIER_BADGE[r.tier].bg, color: TIER_BADGE[r.tier].fg,
+                    fontSize: 10, fontWeight: 700, verticalAlign: 'middle',
+                  }}
+                >
+                  {TIER_BADGE[r.tier].label}
+                </span>
+              )}
+              {r.company ?? '—'}
+            </td>
             <td>{fmtMktCap(r.market_cap)}</td>
             <td><PriceCell value={r.close} ticker={r.ticker} /></td>
             <td>{r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
