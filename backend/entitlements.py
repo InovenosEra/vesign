@@ -13,7 +13,7 @@ from sqlalchemy import text
 from data.loaders import engine
 
 PLANS = ("free", "pro", "max")
-PER_ROW_PRICE_CENTS = 20
+PER_ROW_PRICE_CENTS = 10
 SEE_ALL_PRICE_CENTS = 50        # legacy default exposed via /api/me; live charge is dynamic
 
 
