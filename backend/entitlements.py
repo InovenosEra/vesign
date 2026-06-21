@@ -18,9 +18,10 @@ SEE_ALL_PRICE_CENTS = 50        # legacy default exposed via /api/me; live charg
 
 
 def see_all_price_cents(n_signals: int) -> int:
-    """Bulk 'See all' price: 50% of (n_signals × per-row), rounded DOWN to a
-    whole dollar. e.g. 51 SELL × $0.20 = $10.20 → 50% = $5.10 → $5.00."""
-    return ((max(0, n_signals) * PER_ROW_PRICE_CENTS) // 2 // 100) * 100
+    """Bulk 'See all' price: exactly 50% of (n_signals × per-row), to the cent.
+    e.g. 51 SELL × $0.10 = $5.10 → 50% = $2.55; 15 BUY × $0.10 = $1.50 → $0.75.
+    (No whole-dollar floor — at $0.10/row it rounded small columns down to $0.)"""
+    return (max(0, n_signals) * PER_ROW_PRICE_CENTS) // 2
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
 PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
 OPEN_UNLOCK_ALL_CENTS = 200    # Pro: flat $2 to unlock ALL open trades (one bundle, no per-row)

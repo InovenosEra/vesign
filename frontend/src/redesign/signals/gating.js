@@ -4,7 +4,7 @@ export const hasMoreLocked = (rows) => (rows || []).some(r => r?.locked && r.rea
 export const fmtCents = (cents) =>
   '$' + (Math.round(cents) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-// Bulk "See all" price: 50% of (n × per-row), floored to a whole dollar.
+// Bulk "See all" price: exactly 50% of (n × per-row), to the cent.
 // Mirrors backend ent.see_all_price_cents so the displayed price == the charge.
 export const seeAllCents = (n, perRowCents) =>
-  Math.floor((Math.max(0, n) * perRowCents) / 2 / 100) * 100
+  Math.floor((Math.max(0, n) * perRowCents) / 2)
