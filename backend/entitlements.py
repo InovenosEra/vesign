@@ -13,15 +13,21 @@ from sqlalchemy import text
 from data.loaders import engine
 
 PLANS = ("free", "pro", "max")
-PER_ROW_PRICE_CENTS = 10
+# Per-signal unlock price differs by signal kind: BUY $0.20, SELL $0.10.
+PER_ROW_PRICE_BY_KIND = {"buy": 20, "sell": 10}
 SEE_ALL_PRICE_CENTS = 50        # legacy default exposed via /api/me; live charge is dynamic
 
 
-def see_all_price_cents(n_signals: int) -> int:
-    """Bulk 'See all' price: exactly 50% of (n_signals × per-row), to the cent.
-    e.g. 51 SELL × $0.10 = $5.10 → 50% = $2.55; 15 BUY × $0.10 = $1.50 → $0.75.
+def per_row_price_cents(kind: str) -> int:
+    """Per-signal unlock price for a BUY/SELL kind, in cents (BUY 20, SELL 10)."""
+    return PER_ROW_PRICE_BY_KIND.get((kind or "").lower(), 10)
+
+
+def see_all_price_cents(n_signals: int, kind: str = "buy") -> int:
+    """Bulk 'See all' price: exactly 50% of (n_signals × the kind's per-row), to
+    the cent. e.g. 51 SELL × $0.10 = $5.10 → $2.55; 15 BUY × $0.20 = $3.00 → $1.50.
     (No whole-dollar floor — at $0.10/row it rounded small columns down to $0.)"""
-    return (max(0, n_signals) * PER_ROW_PRICE_CENTS) // 2
+    return (max(0, n_signals) * per_row_price_cents(kind)) // 2
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
 PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
 OPEN_UNLOCK_ALL_CENTS = 200    # Pro: flat $2 to unlock ALL open trades (one bundle, no per-row)
@@ -287,7 +293,7 @@ def gate_signals_multidate(rows, *, plan, unlocks, latest_date):
             elif plan == "free":
                 out.append(_locked_row(k, date, "upgrade"))
             else:  # pro, not unlocked
-                price = PER_ROW_PRICE_CENTS if k == "buy" else None
+                price = per_row_price_cents("buy") if k == "buy" else None
                 out.append(_locked_row(k, date, "pay", price_cents=price,
                                        token=lock_token(k, ticker, date)))
         else:
@@ -316,6 +322,6 @@ def gate_signals(rows, *, kind, plan, unlocks):
             out.append(r)               # free SELL preview (Pro), then pay-to-unlock
             continue
         # Per-row unlock allowed for BUY and SELL; "See all" is the bulk option.
-        out.append(_locked_row(k, date, "pay", price_cents=PER_ROW_PRICE_CENTS,
+        out.append(_locked_row(k, date, "pay", price_cents=per_row_price_cents(k),
                                token=lock_token(k, ticker, date)))
     return out

@@ -2519,7 +2519,7 @@ def me_entitlements(user=Depends(get_current_user)):
     return {
         "plan": ent.get_plan(uid),
         "balance_cents": ent.get_balance(uid),
-        "per_row_price_cents": ent.PER_ROW_PRICE_CENTS,
+        "per_row_price_cents": ent.PER_ROW_PRICE_BY_KIND,
         "see_all_price_cents": ent.SEE_ALL_PRICE_CENTS,
         "phone": _get_user_phone(uid),
     }
@@ -2587,12 +2587,12 @@ def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
         if not match:
             raise HTTPException(status_code=404, detail="signal not found")
         occurrences = [match]
-        price = ent.PER_ROW_PRICE_CENTS
+        price = ent.per_row_price_cents(kind)
     elif scope == "all":
         occurrences = [(r["ticker"], ent._norm_date(r.get(date_key))) for r in candidates if r.get("ticker")]
         # Open trades unlock as ONE flat-$2 bundle (no per-row). BUY/SELL keep the
         # dynamic 50%-of-count price.
-        price = ent.OPEN_UNLOCK_ALL_CENTS if kind == "open" else ent.see_all_price_cents(len(candidates))
+        price = ent.OPEN_UNLOCK_ALL_CENTS if kind == "open" else ent.see_all_price_cents(len(candidates), kind)
     else:
         raise HTTPException(status_code=400, detail="bad scope")
 

@@ -5,7 +5,7 @@ import { getMe } from '../api'
 // `ready` is false until /api/me resolves. Plan-gated UI must wait for it,
 // otherwise it briefly renders the default (free) view before the real plan
 // arrives — a free→pro flash on every reload.
-const DEFAULTS = { plan: 'free', balance_cents: 0, per_row_price_cents: 10, see_all_price_cents: 50, ready: false }
+const DEFAULTS = { plan: 'free', balance_cents: 0, per_row_price_cents: { buy: 20, sell: 10 }, see_all_price_cents: 50, ready: false }
 const MeContext = createContext(DEFAULTS)
 
 export function MeProvider({ children }) {

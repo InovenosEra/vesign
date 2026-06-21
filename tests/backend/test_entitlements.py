@@ -100,7 +100,7 @@ def test_pro_buy_rows_locked_with_per_row_price_and_token(ent):
     out = ent.gate_signals([_sig("AAPL")], kind="BUY", plan="pro", unlocks=set())
     r = out[0]
     assert r["locked"] is True and r["reason"] == "pay"
-    assert r["unlock_price_cents"] == ent.PER_ROW_PRICE_CENTS
+    assert r["unlock_price_cents"] == ent.per_row_price_cents("buy")
     assert r["lock_token"] == ent.lock_token("buy", "AAPL", "2026-05-26")
     assert "ticker" not in r
 
@@ -119,7 +119,7 @@ def test_pro_sell_preview_then_per_row_unlock(ent):
     assert out[0]["ticker"] == "T0"                       # preview visible
     assert out[n - 1]["ticker"] == f"T{n - 1}" and not out[n - 1].get("locked")
     assert out[n]["locked"] is True and out[n]["reason"] == "pay"
-    assert out[n]["unlock_price_cents"] == ent.PER_ROW_PRICE_CENTS   # per-row unlock allowed
+    assert out[n]["unlock_price_cents"] == ent.per_row_price_cents("sell")   # per-row unlock allowed
     assert "lock_token" in out[n]
 
 
@@ -198,7 +198,7 @@ def test_multidate_pro_locks_today_buy_with_token_unless_unlocked(ent):
     unlocks = {("buy", "MSFT", "2026-05-26")}
     out = ent.gate_signals_multidate(rows, plan="pro", unlocks=unlocks, latest_date=latest)
     assert out[0]["locked"] and out[0]["reason"] == "pay"
-    assert out[0]["unlock_price_cents"] == ent.PER_ROW_PRICE_CENTS
+    assert out[0]["unlock_price_cents"] == ent.per_row_price_cents("buy")
     assert out[0]["lock_token"] == ent.lock_token("buy", "AAPL", "2026-05-26")
     assert out[1]["ticker"] == "MSFT"      # unlocked -> full
 

@@ -907,7 +907,7 @@ export default function AccountPage() {
           <div className="acc-pane">
             {pane === 'profile' && <ProfilePane user={user} phone={me.phone} currency={currency} setCurrency={setCurrency} i18n={i18n} notify={notify} />}
             {pane === 'plan' && <PlanPane plan={me.plan} notify={notify} />}
-            {pane === 'wallet' && <WalletPane balanceCents={me.balance_cents} unlockCents={me.per_row_price_cents} />}
+            {pane === 'wallet' && <WalletPane balanceCents={me.balance_cents} unlockCents={me.per_row_price_cents?.buy ?? 20} />}
             {pane === 'notifications' && <NotificationsPane />}
             {pane === 'trading' && <TradingPane />}
             {pane === 'security' && <SecurityPane user={user} openUserProfile={openUserProfile} onChangePassword={() => setPwModal(true)} />}

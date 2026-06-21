@@ -46,7 +46,9 @@ function useSignalSection(kind) {
   }
   const sub = rows.length ? `${rows.length} ${rows.length === 1 ? 'signal' : 'signals'}` : '—'
   const showSeeAll = me.plan === 'pro' && hasMoreLocked(rows)
-  const seeAllPrice = seeAllCents(rows.length, me.per_row_price_cents)
+  // Per-row price is kind-specific (BUY $0.20, SELL $0.10); bulk = 50% of count × it.
+  const perRow = me.per_row_price_cents?.[kind.toLowerCase()] ?? 10
+  const seeAllPrice = seeAllCents(rows.length, perRow)
   return { me, rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice }
 }
 

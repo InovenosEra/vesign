@@ -97,7 +97,7 @@ def test_me_reports_plan_balance_and_prices(api):
     d = client.get("/api/me").json()
     assert d["plan"] == "pro"
     assert d["balance_cents"] == 250
-    assert d["per_row_price_cents"] == 20
+    assert d["per_row_price_cents"] == {"buy": 20, "sell": 10}
     assert d["see_all_price_cents"] == 50      # static legacy field; live see-all is dynamic
     del os.environ["DEV_PLAN"]; del os.environ["DEV_WALLET_CENTS"]
 
@@ -181,7 +181,7 @@ def test_unlock_buy_all_charges_dynamic_price(api):
     resp = client.post("/api/signals/unlock",
                        json={"kind": "buy", "scope": "all", "market": "US"})
     assert resp.status_code == 200
-    assert resp.json()["balance_cents"] == 100 - e.see_all_price_cents(3)   # 3 BUYs seeded
+    assert resp.json()["balance_cents"] == 100 - e.see_all_price_cents(3, "buy")   # 3 BUYs seeded
     rows = client.get("/api/signals/today?signal=BUY&market=US").json()
     assert all(not r.get("locked") for r in rows)
 
@@ -213,7 +213,7 @@ def test_unlock_all_idempotent(api):
     import backend.entitlements as e
     client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
     second = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
-    assert second.json()["balance_cents"] == 100 - e.see_all_price_cents(3)   # no second charge
+    assert second.json()["balance_cents"] == 100 - e.see_all_price_cents(3, "buy")   # no second charge
 
 
 def test_api_signals_list_redacts_today_buys_for_free(api):
