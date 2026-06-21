@@ -1,6 +1,7 @@
 /* Signals page body: two columns — BUY (left) and SELL (right). Every signal is
- * a card with metrics + the AI explanation inline (SignalCard). SELL is paginated
- * so only a page of explanations is fetched at a time. Data: getSignalsToday. */
+ * a card with metrics + the AI explanation inline (SignalCard). Both columns are
+ * paginated (5 cards per page) so only a page of explanations is shown at a time.
+ * Data: getSignalsToday. */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -9,7 +10,7 @@ import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents, seeAllCents } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 
-const SELL_PAGE = 5
+const PAGE_SIZE = 5
 const FREE_PREVIEW = 4   // free users see a short locked teaser per column (no pager)
 
 // Query one side + the unlock handlers + header counts.
@@ -69,37 +70,25 @@ function renderCard(s, i, kind, unlockRow, isFree) {
     : <SignalCard key={s.ticker || i} s={s} />
 }
 
-function BuyColumn({ isFree }) {
-  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice } = useSignalSection('BUY')
-  const shown = isFree ? rows.slice(0, FREE_PREVIEW) : rows
-  return (
-    <div className="sig-col">
-      <SectionHead kind="BUY" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={seeAllPrice} />
-      <div className="sig-cards">
-        {rows.length === 0
-          ? <div className="sig-empty">No buy signals today.</div>
-          : shown.map((s, i) => renderCard(s, i, 'BUY', unlockRow, isFree))}
-      </div>
-    </div>
-  )
-}
-
-function SellColumn({ isFree }) {
-  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice } = useSignalSection('SELL')
+// One paginated column for either side. BUY and SELL behave identically: 5 cards
+// per page with a pager. Free users get a short locked teaser instead (no paging,
+// since the whole feed is upgrade-gated).
+function SignalColumn({ kind, isFree }) {
+  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice } = useSignalSection(kind)
   const [page, setPage] = useState(0)
-  const pages = Math.max(1, Math.ceil(rows.length / SELL_PAGE))
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage = Math.min(page, pages - 1)
-  // Free: a short locked teaser (no paging — everything is locked anyway).
+  const emptyMsg = kind === 'BUY' ? 'No buy signals today.' : 'No sell signals today.'
   const slice = isFree
     ? rows.slice(0, FREE_PREVIEW)
-    : rows.slice(safePage * SELL_PAGE, safePage * SELL_PAGE + SELL_PAGE)
+    : rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
   return (
     <div className="sig-col">
-      <SectionHead kind="SELL" sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={seeAllPrice} />
+      <SectionHead kind={kind} sub={sub} showSeeAll={showSeeAll} onSeeAll={unlockAll} seeAllPrice={seeAllPrice} />
       <div className="sig-cards">
         {rows.length === 0
-          ? <div className="sig-empty">No sell signals today.</div>
-          : slice.map((s, i) => renderCard(s, isFree ? i : safePage * SELL_PAGE + i, 'SELL', unlockRow, isFree))}
+          ? <div className="sig-empty">{emptyMsg}</div>
+          : slice.map((s, i) => renderCard(s, isFree ? i : safePage * PAGE_SIZE + i, kind, unlockRow, isFree))}
       </div>
       {!isFree && pages > 1 && (
         <div className="sig-pager">
@@ -139,8 +128,8 @@ export default function SignalsSplit() {
     <>
       {isFree && <UpgradeBanner />}
       <div className="sig-twocol">
-        <BuyColumn isFree={isFree} />
-        <SellColumn isFree={isFree} />
+        <SignalColumn kind="BUY" isFree={isFree} />
+        <SignalColumn kind="SELL" isFree={isFree} />
       </div>
     </>
   )
