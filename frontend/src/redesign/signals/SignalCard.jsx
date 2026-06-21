@@ -51,9 +51,8 @@ export function SignalCard({ s }) {
           <div className="trow"><span className="tk">{s.ticker}</span><TierStar tier={s.tier} size={15} /></div>
           <div className="co">{s.company || ''}</div>
         </div>
+        <SignalExplanation ticker={s.ticker} part="headline" />
       </div>
-
-      <SignalExplanation ticker={s.ticker} part="headline" />
 
       <div className="sc-cockpit">
         <div className="cell"><div className="l">Current Price</div><div className="v num">{s.close == null ? '—' : '$' + num(s.close)}</div></div>
@@ -101,9 +100,9 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false })
           <div className="trow"><span className="tk">{f.tk}</span></div>
           <div className="co">{f.co}</div>
         </div>
-      </div>
-      <div className="sig-why lock-haze" aria-hidden="true">
-        <div className="sig-why-head">AI rationale available after unlock — strong analyst upside and healthy fundamentals.</div>
+        <div className="sig-why lock-haze" aria-hidden="true">
+          <div className="sig-why-head">AI rationale available after unlock — strong analyst upside and healthy fundamentals.</div>
+        </div>
       </div>
       <div className="sc-cockpit lock-haze" aria-hidden="true">
         <div className="cell"><div className="l">Current Price</div><div className="v num">${f.price}</div></div>
