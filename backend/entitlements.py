@@ -28,6 +28,41 @@ def see_all_price_cents(n_signals: int, kind: str = "buy") -> int:
     the cent. e.g. 51 SELL × $0.10 = $5.10 → $2.55; 15 BUY × $0.20 = $3.00 → $1.50.
     (No whole-dollar floor — at $0.10/row it rounded small columns down to $0.)"""
     return (max(0, n_signals) * per_row_price_cents(kind)) // 2
+
+
+# Per-tier unlock pricing (BUY only). Value-weighted: Prime dearest. A tier
+# unlocks atomically (no per-row), so the locked count is the full tier or zero.
+PER_TIER_RATE_CENTS = {1: 30, 2: 20, 3: 10}   # Prime, Strong, Promising
+TIER_ALL_DISCOUNT_PCT = 15                      # "Unlock all today" = 15% off the tier sum
+
+
+def tier_of(row) -> int:
+    """Bucket a BUY row to a pricing/legend tier: 1=Prime, 2=Strong, else 3=Promising
+    (untiered/legacy BUYs fall into Promising, the catch-all lowest tier)."""
+    t = row.get("tier")
+    return t if t in (1, 2) else 3
+
+
+def tier_rate_cents(tier: int) -> int:
+    return PER_TIER_RATE_CENTS.get(tier, 10)
+
+
+def tier_unlock_price_cents(tier: int, n_locked: int) -> int:
+    """Price to unlock all still-locked signals of one tier: rate × count."""
+    return tier_rate_cents(tier) * max(0, n_locked)
+
+
+def all_tiers_price_cents(locked_by_tier: dict) -> int:
+    """Price to unlock ALL still-locked BUY tiers at once: 15% off the per-tier
+    sum (round half-up), clamped to never fall below the priciest single tier."""
+    per_tier = {t: tier_unlock_price_cents(t, n) for t, n in locked_by_tier.items()}
+    gross = sum(per_tier.values())
+    if gross <= 0:
+        return 0
+    discounted = (gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) // 100   # round half-up
+    return max(discounted, max(per_tier.values()))
+
+
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
 PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
 OPEN_UNLOCK_ALL_CENTS = 200    # Pro: flat $2 to unlock ALL open trades (one bundle, no per-row)

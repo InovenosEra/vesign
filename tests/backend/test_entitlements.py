@@ -214,3 +214,39 @@ def test_multidate_pro_today_sell_bulk_only(ent):
 def test_multidate_none_latest_gates_nothing(ent):
     rows = [{"ticker": "AAPL", "signal": "BUY", "date": "2026-05-26 00:00:00"}]
     assert ent.gate_signals_multidate(rows, plan="free", unlocks=set(), latest_date=None) == rows
+
+
+def test_tier_of_buckets_untiered_as_promising(ent):
+    assert ent.tier_of({"tier": 1}) == 1
+    assert ent.tier_of({"tier": 2}) == 2
+    assert ent.tier_of({"tier": 3}) == 3
+    assert ent.tier_of({"tier": None}) == 3      # untiered → Promising
+    assert ent.tier_of({}) == 3                   # missing → Promising
+
+
+def test_tier_rate_cents(ent):
+    assert ent.tier_rate_cents(1) == 30
+    assert ent.tier_rate_cents(2) == 20
+    assert ent.tier_rate_cents(3) == 10
+    assert ent.tier_rate_cents(99) == 10          # unknown → lowest rate
+
+
+def test_tier_unlock_price_is_rate_times_count(ent):
+    assert ent.tier_unlock_price_cents(2, 3) == 60     # Strong 20¢ × 3
+    assert ent.tier_unlock_price_cents(3, 11) == 110   # Promising 10¢ × 11
+    assert ent.tier_unlock_price_cents(1, 0) == 0
+
+
+def test_all_tiers_price_is_15pct_off_sum(ent):
+    # 0 Prime, 3 Strong ($0.60), 11 Promising ($1.10) → sum $1.70 → 15% off = $1.45
+    price = ent.all_tiers_price_cents({1: 0, 2: 3, 3: 11})
+    assert price == 145
+
+
+def test_all_tiers_price_clamps_to_priciest_tier(ent):
+    # Only Promising present: gross 30¢, 15% off = 26¢, but a single tier is 30¢ → clamp up
+    assert ent.all_tiers_price_cents({1: 0, 2: 0, 3: 3}) == 30
+
+
+def test_all_tiers_price_zero_when_nothing_locked(ent):
+    assert ent.all_tiers_price_cents({1: 0, 2: 0, 3: 0}) == 0
