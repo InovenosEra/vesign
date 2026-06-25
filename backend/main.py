@@ -1017,6 +1017,12 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
          if live.get(r.get("ticker")) else r)
         for r in rows
     ]
+    if signal and signal.upper() == "BUY":
+        # BUY cards grouped by quality tier: Prime (1) → Strong (2) → High
+        # Potential (3), untiered last; stable within a tier. MUST run before
+        # gate_signals — redacted rows drop `tier`, so the order can't be
+        # reconstructed client-side.
+        rows = sorted(rows, key=lambda r: (r.get("tier") is None, r.get("tier") or 0))
     if signal and signal.upper() in ("BUY", "SELL"):
         plan = ent.get_plan(user["id"])
         unlocks = ent.get_unlocks(user["id"])
