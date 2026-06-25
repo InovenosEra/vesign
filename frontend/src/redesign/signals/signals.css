@@ -186,9 +186,6 @@
      (24/36px) — never the text, card bg, or a fading element — so it doesn't
      bring back the page-background ghost-smear the other blur triggers caused. */
   .rd .logo-skel { width: 24px; height: 24px; border-radius: 5px; background: rgba(255,255,255,0.16); filter: blur(2.5px); transform: translateZ(0); display: inline-block; flex-shrink: 0; }
-  .rd .lock-pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.13); color: var(--ink-3); white-space: nowrap; }
-  .rd button.lock-pill { cursor: pointer; border-color: var(--green); color: var(--green); background: transparent; transition: background .12s ease, color .12s ease; }
-  .rd button.lock-pill:hover { background: var(--green); color: var(--bg, #0b0e13); }
 
 /* ===== Free-user upgrade CTA — single page-level gold banner (Pro = gold) ===== */
 .rd .sig-upsell {
@@ -335,20 +332,6 @@
    each card promoted to its own composited layer in Chrome, and a promoted
    overflow:hidden layer on a scrolling page left the "ghost" smear on the page
    background. This is why only pages WITH unlocked cards smeared. Cards just appear. */
-.rd .sigcard.locked .sc-cta { position: absolute; inset: 0; z-index: 2; margin: 0; display: flex; align-items: center; justify-content: center; }
-.rd .sigcard.locked .lock-pill {
-  font-family: var(--sans, 'Inter', sans-serif); font-size: 14px; font-weight: 700; letter-spacing: 0.01em;
-  gap: 9px; padding: 11px 24px; border-radius: 11px; white-space: nowrap;
-  color: var(--green, #00d97e); border: 1px solid rgba(0,217,126,0.45);
-  background: linear-gradient(180deg, rgba(0,217,126,0.20), rgba(0,217,126,0.09)), rgba(11,15,22,0.92);
-  box-shadow: 0 10px 26px -10px rgba(0,217,126,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
-  /* no backdrop-filter — it's the last blur on this always-present page and a known
-     trigger for Chrome's compositing "ghost" smear on the page background. The
-     content behind is a skeleton anyway, so a more-opaque pill background suffices. */
-}
-.rd .sigcard.locked button.lock-pill { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; }
-.rd .sigcard.locked button.lock-pill:hover { transform: translateY(-1px); color: var(--green, #00d97e); background: linear-gradient(180deg, rgba(0,217,126,0.28), rgba(0,217,126,0.14)), rgba(11,15,22,0.55); box-shadow: 0 14px 32px -10px rgba(0,217,126,0.7), inset 0 1px 0 rgba(255,255,255,0.10); }
-.rd .sigcard.locked .lock-ico { flex: none; }
 
 
 @media (max-width: 980px) { .rd .sig-twocol { grid-template-columns: 1fr; } }

@@ -73,11 +73,10 @@ export function SignalCard({ s }) {
   )
 }
 
-export function LockedSignalCard({ s, kind, idx = 0, isFree = false }) {
+export function LockedSignalCard({ kind, idx = 0 }) {
   const f = FAKE_SIG[idx % FAKE_SIG.length]
   const k = (kind || '').toUpperCase() === 'SELL' ? 'sell' : 'buy'
   const fakeTarget = (parseFloat(f.price) * 1.1).toFixed(2)
-  const canPay = s.reason === 'pay'
   // Frosted "real data you can't quite read" — hazed via text-shadow, NOT
   // filter:blur (filter leaves a "ghost" smear on the page background in Chrome).
   // aria-hidden + fake values, so nothing identifiable is in the DOM.
@@ -99,14 +98,8 @@ export function LockedSignalCard({ s, kind, idx = 0, isFree = false }) {
         <div className="cell"><div className="l">5D ML</div><div className="v num">${(parseFloat(f.price) * 1.01).toFixed(2)}</div><div className="sub2 num up">{f.ml}</div></div>
         <div className="cell"><div className="l">Health</div>{healthDots(f.h)}</div>
       </div>
-      {/* Free users get a single page-level upgrade CTA (in SignalsSplit) instead
-          of a per-card pill, so skip the card CTA here. Pro/Max keep the
-          wallet pay-per-row unlock button. */}
-      {!isFree && (
-        <div className="sc-cta">
-          <span className="lock-pill"><svg className="lock-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>{canPay ? 'Unlock above' : 'Upgrade'}</span>
-        </div>
-      )}
+      {/* No per-card CTA: the haze signals "locked"; unlocking happens from the
+          section header (tier chips + "Unlock all today"). */}
     </div>
   )
 }
