@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSignalsToday, getSignalsTodayTiers, unlockSignal } from '../../api'
 import { useMe } from '../../context/MeContext'
-import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount } from './gating'
+import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount, tierOf, tierUnlockCents, allTiersCents } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 import { TierLegend } from './tierStar'
 import { UnlockAllToggle, ConfirmUnlockDialog } from './UnlockAll'
@@ -15,7 +15,7 @@ import { UnlockAllToggle, ConfirmUnlockDialog } from './UnlockAll'
 const PAGE_SIZE = 5
 const FREE_PREVIEW = 4   // free users see a short locked teaser per column (no pager)
 
-// Query one side + the unlock handlers + header counts.
+// Query one side + the unlock handlers + header counts/prices.
 function useSignalSection(kind) {
   const me = useMe()
   const qc = useQueryClient()
@@ -24,52 +24,63 @@ function useSignalSection(kind) {
     queryFn: () => getSignalsToday(kind, 'US'),
     refetchInterval: 3_000,
   })
-  // BUY-only tier breakdown for the section-head legend. Aggregate counts must
-  // come from the server — locked rows hide `tier`, so the client can't tally.
+  // BUY-only tier breakdown for the section-head legend/chips.
   const { data: tiers } = useQuery({
     queryKey: ['signals-today-tiers', 'US'],
     queryFn: () => getSignalsTodayTiers('US'),
     enabled: kind === 'BUY',
   })
-  const tierCounts = tiers ? { 1: tiers.prime, 2: tiers.strong, 3: tiers.potential } : null
   const rows = Array.isArray(data) ? data : []
-  async function unlockRow(s) {
+  const isBuy = kind === 'BUY'
+
+  async function unlock(body) {
     try {
-      await unlockSignal({ kind: kind.toLowerCase(), scope: 'row', lock_token: s.lock_token, market: 'US' })
-      // Refetch now; react-query keeps the previous rows during the refetch, so the
-      // card stays mounted long enough for its fade-out before the real card swaps in.
+      await unlockSignal({ market: 'US', ...body })
       qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
+      qc.invalidateQueries({ queryKey: ['signals-today-tiers', 'US'] })
       qc.invalidateQueries({ queryKey: ['me'] })
-      return true
     } catch (e) {
       if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
-      return false
     }
   }
-  async function unlockAll() {
-    try {
-      await unlockSignal({ kind: kind.toLowerCase(), scope: 'all', market: 'US' })
-      qc.invalidateQueries({ queryKey: ['signals-today', kind, 'US'] })
-      qc.invalidateQueries({ queryKey: ['me'] })
-    } catch (e) { if (String(e.message).startsWith('402')) alert('Not enough wallet balance.') }
+
+  // Per-tier locked counts: total (from /tiers) minus the unlocked rows we can see.
+  const tierCounts = tiers ? { 1: tiers.tiers.prime.count, 2: tiers.tiers.strong.count, 3: tiers.tiers.promising.count } : null
+  const rates = tiers ? { 1: tiers.tiers.prime.rate_cents, 2: tiers.tiers.strong.rate_cents, 3: tiers.tiers.promising.rate_cents } : null
+  const lockedByTier = {}
+  if (isBuy && tierCounts) {
+    for (const t of [1, 2, 3]) {
+      const unlockedSeen = rows.filter(r => !isLocked(r) && tierOf(r) === t).length
+      lockedByTier[t] = Math.max(0, tierCounts[t] - unlockedSeen)
+    }
   }
+
   const sub = rows.length ? `${rows.length} ${rows.length === 1 ? 'signal' : 'signals'}` : '—'
-  const showSeeAll = me.plan === 'pro' && hasMoreLocked(rows)
-  // Per-row price is kind-specific (BUY $0.20, SELL $0.10); bulk = 50% of count × it.
-  const perRow = me.per_row_price_cents?.[kind.toLowerCase()] ?? 10
-  const seeAllPrice = seeAllCents(rows.length, perRow)
-  return { me, rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice, tierCounts }
+  const isPro = me.plan === 'pro'
+  // BUY "all" price = value-weighted across still-locked tiers; SELL = legacy bulk.
+  const seeAllPrice = isBuy
+    ? allTiersCents(lockedByTier, rates)
+    : seeAllCents(rows.length, me.per_row_price_cents?.sell ?? 10)
+  const showSeeAll = isPro && hasMoreLocked(rows)
+  return { me, isBuy, isPro, rows, unlock, sub, showSeeAll, seeAllPrice, tierCounts, lockedByTier, rates }
 }
 
-function SectionHead({ kind, sub, tierCounts, showSeeAll, onSeeAll, seeAllActive, seeAllPrice }) {
+function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyTier, showSeeAll, onSeeAll, seeAllActive, seeAllPrice }) {
   const isBuy = kind === 'BUY'
+  // A tier chip is a buy button only for a Pro user with ≥1 still-locked signal.
+  const buys = (isBuy && isPro && tierCounts) ? {} : null
+  if (buys) {
+    for (const t of [1, 2, 3]) {
+      const n = lockedByTier?.[t] || 0
+      if (n > 0) buys[t] = { price: fmtCents(tierUnlockCents(t, n, rates)), onUnlock: () => onBuyTier(t) }
+    }
+  }
   return (
     <div className="sig-sec-h">
       <div className="ssh-left">
         <span className={'tag ' + (isBuy ? 'buy' : 'sell')}>{kind}</span>
         <span className="sub">{sub}</span>
-        {/* legend with per-tier counts sits with the count (BUY only — no SELL stars) */}
-        {isBuy && <TierLegend counts={tierCounts} />}
+        {isBuy && <TierLegend counts={tierCounts} buys={buys} />}
       </div>
       <div className="ssh-right">
         {showSeeAll && (
@@ -80,45 +91,66 @@ function SectionHead({ kind, sub, tierCounts, showSeeAll, onSeeAll, seeAllActive
   )
 }
 
-function renderCard(s, i, kind, unlockRow, isFree) {
+function renderCard(s, i, kind, isFree) {
   return isLocked(s)
-    ? <LockedSignalCard key={s.lock_token || 'L' + i} s={s} kind={kind} onUnlock={unlockRow} idx={i} isFree={isFree} />
+    ? <LockedSignalCard key={'L' + i} s={s} kind={kind} idx={i} isFree={isFree} />
     : <SignalCard key={s.ticker || i} s={s} />
 }
 
-// One paginated column for either side. BUY and SELL behave identically: 5 cards
-// per page with a pager. Free users get a short locked teaser instead (no paging,
-// since the whole feed is upgrade-gated).
 function SignalColumn({ kind, isFree }) {
-  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice, tierCounts } = useSignalSection(kind)
+  const { rows, unlock, sub, showSeeAll, seeAllPrice, tierCounts, lockedByTier, rates, isPro } = useSignalSection(kind)
   const [page, setPage] = useState(0)
-  const [confirming, setConfirming] = useState(false)
+  const [confirm, setConfirm] = useState(null)   // { scope:'all' } | { scope:'tier', tier }
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage = Math.min(page, pages - 1)
   const emptyMsg = kind === 'BUY' ? 'No buy signals today.' : 'No sell signals today.'
   const slice = isFree
     ? rows.slice(0, FREE_PREVIEW)
     : rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+
+  const TIER_LABEL = { 1: 'Prime', 2: 'Strong', 3: 'Promising' }
+  let dialog = null
+  if (confirm?.scope === 'all') {
+    const count = lockedCount(rows)
+    dialog = {
+      title: `Unlock all ${kind} signals?`,
+      body: <>This unlocks {count} locked {kind} {count === 1 ? 'signal' : 'signals'} and charges{' '}
+        <b>{fmtCents(seeAllPrice)}</b> from your wallet.</>,
+      price: seeAllPrice,
+      run: () => unlock({ kind: kind.toLowerCase(), scope: 'all' }),
+    }
+  } else if (confirm?.scope === 'tier') {
+    const t = confirm.tier
+    const n = lockedByTier?.[t] || 0
+    const price = tierUnlockCents(t, n, rates)
+    dialog = {
+      title: `Unlock all ${TIER_LABEL[t]} signals?`,
+      body: <>This unlocks {n} locked {TIER_LABEL[t]} {n === 1 ? 'signal' : 'signals'} and charges{' '}
+        <b>{fmtCents(price)}</b> from your wallet.</>,
+      price,
+      run: () => unlock({ kind: 'buy', scope: 'tier', tier: t }),
+    }
+  }
+
   return (
     <div className="sig-col">
-      <SectionHead kind={kind} sub={sub} tierCounts={tierCounts} showSeeAll={showSeeAll} onSeeAll={() => setConfirming(true)} seeAllActive={confirming} seeAllPrice={seeAllPrice} />
-      {confirming && (() => {
-        const count = lockedCount(rows)
-        return (
-          <ConfirmUnlockDialog
-            title={`Unlock all ${kind} signals?`}
-            body={<>This unlocks {count} locked {kind} {count === 1 ? 'signal' : 'signals'} and charges{' '}
-              <b>{fmtCents(seeAllPrice)}</b> from your wallet.</>}
-            price={seeAllPrice}
-            onConfirm={async () => { await unlockAll(); setConfirming(false) }}
-            onCancel={() => setConfirming(false)}
-          />
-        )
-      })()}
+      <SectionHead
+        kind={kind} sub={sub} tierCounts={tierCounts} lockedByTier={lockedByTier} rates={rates} isPro={isPro}
+        onBuyTier={(t) => setConfirm({ scope: 'tier', tier: t })}
+        showSeeAll={showSeeAll} onSeeAll={() => setConfirm({ scope: 'all' })}
+        seeAllActive={!!confirm} seeAllPrice={seeAllPrice}
+      />
+      {dialog && (
+        <ConfirmUnlockDialog
+          title={dialog.title} body={dialog.body} price={dialog.price}
+          onConfirm={async () => { await dialog.run(); setConfirm(null) }}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
       <div className="sig-cards">
         {rows.length === 0
           ? <div className="sig-empty">{emptyMsg}</div>
-          : slice.map((s, i) => renderCard(s, isFree ? i : safePage * PAGE_SIZE + i, kind, unlockRow, isFree))}
+          : slice.map((s, i) => renderCard(s, isFree ? i : safePage * PAGE_SIZE + i, kind, isFree))}
       </div>
       {!isFree && pages > 1 && (
         <div className="sig-pager">
