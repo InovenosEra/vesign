@@ -8,3 +8,25 @@ export const fmtCents = (cents) =>
 // Mirrors backend ent.see_all_price_cents so the displayed price == the charge.
 export const seeAllCents = (n, perRowCents) =>
   Math.floor((Math.max(0, n) * perRowCents) / 2)
+
+// --- Tier unlock pricing (mirrors backend.entitlements; rates come from
+// /api/signals/today/tiers so they stay single-sourced) -----------------------
+export const PER_TIER_RATE_CENTS = { 1: 30, 2: 20, 3: 10 }
+export const TIER_ALL_DISCOUNT_PCT = 15
+
+// Bucket a BUY row to a pricing/legend tier: 1 Prime, 2 Strong, else 3 Promising.
+export const tierOf = (row) => (row?.tier === 1 || row?.tier === 2) ? row.tier : 3
+
+const rateFor = (tier, rates) => (rates?.[tier] ?? PER_TIER_RATE_CENTS[tier] ?? 10)
+
+export const tierUnlockCents = (tier, nLocked, rates) =>
+  rateFor(tier, rates) * Math.max(0, nLocked)
+
+// 15% off the per-tier sum (round half-up), clamped ≥ the priciest single tier.
+export const allTiersCents = (lockedByTier, rates) => {
+  const per = [1, 2, 3].map(t => tierUnlockCents(t, lockedByTier?.[t] || 0, rates))
+  const gross = per[0] + per[1] + per[2]
+  if (gross <= 0) return 0
+  const discounted = Math.floor((gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) / 100)
+  return Math.max(discounted, ...per)
+}
