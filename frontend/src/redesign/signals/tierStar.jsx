@@ -1,10 +1,10 @@
-/* BUY-signal quality-tier star (Prime / Strong / High Potential), shown on each
+/* BUY-signal quality-tier star (Prime / Strong / Promising), shown on each
  * signal card next to the ticker, plus a legend in the page-head. The star
  * colours + glow live in App.css (.tier-star--prime/strong/potential). */
 const TIER = {
   1: { cls: 'prime',     label: 'Prime' },          // purple, shining
   2: { cls: 'strong',    label: 'Strong' },          // gold
-  3: { cls: 'potential', label: 'High Potential' },  // silver
+  3: { cls: 'potential', label: 'Promising' },        // silver
 }
 
 export function TierStar({ tier, size = 14 }) {
