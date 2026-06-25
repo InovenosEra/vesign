@@ -16,12 +16,21 @@ export function TierStar({ tier, size = 14 }) {
   )
 }
 
-export function TierLegend() {
+// `counts` (optional) keyed by tier number {1,2,3} → renders the breakdown number
+// before each label, e.g. "★ 3 Strong". Zero-count tiers are dimmed.
+export function TierLegend({ counts }) {
   return (
     <div className="tier-legend">
-      {[1, 2, 3].map((tr) => (
-        <span key={tr} className="tl-item"><TierStar tier={tr} size={12} /> {TIER[tr].label}</span>
-      ))}
+      {[1, 2, 3].map((tr) => {
+        const n = counts ? (counts[tr] ?? 0) : null
+        return (
+          <span key={tr} className={'tl-item' + (n === 0 ? ' tl-zero' : '')}>
+            <TierStar tier={tr} size={12} />
+            {n != null && <b className="tl-n">{n}</b>}
+            {TIER[tr].label}
+          </span>
+        )
+      })}
     </div>
   )
 }

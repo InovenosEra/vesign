@@ -216,12 +216,12 @@
 .rd .sig-cards { display: flex; flex-direction: column; gap: 10px; }
 .rd .sig-empty { padding: 22px; color: var(--ink-3, #6b7280); font-size: 13px; }
 
-/* 3-part header: identity (left) · unlock button (centered) · tier legend (right).
-   1fr/auto/1fr keeps the button centered over the cards regardless of side widths. */
-.rd .sig-sec-h { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin: 0 0 12px; }
-.rd .sig-sec-h .ssh-left { display: flex; align-items: center; gap: 10px; justify-self: start; min-width: 0; }
-.rd .sig-sec-h .ssh-center { justify-self: center; }
-.rd .sig-sec-h .ssh-right { justify-self: end; }
+/* 2-part header: identity + tier-breakdown legend (left) · unlock toggle (right). */
+.rd .sig-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.rd .sig-sec-h .ssh-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
+.rd .sig-sec-h .ssh-right { flex: none; }
+/* faint divider between the "N signals" count and the legend */
+.rd .sig-sec-h .ssh-left .tier-legend { padding-left: 12px; border-left: 1px solid var(--line, rgba(255,255,255,0.08)); }
 .rd .sig-sec-h .tag { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 5px; }
 .rd .sig-sec-h .tag.buy { background: var(--green-bg, rgba(0,217,126,0.10)); color: var(--green, #00d97e); }
 .rd .sig-sec-h .tag.sell { background: var(--red-bg, rgba(255,77,92,0.10)); color: var(--red, #ff4d5c); }
@@ -404,3 +404,6 @@
 /* Tier legend (Prime / Strong / High Potential stars) — top-right of the BUY column */
 .rd .tier-legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--ink-3, #6b7280); white-space: nowrap; }
 .rd .tier-legend .tl-item { display: inline-flex; align-items: center; gap: 5px; }
+.rd .tier-legend .tl-n { color: var(--ink, #e8eaf0); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* a tier with no signals today is dimmed (label + number + star) */
+.rd .tier-legend .tl-zero { opacity: 0.42; }

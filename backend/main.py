@@ -1030,6 +1030,24 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
     return rows
 
 
+@protected.get("/api/signals/today/tiers")
+def signals_today_tiers(market: Optional[str] = None, user=Depends(get_current_user)):
+    """BUY quality-tier breakdown for today — how many Prime/Strong/High-Potential.
+    Plan-independent: an aggregate count leaks no ticker identity (locked rows hide
+    `tier`, so the Signals-page legend can't compute these client-side)."""
+    mkt = (market or "US").upper()
+    rows = _get_signals_today_cached(mkt)
+    name = {1: "prime", 2: "strong", 3: "potential"}
+    counts = {"prime": 0, "strong": 0, "potential": 0, "total": 0}
+    for r in rows:
+        if r.get("signal") == "BUY":
+            counts["total"] += 1
+            k = name.get(r.get("tier"))
+            if k:
+                counts[k] += 1
+    return counts
+
+
 @protected.get("/api/signals/{ticker}/explanation")
 def signal_explanation(ticker: str, date: Optional[str] = Query(None),
                        user=Depends(get_current_user)):

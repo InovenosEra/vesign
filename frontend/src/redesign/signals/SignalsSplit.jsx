@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getSignalsToday, unlockSignal } from '../../api'
+import { getSignalsToday, getSignalsTodayTiers, unlockSignal } from '../../api'
 import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
@@ -24,6 +24,14 @@ function useSignalSection(kind) {
     queryFn: () => getSignalsToday(kind, 'US'),
     refetchInterval: 3_000,
   })
+  // BUY-only tier breakdown for the section-head legend. Aggregate counts must
+  // come from the server — locked rows hide `tier`, so the client can't tally.
+  const { data: tiers } = useQuery({
+    queryKey: ['signals-today-tiers', 'US'],
+    queryFn: () => getSignalsTodayTiers('US'),
+    enabled: kind === 'BUY',
+  })
+  const tierCounts = tiers ? { 1: tiers.prime, 2: tiers.strong, 3: tiers.potential } : null
   const rows = Array.isArray(data) ? data : []
   async function unlockRow(s) {
     try {
@@ -50,19 +58,19 @@ function useSignalSection(kind) {
   // Per-row price is kind-specific (BUY $0.20, SELL $0.10); bulk = 50% of count × it.
   const perRow = me.per_row_price_cents?.[kind.toLowerCase()] ?? 10
   const seeAllPrice = seeAllCents(rows.length, perRow)
-  return { me, rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice }
+  return { me, rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice, tierCounts }
 }
 
-function SectionHead({ kind, sub, showSeeAll, onSeeAll, seeAllActive, seeAllPrice }) {
+function SectionHead({ kind, sub, tierCounts, showSeeAll, onSeeAll, seeAllActive, seeAllPrice }) {
   const isBuy = kind === 'BUY'
   return (
     <div className="sig-sec-h">
       <div className="ssh-left">
         <span className={'tag ' + (isBuy ? 'buy' : 'sell')}>{kind}</span>
         <span className="sub">{sub}</span>
+        {/* legend with per-tier counts sits with the count (BUY only — no SELL stars) */}
+        {isBuy && <TierLegend counts={tierCounts} />}
       </div>
-      {/* tier legend centered above the cards (BUY only — stars never appear on SELL) */}
-      <div className="ssh-center">{isBuy && <TierLegend />}</div>
       <div className="ssh-right">
         {showSeeAll && (
           <UnlockAllToggle price={seeAllPrice} active={seeAllActive} onToggle={onSeeAll} />
@@ -82,7 +90,7 @@ function renderCard(s, i, kind, unlockRow, isFree) {
 // per page with a pager. Free users get a short locked teaser instead (no paging,
 // since the whole feed is upgrade-gated).
 function SignalColumn({ kind, isFree }) {
-  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice } = useSignalSection(kind)
+  const { rows, unlockRow, unlockAll, sub, showSeeAll, seeAllPrice, tierCounts } = useSignalSection(kind)
   const [page, setPage] = useState(0)
   const [confirming, setConfirming] = useState(false)
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
@@ -93,7 +101,7 @@ function SignalColumn({ kind, isFree }) {
     : rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
   return (
     <div className="sig-col">
-      <SectionHead kind={kind} sub={sub} showSeeAll={showSeeAll} onSeeAll={() => setConfirming(true)} seeAllActive={confirming} seeAllPrice={seeAllPrice} />
+      <SectionHead kind={kind} sub={sub} tierCounts={tierCounts} showSeeAll={showSeeAll} onSeeAll={() => setConfirming(true)} seeAllActive={confirming} seeAllPrice={seeAllPrice} />
       {confirming && (() => {
         const count = lockedCount(rows)
         return (

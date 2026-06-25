@@ -154,6 +154,10 @@ export const getSignalsToday = (signal, market = 'US') => {
   return get(`/signals/today?${params}`)
 }
 
+// Aggregate BUY tier breakdown for today (Prime/Strong/High-Potential counts).
+export const getSignalsTodayTiers = (market = 'US') =>
+  get(`/signals/today/tiers?market=${encodeURIComponent(market)}`)
+
 export const getSignals = ({ signal, search, months = 12, start, end, page = 1, page_size = 100, sort_by = 'date', sort_dir = 'desc', market = 'US' } = {}) => {
   const params = new URLSearchParams({ months, page, page_size, sort_by, sort_dir, market })
   if (signal) params.set('signal', signal)
