@@ -327,10 +327,8 @@ def gate_signals_multidate(rows, *, plan, unlocks, latest_date):
                 out.append(r)
             elif plan == "free":
                 out.append(_locked_row(k, date, "upgrade"))
-            else:  # pro, not unlocked
-                price = per_row_price_cents("buy") if k == "buy" else None
-                out.append(_locked_row(k, date, "pay", price_cents=price,
-                                       token=lock_token(k, ticker, date)))
+            else:  # pro, not unlocked — bulk/tier-only, no per-row token
+                out.append(_locked_row(k, date, "pay"))
         else:
             out.append(r)
     return out
@@ -354,9 +352,9 @@ def gate_signals(rows, *, kind, plan, unlocks):
             out.append(r)
             continue
         if k == "sell" and i < PRO_SELL_PREVIEW_ROWS:
-            out.append(r)               # free SELL preview (Pro), then pay-to-unlock
+            out.append(r)               # free SELL preview (Pro), then bulk-unlock
             continue
-        # Per-row unlock allowed for BUY and SELL; "See all" is the bulk option.
-        out.append(_locked_row(k, date, "pay", price_cents=per_row_price_cents(k),
-                               token=lock_token(k, ticker, date)))
+        # No per-row unlock: BUY unlocks by tier, SELL by "Unlock all". The locked
+        # row carries no token/price — purchase happens from the section header.
+        out.append(_locked_row(k, date, "pay"))
     return out
