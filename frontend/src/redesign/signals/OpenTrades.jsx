@@ -1,12 +1,14 @@
+import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getOpenTrades, unlockSignal } from '../../api'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
-import { isLocked, hasMoreLocked, fmtCents } from './gating'
+import { isLocked, hasMoreLocked, fmtCents, lockedCount } from './gating'
 import { logoCls, ymd } from './util'
 import { FAKE_SIG } from './locked-fixtures'
+import { UnlockAllToggle, ConfirmUnlockDialog } from './UnlockAll'
 import PagedTable from './Pager'
 
 const FREE_PREVIEW = 10           // free users see the top-10 by yield, yield-only, no pager
@@ -77,6 +79,7 @@ export default function OpenTrades() {
   const me = useMe()
   const isFree = me.plan === 'free'
   const qc = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
   const { data } = useQuery({ queryKey: ['open-trades', 'US'], queryFn: () => getOpenTrades('US') })
   const rows = Array.isArray(data) ? data : []          // server-sorted by yield desc
 
@@ -115,12 +118,31 @@ export default function OpenTrades() {
     <>
       <div className="section-h">
         <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
-        {/* One flat-$2 bundle for ALL locked open trades (no per-row unlock).
-            $2.00 must match backend ent.OPEN_UNLOCK_ALL_CENTS. */}
+        {/* Same blue switch + confirm as the BUY/SELL section heads. One flat-$2
+            bundle for ALL locked open trades (no per-row unlock); $2.00 must match
+            backend ent.OPEN_UNLOCK_ALL_CENTS. */}
         {showSeeAll && (
-          <button className="see-all-cta" onClick={unlockAll}>Unlock all · {fmtCents(OPEN_UNLOCK_ALL_CENTS)}</button>
+          <UnlockAllToggle
+            price={OPEN_UNLOCK_ALL_CENTS}
+            active={confirming}
+            onToggle={() => setConfirming(true)}
+            label="Unlock all"
+          />
         )}
       </div>
+      {confirming && (() => {
+        const count = lockedCount(rows)
+        return (
+          <ConfirmUnlockDialog
+            title="Unlock all open trades?"
+            body={<>This unlocks {count} locked open {count === 1 ? 'trade' : 'trades'} and charges{' '}
+              <b>{fmtCents(OPEN_UNLOCK_ALL_CENTS)}</b> from your wallet.</>}
+            price={OPEN_UNLOCK_ALL_CENTS}
+            onConfirm={async () => { await unlockAll(); setConfirming(false) }}
+            onCancel={() => setConfirming(false)}
+          />
+        )
+      })()}
       <PagedTable
         head={HEAD}
         rows={rows}

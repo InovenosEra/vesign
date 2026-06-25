@@ -2,7 +2,7 @@
  * a card with metrics + the AI explanation inline (SignalCard). Both columns are
  * paginated (5 cards per page) so only a page of explanations is shown at a time.
  * Data: getSignalsToday. */
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSignalsToday, unlockSignal } from '../../api'
@@ -10,6 +10,7 @@ import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 import { TierLegend } from './tierStar'
+import { UnlockAllToggle, ConfirmUnlockDialog } from './UnlockAll'
 
 const PAGE_SIZE = 5
 const FREE_PREVIEW = 4   // free users see a short locked teaser per column (no pager)
@@ -64,49 +65,8 @@ function SectionHead({ kind, sub, showSeeAll, onSeeAll, seeAllActive, seeAllPric
       <div className="ssh-center">{isBuy && <TierLegend />}</div>
       <div className="ssh-right">
         {showSeeAll && (
-          // A switch, not a plain button: flipping it opens the confirm dialog (a
-          // misclick must not spend money). The knob shows "on" only while that
-          // dialog is pending — confirm completes the unlock, cancel snaps it back.
-          <button
-            type="button"
-            className={'see-all-toggle' + (seeAllActive ? ' on' : '')}
-            role="switch"
-            aria-checked={seeAllActive}
-            onClick={onSeeAll}
-          >
-            <span className="sat-label">Unlock all today · {fmtCents(seeAllPrice)}</span>
-            <span className="sat-switch" aria-hidden="true"><span className="sat-knob" /></span>
-          </button>
+          <UnlockAllToggle price={seeAllPrice} active={seeAllActive} onToggle={onSeeAll} />
         )}
-      </div>
-    </div>
-  )
-}
-
-// Confirm dialog for the bulk "Unlock all" — a single click charges the wallet
-// (unlike the deliberate per-row slide), so a misclick must not spend money.
-function ConfirmUnlockDialog({ kind, count, price, onConfirm, onCancel }) {
-  const [busy, setBusy] = useState(false)
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !busy) onCancel() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [busy, onCancel])
-  const handleConfirm = async () => { setBusy(true); await onConfirm() }
-  return (
-    <div className="confirm-overlay" onClick={() => !busy && onCancel()} role="dialog" aria-modal="true">
-      <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
-        <div className="confirm-title">Unlock all {kind} signals?</div>
-        <div className="confirm-body">
-          This unlocks {count} locked {kind} {count === 1 ? 'signal' : 'signals'} and charges{' '}
-          <b>{fmtCents(price)}</b> from your wallet.
-        </div>
-        <div className="confirm-actions">
-          <button className="confirm-cancel" onClick={onCancel} disabled={busy}>Cancel</button>
-          <button className="confirm-ok" onClick={handleConfirm} disabled={busy}>
-            {busy ? 'Unlocking…' : `Unlock · ${fmtCents(price)}`}
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -134,15 +94,19 @@ function SignalColumn({ kind, isFree }) {
   return (
     <div className="sig-col">
       <SectionHead kind={kind} sub={sub} showSeeAll={showSeeAll} onSeeAll={() => setConfirming(true)} seeAllActive={confirming} seeAllPrice={seeAllPrice} />
-      {confirming && (
-        <ConfirmUnlockDialog
-          kind={kind}
-          count={lockedCount(rows)}
-          price={seeAllPrice}
-          onConfirm={async () => { await unlockAll(); setConfirming(false) }}
-          onCancel={() => setConfirming(false)}
-        />
-      )}
+      {confirming && (() => {
+        const count = lockedCount(rows)
+        return (
+          <ConfirmUnlockDialog
+            title={`Unlock all ${kind} signals?`}
+            body={<>This unlocks {count} locked {kind} {count === 1 ? 'signal' : 'signals'} and charges{' '}
+              <b>{fmtCents(seeAllPrice)}</b> from your wallet.</>}
+            price={seeAllPrice}
+            onConfirm={async () => { await unlockAll(); setConfirming(false) }}
+            onCancel={() => setConfirming(false)}
+          />
+        )
+      })()}
       <div className="sig-cards">
         {rows.length === 0
           ? <div className="sig-empty">{emptyMsg}</div>
