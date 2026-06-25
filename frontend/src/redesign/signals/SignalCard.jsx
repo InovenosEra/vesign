@@ -7,12 +7,9 @@
 import { useState } from 'react'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
-import { useMe } from '../../context/MeContext'
-import { fmtCents } from './gating'
 import { logoCls } from './util'
 import { TierStar } from './tierStar'
 import { FAKE_SIG } from './locked-fixtures'
-import SlideToUnlock from './SlideToUnlock'
 import SignalExplanation from '../SignalExplanation'
 
 // Health dot colour by 5-point score: 1 red → 2 dark-orange → 3 bright-orange
@@ -76,24 +73,16 @@ export function SignalCard({ s }) {
   )
 }
 
-export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false }) {
-  const me = useMe()
-  const [unlocking, setUnlocking] = useState(false)
+export function LockedSignalCard({ s, kind, idx = 0, isFree = false }) {
   const f = FAKE_SIG[idx % FAKE_SIG.length]
   const k = (kind || '').toUpperCase() === 'SELL' ? 'sell' : 'buy'
   const fakeTarget = (parseFloat(f.price) * 1.1).toFixed(2)
-  const canPayRow = s.reason === 'pay'
-  // On a successful slide, fade the card out before the real one swaps in.
-  const handleUnlock = async () => {
-    const ok = await onUnlock(s)
-    if (ok) setUnlocking(true)
-    return ok
-  }
+  const canPay = s.reason === 'pay'
   // Frosted "real data you can't quite read" — hazed via text-shadow, NOT
   // filter:blur (filter leaves a "ghost" smear on the page background in Chrome).
   // aria-hidden + fake values, so nothing identifiable is in the DOM.
   return (
-    <div className={'sigcard locked ' + k + (unlocking ? ' unlocking' : '')}>
+    <div className={'sigcard locked ' + k}>
       <div className="sc-head">
         <span className="sc-logo logo-skel" aria-hidden="true" />
         <div className="sc-id lock-haze" aria-hidden="true">
@@ -115,9 +104,7 @@ export function LockedSignalCard({ s, kind, onUnlock, idx = 0, isFree = false })
           wallet pay-per-row unlock button. */}
       {!isFree && (
         <div className="sc-cta">
-          {canPayRow
-            ? <SlideToUnlock priceLabel={fmtCents(s.unlock_price_cents ?? me.per_row_price_cents?.[k] ?? 10)} onUnlock={handleUnlock} />
-            : <span className="lock-pill"><svg className="lock-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>{s.reason === 'pay' ? 'See all' : 'Upgrade'}</span>}
+          <span className="lock-pill"><svg className="lock-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>{canPay ? 'Unlock above' : 'Upgrade'}</span>
         </div>
       )}
     </div>
