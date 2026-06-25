@@ -16,19 +16,30 @@ export function TierStar({ tier, size = 14 }) {
   )
 }
 
-// `counts` (optional) keyed by tier number {1,2,3} → renders the breakdown number
-// before each label, e.g. "★ 3 Strong". Zero-count tiers are dimmed.
-export function TierLegend({ counts }) {
+// `counts` (optional) keyed by tier {1,2,3} → renders the breakdown number before
+// each label, e.g. "★ 3 Strong". `buys` (optional) keyed by tier → that tier is a
+// buy BUTTON ("★ 3 Strong $0.60") that calls buys[tier].onUnlock on click. A tier
+// with no count is dimmed and never a button.
+export function TierLegend({ counts, buys }) {
   return (
     <div className="tier-legend">
       {[1, 2, 3].map((tr) => {
         const n = counts ? (counts[tr] ?? 0) : null
-        return (
-          <span key={tr} className={'tl-item' + (n === 0 ? ' tl-zero' : '')}>
+        const buy = n ? buys?.[tr] : null            // only sell a non-empty tier
+        const inner = (
+          <>
             <TierStar tier={tr} size={12} />
             {n != null && <b className="tl-n">{n}</b>}
             {TIER[tr].label}
-          </span>
+            {buy && <span className="tl-price">{buy.price}</span>}
+          </>
+        )
+        return buy ? (
+          <button key={tr} type="button" className="tl-item tl-buy" onClick={buy.onUnlock}>
+            {inner}
+          </button>
+        ) : (
+          <span key={tr} className={'tl-item' + (n === 0 ? ' tl-zero' : '')}>{inner}</span>
         )
       })}
     </div>

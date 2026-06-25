@@ -407,3 +407,8 @@
 .rd .tier-legend .tl-n { color: var(--ink, #e8eaf0); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* a tier with no signals today is dimmed (label + number + star) */
 .rd .tier-legend .tl-zero { opacity: 0.42; }
+.rd .tier-legend .tl-price { color: var(--blue-2, #60a5fa); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* a clickable tier chip (buy affordance) */
+.rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.28); border-radius: 999px; padding: 3px 10px; cursor: pointer; transition: background .12s ease, border-color .12s ease; }
+.rd .tier-legend button.tl-buy:hover { background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.48); }
+.rd .tier-legend button.tl-buy:hover .tl-price { color: #93c5fd; }
