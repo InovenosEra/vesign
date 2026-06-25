@@ -61,7 +61,7 @@ function useSignalSection(kind) {
   const seeAllPrice = isBuy
     ? allTiersCents(lockedByTier, rates)
     : seeAllCents(rows.length, me.per_row_price_cents?.sell ?? 10)
-  const showSeeAll = isPro && hasMoreLocked(rows)
+  const showSeeAll = isPro && hasMoreLocked(rows) && (!isBuy || !!tiers)
   return { me, isBuy, isPro, rows, unlock, sub, showSeeAll, seeAllPrice, tierCounts, lockedByTier, rates }
 }
 
@@ -138,7 +138,7 @@ function SignalColumn({ kind, isFree }) {
         kind={kind} sub={sub} tierCounts={tierCounts} lockedByTier={lockedByTier} rates={rates} isPro={isPro}
         onBuyTier={(t) => setConfirm({ scope: 'tier', tier: t })}
         showSeeAll={showSeeAll} onSeeAll={() => setConfirm({ scope: 'all' })}
-        seeAllActive={!!confirm} seeAllPrice={seeAllPrice}
+        seeAllActive={confirm?.scope === 'all'} seeAllPrice={seeAllPrice}
       />
       {dialog && (
         <ConfirmUnlockDialog

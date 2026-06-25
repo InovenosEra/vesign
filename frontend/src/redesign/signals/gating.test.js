@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tierOf, tierUnlockCents, allTiersCents } from './gating'
+import { isLocked, lockedCount, fmtCents, hasMoreLocked, tierOf, tierUnlockCents, allTiersCents } from './gating'
 
 const RATES = { 1: 30, 2: 20, 3: 10 }
 
@@ -28,5 +28,25 @@ describe('tier pricing helpers', () => {
 
   it('is zero when nothing is locked', () => {
     expect(allTiersCents({ 1: 0, 2: 0, 3: 0 }, RATES)).toBe(0)
+  })
+})
+
+describe('gating helpers', () => {
+  it('isLocked reflects the row flag', () => {
+    expect(isLocked({ locked: true })).toBe(true)
+    expect(isLocked({ ticker: 'AAPL' })).toBe(false)
+  })
+  it('lockedCount counts locked rows', () => {
+    expect(lockedCount([{ locked: true }, { ticker: 'A' }, { locked: true }])).toBe(2)
+  })
+  it('fmtCents renders dollars', () => {
+    expect(fmtCents(10)).toBe('$0.10')
+    expect(fmtCents(50)).toBe('$0.50')
+    expect(fmtCents(250)).toBe('$2.50')
+  })
+  it('hasMoreLocked is true when any payable lock exists', () => {
+    expect(hasMoreLocked([{ locked: true, reason: 'pay' }])).toBe(true)
+    expect(hasMoreLocked([{ locked: true, reason: 'upgrade' }])).toBe(false)
+    expect(hasMoreLocked([{ ticker: 'A' }])).toBe(false)
   })
 })
