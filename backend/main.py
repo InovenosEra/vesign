@@ -1032,20 +1032,20 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
 
 @protected.get("/api/signals/today/tiers")
 def signals_today_tiers(market: Optional[str] = None, user=Depends(get_current_user)):
-    """BUY quality-tier breakdown for today — how many Prime/Strong/High-Potential.
-    Plan-independent: an aggregate count leaks no ticker identity (locked rows hide
-    `tier`, so the Signals-page legend can't compute these client-side)."""
+    """BUY quality-tier breakdown for today: per-tier counts + per-signal rates +
+    the bulk discount. Aggregate counts leak no ticker identity (locked rows hide
+    `tier`), so this is plan-independent and lets the legend price chips client-side."""
     mkt = (market or "US").upper()
     rows = _get_signals_today_cached(mkt)
-    name = {1: "prime", 2: "strong", 3: "potential"}
-    counts = {"prime": 0, "strong": 0, "potential": 0, "total": 0}
+    name = {1: "prime", 2: "strong", 3: "promising"}
+    tiers = {v: {"tier": k, "count": 0, "rate_cents": ent.tier_rate_cents(k)}
+             for k, v in name.items()}
+    total = 0
     for r in rows:
         if r.get("signal") == "BUY":
-            counts["total"] += 1
-            k = name.get(r.get("tier"))
-            if k:
-                counts[k] += 1
-    return counts
+            total += 1
+            tiers[name[ent.tier_of(r)]]["count"] += 1
+    return {"total": total, "all_discount_pct": ent.TIER_ALL_DISCOUNT_PCT, "tiers": tiers}
 
 
 @protected.get("/api/signals/{ticker}/explanation")

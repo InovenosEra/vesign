@@ -245,6 +245,18 @@ def test_signals_export_excludes_today_buys_for_nonmax(api):
     del os.environ["DEV_PLAN"]
 
 
+def test_tiers_endpoint_shape_counts_and_rates(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "pro"
+    d = client.get("/api/signals/today/tiers?market=US").json()
+    assert d["total"] == 3                      # 3 BUYs seeded (untiered → Promising)
+    assert d["all_discount_pct"] == 15
+    assert d["tiers"]["prime"] == {"tier": 1, "count": 0, "rate_cents": 30}
+    assert d["tiers"]["strong"] == {"tier": 2, "count": 0, "rate_cents": 20}
+    assert d["tiers"]["promising"] == {"tier": 3, "count": 3, "rate_cents": 10}
+    del os.environ["DEV_PLAN"]
+
+
 def test_open_trades_export_is_max_only(api):
     bm, client = api
     os.environ["DEV_PLAN"] = "free"
