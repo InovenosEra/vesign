@@ -254,17 +254,6 @@ class InsufficientFunds(Exception):
     pass
 
 
-def resolve_token(token: str, kind: str, candidate_rows, *, date_key) -> tuple[str, str] | None:
-    """Find the (ticker, signal_date) whose token matches, by recomputing the
-    HMAC for each candidate. Returns None if no match."""
-    for r in candidate_rows:
-        ticker = r.get("ticker")
-        date = _norm_date(r.get(date_key))
-        if ticker and lock_token(kind, ticker, date) == token:
-            return ticker, date
-    return None
-
-
 def unlock_purchase(user_id: str, *, occurrences, kind, price_cents) -> int:
     """Atomically: skip already-owned occurrences, charge `price_cents` iff at
     least one is new, record unlocks + ledger. Returns the new balance.

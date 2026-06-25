@@ -129,38 +129,33 @@ def test_set_plan_rejects_invalid(api):
     assert client.get("/api/me").json()["plan"] == "free"      # unchanged
 
 
-def test_unlock_buy_row_deducts_and_reveals(api):
+def test_unlock_buy_tier_deducts_and_reveals(api):
     bm, client = api
     _seed_pro(bm, 100)
     import backend.entitlements as e
-    token = e.lock_token("buy", "T0", "2026-05-26")
+    # 3 seeded BUYs are untiered → Promising (tier 3); unlock that tier.
     resp = client.post("/api/signals/unlock",
-                       json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+                       json={"kind": "buy", "scope": "tier", "tier": 3, "market": "US"})
     assert resp.status_code == 200
-    assert resp.json()["balance_cents"] == 80        # 100 - 20 (per-row)
+    assert resp.json()["balance_cents"] == 100 - e.tier_unlock_price_cents(3, 3)  # 100-30
     rows = client.get("/api/signals/today?signal=BUY&market=US").json()
-    t0 = next(r for r in rows if r.get("ticker") == "T0")
-    assert not t0.get("locked")
+    assert all(not r.get("locked") for r in rows)
 
 
-def test_unlock_is_idempotent_no_double_charge(api):
+def test_unlock_tier_idempotent_no_double_charge(api):
     bm, client = api
     _seed_pro(bm, 100)
-    import backend.entitlements as e
-    token = e.lock_token("buy", "T0", "2026-05-26")
-    body = {"kind": "buy", "scope": "row", "lock_token": token, "market": "US"}
+    body = {"kind": "buy", "scope": "tier", "tier": 3, "market": "US"}
     client.post("/api/signals/unlock", json=body)
     second = client.post("/api/signals/unlock", json=body)
-    assert second.json()["balance_cents"] == 80      # unchanged on re-purchase
+    assert second.json()["balance_cents"] == 70      # unchanged on re-purchase
 
 
 def test_unlock_insufficient_funds(api):
     bm, client = api
     _seed_pro(bm, 5)
-    import backend.entitlements as e
-    token = e.lock_token("buy", "T0", "2026-05-26")
     resp = client.post("/api/signals/unlock",
-                       json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+                       json={"kind": "buy", "scope": "tier", "tier": 3, "market": "US"})
     assert resp.status_code == 402
 
 
@@ -168,20 +163,19 @@ def test_unlock_rejected_for_free_plan(api):
     bm, client = api
     import backend.entitlements as e
     e.set_plan("dev-bypass", "free")
-    token = e.lock_token("buy", "T0", "2026-05-26")
     resp = client.post("/api/signals/unlock",
-                       json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+                       json={"kind": "buy", "scope": "tier", "tier": 3, "market": "US"})
     assert resp.status_code == 402
 
 
-def test_unlock_buy_all_charges_dynamic_price(api):
+def test_unlock_buy_all_charges_value_weighted_price(api):
     bm, client = api
     _seed_pro(bm, 100)
     import backend.entitlements as e
     resp = client.post("/api/signals/unlock",
                        json={"kind": "buy", "scope": "all", "market": "US"})
     assert resp.status_code == 200
-    assert resp.json()["balance_cents"] == 100 - e.see_all_price_cents(3, "buy")   # 3 BUYs seeded
+    assert resp.json()["balance_cents"] == 100 - e.all_tiers_price_cents({1: 0, 2: 0, 3: 3})  # 100-30
     rows = client.get("/api/signals/today?signal=BUY&market=US").json()
     assert all(not r.get("locked") for r in rows)
 
@@ -189,15 +183,20 @@ def test_unlock_buy_all_charges_dynamic_price(api):
 def test_unlock_error_codes_are_distinct(api):
     bm, client = api
     import backend.entitlements as e
-    # free → UPGRADE_REQUIRED
     e.set_plan("dev-bypass", "free")
-    token = e.lock_token("buy", "T0", "2026-05-26")
-    r1 = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+    r1 = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "tier", "tier": 3, "market": "US"})
     assert r1.status_code == 402 and r1.json()["detail"]["code"] == "UPGRADE_REQUIRED"
-    # pro but broke → INSUFFICIENT_FUNDS
     e.set_plan("dev-bypass", "pro")
-    r2 = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "row", "lock_token": token, "market": "US"})
+    r2 = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "tier", "tier": 3, "market": "US"})
     assert r2.status_code == 402 and r2.json()["detail"]["code"] == "INSUFFICIENT_FUNDS"
+
+
+def test_unlock_tier_requires_buy_and_valid_tier(api):
+    bm, client = api
+    _seed_pro(bm, 100)
+    assert client.post("/api/signals/unlock", json={"kind": "sell", "scope": "tier", "tier": 3, "market": "US"}).status_code == 400
+    assert client.post("/api/signals/unlock", json={"kind": "buy", "scope": "tier", "tier": 9, "market": "US"}).status_code == 400
+    assert client.post("/api/signals/unlock", json={"kind": "buy", "scope": "tier", "market": "US"}).status_code == 400
 
 
 def test_unlock_bad_kind_and_scope_rejected(api):
@@ -213,7 +212,7 @@ def test_unlock_all_idempotent(api):
     import backend.entitlements as e
     client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
     second = client.post("/api/signals/unlock", json={"kind": "buy", "scope": "all", "market": "US"})
-    assert second.json()["balance_cents"] == 100 - e.see_all_price_cents(3, "buy")   # no second charge
+    assert second.json()["balance_cents"] == 100 - e.all_tiers_price_cents({1: 0, 2: 0, 3: 3})
 
 
 def test_api_signals_list_redacts_today_buys_for_free(api):

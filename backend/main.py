@@ -528,8 +528,8 @@ class WatchlistCreate(BaseModel):
 
 class UnlockBody(BaseModel):
     kind: str                      # buy | sell | open
-    scope: str                     # row | all
-    lock_token: Optional[str] = None
+    scope: str                     # all | tier
+    tier: Optional[int] = None     # required for scope=tier (BUY only): 1|2|3
     market: Optional[str] = "US"
 
 
@@ -2604,19 +2604,28 @@ def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
         candidates = _get_open_trades_cached(mkt, False)
         date_key = "buy_date"
 
-    if scope == "row":
-        if kind not in ("buy", "sell") or not body.lock_token:
-            raise HTTPException(status_code=400, detail="row unlock needs a BUY/SELL token")
-        match = ent.resolve_token(body.lock_token, kind, candidates, date_key=date_key)
-        if not match:
-            raise HTTPException(status_code=404, detail="signal not found")
-        occurrences = [match]
-        price = ent.per_row_price_cents(kind)
+    owned = ent.get_unlocks(uid)
+
+    def _still_locked(r):
+        return (kind, r.get("ticker"), ent._norm_date(r.get(date_key))) not in owned
+
+    if scope == "tier":
+        if kind != "buy" or body.tier not in (1, 2, 3):
+            raise HTTPException(status_code=400, detail="tier unlock is BUY-only with tier 1|2|3")
+        in_tier = [r for r in candidates if ent.tier_of(r) == body.tier]
+        locked = [r for r in in_tier if _still_locked(r)]
+        occurrences = [(r["ticker"], ent._norm_date(r.get(date_key))) for r in in_tier if r.get("ticker")]
+        price = ent.tier_unlock_price_cents(body.tier, len(locked))
     elif scope == "all":
         occurrences = [(r["ticker"], ent._norm_date(r.get(date_key))) for r in candidates if r.get("ticker")]
-        # Open trades unlock as ONE flat-$2 bundle (no per-row). BUY/SELL keep the
-        # dynamic 50%-of-count price.
-        price = ent.OPEN_UNLOCK_ALL_CENTS if kind == "open" else ent.see_all_price_cents(len(candidates), kind)
+        if kind == "open":
+            price = ent.OPEN_UNLOCK_ALL_CENTS
+        elif kind == "sell":
+            price = ent.see_all_price_cents(len(candidates), "sell")
+        else:  # buy: value-weighted across still-locked tiers, 15% off, clamped
+            locked_by_tier = {t: sum(1 for r in candidates if ent.tier_of(r) == t and _still_locked(r))
+                              for t in (1, 2, 3)}
+            price = ent.all_tiers_price_cents(locked_by_tier)
     else:
         raise HTTPException(status_code=400, detail="bad scope")
 
