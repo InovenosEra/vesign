@@ -46,7 +46,7 @@ export function SignalCard({ s }) {
         <img className={'sc-logo ' + logoCls(s.ticker)} src={LOGO(s.ticker)} alt={s.ticker} />
         <div className="sc-id">
           <div className="trow"><span className="tk">{s.ticker}</span><TierStar tier={s.tier} size={15} /></div>
-          <div className="co">{s.company || ''}</div>
+          <div className="co" title={s.company || ''}>{s.company || ''}</div>
         </div>
         <SignalExplanation ticker={s.ticker} part="headline" />
       </div>
