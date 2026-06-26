@@ -235,7 +235,7 @@
 .rd .sig-sec-h .sub { font-size: 12px; color: var(--ink-3, #6b7280); }
 /* "Unlock all" compact button. A click opens the confirm dialog (the misclick
    guard), so it never spends money directly. */
-.rd .unlock-all-btn { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--blue-2, #60a5fa); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
+.rd .unlock-all-btn { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--blue-2, #60a5fa); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); padding: 4px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
 .rd .unlock-all-btn:hover { background: rgba(59,130,246,0.20); border-color: rgba(59,130,246,0.50); color: #93c5fd; }
 /* In the Open-trades header (flex, not the 3-col grid) push the button to the right. */
 .rd .section-h .unlock-all-btn { margin-left: auto; }
@@ -371,6 +371,8 @@
 .rd .tier-legend .tl-zero { opacity: 0.42; }
 .rd .tier-legend .tl-price { color: var(--blue-2, #60a5fa); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* a clickable tier chip (buy affordance) */
-.rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.28); border-radius: 999px; padding: 3px 10px; cursor: pointer; transition: background .12s ease, border-color .12s ease; }
-.rd .tier-legend button.tl-buy:hover { background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.48); }
+/* same frame as the "Unlock all" button (radius/padding/border/bg) so the tier
+   chips and the unlock-all read as one family; only the text differs. */
+.rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); border-radius: 8px; padding: 4px 11px; cursor: pointer; transition: background .12s ease, border-color .12s ease; }
+.rd .tier-legend button.tl-buy:hover { background: rgba(59,130,246,0.20); border-color: rgba(59,130,246,0.50); }
 .rd .tier-legend button.tl-buy:hover .tl-price { color: #93c5fd; }
