@@ -216,7 +216,10 @@
 /* 2-part header, ALL on one line: identity + tier-breakdown legend (left) ·
    unlock-all button (right). nowrap keeps it single-row; the compact button
    (not the old wide switch) frees the space to fit. */
-.rd .sig-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+/* min-height keeps BUY and SELL heads the SAME height in every state — once a
+   column is fully unlocked it loses its "Unlock all" button and its chips go to
+   plain text, which would otherwise shrink that head and misalign the columns. */
+.rd .sig-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; min-height: 28px; }
 .rd .sig-sec-h .ssh-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap; }
 .rd .sig-sec-h .ssh-right { flex: none; }
 /* faint divider between the "N signals" count and the legend */
