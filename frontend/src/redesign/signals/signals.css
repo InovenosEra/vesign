@@ -367,10 +367,10 @@
 /* Tier legend (Prime / Strong / Promising bars) — left of the BUY section head */
 .rd .tier-legend { display: flex; gap: 9px; align-items: center; font-size: 12px; color: var(--ink-3, #6b7280); white-space: nowrap; }
 .rd .tier-legend .tl-item { display: inline-flex; align-items: center; gap: 5px; }
-.rd .tier-legend .tl-n { color: var(--ink, #e8eaf0); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rd .tier-legend .tl-n { color: var(--ink, #e8eaf0); font-weight: 400; font-variant-numeric: tabular-nums; }
 /* a tier with no signals today is dimmed (label + number + star) */
 .rd .tier-legend .tl-zero { opacity: 0.42; }
-.rd .tier-legend .tl-price { color: var(--blue-2, #60a5fa); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rd .tier-legend .tl-price { color: var(--blue-2, #60a5fa); font-weight: 400; font-variant-numeric: tabular-nums; }
 /* a clickable tier chip (buy affordance) */
 /* same frame as the "Unlock all" button (radius/padding/border/bg) so the tier
    chips and the unlock-all read as one family; only the text differs. */
