@@ -88,7 +88,7 @@ export default function OpenTrades() {
     const shown = rows.slice(0, FREE_PREVIEW)
     return (
       <>
-        <div className="section-h">
+        <div className="section-h ot-head">
           <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
         </div>
         <table className="data-table">
