@@ -265,8 +265,11 @@
 .rd .sigcard.buy { border-color: rgba(0,217,126,0.16); }
 .rd .sigcard.sell { border-color: rgba(255,77,92,0.14); }
 
-.rd .sc-head { display: flex; align-items: center; gap: 10px; }
-/* identity block hugs its content so the headline can take the rest of the row */
+/* min-height reserves room for a 2-line (wrapped) company name so every card —
+   1-line or 2-line name — has the same header height and stays the same size. */
+.rd .sc-head { display: flex; align-items: center; gap: 10px; min-height: 50px; }
+/* fixed-width identity block so the headline always starts at the same x across
+   cards; long company names wrap inside it instead of widening the column. */
 .rd .sc-head > .sc-id { flex: none; }
 /* transparent by default (white-on-transparent logos like WSM/HTZ show on the
    dark card); only allowlisted dark-on-transparent logos get a white plate. */
@@ -275,10 +278,12 @@
 /* locked placeholder (card): grey block, blurred like yesterday's lock-blur.
    filter:blur scoped to this box only (see .logo-skel note) — ticker is redacted. */
 .rd .sc-logo.logo-skel { background: rgba(255,255,255,0.18); filter: blur(3.5px); }
-.rd .sc-id { min-width: 0; }
+.rd .sc-id { width: 150px; flex: none; }
 .rd .sc-id .trow { display: flex; align-items: center; gap: 7px; }
 .rd .sc-id .tk { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
-.rd .sc-id .co { font-size: 11px; color: var(--ink-3, #6b7280); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+/* wrap the company name (up to 2 lines) instead of one ellipsised line, so it
+   stays inside the fixed-width column and the headline stays aligned. */
+.rd .sc-id .co { font-size: 11px; color: var(--ink-3, #6b7280); margin-top: 1px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rd .sigcard .pill { font-size: 8.5px; font-weight: 800; letter-spacing: 0.04em; padding: 1.5px 6px; border-radius: 4px; }
 .rd .sigcard .pill.buy { background: var(--green-bg, rgba(0,217,126,0.10)); color: var(--green, #00d97e); }
 .rd .sigcard .pill.sell { background: var(--red-bg, rgba(255,77,92,0.10)); color: var(--red, #ff4d5c); }
