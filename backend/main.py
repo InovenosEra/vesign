@@ -1555,36 +1555,16 @@ def analyst_history_endpoint(
 
 @protected.get("/api/prices/live")
 def live_prices(tickers: str = Query(..., description="Comma-separated ticker symbols")):
-    """Fetch real-time prices, phase-aware (regular vs extended hours)."""
+    """Per-ticker live prices, read from the shared whole-universe snapshot — the
+    SAME source the BUY/SELL cards and market panels use — so every live price in
+    the app is identical for a given ticker (no mid-vs-last-trade / timing drift).
+    Phase-aware via the snapshot itself."""
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="No tickers provided")
-
-    info = _phase_info()
-    phase = info["phase"]
-
-    if phase == "idle":
-        return {"phase": "idle", "prices": {t: None for t in ticker_list}}
-
-    global _live_price_cache, _live_price_cache_ts, _live_price_cache_phase
-    now = time.time()
-    if _live_price_cache_phase != phase:
-        # phase changed → flush cache to avoid stale prices from prior phase
-        _live_price_cache.clear()
-        _live_price_cache_phase = phase
-
-    cached = {t: _live_price_cache[t] for t in ticker_list if t in _live_price_cache}
-    stale  = [t for t in ticker_list if t not in _live_price_cache or now - _live_price_cache_ts > _LIVE_CACHE_TTL]
-    if stale:
-        if phase == "regular":
-            fresh = fetch_live_prices(stale)
-        else:  # 'pre' or 'post'
-            fresh = fetch_aftermarket_trades(stale)
-        _live_price_cache.update(fresh)
-        _live_price_cache_ts = now
-        cached.update(fresh)
-
-    return {"phase": phase, "prices": cached}
+    snap = _get_live_snapshot()
+    px = snap["prices"]
+    return {"phase": snap["phase"], "prices": {t: px.get(t) for t in ticker_list}}
 
 
 # --- Watchlists -------------------------------------------------------------
