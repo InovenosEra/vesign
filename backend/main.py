@@ -1018,11 +1018,15 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
         for r in rows
     ]
     if signal and signal.upper() == "BUY":
-        # BUY cards grouped by quality tier: Prime (1) → Strong (2) → High
-        # Potential (3), untiered last; stable within a tier. MUST run before
+        # BUY cards grouped by quality tier: Prime (1) → Strong (2) → Promising
+        # (3), untiered last; then within each tier by analyst upside (the % shown
+        # under "Price Target"), highest first, nulls last. MUST run before
         # gate_signals — redacted rows drop `tier`, so the order can't be
         # reconstructed client-side.
-        rows = sorted(rows, key=lambda r: (r.get("tier") is None, r.get("tier") or 0))
+        rows = sorted(rows, key=lambda r: (
+            r.get("tier") is None, r.get("tier") or 0,
+            r.get("fair_value_upside") is None, -(r.get("fair_value_upside") or 0),
+        ))
     if signal and signal.upper() in ("BUY", "SELL"):
         plan = ent.get_plan(user["id"])
         unlocks = ent.get_unlocks(user["id"])
