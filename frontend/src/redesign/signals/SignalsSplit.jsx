@@ -63,7 +63,10 @@ function useSignalSection(kind) {
     : seeAllCents(rows.length, me.per_row_price_cents?.sell ?? 10)
   // "was" anchor (undiscounted tier sum) — BUY only, shown struck through.
   const seeAllGross = isBuy ? allTiersGrossCents(lockedByTier, rates) : 0
-  const showSeeAll = isPro && hasMoreLocked(rows) && (!isBuy || !!tiers)
+  // For BUY, "Unlock all" only earns its place when it bundles 2+ still-locked
+  // tiers; with one tier left it's just a duplicate of that tier's chip, so hide it.
+  const lockedTierCount = [1, 2, 3].filter(t => (lockedByTier[t] || 0) > 0).length
+  const showSeeAll = isPro && hasMoreLocked(rows) && (!isBuy || (!!tiers && lockedTierCount >= 2))
   return { me, isBuy, isPro, rows, unlock, sub, showSeeAll, seeAllPrice, seeAllGross, tierCounts, lockedByTier, rates }
 }
 
