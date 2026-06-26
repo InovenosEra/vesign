@@ -71,7 +71,13 @@ function LiveCell({ p, live, phase }) {
 
 function FullOpenRow({ p, live, phase }) {
   const open = useTickerModal()
-  const yld = p.unrealized_pct
+  // Yield off the SAME live price the live column shows, so they stay consistent
+  // (for a trade opened today, yield == the day's change). Fall back to the
+  // server's value when there's no live price (market closed/loading).
+  const liveYld = (phase && phase !== 'idle' && live != null && p.buy_price)
+    ? (live - p.buy_price) / p.buy_price * 100
+    : null
+  const yld = liveYld != null ? liveYld : p.unrealized_pct
   return (
     <tr data-ticker={p.ticker} data-company={p.company || ''} onClick={() => open(p.ticker, p.company)}>
       <td><img className={logoCls(p.ticker)} src={LOGO(p.ticker)} alt={p.ticker} /></td>
