@@ -236,7 +236,7 @@
 /* "Unlock all" compact button. A click opens the confirm dialog (the misclick
    guard), so it never spends money directly. */
 /* neutral (like "N signals") so it doesn't compete with the coloured tier chips */
-.rd .unlock-all-btn { font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-2, #a8acb8); background: transparent; border: 1px solid rgba(255,255,255,0.18); padding: 4px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: border-color .12s ease, color .12s ease; }
+.rd .unlock-all-btn { font: inherit; font-size: 12px; font-weight: 400; color: var(--ink-2, #a8acb8); background: transparent; border: 1px solid rgba(255,255,255,0.18); padding: 4px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: border-color .12s ease, color .12s ease; }
 .rd .unlock-all-btn:hover { border-color: rgba(255,255,255,0.32); color: var(--ink, #e8eaf0); }
 /* In the Open-trades header (flex, not the 3-col grid) push the button to the right. */
 .rd .section-h .unlock-all-btn { margin-left: auto; }
