@@ -26,11 +26,10 @@ export const tierUnlockCents = (tier, nLocked, rates) =>
 export const allTiersGrossCents = (lockedByTier, rates) =>
   [1, 2, 3].reduce((s, t) => s + tierUnlockCents(t, lockedByTier?.[t] || 0, rates), 0)
 
-// 40% off the per-tier sum (round half-up), clamped ≥ the priciest single tier.
+// A true 40% off the per-tier sum (round half-up) — no floor, so "all" can be
+// cheaper than a single tier (the intended nudge).
 export const allTiersCents = (lockedByTier, rates) => {
-  const per = [1, 2, 3].map(t => tierUnlockCents(t, lockedByTier?.[t] || 0, rates))
-  const gross = per[0] + per[1] + per[2]
+  const gross = allTiersGrossCents(lockedByTier, rates)
   if (gross <= 0) return 0
-  const discounted = Math.floor((gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) / 100)
-  return Math.max(discounted, ...per)
+  return Math.floor((gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) / 100)
 }

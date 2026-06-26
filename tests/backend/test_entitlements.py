@@ -238,15 +238,14 @@ def test_tier_unlock_price_is_rate_times_count(ent):
 
 
 def test_all_tiers_price_is_40pct_off_sum(ent):
-    # 0 Prime, 3 Strong ($0.60), 11 Promising ($1.10) → sum $1.70 → 40% off = $1.02,
-    # but clamped up to the priciest tier (Promising $1.10).
-    price = ent.all_tiers_price_cents({1: 0, 2: 3, 3: 11})
-    assert price == 110
+    # 0 Prime, 3 Strong ($0.60), 11 Promising ($1.10) → sum $1.70 → 40% off = $1.02
+    assert ent.all_tiers_price_cents({1: 0, 2: 3, 3: 11}) == 102
 
 
-def test_all_tiers_price_clamps_to_priciest_tier(ent):
-    # Only Promising present: gross 30¢, 40% off = 18¢, but a single tier is 30¢ → clamp up
-    assert ent.all_tiers_price_cents({1: 0, 2: 0, 3: 3}) == 30
+def test_all_tiers_price_has_no_single_tier_floor(ent):
+    # gross 30¢, true 40% off = 18¢ — cheaper than the single Promising tier ($0.30),
+    # which is the intended "everything is cheaper than one tier" nudge.
+    assert ent.all_tiers_price_cents({1: 0, 2: 0, 3: 3}) == 18
 
 
 def test_all_tiers_price_zero_when_nothing_locked(ent):

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSignalsToday, getSignalsTodayTiers, unlockSignal } from '../../api'
 import { useMe } from '../../context/MeContext'
-import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount, tierOf, tierUnlockCents, allTiersCents, allTiersGrossCents } from './gating'
+import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount, tierOf, tierUnlockCents, allTiersCents, allTiersGrossCents, TIER_ALL_DISCOUNT_PCT } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 import { TierLegend } from './tierStar'
 import { UnlockAllButton, ConfirmUnlockDialog } from './UnlockAll'
@@ -67,7 +67,7 @@ function useSignalSection(kind) {
   return { me, isBuy, isPro, rows, unlock, sub, showSeeAll, seeAllPrice, seeAllGross, tierCounts, lockedByTier, rates }
 }
 
-function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyTier, showSeeAll, onSeeAll, seeAllPrice, seeAllGross }) {
+function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyTier, showSeeAll, onSeeAll, seeAllPrice }) {
   const isBuy = kind === 'BUY'
   // A tier chip is a buy button only for a Pro user with ≥1 still-locked signal.
   const buys = (isBuy && isPro && tierCounts) ? {} : null
@@ -91,7 +91,7 @@ function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyT
       </div>
       <div className="ssh-right">
         {showSeeAll && (
-          <UnlockAllButton price={seeAllPrice} anchor={seeAllGross} onClick={onSeeAll} tone={isBuy ? 'buy' : 'sell'} />
+          <UnlockAllButton price={seeAllPrice} onClick={onSeeAll} tone={isBuy ? 'buy' : 'sell'} discountPct={isBuy ? TIER_ALL_DISCOUNT_PCT : 0} />
         )}
       </div>
     </div>
@@ -146,7 +146,7 @@ function SignalColumn({ kind, isFree }) {
         kind={kind} sub={sub} tierCounts={tierCounts} lockedByTier={lockedByTier} rates={rates} isPro={isPro}
         onBuyTier={(t) => setConfirm({ scope: 'tier', tier: t })}
         showSeeAll={showSeeAll} onSeeAll={() => setConfirm({ scope: 'all' })}
-        seeAllPrice={seeAllPrice} seeAllGross={seeAllGross}
+        seeAllPrice={seeAllPrice}
       />
       {dialog && (
         <ConfirmUnlockDialog

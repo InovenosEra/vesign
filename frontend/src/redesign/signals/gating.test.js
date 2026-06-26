@@ -18,16 +18,16 @@ describe('tier pricing helpers', () => {
     expect(tierUnlockCents(1, 0, RATES)).toBe(0)
   })
 
-  it('prices "all" as 40% off the sum, clamped to the priciest tier ($1.70 → $1.10)', () => {
-    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(110)
+  it('prices "all" as a true 40% off the sum ($1.70 → $1.02)', () => {
+    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(102)
   })
 
-  it('grosses the undiscounted tier sum for the "was" anchor', () => {
+  it('grosses the undiscounted tier sum (for the saving)', () => {
     expect(allTiersGrossCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(170)
   })
 
-  it('clamps "all" up to the priciest single tier', () => {
-    expect(allTiersCents({ 1: 0, 2: 0, 3: 3 }, RATES)).toBe(30)
+  it('has no single-tier floor — "all" can be cheaper than one tier', () => {
+    expect(allTiersCents({ 1: 0, 2: 0, 3: 3 }, RATES)).toBe(18)
   })
 
   it('is zero when nothing is locked', () => {

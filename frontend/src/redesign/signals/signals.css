@@ -237,13 +237,13 @@
    guard), so it never spends money directly. */
 /* same filled-tag look as the BUY/SELL section tags, in the section's colour, so
    "Unlock all" reads as a sibling of BUY/SELL (unlock all of them). */
-.rd .unlock-all-btn { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; padding: 4px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: var(--ink-2, #a8acb8); cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
+.rd .unlock-all-btn { position: relative; display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; padding: 4px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: var(--ink-2, #a8acb8); cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
 .rd .unlock-all-btn--buy { background: var(--green-bg, rgba(0,217,126,0.10)); color: var(--green, #00d97e); border-color: rgba(0,217,126,0.45); }
 .rd .unlock-all-btn--buy:hover { background: rgba(0,217,126,0.18); border-color: rgba(0,217,126,0.7); }
 .rd .unlock-all-btn--sell { background: var(--red-bg, rgba(255,77,92,0.10)); color: var(--red, #ff4d5c); border-color: rgba(255,77,92,0.45); }
 .rd .unlock-all-btn--sell:hover { background: rgba(255,77,92,0.18); border-color: rgba(255,77,92,0.7); }
-/* "was" anchor — struck through and dimmed so the real price stands out */
-.rd .unlock-all-btn .ua-was { text-decoration: line-through; opacity: 0.55; font-weight: 400; margin-right: 2px; }
+/* small discount badge (plan-chip style) above the price, top-right of the button */
+.rd .unlock-all-btn .ua-deal { position: absolute; top: -8px; right: 6px; font-size: 9px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; padding: 2px 5px; border-radius: 999px; background: var(--gold, #f59e0b); color: #1a1205; box-shadow: 0 2px 6px -1px rgba(245,158,11,0.45); }
 /* In the Open-trades header (flex, not the 3-col grid) push the button to the right. */
 .rd .section-h .unlock-all-btn { margin-left: auto; }
 

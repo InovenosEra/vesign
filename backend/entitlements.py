@@ -53,14 +53,13 @@ def tier_unlock_price_cents(tier: int, n_locked: int) -> int:
 
 
 def all_tiers_price_cents(locked_by_tier: dict) -> int:
-    """Price to unlock ALL still-locked BUY tiers at once: 15% off the per-tier
-    sum (round half-up), clamped to never fall below the priciest single tier."""
-    per_tier = {t: tier_unlock_price_cents(t, n) for t, n in locked_by_tier.items()}
-    gross = sum(per_tier.values())
+    """Price to unlock ALL still-locked BUY tiers at once: a true 40% off the
+    per-tier sum (round half-up). No floor — "all" can be cheaper than a single
+    tier, which is the intended nudge toward unlocking everything."""
+    gross = sum(tier_unlock_price_cents(t, n) for t, n in locked_by_tier.items())
     if gross <= 0:
         return 0
-    discounted = (gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) // 100   # round half-up
-    return max(discounted, max(per_tier.values()))
+    return (gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) // 100   # round half-up
 
 
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
