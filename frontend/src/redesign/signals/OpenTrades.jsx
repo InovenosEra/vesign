@@ -5,7 +5,6 @@ import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
 import { useLivePrices } from '../../hooks/useLivePrices'
-import { useSort } from '../../hooks/useSort'
 import { isLocked, hasMoreLocked, fmtCents, lockedCount } from './gating'
 import { logoCls, ymd } from './util'
 import { FAKE_SIG } from './locked-fixtures'
@@ -123,16 +122,25 @@ export default function OpenTrades() {
   const qc = useQueryClient()
   const [page, setPage] = useState(0)
   const [confirming, setConfirming] = useState(false)
-  const { data } = useQuery({ queryKey: ['open-trades', 'US'], queryFn: () => getOpenTrades('US') })
-  const rows = Array.isArray(data) ? data : []          // server-sorted by yield desc
-  // Client-side column sort (locked rows have null fields → sort to the end).
-  const { sorted, sort, toggle } = useSort(rows, 'unrealized_pct', 'desc')
+  const [sort, setSort] = useState({ key: 'unrealized_pct', dir: 'desc' })
+  // Sort is SERVER-side (it sorts all 649 rows before gating), so the unlocked
+  // preview reflects the chosen order even though most rows are redacted. Flip
+  // direction on the same column, else default to desc; reset to page 1.
+  const toggle = (key) => {
+    setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }))
+    setPage(0)
+  }
+  const { data } = useQuery({
+    queryKey: ['open-trades', 'US', sort.key, sort.dir],
+    queryFn: () => getOpenTrades('US', false, sort.key, sort.dir),
+  })
+  const rows = Array.isArray(data) ? data : []          // already sorted by the server
 
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage = Math.min(page, pages - 1)
   const slice = isFree
-    ? sorted.slice(0, FREE_PREVIEW)
-    : sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+    ? rows.slice(0, FREE_PREVIEW)
+    : rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
   // Live prices only for the unlocked rows on the current page (matches prod — no
   // 649-ticker fetch). Hooks run unconditionally (called before the free return).
   const pageTickers = slice.filter(p => !isLocked(p) && p.ticker).map(p => p.ticker)
@@ -195,7 +203,7 @@ export default function OpenTrades() {
         )
       })()}
       <table className="data-table">
-        <thead><HeadRow phase={phase} sort={sort} onSort={(col) => { toggle(col); setPage(0) }} /></thead>
+        <thead><HeadRow phase={phase} sort={sort} onSort={toggle} /></thead>
         <tbody>
           {rows.length === 0
             ? <tr><td colSpan={COLSPAN} className="muted" style={{ textAlign: 'center', padding: 24 }}>No open positions.</td></tr>

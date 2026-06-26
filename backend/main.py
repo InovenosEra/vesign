@@ -2508,11 +2508,18 @@ def _get_open_trades_cached(mkt: str, include_lots: bool = False) -> list[dict]:
         return data
 
 
+_OPEN_SORT_FIELDS = {"ticker", "company", "market_cap", "buy_date", "buy_price",
+                     "current_price", "days_held", "unrealized_pct"}
+
+
 @protected.get("/api/trades/open")
 def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
+                sort_by: Optional[str] = None, sort_dir: Optional[str] = None,
                 user=Depends(get_current_user)):
     """Tickers with a BUY signal and no SELL since — currently open positions.
-    Redacted per the requesting user's plan + unlocks; sorted by yield desc."""
+    Sorted server-side by `sort_by`/`sort_dir` (default yield desc) BEFORE gating,
+    so the unlocked preview is the top-N of the requested order — sorting works
+    even though most rows are redacted for non-Max plans."""
     rows = _get_open_trades_cached((market or "US").upper(), bool(include_lots))
     # Overlay the live snapshot price (the cache holds the last stored close), and
     # recompute the unrealized yield off it — matches signals/today + the rest.
@@ -2525,11 +2532,16 @@ def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
          if live.get(r.get("ticker")) else r)
         for r in rows
     ]
-    rows = sorted(
-        rows,
-        key=lambda r: (r.get("unrealized_pct") is not None, r.get("unrealized_pct") or 0.0),
-        reverse=True,
-    )
+    key = sort_by if sort_by in _OPEN_SORT_FIELDS else "unrealized_pct"
+    desc = (sort_dir or "desc").lower() != "asc"
+
+    def _sk(r):
+        v = r.get(key)
+        return v.lower() if isinstance(v, str) else v
+    # Nulls always sort last, regardless of direction.
+    non_null = sorted((r for r in rows if r.get(key) is not None), key=_sk, reverse=desc)
+    rows = non_null + [r for r in rows if r.get(key) is None]
+
     plan = ent.get_plan(user["id"])
     unlocks = ent.get_unlocks(user["id"])
     return ent.gate_open_trades(rows, plan=plan, unlocks=unlocks)

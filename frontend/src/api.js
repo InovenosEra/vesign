@@ -224,9 +224,11 @@ export const getTrades = ({ start, end, market = 'US', includeLots = false } = {
   return get('/trades?' + params.toString())
 }
 
-export const getOpenTrades = (market = 'US', includeLots = false) => {
+export const getOpenTrades = (market = 'US', includeLots = false, sortBy, sortDir) => {
   const params = new URLSearchParams({ market })
   if (includeLots) params.set('include_lots', '1')
+  if (sortBy) params.set('sort_by', sortBy)
+  if (sortDir) params.set('sort_dir', sortDir)
   return get('/trades/open?' + params.toString())
 }
 
