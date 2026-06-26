@@ -328,9 +328,8 @@
 .rd .sc-more { background: none; border: none; color: var(--blue-2, #60a5fa); font-size: 11px; font-weight: 600; cursor: pointer; padding: 0; }
 .rd .sc-more:hover { text-decoration: underline; }
 
-/* locked card CTA */
-/* locked card: the unlock CTA floats centered over the blurred content */
-.rd .sigcard.locked { min-height: 138px; }
+/* locked cards size to their content (hazed cockpit + 2-line rationale) so they
+   match the unlocked cards — no fixed min-height (that left them taller). */
 /* Frosted "real data you can't quite read": transparent text + a blurred
    text-shadow renders blurry glyphs during normal paint — NO filter/backdrop
    layer, so none of the Chrome compositing ghost-smear that filter:blur caused. */
