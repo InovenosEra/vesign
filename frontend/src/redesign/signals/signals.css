@@ -375,4 +375,11 @@
    chips and the unlock-all read as one family; only the text differs. */
 .rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); border-radius: 8px; padding: 4px 11px; cursor: pointer; transition: background .12s ease, border-color .12s ease; }
 .rd .tier-legend button.tl-buy:hover { background: rgba(59,130,246,0.20); border-color: rgba(59,130,246,0.50); }
+/* frame + fill tinted per tier, matching the bar/icon colour (text stays as-is) */
+.rd .tier-legend button.tl-buy--prime { background: rgba(167,139,250,0.12); border-color: rgba(167,139,250,0.32); }
+.rd .tier-legend button.tl-buy--prime:hover { background: rgba(167,139,250,0.20); border-color: rgba(167,139,250,0.52); }
+.rd .tier-legend button.tl-buy--strong { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.32); }
+.rd .tier-legend button.tl-buy--strong:hover { background: rgba(251,191,36,0.20); border-color: rgba(251,191,36,0.52); }
+.rd .tier-legend button.tl-buy--potential { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.32); }
+.rd .tier-legend button.tl-buy--potential:hover { background: rgba(56,189,248,0.20); border-color: rgba(56,189,248,0.52); }
 .rd .tier-legend button.tl-buy:hover .tl-price { color: #93c5fd; }

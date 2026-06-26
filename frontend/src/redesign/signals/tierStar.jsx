@@ -55,7 +55,7 @@ export function TierLegend({ counts, buys }) {
           </>
         )
         return buy ? (
-          <button key={tr} type="button" className="tl-item tl-buy" onClick={buy.onUnlock}>
+          <button key={tr} type="button" className={`tl-item tl-buy tl-buy--${TIER[tr].cls}`} onClick={buy.onUnlock}>
             {inner}
           </button>
         ) : (
