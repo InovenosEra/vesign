@@ -118,6 +118,9 @@ function SignalColumn({ kind, isFree }) {
   const slice = isFree
     ? rows.slice(0, FREE_PREVIEW)
     : rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  // SELL's first page is the free preview (all open), so "Unlock all" is noise
+  // there — show it only when the current page actually has a locked card.
+  const showUnlockAll = showSeeAll && (kind === 'BUY' || slice.some(isLocked))
 
   const TIER_LABEL = { 1: 'Prime', 2: 'Strong', 3: 'Promising' }
   let dialog = null
@@ -149,7 +152,7 @@ function SignalColumn({ kind, isFree }) {
       <SectionHead
         kind={kind} sub={sub} tierCounts={tierCounts} lockedByTier={lockedByTier} rates={rates} isPro={isPro}
         onBuyTier={(t) => setConfirm({ scope: 'tier', tier: t })}
-        showSeeAll={showSeeAll} onSeeAll={() => setConfirm({ scope: 'all' })}
+        showSeeAll={showUnlockAll} onSeeAll={() => setConfirm({ scope: 'all' })}
         seeAllPrice={seeAllPrice}
       />
       {dialog && (
