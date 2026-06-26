@@ -283,7 +283,7 @@
    filter:blur scoped to this box only (see .logo-skel note) — ticker is redacted. */
 .rd .sc-logo.logo-skel { background: rgba(255,255,255,0.18); filter: blur(3.5px); }
 .rd .sc-id { width: 130px; flex: none; }
-.rd .sc-id .trow { display: flex; align-items: center; gap: 7px; }
+.rd .sc-id .trow { display: flex; align-items: center; gap: 10px; }
 .rd .sc-id .tk { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
 /* single line, ellipsised — stays inside the fixed-width column without growing
    the header height (the full name is shown in the modal). */
