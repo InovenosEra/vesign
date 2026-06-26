@@ -52,7 +52,7 @@ export function SignalCard({ s }) {
       </div>
 
       <div className="sc-cockpit">
-        <div className="cell"><div className="l">Current Price</div><div className="v num">{s.close == null ? '—' : '$' + num(s.close)}</div></div>
+        <div className="cell"><div className="l">Current Price</div><div className="v num">{s.close == null ? '—' : '$' + num(s.close)}</div><div className={'sub2 num ' + dirClass(s.day_change_pct)}>{pct(s.day_change_pct)}</div></div>
         <div className="cell"><div className="l">Price Target</div><div className="v num">{target == null ? '—' : '$' + num(target)}</div><div className={'sub2 num ' + dirClass(upPct)}>{pct(upPct)}</div></div>
         <div className="cell"><div className="l">5D ML</div><div className="v num">{mlPrice == null ? '—' : '$' + num(mlPrice)}</div><div className={'sub2 num ' + dirClass(mlPct)}>{pct(mlPct)}</div></div>
         <div className="cell"><div className="l">Health</div>{healthDots(s.health_score)}</div>
@@ -93,7 +93,7 @@ export function LockedSignalCard({ kind, idx = 0 }) {
         </div>
       </div>
       <div className="sc-cockpit lock-haze" aria-hidden="true">
-        <div className="cell"><div className="l">Current Price</div><div className="v num">${f.price}</div></div>
+        <div className="cell"><div className="l">Current Price</div><div className="v num">${f.price}</div><div className="sub2 num">{f.dc}</div></div>
         <div className="cell"><div className="l">Price Target</div><div className="v num">${fakeTarget}</div><div className="sub2 num up">{f.up}</div></div>
         <div className="cell"><div className="l">5D ML</div><div className="v num">${(parseFloat(f.price) * 1.01).toFixed(2)}</div><div className="sub2 num up">{f.ml}</div></div>
         <div className="cell"><div className="l">Health</div>{healthDots(f.h)}</div>
