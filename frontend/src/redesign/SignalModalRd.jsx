@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getResearch, getPriceHistory, getSignalMarkers, getNews, WHITE_BG_LOGOS,
   getWatchlists, getWatchlistTickers, addTicker, removeTicker } from '../api'
 import SignalExplanation from './SignalExplanation'
+import { useMe } from '../context/MeContext'
 import { num, pct, dateFmt, ago, dirClass, LOGO } from './fmt'
 import { useCurrency } from '../context/CurrencyContext'
 import { useLivePrices } from '../hooks/useLivePrices'
@@ -92,6 +93,8 @@ function MiniChart({ history }) {
 
 export default function SignalModalRd({ row, onClose }) {
   const { fmtPrice, symbol } = useCurrency()
+  const me = useMe()
+  const canSeeSignal = me?.plan === 'pro' || me?.plan === 'max'   // BUY/SELL/HOLD is Pro+
   const ticker = row?.ticker
   const [tab, setTab] = useState('m-overview')
   const [range, setRange] = useState('1Y')
@@ -177,7 +180,7 @@ export default function SignalModalRd({ row, onClose }) {
             <div className="m-id">
               <div className="tk-row">
                 <span className="tk">{r?.ticker || ticker || '—'}</span>
-                <span className={'m-sig-tag ' + sigCls(r?.signal)}>{r?.signal || '—'}</span>
+                {canSeeSignal && <span className={'m-sig-tag ' + sigCls(r?.signal)}>{r?.signal || '—'}</span>}
               </div>
               <div className="co">{company}</div>
               <div className="meta">
