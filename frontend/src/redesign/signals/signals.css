@@ -268,7 +268,10 @@
 .rd .sc-head { display: flex; align-items: center; gap: 10px; }
 /* identity block hugs its content so the headline can take the rest of the row */
 .rd .sc-head > .sc-id { flex: none; }
-.rd .sc-logo { width: 34px; height: 34px; border-radius: 6px; object-fit: contain; background: #fff; flex: none; }
+/* transparent by default (white-on-transparent logos like WSM/HTZ show on the
+   dark card); only allowlisted dark-on-transparent logos get a white plate. */
+.rd .sc-logo { width: 34px; height: 34px; border-radius: 6px; object-fit: contain; background: transparent; flex: none; }
+.rd .sc-logo.white-bg { background: #fff; padding: 2px; }
 /* locked placeholder (card): grey block, blurred like yesterday's lock-blur.
    filter:blur scoped to this box only (see .logo-skel note) — ticker is redacted. */
 .rd .sc-logo.logo-skel { background: rgba(255,255,255,0.18); filter: blur(3.5px); }
