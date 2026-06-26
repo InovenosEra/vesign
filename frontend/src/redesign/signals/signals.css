@@ -382,4 +382,7 @@
 .rd .tier-legend button.tl-buy--strong:hover { background: rgba(251,191,36,0.20); border-color: rgba(251,191,36,0.52); }
 .rd .tier-legend button.tl-buy--potential { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.32); }
 .rd .tier-legend button.tl-buy--potential:hover { background: rgba(56,189,248,0.20); border-color: rgba(56,189,248,0.52); }
-.rd .tier-legend button.tl-buy:hover .tl-price { color: #93c5fd; }
+/* price matches the tier colour too */
+.rd .tier-legend button.tl-buy--prime .tl-price { color: var(--tier-prime); }
+.rd .tier-legend button.tl-buy--strong .tl-price { color: var(--tier-strong); }
+.rd .tier-legend button.tl-buy--potential .tl-price { color: var(--tier-promising); }
