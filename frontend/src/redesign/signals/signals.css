@@ -277,7 +277,10 @@
 .rd .sigcard.buy { border-color: rgba(0,217,126,0.16); }
 .rd .sigcard.sell { border-color: rgba(255,77,92,0.14); }
 
-.rd .sc-head { display: flex; align-items: center; gap: 10px; }
+/* fixed head height + 2-line headline clamp → every card (1-line, 2-line, locked)
+   is the exact same height; the full headline still shows under "More details". */
+.rd .sc-head { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.rd .sc-head .sig-why-head { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* fixed-width identity block so the headline always starts at the same x across
    cards; the company name is single-line (ellipsised) inside it, keeping the
    header compact and every card the same height. */
