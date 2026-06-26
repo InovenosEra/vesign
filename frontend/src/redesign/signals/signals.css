@@ -375,7 +375,7 @@
 /* same frame as the "Unlock all" button (radius/padding/border/bg) so the tier
    chips and the unlock-all read as one family; only the text differs. */
 /* no box — just a tier-coloured underline under each buyable tier chip */
-.rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: transparent; border: none; border-bottom: 2px solid rgba(59,130,246,0.7); border-radius: 0; padding: 1px 3px 4px; cursor: pointer; transition: color .12s ease; }
+.rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: transparent; border: none; border-bottom: 1.5px solid rgba(59,130,246,0.7); border-radius: 0; padding: 1px 3px 4px; cursor: pointer; transition: color .12s ease; }
 .rd .tier-legend button.tl-buy:hover { color: var(--ink-2, #a8acb8); }
 .rd .tier-legend button.tl-buy--prime { border-bottom-color: var(--tier-prime); }
 .rd .tier-legend button.tl-buy--strong { border-bottom-color: var(--tier-strong); }
