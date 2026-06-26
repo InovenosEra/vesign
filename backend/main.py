@@ -2626,7 +2626,7 @@ def unlock_signal(body: UnlockBody, user=Depends(get_current_user)):
         if kind == "open":
             price = ent.OPEN_UNLOCK_ALL_CENTS
         elif kind == "sell":
-            price = ent.see_all_price_cents(len(candidates), "sell")
+            price = ent.SELL_UNLOCK_ALL_CENTS
         else:  # buy: value-weighted across still-locked tiers, 15% off, clamped
             locked_by_tier = {t: sum(1 for r in candidates if ent.tier_of(r) == t and _still_locked(r))
                               for t in (1, 2, 3)}

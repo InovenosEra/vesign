@@ -66,6 +66,7 @@ def all_tiers_price_cents(locked_by_tier: dict) -> int:
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
 PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
 OPEN_UNLOCK_ALL_CENTS = 200    # Pro: flat $2 to unlock ALL open trades (one bundle, no per-row)
+SELL_UNLOCK_ALL_CENTS = 100    # Pro: flat $1 to unlock ALL SELL signals, regardless of count
 
 _UNLOCK_SECRET = (
     os.getenv("UNLOCK_SECRET")

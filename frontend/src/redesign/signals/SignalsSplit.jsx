@@ -7,13 +7,14 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSignalsToday, getSignalsTodayTiers, unlockSignal } from '../../api'
 import { useMe } from '../../context/MeContext'
-import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount, tierOf, tierUnlockCents, allTiersCents, allTiersGrossCents, TIER_ALL_DISCOUNT_PCT } from './gating'
+import { isLocked, hasMoreLocked, fmtCents, lockedCount, tierOf, tierUnlockCents, allTiersCents, allTiersGrossCents, TIER_ALL_DISCOUNT_PCT } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 import { TierLegend } from './tierStar'
 import { UnlockAllButton, ConfirmUnlockDialog } from './UnlockAll'
 
 const PAGE_SIZE = 5
 const FREE_PREVIEW = 4   // free users see a short locked teaser per column (no pager)
+const SELL_UNLOCK_ALL_CENTS = 100   // flat $1 for all SELL; mirrors backend ent.SELL_UNLOCK_ALL_CENTS
 
 // Query one side + the unlock handlers + header counts/prices.
 function useSignalSection(kind) {
@@ -60,7 +61,7 @@ function useSignalSection(kind) {
   // BUY "all" price = value-weighted across still-locked tiers; SELL = legacy bulk.
   const seeAllPrice = isBuy
     ? allTiersCents(lockedByTier, rates)
-    : seeAllCents(rows.length, me.per_row_price_cents?.sell ?? 10)
+    : SELL_UNLOCK_ALL_CENTS
   // "was" anchor (undiscounted tier sum) — BUY only, shown struck through.
   const seeAllGross = isBuy ? allTiersGrossCents(lockedByTier, rates) : 0
   // For BUY, "Unlock all" only earns its place when it bundles 2+ still-locked
