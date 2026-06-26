@@ -6,9 +6,10 @@ import { fmtCents } from './gating'
 
 // Compact "Unlock all" button. It opens the confirm dialog (the misclick guard),
 // so a single click never spends money directly — the dialog is the deliberate step.
-export function UnlockAllButton({ price, onClick, label = 'Unlock all' }) {
+// `tone` ('buy' | 'sell') tints it like that section's tag; omit for neutral.
+export function UnlockAllButton({ price, onClick, label = 'Unlock all', tone }) {
   return (
-    <button type="button" className="unlock-all-btn" onClick={onClick}>
+    <button type="button" className={'unlock-all-btn' + (tone ? ' unlock-all-btn--' + tone : '')} onClick={onClick}>
       {label} · {fmtCents(price)}
     </button>
   )

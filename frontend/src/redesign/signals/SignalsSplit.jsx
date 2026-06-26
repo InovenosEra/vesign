@@ -89,7 +89,7 @@ function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyT
       </div>
       <div className="ssh-right">
         {showSeeAll && (
-          <UnlockAllButton price={seeAllPrice} onClick={onSeeAll} />
+          <UnlockAllButton price={seeAllPrice} onClick={onSeeAll} tone={isBuy ? 'buy' : 'sell'} />
         )}
       </div>
     </div>
