@@ -2521,13 +2521,13 @@ def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
     so the unlocked preview is the top-N of the requested order — sorting works
     even though most rows are redacted for non-Max plans."""
     rows = _get_open_trades_cached((market or "US").upper(), bool(include_lots))
-    # Overlay the live snapshot price (the cache holds the last stored close), and
-    # recompute the unrealized yield off it — matches signals/today + the rest.
+    # Recompute the unrealized yield off the live snapshot, but KEEP current_price
+    # as the last stored close — the table shows both "Last day price" (close) and
+    # a separate live column, and the live column's day-change is vs that close.
     live = _get_live_snapshot()["prices"]
     rows = [
-        ({**r, "current_price": round(float(live[r["ticker"]]), 2),
-          "unrealized_pct": round((live[r["ticker"]] - (r.get("avg_cost") or r.get("buy_price")))
-                                  / (r.get("avg_cost") or r.get("buy_price")) * 100, 2)
+        ({**r, "unrealized_pct": round((live[r["ticker"]] - (r.get("avg_cost") or r.get("buy_price")))
+                                       / (r.get("avg_cost") or r.get("buy_price")) * 100, 2)
           if (r.get("avg_cost") or r.get("buy_price")) else r.get("unrealized_pct")}
          if live.get(r.get("ticker")) else r)
         for r in rows
