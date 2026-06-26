@@ -10,7 +10,7 @@ import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents, seeAllCents, lockedCount, tierOf, tierUnlockCents, allTiersCents } from './gating'
 import { SignalCard, LockedSignalCard } from './SignalCard'
 import { TierLegend } from './tierStar'
-import { UnlockAllToggle, ConfirmUnlockDialog } from './UnlockAll'
+import { UnlockAllButton, ConfirmUnlockDialog } from './UnlockAll'
 
 const PAGE_SIZE = 5
 const FREE_PREVIEW = 4   // free users see a short locked teaser per column (no pager)
@@ -65,7 +65,7 @@ function useSignalSection(kind) {
   return { me, isBuy, isPro, rows, unlock, sub, showSeeAll, seeAllPrice, tierCounts, lockedByTier, rates }
 }
 
-function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyTier, showSeeAll, onSeeAll, seeAllActive, seeAllPrice }) {
+function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyTier, showSeeAll, onSeeAll, seeAllPrice }) {
   const isBuy = kind === 'BUY'
   // A tier chip is a buy button only for a Pro user with ≥1 still-locked signal.
   const buys = (isBuy && isPro && tierCounts) ? {} : null
@@ -84,7 +84,7 @@ function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyT
       </div>
       <div className="ssh-right">
         {showSeeAll && (
-          <UnlockAllToggle price={seeAllPrice} active={seeAllActive} onToggle={onSeeAll} />
+          <UnlockAllButton price={seeAllPrice} onClick={onSeeAll} />
         )}
       </div>
     </div>
@@ -138,7 +138,7 @@ function SignalColumn({ kind, isFree }) {
         kind={kind} sub={sub} tierCounts={tierCounts} lockedByTier={lockedByTier} rates={rates} isPro={isPro}
         onBuyTier={(t) => setConfirm({ scope: 'tier', tier: t })}
         showSeeAll={showSeeAll} onSeeAll={() => setConfirm({ scope: 'all' })}
-        seeAllActive={confirm?.scope === 'all'} seeAllPrice={seeAllPrice}
+        seeAllPrice={seeAllPrice}
       />
       {dialog && (
         <ConfirmUnlockDialog

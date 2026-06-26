@@ -8,7 +8,7 @@ import { useMe } from '../../context/MeContext'
 import { isLocked, hasMoreLocked, fmtCents, lockedCount } from './gating'
 import { logoCls, ymd } from './util'
 import { FAKE_SIG } from './locked-fixtures'
-import { UnlockAllToggle, ConfirmUnlockDialog } from './UnlockAll'
+import { UnlockAllButton, ConfirmUnlockDialog } from './UnlockAll'
 import PagedTable from './Pager'
 
 const FREE_PREVIEW = 10           // free users see the top-10 by yield, yield-only, no pager
@@ -118,14 +118,13 @@ export default function OpenTrades() {
     <>
       <div className="section-h">
         <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
-        {/* Same blue switch + confirm as the BUY/SELL section heads. One flat-$2
+        {/* Same compact button + confirm as the BUY/SELL section heads. One flat-$2
             bundle for ALL locked open trades (no per-row unlock); $2.00 must match
             backend ent.OPEN_UNLOCK_ALL_CENTS. */}
         {showSeeAll && (
-          <UnlockAllToggle
+          <UnlockAllButton
             price={OPEN_UNLOCK_ALL_CENTS}
-            active={confirming}
-            onToggle={() => setConfirming(true)}
+            onClick={() => setConfirming(true)}
             label="Unlock all"
           />
         )}

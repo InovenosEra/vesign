@@ -4,21 +4,12 @@
 import { useState, useEffect } from 'react'
 import { fmtCents } from './gating'
 
-// A switch, not a plain button: flipping it opens the confirm dialog (a misclick
-// must not spend money). `active` is true only while that dialog is pending — the
-// knob animates via `left` (NOT transform) so nothing gets a compositing layer
-// that would flash the page's filter:blur ghost-smear in Chrome.
-export function UnlockAllToggle({ price, active, onToggle, label = 'Unlock all today' }) {
+// Compact "Unlock all" button. It opens the confirm dialog (the misclick guard),
+// so a single click never spends money directly — the dialog is the deliberate step.
+export function UnlockAllButton({ price, onClick, label = 'Unlock all' }) {
   return (
-    <button
-      type="button"
-      className={'see-all-toggle' + (active ? ' on' : '')}
-      role="switch"
-      aria-checked={active}
-      onClick={onToggle}
-    >
-      <span className="sat-label">{label} · {fmtCents(price)}</span>
-      <span className="sat-switch" aria-hidden="true"><span className="sat-knob" /></span>
+    <button type="button" className="unlock-all-btn" onClick={onClick}>
+      {label} · {fmtCents(price)}
     </button>
   )
 }

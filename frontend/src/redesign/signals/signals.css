@@ -213,9 +213,11 @@
 .rd .sig-cards { display: flex; flex-direction: column; gap: 10px; }
 .rd .sig-empty { padding: 22px; color: var(--ink-3, #6b7280); font-size: 13px; }
 
-/* 2-part header: identity + tier-breakdown legend (left) · unlock toggle (right). */
-.rd .sig-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
-.rd .sig-sec-h .ssh-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
+/* 2-part header, ALL on one line: identity + tier-breakdown legend (left) ·
+   unlock-all button (right). nowrap keeps it single-row; the compact button
+   (not the old wide switch) frees the space to fit. */
+.rd .sig-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+.rd .sig-sec-h .ssh-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap; }
 .rd .sig-sec-h .ssh-right { flex: none; }
 /* faint divider between the "N signals" count and the legend */
 .rd .sig-sec-h .ssh-left .tier-legend { padding-left: 12px; border-left: 1px solid var(--line, rgba(255,255,255,0.08)); }
@@ -223,16 +225,12 @@
 .rd .sig-sec-h .tag.buy { background: var(--green-bg, rgba(0,217,126,0.10)); color: var(--green, #00d97e); }
 .rd .sig-sec-h .tag.sell { background: var(--red-bg, rgba(255,77,92,0.10)); color: var(--red, #ff4d5c); }
 .rd .sig-sec-h .sub { font-size: 12px; color: var(--ink-3, #6b7280); }
-/* "Unlock all today" as a switch. Flipping it opens the confirm dialog; the knob
-   animates via `left` (NOT transform) so nothing gets a compositing layer. */
-.rd .see-all-toggle { display: inline-flex; align-items: center; gap: 9px; font-size: 11.5px; font-weight: 600; color: var(--blue-2, #60a5fa); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); padding: 4px 7px 4px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
-.rd .see-all-toggle:hover { background: rgba(59,130,246,0.20); border-color: rgba(59,130,246,0.50); color: #93c5fd; }
-/* In the Open-trades header (flex, not the 3-col grid) push the toggle to the right. */
-.rd .section-h .see-all-toggle { margin-left: auto; }
-.rd .see-all-toggle .sat-switch { position: relative; flex: none; width: 30px; height: 17px; border-radius: 999px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.20); transition: background .15s ease, border-color .15s ease; }
-.rd .see-all-toggle .sat-knob { position: absolute; top: 1px; left: 1px; width: 13px; height: 13px; border-radius: 50%; background: #cdd3df; transition: left .15s ease, background .15s ease; }
-.rd .see-all-toggle.on .sat-switch { background: rgba(59,130,246,0.55); border-color: rgba(59,130,246,0.85); }
-.rd .see-all-toggle.on .sat-knob { left: 14px; background: #fff; }
+/* "Unlock all" compact button. A click opens the confirm dialog (the misclick
+   guard), so it never spends money directly. */
+.rd .unlock-all-btn { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--blue-2, #60a5fa); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
+.rd .unlock-all-btn:hover { background: rgba(59,130,246,0.20); border-color: rgba(59,130,246,0.50); color: #93c5fd; }
+/* In the Open-trades header (flex, not the 3-col grid) push the button to the right. */
+.rd .section-h .unlock-all-btn { margin-left: auto; }
 
 /* Confirm dialog for the bulk "Unlock all" — one click charges the wallet, so a
    misclick must be caught. Solid scrim, NO backdrop-filter (avoids the Chrome
@@ -337,7 +335,7 @@
 @media (max-width: 980px) { .rd .sig-twocol { grid-template-columns: 1fr; } }
 
 /* Tier legend (Prime / Strong / Promising stars) — top-right of the BUY column */
-.rd .tier-legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--ink-3, #6b7280); white-space: nowrap; }
+.rd .tier-legend { display: flex; gap: 9px; align-items: center; font-size: 12px; color: var(--ink-3, #6b7280); white-space: nowrap; }
 .rd .tier-legend .tl-item { display: inline-flex; align-items: center; gap: 5px; }
 .rd .tier-legend .tl-n { color: var(--ink, #e8eaf0); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* a tier with no signals today is dimmed (label + number + star) */
