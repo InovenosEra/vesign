@@ -79,7 +79,7 @@ function SectionHead({ kind, sub, tierCounts, lockedByTier, rates, isPro, onBuyT
     <div className="sig-sec-h">
       <div className="ssh-left">
         <span className={'tag ' + (isBuy ? 'buy' : 'sell')}>
-          <svg className="tag-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg className="tag-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {isBuy ? <><path d="M12 19V7" /><path d="M6 13l6-6 6 6" /></> : <><path d="M12 5v12" /><path d="M18 11l-6 6-6-6" /></>}
           </svg>
           {kind}
