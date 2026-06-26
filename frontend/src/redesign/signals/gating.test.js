@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isLocked, lockedCount, fmtCents, hasMoreLocked, tierOf, tierUnlockCents, allTiersCents } from './gating'
+import { isLocked, lockedCount, fmtCents, hasMoreLocked, tierOf, tierUnlockCents, allTiersCents, allTiersGrossCents } from './gating'
 
 const RATES = { 1: 30, 2: 20, 3: 10 }
 
@@ -18,8 +18,12 @@ describe('tier pricing helpers', () => {
     expect(tierUnlockCents(1, 0, RATES)).toBe(0)
   })
 
-  it('prices "all" as 15% off the sum (today: $1.70 → $1.45)', () => {
-    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(145)
+  it('prices "all" as 40% off the sum, clamped to the priciest tier ($1.70 → $1.10)', () => {
+    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(110)
+  })
+
+  it('grosses the undiscounted tier sum for the "was" anchor', () => {
+    expect(allTiersGrossCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(170)
   })
 
   it('clamps "all" up to the priciest single tier', () => {

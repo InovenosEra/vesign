@@ -237,14 +237,15 @@ def test_tier_unlock_price_is_rate_times_count(ent):
     assert ent.tier_unlock_price_cents(1, 0) == 0
 
 
-def test_all_tiers_price_is_15pct_off_sum(ent):
-    # 0 Prime, 3 Strong ($0.60), 11 Promising ($1.10) → sum $1.70 → 15% off = $1.45
+def test_all_tiers_price_is_40pct_off_sum(ent):
+    # 0 Prime, 3 Strong ($0.60), 11 Promising ($1.10) → sum $1.70 → 40% off = $1.02,
+    # but clamped up to the priciest tier (Promising $1.10).
     price = ent.all_tiers_price_cents({1: 0, 2: 3, 3: 11})
-    assert price == 145
+    assert price == 110
 
 
 def test_all_tiers_price_clamps_to_priciest_tier(ent):
-    # Only Promising present: gross 30¢, 15% off = 26¢, but a single tier is 30¢ → clamp up
+    # Only Promising present: gross 30¢, 40% off = 18¢, but a single tier is 30¢ → clamp up
     assert ent.all_tiers_price_cents({1: 0, 2: 0, 3: 3}) == 30
 
 

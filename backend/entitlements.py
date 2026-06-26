@@ -33,7 +33,7 @@ def see_all_price_cents(n_signals: int, kind: str = "buy") -> int:
 # Per-tier unlock pricing (BUY only). Value-weighted: Prime dearest. A tier
 # unlocks atomically (no per-row), so the locked count is the full tier or zero.
 PER_TIER_RATE_CENTS = {1: 30, 2: 20, 3: 10}   # Prime, Strong, Promising
-TIER_ALL_DISCOUNT_PCT = 15                      # "Unlock all today" = 15% off the tier sum
+TIER_ALL_DISCOUNT_PCT = 40                      # "Unlock all today" = 40% off the tier sum
 
 
 def tier_of(row) -> int:

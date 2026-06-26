@@ -242,6 +242,8 @@
 .rd .unlock-all-btn--buy:hover { background: rgba(0,217,126,0.18); border-color: rgba(0,217,126,0.7); }
 .rd .unlock-all-btn--sell { background: var(--red-bg, rgba(255,77,92,0.10)); color: var(--red, #ff4d5c); border-color: rgba(255,77,92,0.45); }
 .rd .unlock-all-btn--sell:hover { background: rgba(255,77,92,0.18); border-color: rgba(255,77,92,0.7); }
+/* "was" anchor — struck through and dimmed so the real price stands out */
+.rd .unlock-all-btn .ua-was { text-decoration: line-through; opacity: 0.55; font-weight: 400; margin-right: 2px; }
 /* In the Open-trades header (flex, not the 3-col grid) push the button to the right. */
 .rd .section-h .unlock-all-btn { margin-left: auto; }
 

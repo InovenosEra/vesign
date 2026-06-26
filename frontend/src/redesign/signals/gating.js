@@ -12,7 +12,7 @@ export const seeAllCents = (n, perRowCents) =>
 // --- Tier unlock pricing (mirrors backend.entitlements; rates come from
 // /api/signals/today/tiers so they stay single-sourced) -----------------------
 export const PER_TIER_RATE_CENTS = { 1: 30, 2: 20, 3: 10 }
-export const TIER_ALL_DISCOUNT_PCT = 15
+export const TIER_ALL_DISCOUNT_PCT = 40
 
 // Bucket a BUY row to a pricing/legend tier: 1 Prime, 2 Strong, else 3 Promising.
 export const tierOf = (row) => (row?.tier === 1 || row?.tier === 2) ? row.tier : 3
@@ -22,7 +22,11 @@ const rateFor = (tier, rates) => (rates?.[tier] ?? PER_TIER_RATE_CENTS[tier] ?? 
 export const tierUnlockCents = (tier, nLocked, rates) =>
   rateFor(tier, rates) * Math.max(0, nLocked)
 
-// 15% off the per-tier sum (round half-up), clamped ≥ the priciest single tier.
+// Undiscounted sum of the per-tier prices — the "was" anchor for "Unlock all".
+export const allTiersGrossCents = (lockedByTier, rates) =>
+  [1, 2, 3].reduce((s, t) => s + tierUnlockCents(t, lockedByTier?.[t] || 0, rates), 0)
+
+// 40% off the per-tier sum (round half-up), clamped ≥ the priciest single tier.
 export const allTiersCents = (lockedByTier, rates) => {
   const per = [1, 2, 3].map(t => tierUnlockCents(t, lockedByTier?.[t] || 0, rates))
   const gross = per[0] + per[1] + per[2]
