@@ -227,25 +227,25 @@ def test_tier_of_buckets_untiered_as_promising(ent):
 def test_tier_rate_cents(ent):
     assert ent.tier_rate_cents(1) == 30
     assert ent.tier_rate_cents(2) == 20
-    assert ent.tier_rate_cents(3) == 10
-    assert ent.tier_rate_cents(99) == 10          # unknown → lowest rate
+    assert ent.tier_rate_cents(3) == 5
+    assert ent.tier_rate_cents(99) == 10          # unknown → lowest fallback rate
 
 
 def test_tier_unlock_price_is_rate_times_count(ent):
     assert ent.tier_unlock_price_cents(2, 3) == 60     # Strong 20¢ × 3
-    assert ent.tier_unlock_price_cents(3, 11) == 110   # Promising 10¢ × 11
+    assert ent.tier_unlock_price_cents(3, 11) == 55    # Promising 5¢ × 11
     assert ent.tier_unlock_price_cents(1, 0) == 0
 
 
-def test_all_tiers_price_is_40pct_off_sum_rounded_down(ent):
-    # 0 Prime, 3 Strong ($0.60), 11 Promising ($1.10) → sum $1.70 → 40% off = $1.02
-    # → rounded DOWN to the nearest 5¢ = $1.00.
-    assert ent.all_tiers_price_cents({1: 0, 2: 3, 3: 11}) == 100
+def test_all_tiers_price_is_full_sum(ent):
+    # 0 Prime, 3 Strong ($0.60), 11 Promising (11 × 5¢ = $0.55) → full sum $1.15
+    # (no bundle discount).
+    assert ent.all_tiers_price_cents({1: 0, 2: 3, 3: 11}) == 115
 
 
-def test_all_tiers_price_has_no_single_tier_floor(ent):
-    # gross 30¢, 40% off = 18¢ → floored to 5¢ = 15¢ — cheaper than the single
-    # Promising tier ($0.30), the intended "everything is cheaper than one tier" nudge.
+def test_all_tiers_price_rounds_down_to_5c(ent):
+    # 3 Promising × 5¢ = 15¢ — already a multiple of 5; the floor only kicks in on
+    # odd figures (it never rounds up).
     assert ent.all_tiers_price_cents({1: 0, 2: 0, 3: 3}) == 15
 
 

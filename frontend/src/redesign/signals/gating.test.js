@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { isLocked, lockedCount, fmtCents, hasMoreLocked, tierOf, tierUnlockCents, allTiersCents, allTiersGrossCents } from './gating'
 
-const RATES = { 1: 30, 2: 20, 3: 10 }
+const RATES = { 1: 30, 2: 20, 3: 5 }
 
 describe('tier pricing helpers', () => {
   it('buckets untiered rows as Promising (3)', () => {
@@ -14,19 +14,19 @@ describe('tier pricing helpers', () => {
 
   it('prices a tier as rate × locked count', () => {
     expect(tierUnlockCents(2, 3, RATES)).toBe(60)
-    expect(tierUnlockCents(3, 11, RATES)).toBe(110)
+    expect(tierUnlockCents(3, 11, RATES)).toBe(55)
     expect(tierUnlockCents(1, 0, RATES)).toBe(0)
   })
 
-  it('prices "all" as 40% off the sum, floored to 5¢ ($1.70 → $1.00)', () => {
-    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(100)
+  it('prices "all" as the full tier sum, no discount ($0.60 + $0.55 = $1.15)', () => {
+    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(115)
   })
 
-  it('grosses the undiscounted tier sum (for the saving)', () => {
-    expect(allTiersGrossCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(170)
+  it('grosses the undiscounted tier sum', () => {
+    expect(allTiersGrossCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(115)
   })
 
-  it('has no single-tier floor — "all" can be cheaper than one tier', () => {
+  it('rounds the "all" price down to the nearest 5¢', () => {
     expect(allTiersCents({ 1: 0, 2: 0, 3: 3 }, RATES)).toBe(15)
   })
 

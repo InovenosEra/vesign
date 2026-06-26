@@ -148,7 +148,7 @@ def test_unlock_tier_idempotent_no_double_charge(api):
     body = {"kind": "buy", "scope": "tier", "tier": 3, "market": "US"}
     client.post("/api/signals/unlock", json=body)
     second = client.post("/api/signals/unlock", json=body)
-    assert second.json()["balance_cents"] == 70      # unchanged on re-purchase
+    assert second.json()["balance_cents"] == 85      # 100 - (3 Promising × 5¢); no double-charge
 
 
 def test_unlock_insufficient_funds(api):
@@ -249,10 +249,10 @@ def test_tiers_endpoint_shape_counts_and_rates(api):
     os.environ["DEV_PLAN"] = "pro"
     d = client.get("/api/signals/today/tiers?market=US").json()
     assert d["total"] == 3                      # 3 BUYs seeded (untiered → Promising)
-    assert d["all_discount_pct"] == 40
+    assert d["all_discount_pct"] == 0
     assert d["tiers"]["prime"] == {"tier": 1, "count": 0, "rate_cents": 30}
     assert d["tiers"]["strong"] == {"tier": 2, "count": 0, "rate_cents": 20}
-    assert d["tiers"]["promising"] == {"tier": 3, "count": 3, "rate_cents": 10}
+    assert d["tiers"]["promising"] == {"tier": 3, "count": 3, "rate_cents": 5}
     del os.environ["DEV_PLAN"]
 
 

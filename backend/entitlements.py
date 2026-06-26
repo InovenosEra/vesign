@@ -32,8 +32,8 @@ def see_all_price_cents(n_signals: int, kind: str = "buy") -> int:
 
 # Per-tier unlock pricing (BUY only). Value-weighted: Prime dearest. A tier
 # unlocks atomically (no per-row), so the locked count is the full tier or zero.
-PER_TIER_RATE_CENTS = {1: 30, 2: 20, 3: 10}   # Prime, Strong, Promising
-TIER_ALL_DISCOUNT_PCT = 40                      # "Unlock all today" = 40% off the tier sum
+PER_TIER_RATE_CENTS = {1: 30, 2: 20, 3: 5}    # Prime, Strong, Promising (cents/signal)
+TIER_ALL_DISCOUNT_PCT = 0                       # no bundle discount — "Unlock all" = full sum
 
 
 def tier_of(row) -> int:
@@ -53,14 +53,14 @@ def tier_unlock_price_cents(tier: int, n_locked: int) -> int:
 
 
 def all_tiers_price_cents(locked_by_tier: dict) -> int:
-    """Price to unlock ALL still-locked BUY tiers at once: a true 40% off the
-    per-tier sum (round half-up). No floor — "all" can be cheaper than a single
-    tier, which is the intended nudge toward unlocking everything."""
+    """Price to unlock ALL still-locked BUY tiers at once: the full per-tier sum
+    (TIER_ALL_DISCOUNT_PCT is 0 — no bundle discount), rounded DOWN to the
+    nearest 5¢ in case the figure is odd."""
     gross = sum(tier_unlock_price_cents(t, n) for t, n in locked_by_tier.items())
     if gross <= 0:
         return 0
-    price = (gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) // 100   # 40% off, round half-up
-    return (price // 5) * 5                                       # then round DOWN to nearest 5¢
+    price = (gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) // 100   # full sum (no discount)
+    return (price // 5) * 5                                       # round DOWN to nearest 5¢
 
 
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
