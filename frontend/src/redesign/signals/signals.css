@@ -235,8 +235,8 @@
 .rd .sig-sec-h .sub { font-size: 12px; color: var(--ink-3, #6b7280); }
 /* "Unlock all" compact button. A click opens the confirm dialog (the misclick
    guard), so it never spends money directly. */
-.rd .unlock-all-btn { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--blue-2, #60a5fa); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); padding: 4px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
-.rd .unlock-all-btn:hover { background: rgba(59,130,246,0.20); border-color: rgba(59,130,246,0.50); color: #93c5fd; }
+.rd .unlock-all-btn { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--blue-2, #60a5fa); background: transparent; border: 1px solid rgba(59,130,246,0.45); padding: 4px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: border-color .12s ease, color .12s ease; }
+.rd .unlock-all-btn:hover { border-color: rgba(59,130,246,0.75); color: #93c5fd; }
 /* In the Open-trades header (flex, not the 3-col grid) push the button to the right. */
 .rd .section-h .unlock-all-btn { margin-left: auto; }
 
@@ -373,15 +373,15 @@
 /* a clickable tier chip (buy affordance) */
 /* same frame as the "Unlock all" button (radius/padding/border/bg) so the tier
    chips and the unlock-all read as one family; only the text differs. */
-.rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.30); border-radius: 8px; padding: 4px 11px; cursor: pointer; transition: background .12s ease, border-color .12s ease; }
-.rd .tier-legend button.tl-buy:hover { background: rgba(59,130,246,0.20); border-color: rgba(59,130,246,0.50); }
-/* frame + fill tinted per tier, matching the bar/icon colour (text stays as-is) */
-.rd .tier-legend button.tl-buy--prime { background: rgba(167,139,250,0.12); border-color: rgba(167,139,250,0.32); }
-.rd .tier-legend button.tl-buy--prime:hover { background: rgba(167,139,250,0.20); border-color: rgba(167,139,250,0.52); }
-.rd .tier-legend button.tl-buy--strong { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.32); }
-.rd .tier-legend button.tl-buy--strong:hover { background: rgba(251,191,36,0.20); border-color: rgba(251,191,36,0.52); }
-.rd .tier-legend button.tl-buy--potential { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.32); }
-.rd .tier-legend button.tl-buy--potential:hover { background: rgba(56,189,248,0.20); border-color: rgba(56,189,248,0.52); }
+.rd .tier-legend button.tl-buy { font: inherit; color: var(--ink-3, #6b7280); background: transparent; border: 1px solid rgba(59,130,246,0.45); border-radius: 8px; padding: 4px 11px; cursor: pointer; transition: border-color .12s ease; }
+.rd .tier-legend button.tl-buy:hover { border-color: rgba(59,130,246,0.75); }
+/* outline only — frame tinted per tier, matching the bar/icon colour (no fill) */
+.rd .tier-legend button.tl-buy--prime { border-color: rgba(167,139,250,0.45); }
+.rd .tier-legend button.tl-buy--prime:hover { border-color: rgba(167,139,250,0.75); }
+.rd .tier-legend button.tl-buy--strong { border-color: rgba(251,191,36,0.45); }
+.rd .tier-legend button.tl-buy--strong:hover { border-color: rgba(251,191,36,0.75); }
+.rd .tier-legend button.tl-buy--potential { border-color: rgba(56,189,248,0.45); }
+.rd .tier-legend button.tl-buy--potential:hover { border-color: rgba(56,189,248,0.75); }
 /* price matches the tier colour too */
 .rd .tier-legend button.tl-buy--prime .tl-price { color: var(--tier-prime); }
 .rd .tier-legend button.tl-buy--strong .tl-price { color: var(--tier-strong); }
