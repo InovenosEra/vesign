@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { logoCls } from './util'
-import { TierStar } from './tierStar'
+import { TierMark } from './tierStar'
 import { FAKE_SIG } from './locked-fixtures'
 import SignalExplanation from '../SignalExplanation'
 
@@ -45,7 +45,7 @@ export function SignalCard({ s }) {
       <div className="sc-head">
         <img className={'sc-logo ' + logoCls(s.ticker)} src={LOGO(s.ticker)} alt={s.ticker} />
         <div className="sc-id">
-          <div className="trow"><span className="tk">{s.ticker}</span><TierStar tier={s.tier} size={15} /></div>
+          <div className="trow"><span className="tk">{s.ticker}</span><TierMark tier={s.tier} /></div>
           <div className="co" title={s.company || ''}>{s.company || ''}</div>
         </div>
         <SignalExplanation ticker={s.ticker} part="headline" />
