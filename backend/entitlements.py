@@ -59,7 +59,8 @@ def all_tiers_price_cents(locked_by_tier: dict) -> int:
     gross = sum(tier_unlock_price_cents(t, n) for t, n in locked_by_tier.items())
     if gross <= 0:
         return 0
-    return (gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) // 100   # round half-up
+    price = (gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) // 100   # 40% off, round half-up
+    return (price // 5) * 5                                       # then round DOWN to nearest 5¢
 
 
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal

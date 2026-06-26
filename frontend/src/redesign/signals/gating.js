@@ -31,5 +31,6 @@ export const allTiersGrossCents = (lockedByTier, rates) =>
 export const allTiersCents = (lockedByTier, rates) => {
   const gross = allTiersGrossCents(lockedByTier, rates)
   if (gross <= 0) return 0
-  return Math.floor((gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) / 100)
+  const price = Math.floor((gross * (100 - TIER_ALL_DISCOUNT_PCT) + 50) / 100)
+  return Math.floor(price / 5) * 5   // round DOWN to nearest 5¢
 }

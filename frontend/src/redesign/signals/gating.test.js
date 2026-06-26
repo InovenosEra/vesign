@@ -18,8 +18,8 @@ describe('tier pricing helpers', () => {
     expect(tierUnlockCents(1, 0, RATES)).toBe(0)
   })
 
-  it('prices "all" as a true 40% off the sum ($1.70 → $1.02)', () => {
-    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(102)
+  it('prices "all" as 40% off the sum, floored to 5¢ ($1.70 → $1.00)', () => {
+    expect(allTiersCents({ 1: 0, 2: 3, 3: 11 }, RATES)).toBe(100)
   })
 
   it('grosses the undiscounted tier sum (for the saving)', () => {
@@ -27,7 +27,7 @@ describe('tier pricing helpers', () => {
   })
 
   it('has no single-tier floor — "all" can be cheaper than one tier', () => {
-    expect(allTiersCents({ 1: 0, 2: 0, 3: 3 }, RATES)).toBe(18)
+    expect(allTiersCents({ 1: 0, 2: 0, 3: 3 }, RATES)).toBe(15)
   })
 
   it('is zero when nothing is locked', () => {
