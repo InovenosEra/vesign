@@ -148,6 +148,10 @@
     background: var(--bg-2);
   }
   .rd .data-table thead th.r { text-align: right; }
+  /* sortable header: clickable, highlights on hover, ▲/▼ marks the active column */
+  .rd .data-table thead th.sortable { cursor: pointer; user-select: none; transition: color .12s; }
+  .rd .data-table thead th.sortable:hover { color: var(--ink-2); }
+  .rd .data-table thead th .sort-ar { margin-left: 4px; font-size: 8px; color: var(--blue-2); }
   .rd .data-table tbody tr {
     border-bottom: 1px solid var(--line);
     transition: background .15s ease, transform .15s ease;

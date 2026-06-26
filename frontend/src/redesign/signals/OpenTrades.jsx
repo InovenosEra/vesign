@@ -5,6 +5,7 @@ import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
 import { useLivePrices } from '../../hooks/useLivePrices'
+import { useSort } from '../../hooks/useSort'
 import { isLocked, hasMoreLocked, fmtCents, lockedCount } from './gating'
 import { logoCls, ymd } from './util'
 import { FAKE_SIG } from './locked-fixtures'
@@ -18,23 +19,37 @@ const COLSPAN = 10
 // Market cap in billions, 1 decimal (matches ve-sign.com's open-trades column).
 const mcapB = (mc) => (mc == null ? '—' : (mc / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
 
+// Sortable header cell — click to sort, ▲/▼ shows the active column + direction.
+function Th({ label, col, sort, onSort, className, style }) {
+  const active = sort?.key === col
+  return (
+    <th onClick={() => onSort(col)} className={'sortable' + (className ? ' ' + className : '')} style={style}>
+      {label}{active ? <span className="sort-ar">{sort.dir === 'asc' ? '▲' : '▼'}</span> : null}
+    </th>
+  )
+}
+
 // Columns mirror ve-sign.com (TradesPage open-trades), in the same order:
 // logo · Ticker · Company · Market Cap · Buy date · Buy price · Last day price ·
-// Days held · Live price (phase-aware) · Yield.
-function HeadRow({ phase }) {
+// Days held · Live price (phase-aware) · Yield. Live price is the only non-sortable
+// data column (it's client-side live, not in the row array).
+function HeadRow({ phase, sort, onSort }) {
   const liveLabel = phase === 'pre' ? 'Pre-market' : phase === 'post' ? 'Post-market' : 'Live price'
+  const H = (label, col, className, style) => onSort
+    ? <Th label={label} col={col} sort={sort} onSort={onSort} className={className} style={style} />
+    : <th className={className} style={style}>{label}</th>
   return (
     <tr>
       <th></th>
-      <th>Ticker</th>
-      <th>Company</th>
-      <th className="r">Market Cap</th>
-      <th className="r">Buy date</th>
-      <th className="r">Buy price</th>
-      <th className="r">Last day price</th>
-      <th className="r">Days held</th>
+      {H('Ticker', 'ticker')}
+      {H('Company', 'company')}
+      {H('Market Cap', 'market_cap', 'r')}
+      {H('Buy date', 'buy_date', 'r')}
+      {H('Buy price', 'buy_price', 'r')}
+      {H('Last day price', 'current_price', 'r')}
+      {H('Days held', 'days_held', 'r')}
       <th className="r">{liveLabel}</th>
-      <th className="r" style={{ paddingRight: 18 }}>Yield</th>
+      {H('Yield', 'unrealized_pct', 'r', { paddingRight: 18 })}
     </tr>
   )
 }
@@ -110,12 +125,14 @@ export default function OpenTrades() {
   const [confirming, setConfirming] = useState(false)
   const { data } = useQuery({ queryKey: ['open-trades', 'US'], queryFn: () => getOpenTrades('US') })
   const rows = Array.isArray(data) ? data : []          // server-sorted by yield desc
+  // Client-side column sort (locked rows have null fields → sort to the end).
+  const { sorted, sort, toggle } = useSort(rows, 'unrealized_pct', 'desc')
 
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage = Math.min(page, pages - 1)
   const slice = isFree
-    ? rows.slice(0, FREE_PREVIEW)
-    : rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+    ? sorted.slice(0, FREE_PREVIEW)
+    : sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
   // Live prices only for the unlocked rows on the current page (matches prod — no
   // 649-ticker fetch). Hooks run unconditionally (called before the free return).
   const pageTickers = slice.filter(p => !isLocked(p) && p.ticker).map(p => p.ticker)
@@ -178,7 +195,7 @@ export default function OpenTrades() {
         )
       })()}
       <table className="data-table">
-        <thead><HeadRow phase={phase} /></thead>
+        <thead><HeadRow phase={phase} sort={sort} onSort={(col) => { toggle(col); setPage(0) }} /></thead>
         <tbody>
           {rows.length === 0
             ? <tr><td colSpan={COLSPAN} className="muted" style={{ textAlign: 'center', padding: 24 }}>No open positions.</td></tr>
