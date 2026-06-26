@@ -2,75 +2,102 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getOpenTrades, unlockSignal } from '../../api'
 import { num, pct, dirClass, LOGO } from '../fmt'
-import { useCurrency } from '../../context/CurrencyContext'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
+import { useLivePrices } from '../../hooks/useLivePrices'
 import { isLocked, hasMoreLocked, fmtCents, lockedCount } from './gating'
 import { logoCls, ymd } from './util'
 import { FAKE_SIG } from './locked-fixtures'
 import { UnlockAllButton, ConfirmUnlockDialog } from './UnlockAll'
-import PagedTable from './Pager'
 
+const PAGE_SIZE = 10
 const FREE_PREVIEW = 10           // free users see the top-10 by yield, yield-only, no pager
 const OPEN_UNLOCK_ALL_CENTS = 200 // flat $2 to unlock ALL open trades — mirrors backend ent.OPEN_UNLOCK_ALL_CENTS
+const COLSPAN = 10
 
-const HEAD = (
-  <tr>
-    <th>Ticker</th><th className="r">Bought</th><th className="r">Entry</th>
-    <th className="r">Price</th><th className="r">Days held</th>
-    <th className="r">Unrealised P&amp;L</th>
-    <th className="r" style={{ paddingRight: 18 }}>Yield</th>
-  </tr>
-)
+// Market cap in billions, 1 decimal (matches ve-sign.com's open-trades column).
+const mcapB = (mc) => (mc == null ? '—' : (mc / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
 
-// Frosted locked row: every column is fake data hazed via text-shadow (NOT
-// filter:blur, which smears the page background in Chrome). aria-hidden + fake
-// values — nothing identifying. Free's top-10 reveal the real Yield (sharp) as
-// the teaser; Pro's locked rows haze the Yield too (no revealed value).
-function BlurredOpenRow({ p, idx = 0 }) {
-  const f = FAKE_SIG[idx % FAKE_SIG.length]
-  const yld = p.reveal?.includes('yield') ? p.unrealized_pct : null   // server reveals yield for the top teaser rows
-  const fakeEntry = (parseFloat(f.price) * 0.9).toFixed(2)
-  const fakeDays = [12, 34, 7, 21, 45][idx % 5]
-  const fakeYld = [18.4, 9.2, 31.7, 5.6, 22.1][idx % 5]   // hazed when the row has no revealed yield (Pro)
+// Columns mirror ve-sign.com (TradesPage open-trades), in the same order:
+// logo · Ticker · Company · Market Cap · Buy date · Buy price · Last day price ·
+// Days held · Live price (phase-aware) · Yield.
+function HeadRow({ phase }) {
+  const liveLabel = phase === 'pre' ? 'Pre-market' : phase === 'post' ? 'Post-market' : 'Live price'
   return (
-    <tr className="locked-row">
-      <td><div className="ticker-cell lock-haze" aria-hidden="true">
-        <span className="logo-skel" />
-        <span className="tk">{f.tk}</span><span className="co">{f.co}</span>
-      </div></td>
-      <td className="r lock-haze" aria-hidden="true">2026-05-12</td>
-      <td className="r lock-haze" aria-hidden="true">{fakeEntry}</td>
-      <td className="r lock-haze" aria-hidden="true">{f.price}</td>
-      <td className="r lock-haze" aria-hidden="true">{fakeDays}</td>
-      <td className="r lock-haze" aria-hidden="true">+$120</td>
-      {yld == null
-        ? <td className="r lock-haze" aria-hidden="true" style={{ paddingRight: 18 }}><strong>+{fakeYld}%</strong></td>
-        : <td className={'r ' + dirClass(yld)} style={{ paddingRight: 18 }}><strong>{pct(yld)}</strong></td>}
+    <tr>
+      <th></th>
+      <th>Ticker</th>
+      <th>Company</th>
+      <th className="r">Market Cap</th>
+      <th className="r">Buy date</th>
+      <th className="r">Buy price</th>
+      <th className="r">Last day price</th>
+      <th className="r">Days held</th>
+      <th className="r">{liveLabel}</th>
+      <th className="r" style={{ paddingRight: 18 }}>Yield</th>
     </tr>
   )
 }
 
-function FullOpenRow({ p }) {
+// Phase-aware live price: last close while loading/closed, else the live quote
+// with its move vs the prior close.
+function LiveCell({ p, live, phase }) {
+  const close = p.current_price
+  if (phase === 'idle') return <span className="muted" style={{ fontSize: 12 }}>Closed</span>
+  if (phase == null || live == null) return <span className="muted">{close == null ? '—' : num(close)}</span>
+  const diff = close != null ? live - close : null
+  const pv = diff != null && close ? (diff / close) * 100 : null
+  return (
+    <div>
+      <div>{num(live)}</div>
+      {diff != null && <div className={dirClass(diff)} style={{ fontSize: 11 }}>{diff >= 0 ? '▲' : '▼'} {pv != null ? Math.abs(pv).toFixed(2) + '%' : ''}</div>}
+    </div>
+  )
+}
+
+function FullOpenRow({ p, live, phase }) {
   const open = useTickerModal()
-  const { fmtPrice } = useCurrency()
   const yld = p.unrealized_pct
-  const dollarPnL = p.buy_price && p.current_price
-    ? (p.current_price - p.buy_price) * 1000 / p.buy_price : null
   return (
     <tr data-ticker={p.ticker} data-company={p.company || ''} onClick={() => open(p.ticker, p.company)}>
-      <td><div className="ticker-cell">
-        <img className={logoCls(p.ticker)} src={LOGO(p.ticker)} alt={p.ticker} />
-        <span className="tk">{p.ticker}</span><span className="co">{p.company || ''}</span>
-      </div></td>
+      <td><img className={logoCls(p.ticker)} src={LOGO(p.ticker)} alt={p.ticker} /></td>
+      <td><span className="tk">{p.ticker}</span></td>
+      <td><span className="co">{p.company || '—'}</span></td>
+      <td className="r">{mcapB(p.market_cap)}</td>
       <td className="r muted">{ymd(p.buy_date)}</td>
       <td className="r">{p.buy_price == null ? '—' : num(p.buy_price)}</td>
       <td className="r">{p.current_price == null ? '—' : num(p.current_price)}</td>
       <td className="r muted">{p.days_held ?? '—'}</td>
-      <td className={'r ' + dirClass(dollarPnL)}>
-        {dollarPnL == null ? '—' : (dollarPnL >= 0 ? '+' : '-') + fmtPrice(Math.abs(dollarPnL), 0)}
-      </td>
+      <td className="r"><LiveCell p={p} live={live} phase={phase} /></td>
       <td className={'r ' + dirClass(yld)} style={{ paddingRight: 18 }}><strong>{pct(yld)}</strong></td>
+    </tr>
+  )
+}
+
+// Frosted locked row: every column is fake data hazed via text-shadow (NOT
+// filter:blur). Free's top-10 reveal the real Yield (sharp) as the teaser.
+function BlurredOpenRow({ p, idx = 0 }) {
+  const f = FAKE_SIG[idx % FAKE_SIG.length]
+  const yld = p.reveal?.includes('yield') ? p.unrealized_pct : null
+  const fakeEntry = (parseFloat(f.price) * 0.9).toFixed(2)
+  const fakeDays = [12, 34, 7, 21, 45][idx % 5]
+  const fakeYld = [18.4, 9.2, 31.7, 5.6, 22.1][idx % 5]
+  const fakeMcap = ['12.4', '88.1', '5.6', '240.3', '31.0'][idx % 5]
+  const fakeLive = (parseFloat(f.price) * 1.004).toFixed(2)
+  return (
+    <tr className="locked-row">
+      <td><span className="logo-skel" aria-hidden="true" /></td>
+      <td className="lock-haze" aria-hidden="true"><span className="tk">{f.tk}</span></td>
+      <td className="lock-haze" aria-hidden="true"><span className="co">{f.co}</span></td>
+      <td className="r lock-haze" aria-hidden="true">{fakeMcap}</td>
+      <td className="r lock-haze" aria-hidden="true">2026-05-12</td>
+      <td className="r lock-haze" aria-hidden="true">{fakeEntry}</td>
+      <td className="r lock-haze" aria-hidden="true">{f.price}</td>
+      <td className="r lock-haze" aria-hidden="true">{fakeDays}</td>
+      <td className="r lock-haze" aria-hidden="true">{fakeLive}</td>
+      {yld == null
+        ? <td className="r lock-haze" aria-hidden="true" style={{ paddingRight: 18 }}><strong>+{fakeYld}%</strong></td>
+        : <td className={'r ' + dirClass(yld)} style={{ paddingRight: 18 }}><strong>{pct(yld)}</strong></td>}
     </tr>
   )
 }
@@ -79,24 +106,40 @@ export default function OpenTrades() {
   const me = useMe()
   const isFree = me.plan === 'free'
   const qc = useQueryClient()
+  const [page, setPage] = useState(0)
   const [confirming, setConfirming] = useState(false)
   const { data } = useQuery({ queryKey: ['open-trades', 'US'], queryFn: () => getOpenTrades('US') })
   const rows = Array.isArray(data) ? data : []          // server-sorted by yield desc
 
-  // Free: top-10 by yield, yield-only teaser, no pager, no per-row CTA.
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const safePage = Math.min(page, pages - 1)
+  const slice = isFree
+    ? rows.slice(0, FREE_PREVIEW)
+    : rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  // Live prices only for the unlocked rows on the current page (matches prod — no
+  // 649-ticker fetch). Hooks run unconditionally (called before the free return).
+  const pageTickers = slice.filter(p => !isLocked(p) && p.ticker).map(p => p.ticker)
+  const { prices, phase } = useLivePrices(pageTickers)
+
+  const count = Array.isArray(data) ? rows.length : '—'
+  const header = (extra) => (
+    <div className="section-h ot-head">
+      <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{count}</span></h2>
+      {extra}
+    </div>
+  )
+
+  // Free: top-10 by yield, yield-only teaser, no pager, no CTA.
   if (isFree) {
-    const shown = rows.slice(0, FREE_PREVIEW)
     return (
       <>
-        <div className="section-h ot-head">
-          <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
-        </div>
+        {header()}
         <table className="data-table">
-          <thead>{HEAD}</thead>
+          <thead><HeadRow phase={phase} /></thead>
           <tbody>
-            {shown.length
-              ? shown.map((p, i) => <BlurredOpenRow key={i} p={p} idx={i} />)
-              : <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 24 }}>No open positions.</td></tr>}
+            {slice.length
+              ? slice.map((p, i) => <BlurredOpenRow key={i} p={p} idx={i} />)
+              : <tr><td colSpan={COLSPAN} className="muted" style={{ textAlign: 'center', padding: 24 }}>No open positions.</td></tr>}
           </tbody>
         </table>
       </>
@@ -112,29 +155,21 @@ export default function OpenTrades() {
       if (String(e.message).startsWith('402')) alert('Not enough wallet balance.')
     }
   }
-  const showSeeAll = me.plan === 'pro' && hasMoreLocked(rows)
+  // One flat-$2 bundle for ALL locked open trades; show it only when the current
+  // page actually has a locked row (the first page is the open preview).
+  const showSeeAll = me.plan === 'pro' && hasMoreLocked(rows) && slice.some(isLocked)
 
   return (
     <>
-      <div className="section-h">
-        <h2>Open trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{Array.isArray(data) ? rows.length : '—'}</span></h2>
-        {/* Same compact button + confirm as the BUY/SELL section heads. One flat-$2
-            bundle for ALL locked open trades (no per-row unlock); $2.00 must match
-            backend ent.OPEN_UNLOCK_ALL_CENTS. */}
-        {showSeeAll && (
-          <UnlockAllButton
-            price={OPEN_UNLOCK_ALL_CENTS}
-            onClick={() => setConfirming(true)}
-            label="Unlock all"
-          />
-        )}
-      </div>
+      {header(showSeeAll && (
+        <UnlockAllButton price={OPEN_UNLOCK_ALL_CENTS} onClick={() => setConfirming(true)} label="Unlock all" />
+      ))}
       {confirming && (() => {
-        const count = lockedCount(rows)
+        const n = lockedCount(rows)
         return (
           <ConfirmUnlockDialog
             title="Unlock all open trades?"
-            body={<>This unlocks {count} locked open {count === 1 ? 'trade' : 'trades'} and charges{' '}
+            body={<>This unlocks {n} locked open {n === 1 ? 'trade' : 'trades'} and charges{' '}
               <b>{fmtCents(OPEN_UNLOCK_ALL_CENTS)}</b> from your wallet.</>}
             price={OPEN_UNLOCK_ALL_CENTS}
             onConfirm={async () => { await unlockAll(); setConfirming(false) }}
@@ -142,15 +177,25 @@ export default function OpenTrades() {
           />
         )
       })()}
-      <PagedTable
-        head={HEAD}
-        rows={rows}
-        row={(p, i) => isLocked(p)
-          ? <BlurredOpenRow key={i} p={p} idx={i} />
-          : <FullOpenRow key={i} p={p} />}
-        emptyLabel="No open positions."
-        colspan={7}
-      />
+      <table className="data-table">
+        <thead><HeadRow phase={phase} /></thead>
+        <tbody>
+          {rows.length === 0
+            ? <tr><td colSpan={COLSPAN} className="muted" style={{ textAlign: 'center', padding: 24 }}>No open positions.</td></tr>
+            : slice.map((p, i) => isLocked(p)
+              ? <BlurredOpenRow key={i} p={p} idx={safePage * PAGE_SIZE + i} />
+              : <FullOpenRow key={i} p={p} live={prices[p.ticker]} phase={phase} />)}
+        </tbody>
+      </table>
+      {pages > 1 && (
+        <div className="pagination">
+          <button disabled={safePage === 0} onClick={() => setPage(0)} aria-label="First page">«</button>
+          <button disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>‹ Prev</button>
+          <span>{safePage + 1} / {pages}</span>
+          <button disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Next ›</button>
+          <button disabled={safePage >= pages - 1} onClick={() => setPage(pages - 1)} aria-label="Last page">»</button>
+        </div>
+      )}
     </>
   )
 }
