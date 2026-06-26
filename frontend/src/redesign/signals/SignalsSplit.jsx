@@ -169,9 +169,11 @@ function SignalColumn({ kind, isFree }) {
       </div>
       {!isFree && pages > 1 && (
         <div className="sig-pager">
+          <button disabled={safePage === 0} onClick={() => setPage(0)} aria-label="First page">«</button>
           <button disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>‹ Prev</button>
           <span><b>{safePage + 1}</b> / {pages}</span>
           <button disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Next ›</button>
+          <button disabled={safePage >= pages - 1} onClick={() => setPage(pages - 1)} aria-label="Last page">»</button>
         </div>
       )}
     </div>
