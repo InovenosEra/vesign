@@ -61,7 +61,7 @@ function ClosedRow({ t }) {
   const multi = t.n_lots > 1
   const lotsTitle = multi ? (t.lots || []).map(l => `Lot ${l.seq}: ${l.date} @ ${num(l.price)}`).join('\n') : undefined
   return (
-    <tr data-ticker={t.ticker} data-company={t.company || ''} onClick={() => open(t.ticker, t.company)}>
+    <tr data-ticker={t.ticker} data-company={t.company || ''} onClick={() => open(t.ticker, t.company, { hideWhy: true })}>
       <td><img className={logoCls(t.ticker)} src={LOGO(t.ticker)} alt={t.ticker} /></td>
       <td><span className="tk">{t.ticker}</span></td>
       <td><span className="co">{t.company || '—'}</span></td>

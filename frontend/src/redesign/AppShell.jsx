@@ -166,7 +166,7 @@ function WalletChip() {
 
 export default function AppShell({ children }) {
   const [modalRow, setModalRow] = useState(null)
-  const openTicker = (ticker, company) => { if (ticker) setModalRow({ ticker, company }) }
+  const openTicker = (ticker, company, opts) => { if (ticker) setModalRow({ ticker, company, ...opts }) }
   return (
     <TickerModalContext.Provider value={openTicker}>
     <MeProvider>
