@@ -211,7 +211,7 @@ export default function SignalsSplit() {
   const sigCount = (Array.isArray(buy) ? buy.length : 0) + (Array.isArray(sell) ? sell.length : 0)
   return (
     <>
-      <div className="section-h">
+      <div className="section-h sig-top-head">
         <h2>Signals <span className="sub">{haveCount ? sigCount : '—'}</span></h2>
       </div>
       {isFree && <UpgradeBanner />}
