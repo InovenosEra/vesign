@@ -129,9 +129,10 @@
   /* Open-trades header: extra top gap so it isn't crammed against the signals
      pager directly above it. */
   .rd .section-h.ot-head { margin-top: 44px; }
-  /* First header in the pane: the .body padding already gives top breathing
-     room, so drop the default 28px top margin to avoid a double gap. */
-  .rd .section-h.sig-top-head { margin-top: 4px; }
+  /* First header in the pane: the .body padding already gives the top gap, so
+     zero the default 28px top margin. Keeps the 24px page-head→content gap
+     identical to Market / Portfolio / Research / Closed-trades. */
+  .rd .section-h.sig-top-head { margin-top: 0; }
   .rd .section-h h2 { font-size: 11.5px; font-weight: 600; color: var(--ink); margin: 0; text-transform: uppercase; letter-spacing: 0.12em; }
   .rd .section-h .sub { font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); letter-spacing: 0.02em; }
   .rd .section-h .right { margin-left: auto; font-size: 11.5px; color: var(--blue-2); text-decoration: none; font-weight: 500; transition: color .15s; }
