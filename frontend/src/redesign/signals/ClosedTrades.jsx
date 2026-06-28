@@ -27,6 +27,13 @@ function startForPeriod(p) {
 // Market cap in billions; mirrors OpenTrades' mcapB.
 const mcapB = (mc) => (mc == null ? '—' : (mc / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
 
+// DCA-aware per-trade yield: dollar-weighted avg_cost when present (multi-lot),
+// else the stored return_pct. Matches production's per-row yield AND its stat
+// cards (dcaActive = true). Returns null only when there's no basis at all.
+const yieldOf = (t) => (t.avg_cost && t.sell_price)
+  ? (t.sell_price - t.avg_cost) / t.avg_cost * 100
+  : (t.return_pct ?? null)
+
 // Columns mirror production's "Historical Trades" table (TradesPage.jsx) and the
 // sibling Open Trades table: logo · Ticker · Company · Market Cap · Buy date ·
 // Buy price · Sell date · Sell price · Days held · Yield.
@@ -47,7 +54,7 @@ const HEAD = (
 
 function ClosedRow({ t }) {
   const open = useTickerModal()
-  const ret = t.return_pct == null ? null : t.return_pct
+  const ret = yieldOf(t)
   return (
     <tr data-ticker={t.ticker} data-company={t.company || ''} onClick={() => open(t.ticker, t.company)}>
       <td><img className={logoCls(t.ticker)} src={LOGO(t.ticker)} alt={t.ticker} /></td>
@@ -116,17 +123,11 @@ export default function ClosedTrades() {
     return out
   }, [trades])
 
-  // DCA-aware per-trade yield: dollar-weighted avg_cost when present (multi-lot),
-  // else the stored return_pct. Matches prod's yieldOf with dcaActive = true.
-  const yieldOf = (t) => (t.avg_cost && t.sell_price)
-    ? (t.sell_price - t.avg_cost) / t.avg_cost * 100
-    : (t.return_pct ?? 0)
-
   const loaded = Array.isArray(trades)
   const totalPairs = flat.length
   const wins = flat.filter(t => yieldOf(t) > 0).length
   const winRate = totalPairs ? (wins / totalPairs) * 100 : null
-  const avgReturn = totalPairs ? flat.reduce((s, t) => s + yieldOf(t), 0) / totalPairs : null
+  const avgReturn = totalPairs ? flat.reduce((s, t) => s + (yieldOf(t) ?? 0), 0) / totalPairs : null
   const avgDays = totalPairs ? flat.reduce((s, t) => s + (t.days_held ?? 0), 0) / totalPairs : null
 
   const totalC = loaded ? totalPairs.toLocaleString() : '—'
