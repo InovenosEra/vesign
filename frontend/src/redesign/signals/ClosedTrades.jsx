@@ -55,6 +55,11 @@ const HEAD = (
 function ClosedRow({ t }) {
   const open = useTickerModal()
   const ret = yieldOf(t)
+  // Multi-lot (DCA) trades show the dollar-weighted avg cost + an ×N lots badge,
+  // matching the server. Single-lot: avg_cost == buy_price, no badge.
+  const cost = t.avg_cost != null ? t.avg_cost : t.buy_price
+  const multi = t.n_lots > 1
+  const lotsTitle = multi ? (t.lots || []).map(l => `Lot ${l.seq}: ${l.date} @ ${num(l.price)}`).join('\n') : undefined
   return (
     <tr data-ticker={t.ticker} data-company={t.company || ''} onClick={() => open(t.ticker, t.company)}>
       <td><img className={logoCls(t.ticker)} src={LOGO(t.ticker)} alt={t.ticker} /></td>
@@ -62,7 +67,10 @@ function ClosedRow({ t }) {
       <td><span className="co">{t.company || '—'}</span></td>
       <td className="r">{mcapB(t.market_cap)}</td>
       <td className="r muted">{ymd(t.buy_date)}</td>
-      <td className="r">{t.buy_price == null ? '—' : num(t.buy_price)}</td>
+      <td className="r">
+        {cost == null ? '—' : num(cost)}
+        {multi && <span className="lot-badge" title={lotsTitle}>×{t.n_lots}</span>}
+      </td>
       <td className="r muted">{ymd(t.sell_date)}</td>
       <td className="r">{t.sell_price == null ? '—' : num(t.sell_price)}</td>
       <td className="r muted">{t.days_held ?? '—'}</td>
@@ -114,7 +122,7 @@ export default function ClosedTrades() {
             buy_date: tr.buy_date, buy_price: tr.buy_price,
             sell_date: tr.sell_date, sell_price: tr.sell_price,
             days_held: tr.days_held, return_pct: tr.return_pct,
-            avg_cost: tr.avg_cost,
+            avg_cost: tr.avg_cost, n_lots: tr.n_lots, lots: tr.lots,
           })
         }
       }
