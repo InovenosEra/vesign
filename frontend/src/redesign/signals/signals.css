@@ -435,8 +435,9 @@
 .rd .ct-search input:focus { outline: none; border-color: var(--blue); }
 
 /* DCA lots badge (×N) in the Closed-trades Buy/Avg-cost cell */
+.rd .data-table .avg-cost { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .rd .data-table .lot-badge {
-  display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 999px;
+  display: inline-block; padding: 1px 6px; border-radius: 999px;
   background: rgba(96,165,250,0.14); color: var(--blue-2);
-  font-family: var(--mono); font-size: 10px; font-weight: 700; cursor: help; vertical-align: middle;
+  font-family: var(--mono); font-size: 10px; font-weight: 700; cursor: help; line-height: 1.5;
 }

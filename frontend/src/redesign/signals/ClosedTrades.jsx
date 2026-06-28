@@ -68,8 +68,10 @@ function ClosedRow({ t }) {
       <td className="r">{mcapB(t.market_cap)}</td>
       <td className="r muted">{ymd(t.buy_date)}</td>
       <td className="r">
-        {multi && <span className="lot-badge" title={lotsTitle}>×{t.n_lots}</span>}
-        {cost == null ? '—' : num(cost)}
+        <span className="avg-cost">
+          {multi && <span className="lot-badge" title={lotsTitle}>×{t.n_lots}</span>}
+          <span>{cost == null ? '—' : num(cost)}</span>
+        </span>
       </td>
       <td className="r muted">{ymd(t.sell_date)}</td>
       <td className="r">{t.sell_price == null ? '—' : num(t.sell_price)}</td>
