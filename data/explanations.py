@@ -198,6 +198,13 @@ def latest_signal_date(ticker: str) -> str | None:
     return row[0] if row and row[0] else None
 
 
+def global_latest_signal_date() -> str | None:
+    """The most recent signal date across the whole universe (the active day)."""
+    with engine.begin() as conn:
+        return conn.execute(text(
+            "SELECT max(substr(date, 1, 10)) FROM signals")).scalar()
+
+
 def get_or_create(ticker: str, signal_date: str | None = None, *, client=None) -> dict | None:
     """Cache-aside: return cached payload, else assemble->generate->store. None if
     no signal exists for (ticker, signal_date). When signal_date is omitted, the
@@ -217,6 +224,12 @@ def get_or_create(ticker: str, signal_date: str | None = None, *, client=None) -
 
     evidence = assemble_evidence(ticker, signal_date)
     if evidence is None:
+        return None
+    # Money guard: only ever call the model for an ACTIVE signal — the global
+    # latest signal date AND a BUY/SELL action. Historical trades (delisted /
+    # acquired tickers whose latest signal is old) and HOLD requests serve the
+    # cache if present (returned above) but never trigger a new paid generation.
+    if evidence.get("action") not in ("BUY", "SELL") or signal_date != global_latest_signal_date():
         return None
     payload = generate_explanation(evidence, client=client)
     with engine.begin() as conn:

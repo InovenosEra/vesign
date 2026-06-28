@@ -176,3 +176,30 @@ def test_get_or_create_unknown_signal_returns_none(mod):
     client = _canned_client()
     assert mod.get_or_create("ZZZZ", "2026-05-26", client=client) is None
     assert len(client.calls) == 0
+
+
+def test_get_or_create_historical_signal_not_generated(mod):
+    """Money guard: a BUY/SELL on a date older than the global-latest signal day
+    (e.g. a closed/historical trade) never triggers a paid generation."""
+    from sqlalchemy import text
+    from data.loaders import engine
+    # Global latest stays 2026-05-26; add an older AAPL BUY on 2026-05-20.
+    with engine.begin() as conn:
+        conn.execute(text("""INSERT INTO signals VALUES
+            ('2026-05-20 00:00:00','AAPL',95.0,0.30,9,'BUY',4,120.0)"""))
+    client = _canned_client()
+    assert mod.get_or_create("AAPL", "2026-05-20", client=client) is None
+    assert len(client.calls) == 0          # historical → no model call
+
+
+def test_get_or_create_hold_on_latest_not_generated(mod):
+    """Money guard: a HOLD signal (even on the latest day) never generates."""
+    from sqlalchemy import text
+    from data.loaders import engine
+    with engine.begin() as conn:
+        conn.execute(text("""INSERT INTO companies VALUES ('HLD','Holdco')"""))
+        conn.execute(text("""INSERT INTO signals VALUES
+            ('2026-05-26 00:00:00','HLD',10.0,0.10,5,'HOLD',5,NULL)"""))
+    client = _canned_client()
+    assert mod.get_or_create("HLD", "2026-05-26", client=client) is None
+    assert len(client.calls) == 0          # HOLD → no model call
