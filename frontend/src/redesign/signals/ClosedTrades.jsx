@@ -9,38 +9,41 @@ import { useTickerModal } from '../TickerModalContext'
 import { logoCls, ymd, tradeWindow } from './util'
 import PagedTable from './Pager'
 
+// Market cap in billions (raw integer → "12.3"); mirrors OpenTrades' mcapB.
+const mcapB = (mc) => (mc == null ? '—' : (mc / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
+
+// Columns mirror production's "Historical Trades" table (TradesPage.jsx) and the
+// sibling Open Trades table: logo · Ticker · Company · Market Cap · Buy date ·
+// Buy price · Sell date · Sell price · Days held · Yield.
 const HEAD = (
   <tr>
+    <th></th>
     <th>Ticker</th>
+    <th>Company</th>
+    <th className="r">Market Cap</th>
     <th className="r">Buy date</th>
-    <th className="r">Buy</th>
+    <th className="r">Buy price</th>
     <th className="r">Sell date</th>
-    <th className="r">Sell</th>
+    <th className="r">Sell price</th>
     <th className="r">Days held</th>
-    <th className="r">Result</th>
-    <th className="r" style={{ paddingRight: 18 }}>Return</th>
+    <th className="r" style={{ paddingRight: 18 }}>Yield</th>
   </tr>
 )
 
 function ClosedRow({ t }) {
   const open = useTickerModal()
   const ret = t.return_pct == null ? null : t.return_pct
-  const win = (t.result || '').toLowerCase() === 'win' || (ret != null && ret > 0)
   return (
     <tr data-ticker={t.ticker} data-company={t.company || ''} onClick={() => open(t.ticker, t.company)}>
-      <td>
-        <div className="ticker-cell">
-          <img className={logoCls(t.ticker)} src={LOGO(t.ticker)} alt={t.ticker} />
-          <span className="tk">{t.ticker}</span>
-          <span className="co">{t.company || ''}</span>
-        </div>
-      </td>
+      <td><img className={logoCls(t.ticker)} src={LOGO(t.ticker)} alt={t.ticker} /></td>
+      <td><span className="tk">{t.ticker}</span></td>
+      <td><span className="co">{t.company || '—'}</span></td>
+      <td className="r">{mcapB(t.market_cap)}</td>
       <td className="r muted">{ymd(t.buy_date)}</td>
       <td className="r">{t.buy_price == null ? '—' : num(t.buy_price)}</td>
       <td className="r muted">{ymd(t.sell_date)}</td>
       <td className="r">{t.sell_price == null ? '—' : num(t.sell_price)}</td>
       <td className="r muted">{t.days_held ?? '—'}</td>
-      <td className={'r ' + (win ? 'up' : 'down')}>{win ? 'Win' : 'Loss'}</td>
       <td className={'r ' + dirClass(ret)} style={{ paddingRight: 18 }}><strong>{pct(ret)}</strong></td>
     </tr>
   )
@@ -76,7 +79,7 @@ export default function ClosedTrades() {
     for (const t of trades) {
       for (const tr of (t.trades || [])) {
         flat.push({
-          ticker: t.ticker, company: t.company,
+          ticker: t.ticker, company: t.company, market_cap: t.market_cap,
           buy_date: tr.buy_date, buy_price: tr.buy_price,
           sell_date: tr.sell_date, sell_price: tr.sell_price,
           days_held: tr.days_held, return_pct: tr.return_pct,
@@ -107,7 +110,7 @@ export default function ClosedTrades() {
         rows={flat}
         row={(t, i) => <ClosedRow key={i} t={t} />}
         emptyLabel="No closed trades."
-        colspan={8}
+        colspan={10}
       />
     </>
   )
