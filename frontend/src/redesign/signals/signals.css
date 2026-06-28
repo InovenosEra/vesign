@@ -102,8 +102,9 @@
   @media (max-width: 1000px) { .rd .signals-split { grid-template-columns: 1fr; } }
 
   /* Closed-trades statistics cards (mirrors ve-sign.com TradesPage) */
-  .rd .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-  .rd .metric-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; }
+  /* Compact, left-grouped cards (matches ve-sign.com) — not stretched full-width. */
+  .rd .metrics { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+  .rd .metric-card { flex: 0 0 auto; min-width: 168px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; }
   .rd .metric-card .m-label { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
   .rd .metric-card .m-value { margin-top: 6px; font-family: var(--mono); font-size: 24px; font-weight: 400; color: var(--ink); letter-spacing: -0.02em; }
   .rd .metric-card .m-value.up { color: var(--green); }
