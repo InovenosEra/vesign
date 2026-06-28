@@ -203,8 +203,17 @@ function UpgradeBanner() {
 export default function SignalsSplit() {
   const me = useMe()
   const isFree = me.plan === 'free'
+  // Total today's signals (BUY + SELL) for the section header count. Reuses the
+  // columns' cached queries — no extra fetch.
+  const { data: buy } = useQuery({ queryKey: ['signals-today', 'BUY', 'US'], queryFn: () => getSignalsToday('BUY', 'US') })
+  const { data: sell } = useQuery({ queryKey: ['signals-today', 'SELL', 'US'], queryFn: () => getSignalsToday('SELL', 'US') })
+  const haveCount = Array.isArray(buy) && Array.isArray(sell)
+  const sigCount = (Array.isArray(buy) ? buy.length : 0) + (Array.isArray(sell) ? sell.length : 0)
   return (
     <>
+      <div className="section-h">
+        <h2>Signals <span className="sub">{haveCount ? sigCount : '—'}</span></h2>
+      </div>
       {isFree && <UpgradeBanner />}
       <div className="sig-twocol">
         <SignalColumn kind="BUY" isFree={isFree} />
