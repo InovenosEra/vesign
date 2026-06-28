@@ -44,7 +44,7 @@ const HEAD = (
     <th>Company</th>
     <th className="r">Market Cap</th>
     <th className="r">Buy date</th>
-    <th className="r">Buy price</th>
+    <th className="r">Avg Cost</th>
     <th className="r">Sell date</th>
     <th className="r">Sell price</th>
     <th className="r">Days held</th>
