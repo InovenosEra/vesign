@@ -133,9 +133,7 @@ export default function ClosedTrades() {
   const winC = winRate != null ? winRate.toFixed(1) + '%' : '—'
   const yieldC = avgReturn != null ? (avgReturn >= 0 ? '+' : '') + avgReturn.toFixed(2) + '%' : '—'
   const yieldCls = avgReturn != null ? (avgReturn >= 0 ? 'up' : 'down') : ''
-  const daysC = avgDays != null
-    ? <>{Math.round(avgDays)} <small style={{ color: 'var(--ink-3)', fontSize: 13 }}>days</small></>
-    : '—'
+  const daysC = avgDays != null ? Math.round(avgDays) : '—'
 
   // Search filters the table only — the stat cards stay over the full range.
   const q = search.trim().toLowerCase()
