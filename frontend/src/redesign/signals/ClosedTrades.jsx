@@ -1,15 +1,30 @@
-/* Closed-trades pane: statistics cards (getStats → /api/stats) + flattened
- * historical-trades table (getTrades over the last 12 months). Ported from the
- * trades-v5.html #pane-closed block, fetchStats(), fetchHistoricalTrades() and
- * closedRow(). */
+/* Closed-trades pane: a date-range control (From/To + period chips), four stat
+ * cards computed over the selected range, a ticker/company search box, and the
+ * flattened historical-trades table. Mirrors production's TradesPage controls +
+ * stats (1Y default, DCA-aware per-trade yield) in the redesign style. */
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getStats, getTrades } from '../../api'
+import { getTrades } from '../../api'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { logoCls, ymd, tradeWindow } from './util'
 import PagedTable from './Pager'
 
-// Market cap in billions (raw integer → "12.3"); mirrors OpenTrades' mcapB.
+// Period sentinels: months, or 'ytd'. Order matches production's chip row.
+const PERIODS = [[3, '3M'], [6, '6M'], ['ytd', 'YTD'], [12, '1Y'], [24, '2Y'], [36, '3Y'], [60, '5Y']]
+const todayISO = () => new Date().toISOString().slice(0, 10)
+function isoMonthsAgo(n) {
+  const d = new Date()
+  d.setMonth(d.getMonth() - n)
+  return d.toISOString().slice(0, 10)
+}
+// Period sentinel ('ytd' | months) → ISO start date (matches prod startForPeriod).
+function startForPeriod(p) {
+  if (p === 'ytd') return `${new Date().getFullYear()}-01-01`
+  return isoMonthsAgo(p)
+}
+
+// Market cap in billions; mirrors OpenTrades' mcapB.
 const mcapB = (mc) => (mc == null ? '—' : (mc / 1e9).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
 
 // Columns mirror production's "Historical Trades" table (TradesPage.jsx) and the
@@ -58,58 +73,112 @@ function StatCard({ label, value, cls }) {
   )
 }
 
-export default function ClosedTrades() {
-  const { data: stats } = useQuery({ queryKey: ['stats'], queryFn: getStats })
-  const { start, end } = tradeWindow()
-  const { data: trades } = useQuery({ queryKey: ['trades', start, end, 'US'], queryFn: () => getTrades({ start, end, market: 'US' }) })
+const SearchIcon = () => (
+  <svg className="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+  </svg>
+)
 
-  // Statistics cards (canonical, matches ve-sign.com).
-  const total = stats?.closed_trades != null ? stats.closed_trades.toLocaleString() : '—'
-  const winRate = stats?.win_rate != null ? pct(stats.win_rate) : '—'
-  const avgYield = stats?.avg_yield != null ? pct(stats.avg_yield) : '—'
-  const avgYieldCls = stats?.avg_yield != null ? (stats.avg_yield >= 0 ? 'up' : 'down') : 'up'
-  const winRateCls = stats?.win_rate != null ? (stats.win_rate >= 50 ? 'up' : 'down') : 'up'
-  const avgDays = stats?.avg_hold_days != null
-    ? <>{Math.round(stats.avg_hold_days)} <small style={{ color: 'var(--ink-3)', fontSize: 13 }}>days</small></>
-    : '—'
+export default function ClosedTrades() {
+  // Default window = trailing 1Y (matches prod's default activePeriod = 12).
+  const [{ start, end }, setRange] = useState(() => tradeWindow())
+  const [period, setPeriod] = useState(12)
+  const [search, setSearch] = useState('')
+
+  const { data: trades } = useQuery({
+    queryKey: ['trades', start, end, 'US', true],
+    queryFn: () => getTrades({ start, end, market: 'US', includeLots: true }),
+    staleTime: 300_000,
+  })
+
+  function selectPeriod(p) {
+    setPeriod(p)
+    setRange({ start: startForPeriod(p), end: todayISO() })
+  }
 
   // Flatten per-ticker aggregates → one row per closed trade, newest first.
-  const flat = []
-  if (Array.isArray(trades)) {
-    for (const t of trades) {
-      for (const tr of (t.trades || [])) {
-        flat.push({
-          ticker: t.ticker, company: t.company, market_cap: t.market_cap,
-          buy_date: tr.buy_date, buy_price: tr.buy_price,
-          sell_date: tr.sell_date, sell_price: tr.sell_price,
-          days_held: tr.days_held, return_pct: tr.return_pct,
-          result: tr.result,
-        })
+  const flat = useMemo(() => {
+    const out = []
+    if (Array.isArray(trades)) {
+      for (const t of trades) {
+        for (const tr of (t.trades || [])) {
+          out.push({
+            ticker: t.ticker, company: t.company, market_cap: t.market_cap,
+            buy_date: tr.buy_date, buy_price: tr.buy_price,
+            sell_date: tr.sell_date, sell_price: tr.sell_price,
+            days_held: tr.days_held, return_pct: tr.return_pct,
+            avg_cost: tr.avg_cost,
+          })
+        }
       }
+      out.sort((a, b) => String(b.sell_date || '').localeCompare(String(a.sell_date || '')))
     }
-    flat.sort((a, b) => String(b.sell_date || '').localeCompare(String(a.sell_date || '')))
-  }
-  const closedCount = Array.isArray(trades) ? flat.length.toLocaleString() : '—'
-  const closedSub = Array.isArray(trades) ? `${flat.length} closed trades · newest first` : '—'
+    return out
+  }, [trades])
+
+  // DCA-aware per-trade yield: dollar-weighted avg_cost when present (multi-lot),
+  // else the stored return_pct. Matches prod's yieldOf with dcaActive = true.
+  const yieldOf = (t) => (t.avg_cost && t.sell_price)
+    ? (t.sell_price - t.avg_cost) / t.avg_cost * 100
+    : (t.return_pct ?? 0)
+
+  const loaded = Array.isArray(trades)
+  const totalPairs = flat.length
+  const wins = flat.filter(t => yieldOf(t) > 0).length
+  const winRate = totalPairs ? (wins / totalPairs) * 100 : null
+  const avgReturn = totalPairs ? flat.reduce((s, t) => s + yieldOf(t), 0) / totalPairs : null
+  const avgDays = totalPairs ? flat.reduce((s, t) => s + (t.days_held ?? 0), 0) / totalPairs : null
+
+  const totalC = loaded ? totalPairs.toLocaleString() : '—'
+  const winC = winRate != null ? winRate.toFixed(1) + '%' : '—'
+  const yieldC = avgReturn != null ? (avgReturn >= 0 ? '+' : '') + avgReturn.toFixed(2) + '%' : '—'
+  const yieldCls = avgReturn != null ? (avgReturn >= 0 ? 'up' : 'down') : ''
+  const daysC = avgDays != null
+    ? <>{Math.round(avgDays)} <small style={{ color: 'var(--ink-3)', fontSize: 13 }}>days</small></>
+    : '—'
+
+  // Search filters the table only — the stat cards stay over the full range.
+  const q = search.trim().toLowerCase()
+  const rows = q
+    ? flat.filter(t => (t.ticker || '').toLowerCase().includes(q) || (t.company || '').toLowerCase().includes(q))
+    : flat
 
   return (
     <>
-      <div className="metrics">
-        <StatCard label="Total trades" value={total} />
-        <StatCard label="Win rate" value={winRate} cls={winRateCls} />
-        <StatCard label="Avg yield" value={avgYield} cls={avgYieldCls} />
-        <StatCard label="Avg days held" value={avgDays} />
+      <div className="ct-controls">
+        <label>From</label>
+        <input type="date" className="ct-date" value={start}
+          onChange={e => { setRange(r => ({ ...r, start: e.target.value })); setPeriod(null) }} />
+        <label>To</label>
+        <input type="date" className="ct-date" value={end}
+          onChange={e => { setRange(r => ({ ...r, end: e.target.value })); setPeriod(null) }} />
+        <span className="ct-chips">
+          {PERIODS.map(([p, label]) => (
+            <button key={label} className={'ct-chip' + (period === p ? ' active' : '')}
+              onClick={() => selectPeriod(p)}>{label}</button>
+          ))}
+        </span>
       </div>
 
-      <div className="section-h">
-        <h2>Closed trades <span className="sub" style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{closedCount}</span></h2>
-        <span className="sub">{closedSub}</span>
+      <div className="metrics">
+        <StatCard label="Total trades" value={totalC} />
+        <StatCard label="Win rate" value={winC} />
+        <StatCard label="Avg yield/trade" value={yieldC} cls={yieldCls} />
+        <StatCard label="Avg days held" value={daysC} />
       </div>
+
+      <div className="ct-search">
+        <SearchIcon />
+        <input type="text" placeholder="Search ticker or company"
+          value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
       <PagedTable
+        key={q}
         head={HEAD}
-        rows={flat}
+        rows={rows}
         row={(t, i) => <ClosedRow key={i} t={t} />}
-        emptyLabel="No closed trades."
+        emptyLabel={loaded ? (q ? 'No matching trades.' : 'No closed trades.') : 'Loading…'}
         colspan={10}
       />
     </>

@@ -406,3 +406,29 @@
 .rd .tier-legend button.tl-buy--prime .tl-price { color: var(--tier-prime); }
 .rd .tier-legend button.tl-buy--strong .tl-price { color: var(--tier-strong); }
 .rd .tier-legend button.tl-buy--potential .tl-price { color: var(--tier-promising); }
+
+/* CLOSED-TRADES date-range controls + period chips + search ----------------- */
+.rd .ct-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 16px; }
+.rd .ct-controls label { font-size: 12px; color: var(--ink-3); }
+.rd .ct-date {
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-family: var(--mono);
+  color-scheme: dark; cursor: text;
+}
+.rd .ct-date:focus { outline: none; border-color: var(--blue); }
+.rd .ct-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-left: 4px; }
+.rd .ct-chip {
+  background: transparent; border: 1px solid var(--line); color: var(--ink-2);
+  border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: color .12s, border-color .12s, background .12s;
+}
+.rd .ct-chip:hover { border-color: var(--line-2); color: var(--ink); }
+.rd .ct-chip.active { border-color: var(--blue); color: var(--blue-2); background: rgba(59,130,246,0.10); }
+.rd .ct-search { position: relative; max-width: 380px; margin: 0 0 16px; }
+.rd .ct-search .ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.rd .ct-search input {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 10px; padding: 9px 12px 9px 34px; font-size: 13px;
+}
+.rd .ct-search input::placeholder { color: var(--ink-3); }
+.rd .ct-search input:focus { outline: none; border-color: var(--blue); }

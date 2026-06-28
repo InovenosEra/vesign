@@ -11,7 +11,7 @@ import ClosedTrades from './signals/ClosedTrades'
 import { tradeWindow } from './signals/util'
 import { useReady, PageSkeleton } from './LoadGate'
 import { useMe } from '../context/MeContext'
-import { getSignalsToday, getOpenTrades, getStats, getTrades } from '../api'
+import { getSignalsToday, getOpenTrades, getTrades } from '../api'
 
 // URL slug <-> internal tab key. The slug is the last path segment so the URL
 // reflects the active sub-page (/signals/active-trades, /signals/closed-trades).
@@ -35,8 +35,9 @@ export default function SignalsPage() {
   ])
   const todayReady = me.ready && todayDataReady
   const closedReady = useReady(true, [
-    [['stats'], getStats],
-    [['trades', start, end, 'US'], () => getTrades({ start, end, market: 'US' })],
+    // Matches ClosedTrades' default query (trailing 1Y, DCA lots) so the pane's
+    // first paint has data. ClosedTrades owns the range/period state thereafter.
+    [['trades', start, end, 'US', true], () => getTrades({ start, end, market: 'US', includeLots: true })],
   ])
   return (
     <>
