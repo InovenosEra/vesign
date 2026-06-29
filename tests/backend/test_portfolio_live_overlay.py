@@ -21,6 +21,8 @@ def portfolio_app():
         conn.execute(text("CREATE TABLE fundamentals (ticker TEXT, market_cap REAL)"))
         conn.execute(text("CREATE TABLE daily_prices (date DATETIME, ticker TEXT, open FLOAT, high FLOAT, low FLOAT, close FLOAT, volume BIGINT)"))
         conn.execute(text("CREATE TABLE company_health_history (ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT)"))
+        conn.execute(text("CREATE TABLE company_health (ticker TEXT PRIMARY KEY, score INTEGER, reason TEXT)"))
+        conn.execute(text("CREATE TABLE signals (ticker TEXT, date TEXT, signal TEXT, fair_value_upside REAL, prediction_score REAL, target_mean_price REAL)"))
         conn.execute(text("INSERT INTO watchlist_lists (id, user_id, name) VALUES (1, 'dev-bypass', 'Mine')"))
         conn.execute(text("INSERT INTO watchlist_holdings (watchlist_id, ticker, quantity, buy_price, buy_date) VALUES (1,'AAA',10,100.0,'2026-01-01')"))
         conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES ('AAA','AAA Corp','US')"))
