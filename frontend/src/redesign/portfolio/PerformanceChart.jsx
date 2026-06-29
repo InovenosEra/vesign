@@ -40,14 +40,7 @@ export default function PerformanceChart() {
   // Which series get drawn. In $ mode it's the single portfolio-value line.
   const seriesDefs = isValue ? [VALUE_SERIES] : SERIES.filter(s => !hidden.has(s.key))
 
-  const fmtAxis = (v) => {
-    if (!isValue) return `${v >= 0 ? '+' : ''}${v.toFixed(0)}%`
-    const vv = v * rate, a = Math.abs(vv)
-    return symbol + (a >= 1000 ? (vv / 1000).toFixed(a >= 10000 ? 0 : 1) + 'k' : vv.toFixed(0))
-  }
-
   let lines = []
-  let yAxis = ['—', '—', '—', '—', '—', '—']
   let xAxis = []
   let minV = 0, span = 1
 
@@ -77,7 +70,6 @@ export default function PerformanceChart() {
       return { ...s, points: toks.join(' '), area: d, dot: last ? { cx: last[0], cy: last[1] } : null }
     })
 
-    yAxis = [0, 1, 2, 3, 4, 5].map(i => fmtAxis(maxV - (i / 5) * span))
     xAxis = [0, 1, 2, 3, 4, 5, 6].map(i => {
       const dt = new Date(data[Math.round(i / 6 * (N - 1))].week)
       return dt.toLocaleDateString(undefined, { month: 'short' })
@@ -131,10 +123,10 @@ export default function PerformanceChart() {
         </div>
       </div>
       <div className="chart-body" ref={bodyRef}>
-        <div className="y-axis">{yAxis.map((v, i) => <span key={i}>{v}</span>)}</div>
         <svg ref={svgRef} viewBox="0 0 800 300" preserveAspectRatio="none" onMouseMove={onMove} onMouseLeave={onLeave}>
-          {[50, 100, 150, 200, 250].map(y => (
-            <line key={y} x1="0" x2="800" y1={y} y2={y} stroke="rgba(255,255,255,0.04)" />
+          {/* gridlines aligned to the 6 y-axis label rows (0…H in 5 steps) */}
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <line key={i} x1="0" x2="800" y1={i * H / 5} y2={i * H / 5} stroke="rgba(255,255,255,0.05)" />
           ))}
           {lines.map(s => (
             <g key={s.key}>
