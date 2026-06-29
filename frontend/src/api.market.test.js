@@ -21,6 +21,6 @@ test('market fetchers hit the right /api paths', async () => {
   await api.getTape();                 expect(lastUrl()).toBe('/api/market/tape')
   await api.getTopNews(5);             expect(lastUrl()).toBe('/api/market/news/top?limit=5')
   await api.getTopAnalyst(1, 5);       expect(lastUrl()).toBe('/api/market/analyst-changes/top?days=1&limit=5')
-  await api.getEarningsWeek();         expect(lastUrl()).toBe('/api/market/earnings/week')
+  await api.getEarningsWeek();         expect(lastUrl()).toBe('/api/market/earnings/week?days=7')
   await api.getEconomicCal(7);         expect(lastUrl()).toBe('/api/market/economic-calendar?days=7')
 })

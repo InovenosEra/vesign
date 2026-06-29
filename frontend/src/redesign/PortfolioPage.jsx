@@ -5,6 +5,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getPortfolioHoldings, getPortfolioComparison, getPortfolioPerformance } from '../api'
+import { computeRows } from './portfolio/derive'
 import KpiStrip from './portfolio/KpiStrip'
 import PerformanceChart from './portfolio/PerformanceChart'
 import AllocationDonut from './portfolio/AllocationDonut'
@@ -13,42 +14,6 @@ import HoldingsTable from './portfolio/HoldingsTable'
 import WatchlistsTab from './portfolio/WatchlistsTab'
 import { useReady, PageSkeleton } from './LoadGate'
 import './portfolio/portfolio.css'
-
-function computeRows(holdings) {
-  const rows = holdings.map(h => {
-    const value = (h.total_qty != null && h.latest_close != null) ? h.total_qty * h.latest_close : null
-    const cost = h.total_cost
-    const pnl = (value != null && cost != null) ? value - cost : null
-    const yld = (pnl != null && cost) ? pnl / cost * 100 : null
-    const day = (h.latest_close != null && h.prev_close) ? (h.latest_close - h.prev_close) / h.prev_close * 100 : null
-    return { ...h, value, cost, pnl, yld, day }
-  }).sort((a, b) => a.ticker.localeCompare(b.ticker))
-
-  const totalCost = rows.reduce((s, r) => s + (r.cost || 0), 0)
-  const totalValue = rows.reduce((s, r) => s + (r.value || 0), 0)
-  const totalPnl = totalValue - totalCost
-  const totalYld = totalCost ? totalPnl / totalCost * 100 : 0
-  const todayDelta = rows.reduce((s, r) =>
-    s + ((r.latest_close != null && r.prev_close != null) ? (r.latest_close - r.prev_close) * (r.total_qty || 0) : 0), 0)
-  const todayPct = (totalValue - todayDelta) ? todayDelta / (totalValue - todayDelta) * 100 : 0
-
-  const best = rows.slice().sort((a, b) => (b.yld || -1e9) - (a.yld || -1e9))[0]
-  const worst = rows.slice().sort((a, b) => (a.yld || 1e9) - (b.yld || 1e9))[0]
-  // Largest by value — computed explicitly so it doesn't depend on row order
-  // (rows are now sorted A→Z by ticker, not by value).
-  const largestRow = rows.length
-    ? rows.reduce((a, b) => ((b.value || 0) > (a.value || 0) ? b : a))
-    : null
-  const largest = largestRow
-    ? { ...largestRow, pctOfValue: totalValue ? largestRow.value / totalValue * 100 : 0 }
-    : null
-
-  return {
-    rows,
-    totals: { totalCost, totalValue, totalPnl, totalYld, todayDelta, todayPct, count: rows.length },
-    best, worst, largest,
-  }
-}
 
 const PORTFOLIO_TABS = ['holdings', 'watchlists']   // URL slug == tab id
 
