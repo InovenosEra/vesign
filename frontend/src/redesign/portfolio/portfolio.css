@@ -235,6 +235,26 @@
   .rd .conc-label.balanced { color: var(--gold); background: rgba(245,158,11,0.13); }
   .rd .conc-label.diversified { color: var(--green); background: rgba(0,217,126,0.13); }
 
+  /* VESIGN'S READ panel */
+  .rd .vr-panel { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 28px; }
+  .rd .vr-cell { background: var(--panel); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 64px; }
+  .rd .vr-lbl { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .rd .vr-val { font-family: var(--mono); font-size: 15px; color: var(--ink); font-feature-settings: 'tnum' 1; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .rd .vr-val .vr-of { color: var(--ink-3); font-size: 11px; }
+  .rd .vr-val .up { color: var(--green); }
+  .rd .vr-val .down { color: var(--red); font-weight: 600; }
+  .rd .vr-tk { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+  .rd .vr-tk .logo-mini { width: 18px; height: 18px; border-radius: 4px; }
+  .rd .vr-muted { color: var(--ink-3); font-size: 12px; }
+  .rd .vr-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rd .vr-chip { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+  .rd .vr-chip.buy { color: var(--green); background: rgba(0,217,126,0.13); }
+  .rd .vr-chip.hold { color: var(--ink-2); background: var(--bg-3); }
+  .rd .vr-chip.sell { color: var(--red); background: rgba(255,77,92,0.13); }
+  .rd .vr-dots { display: inline-flex; gap: 2.5px; }
+  .rd .vr-dots .vd { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; }
+  .rd .vr-dots .vd.off { background: rgba(255,255,255,0.10); }
+
   /* WATCHLIST BARS */
   .rd .wl-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; padding: 18px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
   .rd .wl-row { display: grid; grid-template-columns: 160px 1fr 84px; align-items: center; gap: 16px; padding: 7px 0; transition: padding .15s ease; position: relative; cursor: pointer; }
