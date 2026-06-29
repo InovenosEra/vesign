@@ -3105,6 +3105,12 @@ def portfolio_performance(
             ORDER BY ticker, date
         """), {**tp, "cutoff": cutoff_buf}).fetchall()
 
+        # SPY benchmark: buy-and-hold daily closes over the same window.
+        spy_rows = conn.execute(text("""
+            SELECT DATE(date) AS d, close FROM daily_prices
+            WHERE ticker = 'SPY' AND date >= :cutoff ORDER BY date
+        """), {"cutoff": cutoff_buf}).fetchall()
+
     cache = _get_vesign_cache(market)
 
     user_price_map = defaultdict(list)
@@ -3113,6 +3119,21 @@ def portfolio_performance(
             user_price_map[ticker].append((_date.fromisoformat(str(d_str)[:10]), float(close)))
         except Exception:
             pass
+
+    # SPY price-at-or-before helper + window base for normalization to 0%.
+    spy_prices = []
+    for d_str, close in spy_rows:
+        try:
+            spy_prices.append((_date.fromisoformat(str(d_str)[:10]), float(close)))
+        except Exception:
+            pass
+
+    def spy_price_at(target):
+        for d_obj, close in reversed(spy_prices):
+            if d_obj <= target:
+                return close
+        return None
+    spy_base = spy_price_at(weeks[0])
 
     def get_user_price_at(ticker, target):
         for d_obj, close in reversed(user_price_map.get(ticker, [])):
@@ -3175,7 +3196,18 @@ def portfolio_performance(
         if week_date == weeks[0]:
             port_yield = 0.0  # user portfolio normalized to start at 0; Vesign line shows actual MTM
 
-        result.append({"week": week_date.isoformat(), "portfolio": port_yield, "vesign": vesign_yield})
+        sp = spy_price_at(week_date)
+        spy_yield = round((sp / spy_base - 1) * 100, 2) if (sp is not None and spy_base) else None
+        if week_date == weeks[0] and spy_base is not None:
+            spy_yield = 0.0
+
+        result.append({
+            "week": week_date.isoformat(),
+            "portfolio": port_yield,
+            "vesign": vesign_yield,
+            "spy": spy_yield,
+            "value": round(total_val, 2) if total_val else 0.0,
+        })
 
     return result
 
