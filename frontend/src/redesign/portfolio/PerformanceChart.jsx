@@ -1,46 +1,92 @@
-/* Performance chart — your portfolio vs the Vesign strategy vs SPY, inline SVG.
- * Range chips (1M…All) refetch the series at that horizon; a %/$ toggle switches
- * between normalized return % (all three series) and portfolio market value $
- * (single line, currency-formatted). Legend items toggle individual series.
- * Hover crosshair snaps to the nearest weekly point and tooltips the visible series. */
-import { useState, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getPortfolioPerformance } from '../../api'
+/* Performance chart — Holdings vs benchmarks (Vesign, S&P 500) and any tickers
+ * the user adds, inline SVG. Range chips (1M…All) refetch at that horizon; a %/$
+ * toggle switches between normalized return % (all lines) and Holdings market
+ * value $ (single line). Holdings is always shown; up to 4 comparison lines can
+ * be removed (×) or added (+ Add → ticker search). Hover snaps to the nearest
+ * weekly point and tooltips the visible series. */
+import { useState, useRef, useEffect } from 'react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { getPortfolioPerformance, searchTickers } from '../../api'
 import { useCurrency } from '../../context/CurrencyContext'
+import { LOGO } from '../fmt'
 
 const W = 800, H = 300
 const RANGES = [['1M', 1], ['3M', 3], ['6M', 6], ['1Y', 12], ['2Y', 24], ['All', 60]]
-const SERIES = [
-  { key: 'portfolio', color: '#60a5fa', label: 'Holdings' },
-  { key: 'vesign', color: '#00d97e', label: 'Vesign' },
-  { key: 'spy', color: '#f59e0b', label: 'S&P 500' },
-]
+const BUILTIN = {
+  portfolio: { label: 'Holdings', color: '#60a5fa' },
+  vesign: { label: 'Vesign', color: '#00d97e' },
+  spy: { label: 'S&P 500', color: '#f59e0b' },
+}
+const EXTRA_COLORS = ['#a855f7', '#22d3ee', '#ec4899', '#eab308']
 const VALUE_SERIES = { key: 'value', color: '#60a5fa', label: 'Holdings value' }
+const MAX_COMPARISONS = 3   // Holdings + 3 = 4 lines max
+// Market indexes live in index_prices, keyed by these symbols; map to friendly labels.
+const INDEX_LABELS = { '^DJI': 'Dow Jones', '^NDX': 'Nasdaq 100', '^RUT': 'Russell 2000', '^GSPC': 'S&P 500' }
+// One-click presets in the Add popover (re-add built-ins + the market indexes).
+const PRESETS = [
+  { key: 'vesign', label: 'Vesign' },
+  { key: 'spy', label: 'S&P 500' },
+  { key: '^DJI', label: 'Dow Jones' },
+  { key: '^NDX', label: 'Nasdaq 100' },
+  { key: '^RUT', label: 'Russell 2000' },
+]
 
 const fmtPct = (v) => (v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`)
 const fmtDate = (w) => new Date(w).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
 export default function PerformanceChart() {
   const [months, setMonths] = useState(12)
-  const [mode, setMode] = useState('pct')          // 'pct' | 'value'
-  const [hidden, setHidden] = useState(() => new Set())
+  const [mode, setMode] = useState('pct')                       // 'pct' | 'value'
+  const [comparisons, setComparisons] = useState(['vesign', 'spy'])
+  const [addOpen, setAddOpen] = useState(false)
+  const [sq, setSq] = useState('')
   const { symbol, rate } = useCurrency()
-  const { data: pts } = useQuery({
-    queryKey: ['portfolio-performance', months],
-    queryFn: () => getPortfolioPerformance('US', months),
-  })
   const svgRef = useRef(null)
   const bodyRef = useRef(null)
+  const addRef = useRef(null)
   const [hover, setHover] = useState(null)
+
+  const extraParam = comparisons.filter(k => !BUILTIN[k]).join(',')
+  const { data: pts } = useQuery({
+    queryKey: ['portfolio-performance', months, extraParam],
+    queryFn: () => getPortfolioPerformance('US', months, extraParam),
+    placeholderData: keepPreviousData,
+  })
+  const { data: searchRes } = useQuery({
+    queryKey: ['perf-search', sq],
+    queryFn: () => searchTickers(sq, 8),
+    enabled: addOpen && sq.trim().length >= 1,
+  })
+
+  // Close the add-popover on outside click.
+  useEffect(() => {
+    if (!addOpen) return
+    const onDoc = (e) => { if (addRef.current && !addRef.current.contains(e.target)) setAddOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [addOpen])
 
   const data = Array.isArray(pts) ? pts : []
   const N = data.length
   const isValue = mode === 'value'
 
-  // Which series get drawn. In $ mode it's the single portfolio-value line.
-  const seriesDefs = isValue ? [VALUE_SERIES] : SERIES.filter(s => !hidden.has(s.key))
+  // Resolve each comparison to a {key,label,color}; tickers get palette colors.
+  let tIdx = 0
+  const compDefs = comparisons.map(k => BUILTIN[k]
+    ? { key: k, ...BUILTIN[k] }
+    : { key: k, label: INDEX_LABELS[k] || k, color: EXTRA_COLORS[(tIdx++) % EXTRA_COLORS.length] })
+  const seriesDefs = isValue
+    ? [VALUE_SERIES]
+    : [{ key: 'portfolio', ...BUILTIN.portfolio }, ...compDefs]
+
+  const fmtAxis = (v) => {
+    if (!isValue) return `${v >= 0 ? '+' : ''}${v.toFixed(0)}%`
+    const vv = v * rate, a = Math.abs(vv)
+    return symbol + (a >= 1000 ? (vv / 1000).toFixed(a >= 10000 ? 0 : 1) + 'k' : vv.toFixed(0))
+  }
 
   let lines = []
+  let yAxis = ['—', '—', '—', '—', '—', '—']
   let xAxis = []
   let minV = 0, span = 1
 
@@ -70,9 +116,10 @@ export default function PerformanceChart() {
       return { ...s, points: toks.join(' '), area: d, dot: last ? { cx: last[0], cy: last[1] } : null }
     })
 
+    yAxis = [0, 1, 2, 3, 4, 5].map(i => fmtAxis(maxV - (i / 5) * span))
     xAxis = [0, 1, 2, 3, 4, 5, 6].map(i => {
       const dt = new Date(data[Math.round(i / 6 * (N - 1))].week)
-      return dt.toLocaleDateString(undefined, { month: 'short' })
+      return `${dt.toLocaleDateString(undefined, { month: 'short' })}'${String(dt.getFullYear()).slice(-2)}`
     })
   }
 
@@ -96,22 +143,60 @@ export default function PerformanceChart() {
     ? (hover.frac < 0.15 ? 'translateX(0)' : hover.frac > 0.85 ? 'translateX(-100%)' : 'translateX(-50%)')
     : ''
 
-  const toggleSeries = (key) => setHidden(prev => {
-    const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n
-  })
+  const removeComp = (key) => setComparisons(prev => prev.filter(k => k !== key))
+  const addComp = (ticker) => setComparisons(prev =>
+    (prev.length >= MAX_COMPARISONS || prev.includes(ticker)) ? prev : [...prev, ticker])
+  const canAdd = comparisons.length < MAX_COMPARISONS
+  const addable = (searchRes || []).filter(r => r.ticker && !comparisons.includes(r.ticker) && r.ticker !== 'SPY')
+  const availPresets = PRESETS.filter(p => !comparisons.includes(p.key))
 
   return (
     <div className="panel">
       <div className="panel-head">
         <h3>Performance</h3>
         <div className="legend">
-          {(isValue ? [VALUE_SERIES] : SERIES).map(s => (
-            <span key={s.key}
-              className={'lg-item' + (isValue ? '' : ' clickable') + (!isValue && hidden.has(s.key) ? ' off' : '')}
-              onClick={isValue ? undefined : () => toggleSeries(s.key)}>
-              <span className="sw" style={{ background: s.color }}></span> {s.label}
-            </span>
-          ))}
+          {isValue ? (
+            <span className="lg-item"><span className="sw" style={{ background: VALUE_SERIES.color }}></span> {VALUE_SERIES.label}</span>
+          ) : (
+            <>
+              <span className="lg-item"><span className="sw" style={{ background: BUILTIN.portfolio.color }}></span> Holdings</span>
+              {compDefs.map(s => (
+                <span key={s.key} className="lg-item lg-removable">
+                  <span className="sw" style={{ background: s.color }}></span> {s.label}
+                  <button className="lg-x" onClick={() => removeComp(s.key)} title={`Remove ${s.label}`}>×</button>
+                </span>
+              ))}
+              {canAdd && (
+                <span className="lg-add-wrap" ref={addRef}>
+                  <button className="lg-add" onClick={() => setAddOpen(o => !o)}>+ Add</button>
+                  {addOpen && (
+                    <div className="lg-add-pop">
+                      {availPresets.length > 0 && (
+                        <div className="lg-presets">
+                          {availPresets.map(p => (
+                            <button key={p.key} className="lg-preset"
+                              onClick={() => { addComp(p.key); setAddOpen(false); setSq('') }}>{p.label}</button>
+                          ))}
+                        </div>
+                      )}
+                      <input autoFocus placeholder="Add ticker…" value={sq} onChange={e => setSq(e.target.value)} />
+                      <div className="lg-add-list">
+                        {addable.length === 0
+                          ? <div className="lg-add-empty">{sq.trim() ? 'No matches' : 'Type a ticker or company'}</div>
+                          : addable.map(r => (
+                            <button key={r.ticker} className="lg-add-item"
+                              onClick={() => { addComp(r.ticker); setAddOpen(false); setSq('') }}>
+                              <img className="logo-mini" src={LOGO(r.ticker)} alt={r.ticker} />
+                              <b>{r.ticker}</b><span className="co">{r.company}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </span>
+              )}
+            </>
+          )}
         </div>
         <div className="chips">
           <span className={'chip' + (mode === 'pct' ? ' active' : '')} onClick={() => setMode('pct')}>%</span>
@@ -123,6 +208,7 @@ export default function PerformanceChart() {
         </div>
       </div>
       <div className="chart-body" ref={bodyRef}>
+        <div className="y-axis">{yAxis.map((v, i) => <span key={i}>{v}</span>)}</div>
         <svg ref={svgRef} viewBox="0 0 800 300" preserveAspectRatio="none" onMouseMove={onMove} onMouseLeave={onLeave}>
           {/* gridlines aligned to the 6 y-axis label rows (0…H in 5 steps) */}
           {[0, 1, 2, 3, 4, 5].map(i => (
@@ -130,7 +216,7 @@ export default function PerformanceChart() {
           ))}
           {lines.map(s => (
             <g key={s.key}>
-              <path d={s.area} fill={s.color} fillOpacity="0.10" />
+              <path d={s.area} fill={s.color} fillOpacity="0.07" />
               <polyline fill="none" stroke={s.color} strokeWidth={s.key === 'portfolio' || s.key === 'value' ? 2 : 1.8}
                 strokeLinejoin="round" points={s.points} />
             </g>

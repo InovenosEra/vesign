@@ -25,12 +25,13 @@ def perf_app():
         start = date.today() - timedelta(days=400)
         c.execute(text("INSERT INTO watchlist_holdings (watchlist_id,ticker,quantity,buy_price,buy_date) "
                        f"VALUES (1,'AAPL',10,100.0,'{start.isoformat()}')"))
-        # daily prices for AAPL + SPY across the last 400 days (rising)
+        # daily prices for AAPL + SPY + QQQ across the last 400 days (rising)
         d = start
         i = 0
         while d <= date.today():
             c.execute(text("INSERT INTO daily_prices VALUES ('AAPL',:dt,:p)"), {"dt": d.isoformat(), "p": 100.0 + i})
             c.execute(text("INSERT INTO daily_prices VALUES ('SPY',:dt,:p)"), {"dt": d.isoformat(), "p": 400.0 + i})
+            c.execute(text("INSERT INTO daily_prices VALUES ('QQQ',:dt,:p)"), {"dt": d.isoformat(), "p": 300.0 + i})
             d += timedelta(days=1); i += 1
     eng.dispose()
     import importlib, backend.main as bm
@@ -54,3 +55,13 @@ def test_performance_has_spy_and_value(perf_app):
     assert pts[0]["spy"] == 0.0          # normalized to 0 at window start
     assert pts[-1]["spy"] > 0            # SPY rose over the window
     assert pts[-1]["value"] is not None and pts[-1]["value"] > 0
+
+
+def test_performance_extra_ticker_series(perf_app):
+    bm, client = perf_app
+    empty_cache = {"lots": [], "price_at": lambda *a: None}
+    with patch.object(bm, "_get_vesign_cache", return_value=empty_cache):
+        pts = client.get("/api/portfolio/performance?months=12&extra=qqq").json()
+    assert "QQQ" in pts[0]               # uppercased extra ticker keyed in
+    assert pts[0]["QQQ"] == 0.0          # normalized to 0 at window start
+    assert pts[-1]["QQQ"] > 0            # QQQ rose over the window

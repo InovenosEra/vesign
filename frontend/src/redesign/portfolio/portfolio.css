@@ -115,12 +115,28 @@
   .rd .nw-chip .val.nw-bw { font-size: 12.5px; line-height: 1.4; }
   .rd .nw-chip .sub { font-size: 10px; color: var(--ink-3); font-family: var(--mono); }
 
-  /* Performance chart: clickable legend toggles + range/mode chip separator */
-  .rd .panel-head .lg-item.clickable { cursor: pointer; user-select: none; transition: opacity .15s; }
-  .rd .panel-head .lg-item.clickable:hover { color: var(--ink-2); }
-  .rd .panel-head .lg-item.off { opacity: 0.4; }
-  .rd .panel-head .lg-item.off .sw { background: var(--ink-3) !important; }
+  /* Performance chart: range/mode chip separator + removable/addable legend */
   .rd .panel-head .chip-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--line); }
+  .rd .panel-head .legend { flex-wrap: wrap; row-gap: 6px; }
+  .rd .panel-head .lg-removable { display: inline-flex; align-items: center; gap: 6px; }
+  .rd .panel-head .lg-x { background: none; border: 0; color: var(--ink-3); cursor: pointer; font-size: 13px; line-height: 1; padding: 0 1px; margin-left: 1px; border-radius: 3px; transition: color .12s, background .12s; }
+  .rd .panel-head .lg-x:hover { color: var(--red); background: rgba(255,77,92,0.12); }
+  .rd .lg-add-wrap { position: relative; display: inline-flex; }
+  .rd .lg-add { background: var(--bg-3); border: 1px dashed var(--line-2); color: var(--ink-3); font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 5px; cursor: pointer; transition: color .12s, border-color .12s; }
+  .rd .lg-add:hover { color: var(--blue-2); border-color: var(--blue-2); }
+  .rd .lg-add-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: 240px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px; box-shadow: 0 10px 28px rgba(0,0,0,0.45); }
+  .rd .lg-presets { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .rd .lg-preset { background: var(--bg-3); border: 1px solid var(--line-2); color: var(--ink-2); font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 5px; cursor: pointer; transition: color .12s, border-color .12s, background .12s; }
+  .rd .lg-preset:hover { color: var(--ink); border-color: var(--blue-2); background: rgba(59,130,246,0.10); }
+  .rd .lg-add-pop input { width: 100%; box-sizing: border-box; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 6px; padding: 7px 10px; font-size: 12.5px; color: var(--ink); outline: none; }
+  .rd .lg-add-pop input:focus { border-color: var(--blue-2); }
+  .rd .lg-add-list { margin-top: 6px; max-height: 230px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+  .rd .lg-add-empty { font-size: 11.5px; color: var(--ink-3); padding: 10px 8px; text-align: center; }
+  .rd .lg-add-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; padding: 7px 8px; border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+  .rd .lg-add-item:hover { background: var(--bg-3); }
+  .rd .lg-add-item .logo-mini { width: 20px; height: 20px; border-radius: 4px; object-fit: contain; flex-shrink: 0; }
+  .rd .lg-add-item b { font-family: var(--mono); font-size: 12px; color: var(--ink); }
+  .rd .lg-add-item .co { font-size: 11px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .rd .kpi-row {
     display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
@@ -187,9 +203,13 @@
     display: grid; grid-template-columns: 1.6fr 1fr;
     gap: 16px; margin-bottom: 28px;
   }
-  .rd .chart-body { padding: 6px 16px 14px; height: 320px; position: relative; }
+  /* let the performance panel grow its chart to fill the (allocation-matched) height */
+  .rd .perf-grid > .panel { display: flex; flex-direction: column; }
+  .rd .chart-body { flex: 1; min-height: 280px; padding: 18px 24px 16px; position: relative; }
   .rd .chart-body svg { width: 100%; height: 100%; }
-  .rd .x-axis { padding: 0 16px 14px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); }
+  /* Y-axis labels overlaid on the left of the plot, aligned to the gridlines */
+  .rd .y-axis { position: absolute; left: 24px; top: 18px; bottom: 16px; display: flex; flex-direction: column; justify-content: space-between; font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); pointer-events: none; z-index: 1; }
+  .rd .x-axis { padding: 0 24px 16px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); }
   .rd .chart-body svg { cursor: crosshair; }
   /* hover tooltip — snaps to the nearest weekly point */
   .rd .perf-tip {
@@ -205,7 +225,7 @@
   .rd .perf-tip-row b { margin-left: auto; padding-left: 12px; font-family: var(--mono); font-weight: 600; color: var(--ink-1); }
 
   /* ALLOCATION DONUT */
-  .rd .alloc-body { padding: 22px 24px 18px; display: flex; flex-direction: column; gap: 18px; align-items: center; }
+  .rd .alloc-body { flex: 1; padding: 22px 24px 18px; display: flex; flex-direction: row; align-items: center; gap: 24px; }
   .rd .alloc-donut-wrap { position: relative; width: 220px; height: 220px; flex-shrink: 0; }
   .rd .alloc-donut-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .rd .alloc-center {
@@ -217,7 +237,7 @@
   .rd .alloc-center .big { margin-top: 4px; font-family: var(--mono); font-size: 22px; color: var(--ink); letter-spacing: -0.015em; }
   .rd .alloc-center .big .s { color: var(--ink-3); font-size: 16px; margin-right: 1px; }
   .rd .alloc-center .delta { margin-top: 3px; font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--green); }
-  .rd .alloc-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; width: 100%; padding: 0 4px; }
+  .rd .alloc-legend { display: grid; grid-template-columns: 1fr; gap: 10px; flex: 1; min-width: 0; }
   .rd .alloc-row { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; font-size: 11.5px; }
   .rd .alloc-row .sw { width: 8px; height: 8px; border-radius: 50%; }
   .rd .alloc-row .nm { color: var(--ink-2); }

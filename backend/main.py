@@ -3058,11 +3058,20 @@ def portfolio_performance(
     user=Depends(get_current_user),
     market: str = Query(default="US"),
     months: int = Query(default=12, ge=1, le=60),
+    extra: str = Query(default=""),
 ):
     """Weekly cumulative yield %: user portfolio + Vesign compound-equity model.
-    Chart spans the last `months` months; last point = yesterday, first point = 0."""
+    Chart spans the last `months` months; last point = yesterday, first point = 0.
+    `extra` is a comma list of tickers to add as normalized buy-and-hold lines
+    (for the comparison chart), capped at 4."""
     from datetime import date as _date, timedelta
     from collections import defaultdict
+
+    extra_tickers = [t.strip().upper() for t in (extra or "").split(",") if t.strip()]
+    # de-dupe preserving order, drop the built-ins, cap at 4
+    seen_ex = set()
+    extra_tickers = [t for t in extra_tickers
+                     if t not in ("SPY",) and not (t in seen_ex or seen_ex.add(t))][:3]
 
     uid = user["id"]
     end_date = _date.today() - timedelta(days=1)  # yesterday
@@ -3111,6 +3120,25 @@ def portfolio_performance(
             WHERE ticker = 'SPY' AND date >= :cutoff ORDER BY date
         """), {"cutoff": cutoff_buf}).fetchall()
 
+        # Extra comparison tickers/indexes: buy-and-hold closes over the window.
+        # Stocks/ETFs live in daily_prices; market indexes (^DJI, ^NDX, ^RUT,
+        # ^GSPC) live in index_prices — pull from both (index_prices is optional).
+        extra_rows = []
+        if extra_tickers:
+            eph = ", ".join([f":e{i}" for i in range(len(extra_tickers))])
+            ep = {f"e{i}": t for i, t in enumerate(extra_tickers)}
+            extra_rows = conn.execute(text(f"""
+                SELECT ticker, DATE(date) AS d, close FROM daily_prices
+                WHERE ticker IN ({eph}) AND date >= :cutoff ORDER BY ticker, date
+            """), {**ep, "cutoff": cutoff_buf}).fetchall()
+            try:
+                extra_rows += conn.execute(text(f"""
+                    SELECT ticker, DATE(date) AS d, close FROM index_prices
+                    WHERE ticker IN ({eph}) AND date >= :cutoff ORDER BY ticker, date
+                """), {**ep, "cutoff": cutoff_buf}).fetchall()
+            except Exception:
+                pass
+
     cache = _get_vesign_cache(market)
 
     user_price_map = defaultdict(list)
@@ -3134,6 +3162,21 @@ def portfolio_performance(
                 return close
         return None
     spy_base = spy_price_at(weeks[0])
+
+    # Extra tickers: per-ticker price series, price-at helper, and window base.
+    extra_prices = defaultdict(list)
+    for ticker, d_str, close in extra_rows:
+        try:
+            extra_prices[ticker].append((_date.fromisoformat(str(d_str)[:10]), float(close)))
+        except Exception:
+            pass
+
+    def extra_price_at(ticker, target):
+        for d_obj, close in reversed(extra_prices.get(ticker, [])):
+            if d_obj <= target:
+                return close
+        return None
+    extra_base = {t: extra_price_at(t, weeks[0]) for t in extra_tickers}
 
     def get_user_price_at(ticker, target):
         for d_obj, close in reversed(user_price_map.get(ticker, [])):
@@ -3201,13 +3244,19 @@ def portfolio_performance(
         if week_date == weeks[0] and spy_base is not None:
             spy_yield = 0.0
 
-        result.append({
+        point = {
             "week": week_date.isoformat(),
             "portfolio": port_yield,
             "vesign": vesign_yield,
             "spy": spy_yield,
             "value": round(total_val, 2) if total_val else 0.0,
-        })
+        }
+        for t in extra_tickers:
+            base = extra_base.get(t)
+            ep = extra_price_at(t, week_date)
+            point[t] = (0.0 if week_date == weeks[0]
+                        else round((ep / base - 1) * 100, 2) if (ep is not None and base) else None)
+        result.append(point)
 
     return result
 
