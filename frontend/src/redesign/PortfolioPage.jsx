@@ -6,7 +6,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getPortfolioHoldings, getPortfolioComparison, getPortfolioPerformance } from '../api'
 import { computeRows } from './portfolio/derive'
-import KpiStrip from './portfolio/KpiStrip'
+import NetWorthHero from './portfolio/NetWorthHero'
 import PerformanceChart from './portfolio/PerformanceChart'
 import AllocationDonut from './portfolio/AllocationDonut'
 import WatchlistComparison from './portfolio/WatchlistComparison'
@@ -71,7 +71,7 @@ export default function PortfolioPage() {
               <div className="section-h"><span className="sub">No holdings yet.</span></div>
             ) : (
               <>
-                <KpiStrip totals={totals} best={best} worst={worst} largest={largest} vsVesign={vsVesign} watchlistCount={wlCount} />
+                <NetWorthHero totals={totals} best={best} worst={worst} largest={largest} vsVesign={vsVesign} watchlistCount={wlCount} />
                 <div className="perf-grid">
                   <PerformanceChart />
                   <AllocationDonut rows={rows} totalValue={totals.totalValue} totalYld={totals.totalYld} />
