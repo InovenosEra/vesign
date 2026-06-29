@@ -8,7 +8,6 @@ import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { useCurrency } from '../../context/CurrencyContext'
 import { getWatchlists, getMarketStatus } from '../../api'
-import DownloadButton from '../../components/DownloadButton'
 import AddHoldingForm from './AddHoldingForm'
 import HoldingLots from './HoldingLots'
 
@@ -70,7 +69,7 @@ export default function HoldingsTable({ rows, subhead }) {
   const [expanded, setExpanded] = useState(() => new Set())
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState({ key: 'value', dir: 'desc' })   // default: biggest positions first
+  const [sort, setSort] = useState({ key: 'ticker', dir: 'asc' })   // default: A→Z by ticker
   const { data: watchlists } = useQuery({ queryKey: ['dd-watchlists'], queryFn: getWatchlists })
   const { data: mstat } = useQuery({ queryKey: ['market-status', 'US'], queryFn: () => getMarketStatus('US') })
   const toggle = (t) => setExpanded(prev => { const n = new Set(prev); n.has(t) ? n.delete(t) : n.add(t); return n })
@@ -98,7 +97,6 @@ export default function HoldingsTable({ rows, subhead }) {
         <span className="sub">{subhead}</span>
         <div className="hold-controls">
           <span className="hold-search"><SearchIcon /><input placeholder="Search ticker / company" value={search} onChange={e => setSearch(e.target.value)} /></span>
-          <DownloadButton url="/api/portfolio/holdings/export" filenameFallback="holdings" label="Export" />
           <a className="hold-add" onClick={() => setAdding(a => !a)}>+ Add holding</a>
         </div>
       </div>
