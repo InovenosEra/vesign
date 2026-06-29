@@ -3,12 +3,15 @@
 import { useState } from 'react'
 import { num, pct } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
+import { concentration } from './derive'
 
 const DONUT_COLORS = ['#3b82f6', '#22d3ee', '#00d97e', '#a855f7', '#f59e0b', '#ec4899', '#60a5fa', '#6b7280']
 const C = 2 * Math.PI * 38 // circumference, r=38
 
 function group(rows, mode) {
-  const keyOf = (r) => mode === 'industry' ? (r.industry || 'Other') : r.ticker
+  const keyOf = (r) => mode === 'sector' ? (r.sector || 'Other')
+    : mode === 'industry' ? (r.industry || 'Other')
+    : r.ticker
   const map = new Map()
   rows.filter(r => r.value).forEach(r => {
     const k = keyOf(r)
@@ -25,9 +28,10 @@ function group(rows, mode) {
 }
 
 export default function AllocationDonut({ rows, totalValue, totalYld }) {
-  const [mode, setMode] = useState('industry')
+  const [mode, setMode] = useState('sector')
   const { symbol, rate } = useCurrency()
   const alloc = totalValue > 0 ? group(rows, mode) : []
+  const conc = concentration(rows, totalValue)
 
   let offset = 0
   const segs = alloc.map((a, i) => {
@@ -49,6 +53,7 @@ export default function AllocationDonut({ rows, totalValue, totalYld }) {
       <div className="panel-head">
         <h3>Allocation</h3>
         <div className="chips">
+          <span className={'chip' + (mode === 'sector' ? ' active' : '')} onClick={() => setMode('sector')}>Sector</span>
           <span className={'chip' + (mode === 'industry' ? ' active' : '')} onClick={() => setMode('industry')}>Industry</span>
           <span className={'chip' + (mode === 'ticker' ? ' active' : '')} onClick={() => setMode('ticker')}>Ticker</span>
         </div>
@@ -79,6 +84,15 @@ export default function AllocationDonut({ rows, totalValue, totalYld }) {
             </div>
           ))}
         </div>
+      </div>
+      <div className="conc">
+        <div className="conc-grid">
+          <div className="conc-cell"><div className="cv">{conc.topPct.toFixed(0)}%</div><div className="cl">Top holding</div></div>
+          <div className="conc-cell"><div className="cv">{conc.top5Pct.toFixed(0)}%</div><div className="cl">Top 5</div></div>
+          <div className="conc-cell"><div className="cv">{conc.positions}</div><div className="cl">Positions</div></div>
+          <div className="conc-cell"><div className="cv">{conc.topSectorPct.toFixed(0)}%</div><div className="cl">Top sector</div></div>
+        </div>
+        <span className={'conc-label ' + conc.label.toLowerCase()}>{conc.label}</span>
       </div>
     </div>
   )

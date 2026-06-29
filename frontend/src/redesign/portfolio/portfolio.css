@@ -224,6 +224,17 @@
   .rd .alloc-row .nm { color: var(--ink-2); }
   .rd .alloc-row .pct { font-family: var(--mono); font-size: 11px; color: var(--ink); font-weight: 600; font-feature-settings: 'tnum' 1; }
 
+  /* CONCENTRATION READOUT (under the donut) */
+  .rd .conc { border-top: 1px solid var(--line); padding: 14px 20px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .rd .conc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; flex: 1 1 260px; }
+  .rd .conc-cell { text-align: center; }
+  .rd .conc-cell .cv { font-family: var(--mono); font-size: 17px; color: var(--ink); font-feature-settings: 'tnum' 1; letter-spacing: -0.01em; }
+  .rd .conc-cell .cl { margin-top: 2px; font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .rd .conc-label { font-family: var(--mono); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .rd .conc-label.concentrated { color: var(--red); background: rgba(255,77,92,0.12); }
+  .rd .conc-label.balanced { color: var(--gold); background: rgba(245,158,11,0.13); }
+  .rd .conc-label.diversified { color: var(--green); background: rgba(0,217,126,0.13); }
+
   /* WATCHLIST BARS */
   .rd .wl-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; padding: 18px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
   .rd .wl-row { display: grid; grid-template-columns: 160px 1fr 84px; align-items: center; gap: 16px; padding: 7px 0; transition: padding .15s ease; position: relative; cursor: pointer; }
