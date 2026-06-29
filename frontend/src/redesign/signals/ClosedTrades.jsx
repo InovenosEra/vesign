@@ -34,23 +34,55 @@ const yieldOf = (t) => (t.avg_cost && t.sell_price)
   ? (t.sell_price - t.avg_cost) / t.avg_cost * 100
   : (t.return_pct ?? null)
 
+// Sortable header cell — click to sort, ▲/▼ shows the active column + direction.
+function Th({ label, col, sort, onSort, className, style }) {
+  const active = sort?.key === col
+  return (
+    <th onClick={() => onSort(col)} className={'sortable' + (className ? ' ' + className : '')} style={style}>
+      {label}{active ? <span className="sort-ar">{sort.dir === 'asc' ? '▲' : '▼'}</span> : null}
+    </th>
+  )
+}
+
 // Columns mirror production's "Historical Trades" table (TradesPage.jsx) and the
 // sibling Open Trades table: logo · Ticker · Company · Market Cap · Buy date ·
-// Buy price · Sell date · Sell price · Days held · Yield.
-const HEAD = (
-  <tr>
-    <th></th>
-    <th>Ticker</th>
-    <th>Company</th>
-    <th className="r">Market Cap</th>
-    <th className="r">Buy date</th>
-    <th className="r">Avg Cost</th>
-    <th className="r">Sell date</th>
-    <th className="r">Sell price</th>
-    <th className="r">Days held</th>
-    <th className="r" style={{ paddingRight: 18 }}>Yield</th>
-  </tr>
-)
+// Avg Cost · Sell date · Sell price · Days held · Yield. All but the logo sort.
+function HeadRow({ sort, onSort }) {
+  const H = (label, col, className, style) =>
+    <Th label={label} col={col} sort={sort} onSort={onSort} className={className} style={style} />
+  return (
+    <tr>
+      <th></th>
+      {H('Ticker', 'ticker')}
+      {H('Company', 'company')}
+      {H('Market Cap', 'market_cap', 'r')}
+      {H('Buy date', 'buy_date', 'r')}
+      {H('Avg Cost', 'cost', 'r')}
+      {H('Sell date', 'sell_date', 'r')}
+      {H('Sell price', 'sell_price', 'r')}
+      {H('Days held', 'days_held', 'r')}
+      {H('Yield', 'yield', 'r', { paddingRight: 18 })}
+    </tr>
+  )
+}
+
+// Value a row sorts by for a given column key (handles the two computed columns:
+// Avg Cost = avg_cost ?? buy_price, Yield = DCA-aware yieldOf).
+const sortVal = (t, key) =>
+  key === 'cost' ? (t.avg_cost != null ? t.avg_cost : t.buy_price)
+  : key === 'yield' ? yieldOf(t)
+  : t[key]
+
+// Comparator: numbers numerically, strings lexically; nulls always sort last.
+function cmpBy(a, b, key, dir) {
+  const va = sortVal(a, key), vb = sortVal(b, key)
+  if (va == null && vb == null) return 0
+  if (va == null) return 1
+  if (vb == null) return -1
+  const c = (typeof va === 'number' && typeof vb === 'number')
+    ? va - vb : String(va).localeCompare(String(vb))
+  return dir === 'asc' ? c : -c
+}
 
 function ClosedRow({ t }) {
   const open = useTickerModal()
@@ -101,6 +133,11 @@ export default function ClosedTrades() {
   const [{ start, end }, setRange] = useState(() => tradeWindow())
   const [period, setPeriod] = useState(12)
   const [search, setSearch] = useState('')
+  // Default order = newest closed first (Sell date desc), matching the prior view.
+  const [sort, setSort] = useState({ key: 'sell_date', dir: 'desc' })
+  // Flip direction on the same column, else start a new column descending.
+  const toggleSort = (key) =>
+    setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }))
 
   const { data: trades } = useQuery({
     queryKey: ['trades', start, end, 'US', true],
@@ -147,10 +184,14 @@ export default function ClosedTrades() {
   const daysC = avgDays != null ? Math.round(avgDays) : '—'
 
   // Search filters the table only — the stat cards stay over the full range.
+  // Then apply the active column sort (stat cards are unaffected).
   const q = search.trim().toLowerCase()
-  const rows = q
-    ? flat.filter(t => (t.ticker || '').toLowerCase().includes(q) || (t.company || '').toLowerCase().includes(q))
-    : flat
+  const rows = useMemo(() => {
+    const base = q
+      ? flat.filter(t => (t.ticker || '').toLowerCase().includes(q) || (t.company || '').toLowerCase().includes(q))
+      : flat
+    return base.slice().sort((a, b) => cmpBy(a, b, sort.key, sort.dir))
+  }, [flat, q, sort])
 
   return (
     <>
@@ -183,8 +224,8 @@ export default function ClosedTrades() {
       </div>
 
       <PagedTable
-        key={q}
-        head={HEAD}
+        key={`${q}|${sort.key}|${sort.dir}`}
+        head={<HeadRow sort={sort} onSort={toggleSort} />}
         rows={rows}
         row={(t, i) => <ClosedRow key={i} t={t} />}
         emptyLabel={loaded ? (q ? 'No matching trades.' : 'No closed trades.') : 'Loading…'}

@@ -46,6 +46,18 @@ export function pct(n, opts = {}) {
   return `${sign}${Number(n).toFixed(opts.fd != null ? opts.fd : 2)}%`
 }
 
+const _DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+const _MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+
+/* Calendar day-group header: "2026-06-29..." -> "MON · JUN 29".
+ * Parsed from the ISO parts and built in UTC so it never drifts across TZs. */
+export function dayGroupHeader(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '')
+  if (!m) return iso || ''
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]))
+  return `${_DOW[d.getUTCDay()]} · ${_MON[+m[2] - 1]} ${+m[3]}`
+}
+
 export function dateFmt(iso) {
   if (!iso) return ''
   const d = new Date(iso.replace(' ', 'T'))

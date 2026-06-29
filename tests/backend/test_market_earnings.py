@@ -1,7 +1,7 @@
-"""Tests for GET /api/market/earnings/week — Mon-Fri earnings calendar."""
+"""Tests for GET /api/market/earnings/week — next-N-days earnings calendar."""
 import os
 import tempfile
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
@@ -30,8 +30,20 @@ def earnings_app():
             )
         """))
         conn.execute(text("""
+            CREATE TABLE company_health (ticker TEXT PRIMARY KEY, score INTEGER, reason TEXT)
+        """))
+        conn.execute(text("""
+            CREATE TABLE fundamentals (
+                ticker TEXT, market_cap REAL, pe_ttm REAL
+            )
+        """))
+        conn.execute(text("""
             INSERT INTO companies (ticker, company) VALUES ('NVDA', 'NVIDIA Corp')
         """))
+        conn.execute(text("INSERT INTO company_health (ticker, score) VALUES ('NVDA', 5)"))
+        conn.execute(text(
+            "INSERT INTO fundamentals (ticker, market_cap, pe_ttm) VALUES ('NVDA', 3100000000000, 55.2)"
+        ))
     temp_engine.dispose()
 
     import importlib
@@ -59,12 +71,13 @@ def test_returns_week_with_company_join_and_day_of_week(earnings_app):
     with patch.object(bm, "_fetch_earnings_week", return_value=fmp_fixture) as m:
         body = client.get("/api/market/earnings/week").json()
 
-    # Fetcher gets called with Mon-Fri of the current week.
+    # Fetcher gets called with [today, today + default days].
     args = m.call_args[0]
     assert len(args) == 2
     start, end = args
-    assert date.fromisoformat(start).weekday() == 0  # Monday
-    assert date.fromisoformat(end).weekday() == 4    # Friday
+    today = datetime.now(timezone.utc).date()
+    assert date.fromisoformat(start) == today
+    assert date.fromisoformat(end) == today + timedelta(days=7)
 
     rows = body["earnings"]
     assert len(rows) == 2
@@ -74,10 +87,26 @@ def test_returns_week_with_company_join_and_day_of_week(earnings_app):
     assert nvda["eps_estimated"] == pytest.approx(4.5)
     assert nvda["time"] == "AMC"                # normalized to upper
     assert nvda["day_of_week"] == "Tuesday"     # 2026-05-26 was a Tuesday
+    assert nvda["health_score"] == 5            # join from company_health
+    assert nvda["market_cap"] == pytest.approx(3.1e12)  # join from fundamentals
+    assert nvda["pe_ttm"] == pytest.approx(55.2)
     crm = by_ticker["CRM"]
     assert crm["company"] is None               # not in companies table
     assert crm["time"] == "BMO"
     assert crm["day_of_week"] == "Thursday"
+    assert crm["health_score"] is None          # no indicator rows
+    assert crm["market_cap"] is None
+    assert crm["pe_ttm"] is None
+
+
+def test_days_param_widens_window(earnings_app):
+    bm, client = earnings_app
+    with patch.object(bm, "_fetch_earnings_week", return_value=[]) as m:
+        client.get("/api/market/earnings/week?days=14")
+    start, end = m.call_args[0]
+    today = datetime.now(timezone.utc).date()
+    assert date.fromisoformat(start) == today
+    assert date.fromisoformat(end) == today + timedelta(days=14)
 
 
 def test_unknown_time_passes_through_as_null(earnings_app):

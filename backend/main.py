@@ -5350,28 +5350,50 @@ def _fetch_earnings_week(start: str, end: str) -> list | None:
     return items
 
 
-def _current_week_mon_fri(today: date | None = None) -> tuple[str, str]:
-    today = today or datetime.now(UTC).date()
-    monday = today - _td(days=today.weekday())
-    friday = monday + _td(days=4)
-    return monday.isoformat(), friday.isoformat()
-
-
-def _build_market_earnings_week() -> dict:
-    start, end = _current_week_mon_fri()
+def _build_market_earnings_week(days: int = 7) -> dict:
+    today = datetime.now(UTC).date()
+    start = today.isoformat()
+    end = (today + _td(days=days)).isoformat()
     items = _fetch_earnings_week(start, end) or []
     if not items:
         return {"earnings": []}
 
-    # Single companies lookup for the ticker set in the FMP response.
+    # Single lookup for the ticker set: company name plus per-company indicators
+    # (health score, market cap, trailing P/E). Names come from `companies`
+    # (always present); the indicator join is optional — a minimal DB without
+    # `company_health`/`fundamentals` degrades to nulls rather than erroring.
     tickers = sorted({(i.get("symbol") or "").upper() for i in items if i.get("symbol")})
-    company_by_ticker: dict[str, str] = {}
+    meta_by_ticker: dict[str, dict] = {}
     if tickers:
-        sql = text("SELECT ticker, company FROM companies WHERE ticker IN :tt")\
-            .bindparams(bindparam("tt", expanding=True))
         with engine.connect() as conn:
-            for row in conn.execute(sql, {"tt": tickers}).mappings():
-                company_by_ticker[row["ticker"]] = row["company"]
+            name_sql = text("SELECT ticker, company FROM companies WHERE ticker IN :tt")\
+                .bindparams(bindparam("tt", expanding=True))
+            for row in conn.execute(name_sql, {"tt": tickers}).mappings():
+                meta_by_ticker[row["ticker"]] = {
+                    "company": row["company"], "health_score": None,
+                    "market_cap": None, "pe_ttm": None,
+                }
+            try:
+                ind_sql = text("""
+                    SELECT c.ticker,
+                           CAST(h.score AS INTEGER) AS health_score,
+                           f.market_cap, f.pe_ttm
+                    FROM companies c
+                    LEFT JOIN company_health h ON h.ticker = c.ticker
+                    LEFT JOIN (
+                        SELECT ticker, MAX(market_cap) AS market_cap, MAX(pe_ttm) AS pe_ttm
+                        FROM fundamentals GROUP BY ticker
+                    ) f ON f.ticker = c.ticker
+                    WHERE c.ticker IN :tt
+                """).bindparams(bindparam("tt", expanding=True))
+                for row in conn.execute(ind_sql, {"tt": tickers}).mappings():
+                    m = meta_by_ticker.get(row["ticker"])
+                    if m:
+                        m["health_score"] = row["health_score"]
+                        m["market_cap"] = row["market_cap"]
+                        m["pe_ttm"] = row["pe_ttm"]
+            except Exception:
+                pass
 
     out = []
     for it in items:
@@ -5384,32 +5406,37 @@ def _build_market_earnings_week() -> dict:
             pass
         raw_time = (it.get("time") or "").strip().lower()
         time_norm = {"bmo": "BMO", "amc": "AMC", "dmh": "DMH"}.get(raw_time)
+        meta = meta_by_ticker.get(ticker) or {}
         out.append({
             "date": d_str or None,
             "day_of_week": day_of_week,
             "ticker": ticker or None,
-            "company": company_by_ticker.get(ticker),
+            "company": meta.get("company"),
             "eps_estimated": it.get("epsEstimated"),
             "time": time_norm,
+            "health_score": meta.get("health_score"),
+            "market_cap": meta.get("market_cap"),
+            "pe_ttm": meta.get("pe_ttm"),
         })
     return {"earnings": out}
 
 
-def _get_market_earnings_week_cached() -> dict:
+def _get_market_earnings_week_cached(days: int = 7) -> dict:
+    key = f"earnings_week:{days}"
     now = time.time()
     with _market_cache_lock:
-        c = _market_cache.get("earnings_week")
+        c = _market_cache.get(key)
         if c is not None and now - c["t"] < _CALENDAR_CACHE_TTL_SECONDS:
             return c["data"]
-        data = _build_market_earnings_week()
-        _market_cache["earnings_week"] = {"t": now, "data": data}
+        data = _build_market_earnings_week(days)
+        _market_cache[key] = {"t": now, "data": data}
         return data
 
 
 @protected.get("/api/market/earnings/week")
-def market_earnings_week():
-    """Earnings calendar for Mon–Fri of the current week (FMP)."""
-    return _get_market_earnings_week_cached()
+def market_earnings_week(days: int = Query(7, ge=1, le=60)):
+    """Earnings calendar for the next `days` days starting today (FMP)."""
+    return _get_market_earnings_week_cached(days)
 
 
 _IMPACT_TO_IMPORTANCE = {"low": 1, "medium": 2, "high": 3}

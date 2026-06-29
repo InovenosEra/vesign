@@ -93,7 +93,7 @@ export default function MarketPage() {
             <Movers />
             <Breadth />
             <SectorHeatmap onOpenSector={setSector} />
-            <div className="section-h"><h2>Calendar</h2><span className="sub">Next 7 days</span></div>
+            <div className="section-h"><h2>Calendar</h2><span className="sub">Next 14 days</span></div>
             <div className="two-col-2">
               <EarningsWeek />
               <EconomicCalendar />

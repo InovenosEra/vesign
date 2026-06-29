@@ -143,7 +143,7 @@ export const getTopAnalyst   = (days = 1, n = 5) => get(`/market/analyst-changes
 export const getTopGrades    = (n = 5)       => get(`/market/grades/top?limit=${n}`)
 export const getAnalystActivity = (n = 50)   => get(`/market/analyst-activity?limit=${n}`)
 export const getAnalystConsensus = (tickers = []) => get(`/market/analyst-consensus?tickers=${tickers.join(',')}`)
-export const getEarningsWeek = ()            => get('/market/earnings/week')
+export const getEarningsWeek = (days = 7)    => get(`/market/earnings/week?days=${days}`)
 export const getEconomicCal  = (days = 7)    => get(`/market/economic-calendar?days=${days}`)
 export const getStats        = ()            => get('/stats')
 
