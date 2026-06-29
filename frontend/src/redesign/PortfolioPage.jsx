@@ -10,7 +10,6 @@ import NetWorthHero from './portfolio/NetWorthHero'
 import PerformanceChart from './portfolio/PerformanceChart'
 import AllocationDonut from './portfolio/AllocationDonut'
 import VesignRead from './portfolio/VesignRead'
-import WatchlistComparison from './portfolio/WatchlistComparison'
 import HoldingsTable from './portfolio/HoldingsTable'
 import WatchlistsTab from './portfolio/WatchlistsTab'
 import { useReady, PageSkeleton } from './LoadGate'
@@ -79,7 +78,6 @@ export default function PortfolioPage() {
                 </div>
                 <VesignRead rows={rows} />
                 <HoldingsTable rows={rows} subhead={`${rows.length} positions`} />
-                <WatchlistComparison />
               </>
             )}
           </div>

@@ -11,11 +11,11 @@ import { useCurrency } from '../../context/CurrencyContext'
 const W = 800, H = 300
 const RANGES = [['1M', 1], ['3M', 3], ['6M', 6], ['1Y', 12], ['2Y', 24], ['All', 60]]
 const SERIES = [
-  { key: 'portfolio', color: '#60a5fa', label: 'Your portfolio' },
+  { key: 'portfolio', color: '#60a5fa', label: 'Holdings' },
   { key: 'vesign', color: '#00d97e', label: 'Vesign' },
-  { key: 'spy', color: '#f59e0b', label: 'SPY' },
+  { key: 'spy', color: '#f59e0b', label: 'S&P 500' },
 ]
-const VALUE_SERIES = { key: 'value', color: '#60a5fa', label: 'Portfolio value' }
+const VALUE_SERIES = { key: 'value', color: '#60a5fa', label: 'Holdings value' }
 
 const fmtPct = (v) => (v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`)
 const fmtDate = (w) => new Date(w).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })

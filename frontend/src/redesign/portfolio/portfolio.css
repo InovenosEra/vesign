@@ -255,26 +255,6 @@
   .rd .vr-dots .vd { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; }
   .rd .vr-dots .vd.off { background: rgba(255,255,255,0.10); }
 
-  /* WATCHLIST BARS */
-  .rd .wl-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; padding: 18px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-  .rd .wl-row { display: grid; grid-template-columns: 160px 1fr 84px; align-items: center; gap: 16px; padding: 7px 0; transition: padding .15s ease; position: relative; cursor: pointer; }
-  .rd .wl-row::before { content: ''; position: absolute; left: -22px; top: 0; bottom: 0; width: 2px; background: transparent; transition: background .15s ease; }
-  .rd .wl-row:hover { padding-left: 4px; }
-  .rd .wl-row:hover::before { background: var(--blue-2); }
-  .rd .wl-row.vesign::before { background: var(--green); }
-  .rd .wl-name { font-size: 12.5px; color: var(--ink); font-weight: 500; display: flex; align-items: center; gap: 8px; }
-  .rd .wl-name.vesign { color: var(--green); font-weight: 600; }
-  .rd .wl-name .count { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); font-weight: 400; padding-left: 4px; }
-  .rd .wl-bar { height: 16px; background: var(--bg-2); border-radius: 3px; position: relative; overflow: hidden; }
-  .rd .wl-bar .fill { height: 100%; background: var(--blue); border-radius: 3px; transition: background .15s; }
-  .rd .wl-bar .fill.green { background: var(--green); }
-  .rd .wl-bar .fill.down { background: var(--red); }
-  .rd .wl-bar .fill.muted { background: var(--ink-3); opacity: 0.6; }
-  .rd .wl-yield { font-family: var(--mono); font-size: 12.5px; text-align: right; font-weight: 600; font-feature-settings: 'tnum' 1; }
-  .rd .wl-yield.up { color: var(--green); }
-  .rd .wl-yield.down { color: var(--red); }
-  .rd .wl-yield.vesign { color: var(--green); }
-
   /* TABLES */
   .rd .data-table {
     width: 100%; border-collapse: collapse;
