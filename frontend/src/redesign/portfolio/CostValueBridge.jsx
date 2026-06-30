@@ -157,8 +157,7 @@ export default function CostValueBridge({ rows, totals }) {
                 {signed(top3.reduce((a, s) => a + s.pnl, 0))}</b>
                 {netGain > 0 && <> — {Math.round(top3.reduce((a, s) => a + s.pnl, 0) / netGain * 100)}% of your gain</>}. </>
             )}
-            {lossSum < 0 && <>The red names trimmed <b style={{ color: 'var(--red)' }}>{signed(lossSum)}</b>. </>}
-            Cost <b>{money(cost)}</b> bridges to <b>{money(value)}</b>.
+            {lossSum < 0 && <>The red names trimmed <b style={{ color: 'var(--red)' }}>{signed(lossSum)}</b>.</>}
           </div>
         </div>
 
