@@ -12,7 +12,6 @@ the file with whatever a CDN returns.
 
 MANUAL_LOGOS: set[str] = {
     "SPY", "VOO",       # ETFs — hand-crafted S&P 500 mark
-    "PM",               # parqet served the full Philip Morris crest (busy/illegible small); cropped to the central PM roundel
     "SONY",             # parqet placeholder; rendered from SimpleIcons SVG via cairosvg
     "KLAC",             # parqet+logo.dev only had blue+ placeholder; rendered "KLA" wordmark
     "OXY",              # parqet returned the same blue+ placeholder as KLAC; corrected via logo.dev /oxy.com

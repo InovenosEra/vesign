@@ -39,7 +39,6 @@ ml_models/walk/
 static/logos/*
 !static/logos/.gitkeep
 !static/logos/SPY.png
-!static/logos/PM.png
 !static/logos/VOO.png
 !static/logos/SONY.png
 !static/logos/KLAC.png
