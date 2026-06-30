@@ -59,7 +59,7 @@ export default function CostValueBridge({ rows, totals }) {
 
   return (
     <>
-      <div className="section-h">
+      <div className="section-h bridge-head">
         <h2>Cost → Value bridge</h2>
         <span className="sub">how each holding moved you from invested to today</span>
       </div>
