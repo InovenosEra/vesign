@@ -2,9 +2,10 @@
  * Monetary values go through useCurrency().fmtPrice instead, so prices convert
  * with the selected currency. These helpers cover the rest. */
 
-/* Self-hosted logo (absolute, like the mockup) so it resolves regardless of
- * the local backend having the PNGs. */
-export const LOGO = (t) => 'https://ve-sign.com/logos/' + encodeURIComponent(t) + '.png'
+/* Self-hosted logo, same-origin relative path. In dev Vite proxies /logos to the
+ * local backend (so local logo edits preview immediately); in prod it's served
+ * from the same origin as the app. */
+export const LOGO = (t) => '/logos/' + encodeURIComponent(t) + '.png'
 
 export const dirClass = (v) => (v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '')
 
