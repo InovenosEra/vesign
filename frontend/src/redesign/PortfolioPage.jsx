@@ -78,8 +78,8 @@ export default function PortfolioPage() {
                   <AllocationDonut rows={rows} totalValue={totals.totalValue} totalYld={totals.totalYld} />
                 </div>
                 <VesignRead rows={rows} />
-                <CostValueBridge rows={rows} totals={totals} />
                 <HoldingsTable rows={rows} subhead={`${rows.length} positions`} />
+                <CostValueBridge rows={rows} totals={totals} />
               </>
             )}
           </div>
