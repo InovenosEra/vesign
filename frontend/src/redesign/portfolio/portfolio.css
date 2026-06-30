@@ -225,8 +225,7 @@
   .rd .perf-tip-row b { margin-left: auto; padding-left: 12px; font-family: var(--mono); font-weight: 600; color: var(--ink-1); }
 
   /* COST → VALUE BRIDGE (waterfall) + insights rail */
-  .rd .bridge-head { margin-top: 28px; }   /* gap from the holdings table above */
-  .rd .bridge-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: stretch; }
+  .rd .bridge-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: stretch; margin-top: 28px; }   /* margin-top = gap from the holdings table above */
   .rd .bridge-row > .panel { display: flex; flex-direction: column; }
   .rd .bridge-body { padding: 12px 16px 4px; flex: 1; }
   .rd .bridge-body svg { display: block; width: 100%; height: auto; }
