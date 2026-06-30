@@ -89,6 +89,30 @@ export function topUpside(rows) {
   return best
 }
 
+// Cost→Value "bridge" (waterfall): start at total invested, one step per holding's
+// P&L (gainers first, then losers), ending at total market value. Returns plain
+// data — the component turns it into bars. Steps cover only holdings that have a
+// computed value/pnl; the end bar uses the real portfolio total regardless.
+export function buildBridge(rows, totals) {
+  const cost = totals?.totalCost || 0
+  const value = totals?.totalValue || 0
+  const steps = rows.filter(r => r.pnl != null).slice().sort((a, b) => b.pnl - a.pnl)
+  let cum = cost
+  const segs = steps.map(r => {
+    const from = cum, to = cum + r.pnl
+    cum = to
+    return {
+      ticker: r.ticker, company: r.company, kind: r.pnl >= 0 ? 'gain' : 'loss',
+      pnl: r.pnl, yld: r.yld, cost: r.cost, value: r.value,
+      qty: r.total_qty, avg: r.avg_price, last: r.latest_close, from, to,
+    }
+  })
+  // Highest running total the bars reach: gains stack above the end bar before the
+  // losers pull it back down. Scales the y-axis so nothing clips.
+  const peak = Math.max(value, cost + steps.reduce((s, r) => (r.pnl > 0 ? s + r.pnl : s), 0))
+  return { cost, value, segs, peak }
+}
+
 // Holding with the lowest company-health score (the watch-out).
 export function weakestHealth(rows) {
   let worst = null

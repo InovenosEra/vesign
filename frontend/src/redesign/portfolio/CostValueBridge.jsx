@@ -1,0 +1,171 @@
+/* Cost → Value bridge — a waterfall that attributes every dollar between what you
+ * invested and what you hold today to the holding that earned (or lost) it. Start
+ * bar = total cost, one step per holding (gainers first, then losers), end bar =
+ * market value. No y-axis: each bar carries its own value. Pure data from
+ * buildBridge(); money labels respect the selected currency. Sits above the table. */
+import { useState } from 'react'
+import { useCurrency } from '../../context/CurrencyContext'
+import { LOGO } from '../fmt'
+import { buildBridge } from './derive'
+
+const VB_W = 1040, VB_H = 312
+const PAD_L = 24, PAD_R = 24, PAD_TOP = 40, PAD_BOT = 76
+const GRAD = { tot: 'url(#brg-tot)', gain: 'url(#brg-gain)', loss: 'url(#brg-loss)' }
+
+export default function CostValueBridge({ rows, totals }) {
+  const { symbol, rate, fmtPrice } = useCurrency()
+  const [hover, setHover] = useState(null)   // { bar, x, y }
+
+  const { cost, value, segs, peak } = buildBridge(rows, totals)
+  if (!segs.length) return null
+
+  // Compact currency for the bar labels: +$11.6k / −$0.6k (currency-converted).
+  const compact = (v) => {
+    const vv = Math.abs(v) * rate
+    const s = vv >= 1000 ? (vv / 1000).toFixed(vv >= 100000 ? 0 : 1) + 'k' : vv.toFixed(0)
+    return symbol + s
+  }
+  const signed = (v) => (v >= 0 ? '+' : '−') + compact(v)
+
+  const plotH = VB_H - PAD_TOP - PAD_BOT
+  const n = segs.length + 2
+  const gap = 30
+  const bw = (VB_W - PAD_L - PAD_R - (n - 1) * gap) / n
+  const yMax = (Math.max(value, peak) * 1.07) || 1
+  const y = (v) => PAD_TOP + plotH * (1 - v / yMax)
+  const baseY = y(0)
+
+  // Bars left→right: Cost total, one per holding, Value total.
+  const bars = []
+  let x = PAD_L
+  bars.push({ kind: 'tot', label: 'Cost', sub: 'invested', total: cost, level: cost, x, top: y(cost), bot: baseY })
+  x += bw + gap
+  segs.forEach(s => {
+    bars.push({ kind: s.kind, seg: s, level: s.to, x, top: y(Math.max(s.from, s.to)), bot: y(Math.min(s.from, s.to)) })
+    x += bw + gap
+  })
+  bars.push({ kind: 'tot', label: 'Value', sub: 'today', total: value, level: value, x, top: y(value), bot: baseY })
+
+  const gainSum = segs.filter(s => s.pnl > 0).reduce((a, s) => a + s.pnl, 0)
+  const lossSum = segs.filter(s => s.pnl < 0).reduce((a, s) => a + s.pnl, 0)
+  const top3 = segs.filter(s => s.pnl > 0).slice(0, 3)
+  const netGain = value - cost
+
+  const onEnter = (bar, e) => setHover({ bar, x: e.clientX, y: e.clientY })
+  const onMove = (e) => setHover(h => (h ? { ...h, x: e.clientX, y: e.clientY } : h))
+  const onLeave = () => setHover(null)
+
+  const cur = (v) => fmtPrice(Math.abs(v))   // full-precision currency
+
+  return (
+    <>
+      <div className="section-h">
+        <h2>Cost → Value bridge</h2>
+        <span className="sub">how each holding moved you from invested to today</span>
+      </div>
+      <div className="panel">
+        <div className="panel-head">
+          <h3>Cost → Value</h3>
+          <div className="legend">
+            <span className="lg-item"><span className="sw" style={{ background: 'var(--blue-2)' }} /> Cost / Value</span>
+            <span className="lg-item"><span className="sw" style={{ background: 'var(--green)' }} /> Gain</span>
+            <span className="lg-item"><span className="sw" style={{ background: 'var(--red)' }} /> Loss</span>
+          </div>
+        </div>
+
+        <div className="bridge-body">
+          <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="brg-tot" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#60a5fa" /><stop offset="1" stopColor="#2f6fb0" />
+              </linearGradient>
+              <linearGradient id="brg-gain" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#00d97e" /><stop offset="1" stopColor="#0a8f54" />
+              </linearGradient>
+              <linearGradient id="brg-loss" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#ff5d6c" /><stop offset="1" stopColor="#b8313e" />
+              </linearGradient>
+            </defs>
+
+            <line x1={PAD_L} y1={baseY} x2={VB_W - PAD_R} y2={baseY} stroke="var(--line-2)" />
+
+            {/* dotted connectors tracing the running total */}
+            {bars.slice(0, -1).map((b, i) => {
+              const lvl = y(b.level)
+              return <line key={i} x1={b.x} y1={lvl} x2={bars[i + 1].x + bw} y2={lvl}
+                stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="2 3" opacity="0.55" />
+            })}
+
+            {bars.map((b, i) => {
+              const cx = b.x + bw / 2
+              const h = Math.max(b.bot - b.top, 2)
+              return (
+                <g key={i} style={{ cursor: 'pointer' }}
+                  onMouseEnter={(e) => onEnter(b, e)} onMouseMove={onMove} onMouseLeave={onLeave}>
+                  <rect x={b.x} y={b.top} width={bw} height={h} rx="5" fill={GRAD[b.kind]}
+                    style={hover?.bar === b ? { filter: 'brightness(1.16)' } : undefined} />
+                  {/* value label above the bar */}
+                  {b.kind === 'tot'
+                    ? <text x={cx} y={b.top - 10} textAnchor="middle" className="brg-tot-lbl">{fmtPrice(b.total)}</text>
+                    : <text x={cx} y={b.top - 8} textAnchor="middle" className="brg-step-lbl"
+                        fill={b.seg.pnl >= 0 ? 'var(--green)' : 'var(--red)'}>{signed(b.seg.pnl)}</text>}
+                  {/* x-axis: Cost/Value or logo + ticker + % */}
+                  {b.kind === 'tot' ? (
+                    <>
+                      <text x={cx} y={baseY + 26} textAnchor="middle" className="brg-axis" fill="var(--blue-2)">{b.label}</text>
+                      <text x={cx} y={baseY + 42} textAnchor="middle" className="brg-axis-sub">{b.sub}</text>
+                    </>
+                  ) : (
+                    <>
+                      <image href={LOGO(b.seg.ticker)} x={cx - 11} y={baseY + 11} width="22" height="22"
+                        clipPath="inset(0 round 5px)" />
+                      <text x={cx} y={baseY + 49} textAnchor="middle" className="brg-axis" fill="var(--ink)">{b.seg.ticker}</text>
+                      <text x={cx} y={baseY + 63} textAnchor="middle" className="brg-axis-sub"
+                        fill={b.seg.pnl >= 0 ? 'var(--green)' : 'var(--red)'}>
+                        {(b.seg.yld >= 0 ? '+' : '') + (b.seg.yld == null ? '' : b.seg.yld.toFixed(0)) + '%'}
+                      </text>
+                    </>
+                  )}
+                </g>
+              )
+            })}
+          </svg>
+        </div>
+
+        <div className="bridge-cap">
+          {top3.length === 3 && (
+            <><b>{top3.map(s => s.ticker).join(', ')}</b> built <b style={{ color: 'var(--green)' }}>
+              {signed(top3.reduce((a, s) => a + s.pnl, 0))}</b>
+              {netGain > 0 && <> — {Math.round(top3.reduce((a, s) => a + s.pnl, 0) / netGain * 100)}% of your gain</>}. </>
+          )}
+          {lossSum < 0 && <>The red names trimmed <b style={{ color: 'var(--red)' }}>{signed(lossSum)}</b>. </>}
+          Cost <b>{fmtPrice(cost)}</b> bridges to <b>{fmtPrice(value)}</b>.
+        </div>
+      </div>
+
+      {hover && (
+        <div className="bridge-tip" style={{
+          left: Math.min(hover.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 200),
+          top: hover.y + 14,
+        }}>
+          {hover.bar.kind === 'tot' ? (
+            <>
+              <div className="bt-head">{hover.bar.label} total</div>
+              <div className="bt-row"><span>{hover.bar.label === 'Cost' ? 'Invested' : 'Market value'}</span><b>{fmtPrice(hover.bar.total)}</b></div>
+            </>
+          ) : (
+            <>
+              <div className="bt-head"><img src={LOGO(hover.bar.seg.ticker)} alt="" />{hover.bar.seg.ticker} · {hover.bar.seg.company || ''}</div>
+              <div className="bt-row"><span>{hover.bar.seg.qty} sh @ {fmtPrice(hover.bar.seg.avg)}</span><b>{cur(hover.bar.seg.cost)}</b></div>
+              <div className="bt-row"><span>now @ {fmtPrice(hover.bar.seg.last)}</span><b>{cur(hover.bar.seg.value)}</b></div>
+              <div className="bt-row"><span>contribution</span>
+                <b style={{ color: hover.bar.seg.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                  {signed(hover.bar.seg.pnl)} ({hover.bar.seg.yld >= 0 ? '+' : ''}{hover.bar.seg.yld?.toFixed(1)}%)
+                </b></div>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
