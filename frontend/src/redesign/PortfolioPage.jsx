@@ -9,7 +9,6 @@ import { computeRows } from './portfolio/derive'
 import NetWorthHero from './portfolio/NetWorthHero'
 import PerformanceChart from './portfolio/PerformanceChart'
 import AllocationDonut from './portfolio/AllocationDonut'
-import VesignRead from './portfolio/VesignRead'
 import CostValueBridge from './portfolio/CostValueBridge'
 import HoldingsTable from './portfolio/HoldingsTable'
 import WatchlistsTab from './portfolio/WatchlistsTab'
@@ -77,7 +76,6 @@ export default function PortfolioPage() {
                   <PerformanceChart />
                   <AllocationDonut rows={rows} totalValue={totals.totalValue} totalYld={totals.totalYld} />
                 </div>
-                <VesignRead rows={rows} />
                 <HoldingsTable rows={rows} subhead={`${rows.length} positions`} />
                 <CostValueBridge rows={rows} totals={totals} />
               </>
