@@ -134,8 +134,7 @@ export default function CostValueBridge({ rows, totals }) {
                       <>
                         <image href={LOGO(b.seg.ticker)} x={cx - 11} y={baseY + 11} width="22" height="22"
                           clipPath="inset(0 round 5px)" />
-                        <text x={cx} y={baseY + 49} textAnchor="middle" className="brg-axis" fill="var(--ink)">{b.seg.ticker}</text>
-                        <text x={cx} y={baseY + 63} textAnchor="middle" className="brg-axis-sub"
+                        <text x={cx} y={baseY + 50} textAnchor="middle" className="brg-axis-sub"
                           fill={b.seg.pnl >= 0 ? 'var(--green)' : 'var(--red)'}>
                           {(b.seg.yld >= 0 ? '+' : '') + (b.seg.yld == null ? '' : b.seg.yld.toFixed(0)) + '%'}
                         </text>
