@@ -34,13 +34,9 @@ export default function CostValueBridge({ rows, totals }) {
   const { cost, value, segs, peak } = buildBridge(rows, totals)
   if (!segs.length) return null
 
-  // Compact currency for the bar labels: +$11.6k / −$0.6k (currency-converted).
-  const compact = (v) => {
-    const vv = Math.abs(v) * rate
-    const s = vv >= 1000 ? (vv / 1000).toFixed(vv >= 100000 ? 0 : 1) + 'k' : vv.toFixed(0)
-    return symbol + s
-  }
-  const signed = (v) => (v >= 0 ? '+' : '−') + compact(v)
+  // Full, decimal-free currency for the bridge: $58,643 / +$11,626 (currency-converted).
+  const money = (v) => symbol + Math.round(Math.abs(v) * rate).toLocaleString()
+  const signed = (v) => (v >= 0 ? '+' : '−') + money(v)
 
   const plotH = VB_H - PAD_TOP - PAD_BOT
   const n = segs.length + 2
@@ -91,7 +87,7 @@ export default function CostValueBridge({ rows, totals }) {
         {/* LEFT — bridge (66%) */}
         <div className="panel">
           <div className="panel-head">
-            <h3>Cost → Value</h3>
+            <h3>P&amp;L</h3>
             <div className="legend">
               <span className="lg-item"><span className="sw" style={{ background: 'var(--blue-2)' }} /> Cost / Value</span>
               <span className="lg-item"><span className="sw" style={{ background: 'var(--green)' }} /> Gain</span>
@@ -130,7 +126,7 @@ export default function CostValueBridge({ rows, totals }) {
                     <rect x={b.x} y={b.top} width={bw} height={h} rx="5" fill={GRAD[b.kind]}
                       style={hover?.bar === b ? { filter: 'brightness(1.16)' } : undefined} />
                     {b.kind === 'tot'
-                      ? <text x={cx} y={b.top - 10} textAnchor="middle" className="brg-tot-lbl">{fmtPrice(b.total)}</text>
+                      ? <text x={cx} y={b.top - 10} textAnchor="middle" className="brg-tot-lbl">{money(b.total)}</text>
                       : <text x={cx} y={b.top - 8} textAnchor="middle" className="brg-step-lbl"
                           fill={b.seg.pnl >= 0 ? 'var(--green)' : 'var(--red)'}>{signed(b.seg.pnl)}</text>}
                     {b.kind === 'tot' ? (
@@ -162,7 +158,7 @@ export default function CostValueBridge({ rows, totals }) {
                 {netGain > 0 && <> — {Math.round(top3.reduce((a, s) => a + s.pnl, 0) / netGain * 100)}% of your gain</>}. </>
             )}
             {lossSum < 0 && <>The red names trimmed <b style={{ color: 'var(--red)' }}>{signed(lossSum)}</b>. </>}
-            Cost <b>{fmtPrice(cost)}</b> bridges to <b>{fmtPrice(value)}</b>.
+            Cost <b>{money(cost)}</b> bridges to <b>{money(value)}</b>.
           </div>
         </div>
 
@@ -235,13 +231,13 @@ export default function CostValueBridge({ rows, totals }) {
           {hover.bar.kind === 'tot' ? (
             <>
               <div className="bt-head">{hover.bar.label} total</div>
-              <div className="bt-row"><span>{hover.bar.label === 'Cost' ? 'Invested' : 'Market value'}</span><b>{fmtPrice(hover.bar.total)}</b></div>
+              <div className="bt-row"><span>{hover.bar.label === 'Cost' ? 'Invested' : 'Market value'}</span><b>{money(hover.bar.total)}</b></div>
             </>
           ) : (
             <>
               <div className="bt-head"><img src={LOGO(hover.bar.seg.ticker)} alt="" />{hover.bar.seg.ticker} · {hover.bar.seg.company || ''}</div>
-              <div className="bt-row"><span>{hover.bar.seg.qty} sh @ {fmtPrice(hover.bar.seg.avg)}</span><b>{cur(hover.bar.seg.cost)}</b></div>
-              <div className="bt-row"><span>now @ {fmtPrice(hover.bar.seg.last)}</span><b>{cur(hover.bar.seg.value)}</b></div>
+              <div className="bt-row"><span>{hover.bar.seg.qty} sh @ {fmtPrice(hover.bar.seg.avg)}</span><b>{money(hover.bar.seg.cost)}</b></div>
+              <div className="bt-row"><span>now @ {fmtPrice(hover.bar.seg.last)}</span><b>{money(hover.bar.seg.value)}</b></div>
               <div className="bt-row"><span>contribution</span>
                 <b style={{ color: hover.bar.seg.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
                   {signed(hover.bar.seg.pnl)} ({hover.bar.seg.yld >= 0 ? '+' : ''}{hover.bar.seg.yld?.toFixed(1)}%)
@@ -252,6 +248,4 @@ export default function CostValueBridge({ rows, totals }) {
       )}
     </>
   )
-
-  function cur(v) { return fmtPrice(Math.abs(v)) }
 }
