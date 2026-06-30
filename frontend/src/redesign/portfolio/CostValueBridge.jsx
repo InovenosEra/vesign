@@ -57,9 +57,8 @@ export default function CostValueBridge({ rows, totals }) {
   })
   bars.push({ kind: 'tot', label: 'Value', sub: 'today', total: value, level: value, x, top: y(value), bot: baseY })
 
+  const gainSum = segs.filter(s => s.pnl > 0).reduce((a, s) => a + s.pnl, 0)
   const lossSum = segs.filter(s => s.pnl < 0).reduce((a, s) => a + s.pnl, 0)
-  const top3 = segs.filter(s => s.pnl > 0).slice(0, 3)
-  const netGain = value - cost
 
   const onEnter = (bar, e) => setHover({ bar, x: e.clientX, y: e.clientY })
   const onMove = (e) => setHover(h => (h ? { ...h, x: e.clientX, y: e.clientY } : h))
@@ -152,12 +151,9 @@ export default function CostValueBridge({ rows, totals }) {
           </div>
 
           <div className="bridge-cap">
-            {top3.length === 3 && (
-              <><b>{top3.map(s => s.ticker).join(', ')}</b> built <b style={{ color: 'var(--green)' }}>
-                {signed(top3.reduce((a, s) => a + s.pnl, 0))}</b>
-                {netGain > 0 && <> — {Math.round(top3.reduce((a, s) => a + s.pnl, 0) / netGain * 100)}% of your gain</>}. </>
-            )}
-            {lossSum < 0 && <>The red names trimmed <b style={{ color: 'var(--red)' }}>{signed(lossSum)}</b>.</>}
+            {gainSum > 0 && <>Gains <b style={{ color: 'var(--green)' }}>{signed(gainSum)}</b></>}
+            {gainSum > 0 && lossSum < 0 && <>{' · '}</>}
+            {lossSum < 0 && <>Losses <b style={{ color: 'var(--red)' }}>{signed(lossSum)}</b></>}
           </div>
         </div>
 
