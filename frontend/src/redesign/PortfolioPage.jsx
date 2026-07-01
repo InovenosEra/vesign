@@ -83,7 +83,7 @@ export default function PortfolioPage() {
           </div>
         )}
 
-        {tab === 'watchlists' && <WatchlistsTab holdingsCount={rows.length} />}
+        {tab === 'watchlists' && <WatchlistsTab />}
       </div>
     </>
   )
