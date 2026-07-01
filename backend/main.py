@@ -3269,17 +3269,17 @@ def portfolio_performance(
             if p is not None:
                 total_val += qty * p
                 total_base += qty * base_p
-        # Before the first purchase no lots qualify (total_base == 0) → you hold
-        # nothing, so the return is a flat 0%. Returning None here made the frontend
-        # (which drops nulls) draw a straight slope from the start to the first real
-        # point, dipping the pre-investment line below zero. Keep it at 0.0.
-        port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else 0.0
+        # No holdings yet (total_base == 0) → leave it None so the Holdings line
+        # simply doesn't start until the first purchase (rather than drawing a flat
+        # or sloped pre-investment segment across years you held nothing).
+        port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
 
         vy = vesign_yield_at(week_date)
         vesign_yield = round(vy * 100, 2) if vy is not None else None
 
-        if week_date == weeks[0]:
-            port_yield = 0.0  # user portfolio normalized to start at 0; Vesign line shows actual MTM
+        if week_date == weeks[0] and total_base > 0:
+            port_yield = 0.0  # normalize to 0 only when the window already starts mid-investment
+            # (if there are no holdings at weeks[0], leave None so the line starts at the first buy)
 
         sp = spy_price_at(week_date)
         spy_yield = round((sp / spy_base - 1) * 100, 2) if (sp is not None and spy_base) else None
