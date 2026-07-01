@@ -251,3 +251,23 @@ def test_all_tiers_price_rounds_down_to_5c(ent):
 
 def test_all_tiers_price_zero_when_nothing_locked(ent):
     assert ent.all_tiers_price_cents({1: 0, 2: 0, 3: 0}) == 0
+
+
+def test_redact_holdings_nulls_model_fields_for_free(ent):
+    row = {"ticker": "X", "signal": "HOLD", "health_score": 4, "prediction_score": 0.3,
+           "target_mean_price": 150.0, "fair_value_upside": 0.2, "total_qty": 10, "value": 1500}
+    out = ent.redact_holdings([dict(row)], plan="free")[0]
+    assert out["signal"] is None
+    assert out["health_score"] is None
+    assert out["prediction_score"] is None
+    # analyst target (Prediction column) + the user's own data stay visible
+    assert out["target_mean_price"] == 150.0
+    assert out["fair_value_upside"] == 0.2
+    assert out["total_qty"] == 10 and out["value"] == 1500
+
+
+def test_redact_holdings_keeps_model_fields_for_pro_and_max(ent):
+    row = {"ticker": "X", "signal": "HOLD", "health_score": 4, "prediction_score": 0.3}
+    for plan in ("pro", "max"):
+        out = ent.redact_holdings([dict(row)], plan=plan)[0]
+        assert out["signal"] == "HOLD" and out["health_score"] == 4 and out["prediction_score"] == 0.3

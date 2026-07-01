@@ -6,6 +6,7 @@ import { useState, useMemo, Fragment } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
+import { useMe } from '../../context/MeContext'
 import { useCurrency } from '../../context/CurrencyContext'
 import { getWatchlists, getMarketStatus } from '../../api'
 import AddHoldingForm from './AddHoldingForm'
@@ -63,8 +64,19 @@ const SearchIcon = () => (
 
 const SIG_CLS = { BUY: 'buy', HOLD: 'hold', SELL: 'sell' }
 
+const LockGlyph = ({ size = 11 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4.5" y="11" width="15" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+)
+
 export default function HoldingsTable({ rows, subhead }) {
   const open = useTickerModal()
+  const me = useMe()
+  // Vesign-model columns (signal/health/ML) are Pro+; the server nulls them for
+  // Free, so a null value under a Free plan is a paywall lock (not missing data).
+  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
   const { fmtPrice } = useCurrency()
   const [expanded, setExpanded] = useState(() => new Set())
   const [adding, setAdding] = useState(false)
@@ -138,7 +150,9 @@ export default function HoldingsTable({ rows, subhead }) {
                       <div className="ticker-cell">
                         <img className="logo-mini" src={LOGO(r.ticker)} alt={r.ticker} />
                         <span className="tk">{r.ticker}</span>
-                        {r.signal && <span className={'sig-pill ' + (SIG_CLS[r.signal] || 'hold')}>{r.signal}</span>}
+                        {r.signal
+                          ? <span className={'sig-pill ' + (SIG_CLS[r.signal] || 'hold')}>{r.signal}</span>
+                          : modelLocked && <span className="sig-pill rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>}
                       </div>
                     </td>
                     <td className="co-cell">
@@ -155,9 +169,17 @@ export default function HoldingsTable({ rows, subhead }) {
                         </div>
                       )}
                     </td>
-                    <td className="r">{r.health_score == null ? '—' : <span className="health">{healthDots(r.health_score)}</span>}</td>
+                    <td className="r">{
+                      r.health_score != null ? <span className="health">{healthDots(r.health_score)}</span>
+                        : modelLocked ? <span className="health rd-blur">{healthDots(4)}</span>
+                        : '—'
+                    }</td>
                     <td className={'r ' + dirClass(upside)}>{arrowPct1(upside)}</td>
-                    <td className={'r ' + dirClass(mlPct)}>{arrowPct1(mlPct)}</td>
+                    <td className="r">{
+                      mlPct != null ? <span className={dirClass(mlPct)}>{arrowPct1(mlPct)}</span>
+                        : modelLocked ? <span className="rd-blur">▲ 00%</span>
+                        : '—'
+                    }</td>
                     <td className="r">{r.total_qty == null ? '—' : num(r.total_qty, { fd: 0 })}</td>
                     <td className="r">{r.avg_price == null ? '—' : fmtPrice(r.avg_price)}</td>
                     <td className="r">

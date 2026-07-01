@@ -226,6 +226,24 @@ def _locked_row(kind, signal_date, reason, *, price_cents=None, token=None,
     return row
 
 
+# Vesign-model fields on a Holdings row that are Pro+ only. Free users keep their
+# own portfolio data (qty/price/P&L/weight) and the analyst target (Prediction),
+# but not the model's classification (signal / company-health / ML score).
+HOLDING_MODEL_FIELDS = ("signal", "health_score", "prediction_score")
+
+
+def redact_holdings(rows, *, plan):
+    """Null the Vesign-model fields on each Holdings row for non-Pro/Max plans so
+    the model classification never leaves the server. Mutates and returns rows."""
+    if plan in ("pro", "max"):
+        return rows
+    for r in rows:
+        for f in HOLDING_MODEL_FIELDS:
+            if f in r:
+                r[f] = None
+    return rows
+
+
 def gate_open_trades(rows, *, plan, unlocks):
     """Redact the open-trades list. `rows` MUST already be sorted by yield desc
     (the endpoint does this). Free: top-10 reveal yield only; rest fully locked.

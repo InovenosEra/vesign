@@ -2890,7 +2890,9 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             "last_close": round(daily_latest, 4) if daily_latest is not None else None,
             "first_buy_date": first_buy_date,
         })
-    return result
+    # Vesign-model classification (signal/health/ML) is Pro+; Free keeps their own
+    # portfolio data + analyst target (Prediction), but the model fields are nulled.
+    return ent.redact_holdings(result, plan=ent.get_plan(uid))
 
 
 @protected.get("/api/portfolio/holdings/lots")

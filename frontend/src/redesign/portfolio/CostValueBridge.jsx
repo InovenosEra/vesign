@@ -8,9 +8,18 @@
  * vertical "Vesign's read" insights rail on the right (signal mix, health, ML,
  * biggest upside, watch-out, concentration, top driver). */
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useCurrency } from '../../context/CurrencyContext'
+import { useMe } from '../../context/MeContext'
 import { LOGO } from '../fmt'
 import { buildBridge, signalMix, avgHealthWeighted, topUpside, weakestHealth, concentration } from './derive'
+
+const LockGlyph = ({ size = 11 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4.5" y="11" width="15" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+)
 
 const VB_W = 1040, VB_H = 312
 const PAD_L = 24, PAD_R = 24, PAD_TOP = 40, PAD_BOT = 76
@@ -29,6 +38,10 @@ function HealthDots({ score }) {
 
 export default function CostValueBridge({ rows, totals }) {
   const { symbol, rate, fmtPrice } = useCurrency()
+  const me = useMe()
+  const navigate = useNavigate()
+  // "Vesign's read" is the model's view — Pro+ only; blur it for Free.
+  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
   const [hover, setHover] = useState(null)   // { bar, x, y }
 
   const { cost, value, segs, peak } = buildBridge(rows, totals)
@@ -155,6 +168,14 @@ export default function CostValueBridge({ rows, totals }) {
 
         {/* RIGHT — Vesign's read rail (33%) */}
         <aside className="panel insights-rail">
+          {modelLocked && (
+            <div className="ir-lock-overlay">
+              <span className="ir-lock-ico"><LockGlyph size={20} /></span>
+              <div className="ir-lock-title">Vesign's read</div>
+              <button className="ir-lock-cta" onClick={() => navigate('/account')}>Upgrade to Pro</button>
+            </div>
+          )}
+          <div className={modelLocked ? 'ir-body rd-blur' : 'ir-body'}>
           <div className="ir-head">
             <div>
               <div className="ir-title">Vesign's read</div>
@@ -210,6 +231,7 @@ export default function CostValueBridge({ rows, totals }) {
               <img className="ir-logo" src={LOGO(driver.ticker)} alt="" />{driver.ticker}
               <span style={{ color: driver.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>{signed(driver.pnl)}</span>
             </span>
+          </div>
           </div>
         </aside>
       </div>
