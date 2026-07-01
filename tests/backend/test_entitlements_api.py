@@ -102,6 +102,21 @@ def test_me_reports_plan_balance_and_prices(api):
     del os.environ["DEV_PLAN"]; del os.environ["DEV_WALLET_CENTS"]
 
 
+def test_me_survives_missing_user_settings(api):
+    """A local DB sync can swap in a prod snapshot lacking the redesign-only
+    user_settings table under a running server. /api/me (plan/balance) must not
+    500 on the optional phone lookup — regression for the 'stuck on Free' bug
+    where the frontend fell back to Free because /api/me errored."""
+    bm, client = api
+    from sqlalchemy import text as _text
+    with bm.engine.begin() as conn:
+        conn.execute(_text("DROP TABLE IF EXISTS user_settings"))
+    r = client.get("/api/me")
+    assert r.status_code == 200            # was 500 before the fix
+    assert r.json()["plan"] == "free"      # plan still readable
+    assert r.json()["phone"] == ""         # optional phone degrades to empty
+
+
 def _seed_pro(bm, cents):
     import backend.entitlements as e
     e.set_plan("dev-bypass", "pro")

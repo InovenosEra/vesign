@@ -26,6 +26,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import bindparam, create_engine, text, event as sa_event
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.pool import NullPool
 from backend.auth import get_current_user
 from backend import entitlements as ent
@@ -2528,10 +2529,28 @@ def open_trades(market: Optional[str] = None, include_lots: Optional[int] = 0,
 
 
 def _get_user_phone(uid: str) -> str:
-    with engine.connect() as conn:
-        row = conn.execute(text("SELECT phone FROM user_settings WHERE user_id = :u"),
-                           {"u": uid}).fetchone()
-    return (row[0] if row else "") or ""
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT phone FROM user_settings WHERE user_id = :u"),
+                               {"u": uid}).fetchone()
+        return (row[0] if row else "") or ""
+    except OperationalError:
+        # user_settings is a redesign-only table absent from prod snapshots; a local
+        # DB sync can swap it away under a running server, which would otherwise 500
+        # the whole /api/me (plan/balance) read on this optional phone lookup and make
+        # the UI fall back to Free. Recreate it (self-heal) and treat as no phone.
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_settings (
+                        user_id    TEXT PRIMARY KEY,
+                        phone      TEXT DEFAULT '',
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                """))
+        except Exception:
+            pass
+        return ""
 
 
 @protected.get("/api/me")
