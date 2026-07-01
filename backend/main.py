@@ -1670,6 +1670,7 @@ def delete_watchlist(list_id: int, user=Depends(get_current_user)):
     with engine.begin() as conn:
         _assert_owns_list(conn, list_id, user["id"])
         conn.execute(text("DELETE FROM watchlist WHERE list_id = :lid"), {"lid": list_id})
+        conn.execute(text("DELETE FROM watchlist_holdings WHERE watchlist_id = :lid"), {"lid": list_id})
         conn.execute(text("DELETE FROM watchlist_lists WHERE id = :lid AND user_id = :uid"), {"lid": list_id, "uid": user["id"]})
 
 

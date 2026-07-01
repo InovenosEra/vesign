@@ -80,3 +80,28 @@ def test_add_holding_normalizes_date(lots_app):
     assert r.status_code == 201
     lots = client.get("/api/portfolio/holdings/lots?ticker=AAPL").json()
     assert any(l["id"] == r.json()["id"] and l["buy_date"] == "2026-03-05" for l in lots)
+
+
+def test_delete_watchlist_cascades_holdings(lots_app):
+    """delete_watchlist must also remove watchlist_holdings for that list —
+    there's no FK/ON DELETE CASCADE, so the endpoint has to do it explicitly
+    (mirrors what remove_ticker already does for a single ticker)."""
+    bm, client = lots_app
+    from sqlalchemy import create_engine, text
+    eng = create_engine(f"sqlite:///{os.environ['DB_PATH']}")
+
+    # Seeded fixture already has two AAPL lots under list_id=1 ("Mine").
+    with eng.connect() as conn:
+        before = conn.execute(text("SELECT COUNT(*) FROM watchlist_holdings WHERE watchlist_id = 1")).scalar()
+    assert before == 2
+
+    assert client.delete("/api/watchlists/1").status_code == 204
+
+    with eng.connect() as conn:
+        after = conn.execute(text("SELECT COUNT(*) FROM watchlist_holdings WHERE watchlist_id = 1")).scalar()
+        list_row = conn.execute(text("SELECT id FROM watchlist_lists WHERE id = 1")).fetchone()
+        wl_rows = conn.execute(text("SELECT ticker FROM watchlist WHERE list_id = 1")).fetchall()
+    assert after == 0
+    assert list_row is None
+    assert wl_rows == []
+    eng.dispose()
