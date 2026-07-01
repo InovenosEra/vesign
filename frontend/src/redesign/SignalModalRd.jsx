@@ -34,6 +34,13 @@ const healthDots = (score) => {
   ))
 }
 
+const LockGlyph = ({ size = 11 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4.5" y="11" width="15" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+)
+
 const CHART_RANGES = [['1M', 1], ['3M', 3], ['1Y', 12], ['5Y', 60]]
 const TABS = [
   { id: 'm-overview', label: 'Overview' },
@@ -95,6 +102,9 @@ export default function SignalModalRd({ row, onClose }) {
   const { fmtPrice, symbol } = useCurrency()
   const me = useMe()
   const canSeeSignal = me?.plan === 'pro' || me?.plan === 'max'   // BUY/SELL/HOLD is Pro+
+  // Server nulls Vesign-model fields (signal/health/ML) for Free; a null under
+  // Free is a paywall lock (blurred placeholder), not missing data.
+  const modelLocked = me?.plan !== 'pro' && me?.plan !== 'max'
   const ticker = row?.ticker
   const [tab, setTab] = useState('m-overview')
   const [range, setRange] = useState('1Y')
@@ -230,13 +240,17 @@ export default function SignalModalRd({ row, onClose }) {
 
               <div className="m-verdict">
                 <div className="m-vrow"><div className="lbl">Predicted upside<small>to analyst mean</small></div><div className={'val ' + dirClass(up)}>{up == null ? '—' : pct(up)}</div></div>
-                <div className="m-vrow"><div className="lbl">Health<small>5-point score</small></div><div className="val"><span className="health">{healthDots(r?.health_score)}</span></div></div>
-                <div className="m-vrow"><div className="lbl">ML 5-day<small>walk-forward model</small></div><div className={'val ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)}</div></div>
+                <div className="m-vrow"><div className="lbl">Health<small>5-point score</small></div><div className="val">{modelLocked
+                  ? <span className="health rd-blur">{healthDots(4)}</span>
+                  : <span className="health">{healthDots(r?.health_score)}</span>}</div></div>
+                <div className="m-vrow"><div className="lbl">ML 5-day<small>walk-forward model</small></div>{modelLocked
+                  ? <div className="val"><span className="rd-blur">▲ 00%</span></div>
+                  : <div className={'val ' + dirClass(ml)}>{ml == null ? '—' : pct(ml)}</div>}</div>
                 <div className="m-vrow"><div className="lbl">Entry price<small>Vesign target</small></div><div className="val">{close == null ? '—' : fmtPrice(close)}</div></div>
               </div>
             </div>
 
-            {!row?.hideWhy && (r?.signal === 'BUY' || r?.signal === 'SELL') && (
+            {!modelLocked && !row?.hideWhy && (r?.signal === 'BUY' || r?.signal === 'SELL') && (
               <>
                 <h4 className="m-section-h">Why this signal</h4>
                 <SignalExplanation ticker={ticker} />
@@ -282,26 +296,47 @@ export default function SignalModalRd({ row, onClose }) {
                 ? `${r.trade_count} closed trade${r.trade_count === 1 ? '' : 's'}` + (r.win_rate != null ? ` · Win rate ${r.win_rate.toFixed(0)}%` : '')
                 : `No closed trades on ${ticker || ''} yet`}
             </span></h4>
-            <div className="m-history">
-              {histRows.length ? histRows.map((m, i) => {
-                const s = (m.signal || '').toUpperCase()
-                const mu = m.fair_value_upside == null ? null : m.fair_value_upside * 100
-                return (
-                  <div className="m-h-row" key={i}>
-                    <div className={'sig ' + sigCls(s)}>{s}</div>
-                    <div className="date">{dateFmt(m.date)}</div>
-                    <div className="note">
-                      {mu != null && `Pred upside ${pct(mu)} · `}
-                      {m.health_score != null ? `Health ${m.health_score}/5` : ''}
+            {modelLocked ? (
+              <div className="rd-lock-wrap">
+                <div className="m-history rd-blur" aria-hidden="true">
+                  {[0, 1, 2].map(i => (
+                    <div className="m-h-row" key={i}>
+                      <div className="sig buy">BUY</div>
+                      <div className="date">—</div>
+                      <div className="note">Pred upside ▲ 00% · Health 0/5</div>
+                      <div className="px"><span className="l">Entry</span>$000.00</div>
+                      <div className="ret open">—</div>
                     </div>
-                    <div className="px"><span className="l">{s === 'SELL' ? 'Exit' : 'Entry'}</span>{m.close == null ? '—' : fmtPrice(m.close)}</div>
-                    <div className="ret open">—</div>
-                  </div>
-                )
-              }) : (
-                <div className="m-h-row"><div className="note" style={{ gridColumn: '1 / -1', color: 'var(--ink-3)' }}>No Vesign signal history for {ticker || 'this ticker'}.</div></div>
-              )}
-            </div>
+                  ))}
+                </div>
+                <div className="rd-lock-overlay">
+                  <span className="rd-lock-ico"><LockGlyph size={20} /></span>
+                  <div className="rd-lock-title">Per-signal history is a Pro feature</div>
+                  <button className="rd-lock-cta" onClick={() => { onClose?.(); navigate('/account') }}>Upgrade to Pro</button>
+                </div>
+              </div>
+            ) : (
+              <div className="m-history">
+                {histRows.length ? histRows.map((m, i) => {
+                  const s = (m.signal || '').toUpperCase()
+                  const mu = m.fair_value_upside == null ? null : m.fair_value_upside * 100
+                  return (
+                    <div className="m-h-row" key={i}>
+                      <div className={'sig ' + sigCls(s)}>{s}</div>
+                      <div className="date">{dateFmt(m.date)}</div>
+                      <div className="note">
+                        {mu != null && `Pred upside ${pct(mu)} · `}
+                        {m.health_score != null ? `Health ${m.health_score}/5` : ''}
+                      </div>
+                      <div className="px"><span className="l">{s === 'SELL' ? 'Exit' : 'Entry'}</span>{m.close == null ? '—' : fmtPrice(m.close)}</div>
+                      <div className="ret open">—</div>
+                    </div>
+                  )
+                }) : (
+                  <div className="m-h-row"><div className="note" style={{ gridColumn: '1 / -1', color: 'var(--ink-3)' }}>No Vesign signal history for {ticker || 'this ticker'}.</div></div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* NEWS */}

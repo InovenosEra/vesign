@@ -7,7 +7,15 @@ import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, WHITE_BG_LOGOS } from '../../api'
 import { num, pct, dirClass, LOGO } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
+import { useMe } from '../../context/MeContext'
 import { useTickerModal } from '../TickerModalContext'
+
+const LockGlyph = ({ size = 11 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4.5" y="11" width="15" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+)
 
 const SECTOR_ABBR = {
   'Information Technology': 'Tech', 'Communication Services': 'Comm.',
@@ -112,7 +120,9 @@ const COLUMNS = [
     cell: (r) => <span className={dirClass(r.day_change_pct)}>{r.day_change_pct == null ? '—' : pct(r.day_change_pct)}</span> },
   { key: 'market_cap', label: 'Mkt cap', align: 'r', sortable: true, cell: (r) => capB(r.market_cap) },
   { key: 'signal', label: 'Signal', sortable: true,
-    cell: (r) => <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
+    cell: (r, c) => c.modelLocked
+      ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>
+      : <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
   { key: 'fair_value_upside', label: 'Pred. upside', align: 'r', sortable: true,
     cell: (r, c) => {
       if (r.fair_value_upside == null) return <span className="muted">—</span>
@@ -124,9 +134,12 @@ const COLUMNS = [
     },
     csv: (r) => r.fair_value_upside == null ? '' : (r.fair_value_upside * 100).toFixed(2) },
   { key: 'health_score', label: 'Health', align: 'r', sortable: true,
-    cell: (r) => <span className="health">{healthDots(r.health_score)}</span> },
+    cell: (r, c) => c.modelLocked
+      ? <span className="health rd-blur">{healthDots(4)}</span>
+      : <span className="health">{healthDots(r.health_score)}</span> },
   { key: 'prediction_score', label: 'ML 5d', align: 'r', sortable: true,
-    cell: (r) => {
+    cell: (r, c) => {
+      if (c.modelLocked) return <span className="rd-blur">▲ 00%</span>
       const ml = r.prediction_score == null ? null : r.prediction_score * 100
       return <span className={dirClass(ml)}>{ml == null ? '—' : pct(ml)}</span>
     },
@@ -144,6 +157,10 @@ const loadJSON = (k) => { try { return JSON.parse(localStorage.getItem(k)) } cat
 
 export default function Screener({ onCount }) {
   const openTicker = useTickerModal()
+  const me = useMe()
+  // Vesign-model fields (signal/health/ML) are Pro+; the server nulls them for
+  // Free, so a Free plan renders locked/blurred placeholders instead of data.
+  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
   const { fmtPrice } = useCurrency()
   const { data: rows } = useQuery({ queryKey: ['signals-today', 'US'], queryFn: () => getSignalsToday(null, 'US') })
   const all = Array.isArray(rows) ? rows : []
@@ -214,7 +231,9 @@ export default function Screener({ onCount }) {
   const q = search.trim().toUpperCase()
 
   const filtered = useMemo(() => all.filter(r => {
-    if (signals.size && !signals.has(r.signal)) return false
+    // Model-based filters (signal / health / ML) are Pro+ only; for Free the fields
+    // are nulled server-side, so skip them entirely (else every row would drop out).
+    if (!modelLocked && signals.size && !signals.has(r.signal)) return false
     if (sectors.size) {
       const sec = KNOWN_SECTORS.has(r.sector) ? r.sector : '__other'
       if (!sectors.has(sec)) return false
@@ -223,18 +242,20 @@ export default function Screener({ onCount }) {
       const b = capBucket(r.market_cap)
       if (!b || !caps.has(b)) return false
     }
-    if (health > 1 && (r.health_score || 0) < health) return false
+    if (!modelLocked && health > 1 && (r.health_score || 0) < health) return false
     if (r.fair_value_upside != null) {
       const up = r.fair_value_upside * 100
       if (up < upLo || up > upHi) return false
     }
     if (r.pe_ttm != null && (r.pe_ttm < peLo || r.pe_ttm > peHi)) return false
-    const ml = r.prediction_score
-    if (dir === 'up' && !(ml > 0)) return false
-    if (dir === 'down' && !(ml < 0)) return false
+    if (!modelLocked) {
+      const ml = r.prediction_score
+      if (dir === 'up' && !(ml > 0)) return false
+      if (dir === 'down' && !(ml < 0)) return false
+    }
     if (q && !(`${r.ticker} ${r.company || ''}`.toUpperCase().includes(q))) return false
     return true
-  }), [all, signals, sectors, caps, health, dir, upLo, upHi, peLo, peHi, q])
+  }), [all, signals, sectors, caps, health, dir, upLo, upHi, peLo, peHi, q, modelLocked])
 
   useEffect(() => { onCount && onCount(filtered.length) }, [filtered.length, onCount])
 
@@ -259,7 +280,7 @@ export default function Screener({ onCount }) {
   const maxUp = Math.max(...filtered.filter(r => r.fair_value_upside != null).map(r => r.fair_value_upside * 100), 1)
 
   const visibleCols = COLUMNS.filter(c => !hidden.has(c.key))
-  const ctx = { fmtPrice, maxUp }
+  const ctx = { fmtPrice, maxUp, modelLocked }
 
   const sortLabel = COL_BY_KEY[sort.key]?.label || 'Predicted upside'
   const pages = pagerPages(curPage, pageCount)
@@ -281,6 +302,7 @@ export default function Screener({ onCount }) {
             value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
+        {!modelLocked && (
         <div className="fg">
           <div className="fg-label">Signal</div>
           <div className="pills">
@@ -290,6 +312,7 @@ export default function Screener({ onCount }) {
             ))}
           </div>
         </div>
+        )}
 
         <div className="fg">
           <div className="fg-label">Market cap</div>
@@ -316,6 +339,7 @@ export default function Screener({ onCount }) {
             onChange={(w, val) => setUpside(p => ({ ...p, [w]: val }))} />
         </div>
 
+        {!modelLocked && (
         <div className="fg">
           <div className="fg-label">Health <span className="ct">≥ {health}</span></div>
           <div className="stars">
@@ -325,6 +349,7 @@ export default function Screener({ onCount }) {
             ))}
           </div>
         </div>
+        )}
 
         <div className="fg">
           <div className="fg-label">P/E ratio <span className="ct" style={{ fontWeight: 400, textTransform: 'none' }}>TTM</span></div>
@@ -333,6 +358,7 @@ export default function Screener({ onCount }) {
             onChange={(w, val) => setPe(p => ({ ...p, [w]: val }))} />
         </div>
 
+        {!modelLocked && (
         <div className="fg">
           <div className="fg-label">Day change <span className="ct" style={{ fontWeight: 400, textTransform: 'none' }}>ML direction</span></div>
           <div className="pills">
@@ -341,6 +367,7 @@ export default function Screener({ onCount }) {
             ))}
           </div>
         </div>
+        )}
 
         <div className="fg">
           <button className="save-btn" onClick={saveFilters}>{savedFlag ? 'Saved ✓' : 'Save filter set'}</button>

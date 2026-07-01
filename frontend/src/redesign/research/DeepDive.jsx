@@ -9,11 +9,20 @@
  * Data: getResearch, getPriceHistory, getEarnings, getNews, getSignalMarkers,
  * searchTickers. */
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getResearch, getPriceHistory, getEarnings, getNews, getSignalMarkers, searchTickers,
   getWatchlists, getWatchlistTickers, addTicker, removeTicker } from '../../api'
 import { num, pct, dateFmt, ago, LOGO } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
+import { useMe } from '../../context/MeContext'
+
+const LockGlyph = ({ size = 11 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4.5" y="11" width="15" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+)
 
 const sigCls = (s) => ({ BUY: 'buy', SELL: 'sell' }[s] || 'hold')
 const dirCls = (v) => v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : 'muted'
@@ -113,6 +122,10 @@ function PriceChart({ history, markers }) {
 
 export default function DeepDive({ ticker, setTicker }) {
   const { fmtPrice, symbol } = useCurrency()
+  const me = useMe()
+  const navigate = useNavigate()
+  // Vesign-model fields (signal/health/ML) are Pro+; server nulls them for Free.
+  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
   const [range, setRange] = useState('1Y')   // active chart-range chip label
   const months = RANGES.find(([l]) => l === range)?.[1] || 12
   const [input, setInput] = useState(ticker)
@@ -230,7 +243,9 @@ export default function DeepDive({ ticker, setTicker }) {
         <div />
         <div className="dd-hero-price">
           <div className="px"><span className="s">{symbol}</span><span>{close == null ? '—' : fmtPrice(close).replace(symbol, '')}</span></div>
-          <div className={'delta ' + dirCls(ml)}>{ml == null ? '—' : pct(ml)}</div>
+          {modelLocked
+            ? <div className="delta up rd-blur">▲ 0.00%</div>
+            : <div className={'delta ' + dirCls(ml)}>{ml == null ? '—' : pct(ml)}</div>}
           <div className="dd-hero-actions">
             <div className={'btn sm' + (inFirst ? ' primary' : '')}
               onClick={() => !toggleWatch.isPending && firstList && toggleWatch.mutate()}
@@ -246,11 +261,13 @@ export default function DeepDive({ ticker, setTicker }) {
       <div className="dd-chart-row">
         <div className="dd-chart-panel">
           <div className="dd-chart-head">
-            <h3>Price · Vesign signals overlay</h3>
+            <h3>{modelLocked ? 'Price' : 'Price · Vesign signals overlay'}</h3>
             <div className="legend">
               <span className="lg-item"><span className="sw" style={{ background: '#60a5fa' }} /> {ticker} price</span>
-              <span className="lg-item"><span className="sw tri" style={{ background: '#00d97e' }} /> BUY signal</span>
-              <span className="lg-item"><span className="sw tri" style={{ background: '#ff4d5c' }} /> SELL signal</span>
+              {!modelLocked && <>
+                <span className="lg-item"><span className="sw tri" style={{ background: '#00d97e' }} /> BUY signal</span>
+                <span className="lg-item"><span className="sw tri" style={{ background: '#ff4d5c' }} /> SELL signal</span>
+              </>}
             </div>
             <div className="chips">
               {RANGES.map(([lbl]) => (
@@ -265,7 +282,9 @@ export default function DeepDive({ ticker, setTicker }) {
         {/* VERDICT */}
         <div className="dd-verdict">
           <div className="dd-verdict-head">
-            <span className={'sig-tag ' + sigCls(r?.signal)}>{r?.signal || '—'}</span>
+            {modelLocked
+              ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>
+              : <span className={'sig-tag ' + sigCls(r?.signal)}>{r?.signal || '—'}</span>}
             <span className="since">{r?.trade_count ? `${r.trade_count} historical trade${r.trade_count === 1 ? '' : 's'}` : ''}</span>
           </div>
           <div className="dd-verdict-body">
@@ -275,11 +294,15 @@ export default function DeepDive({ ticker, setTicker }) {
             </div>
             <div className="dd-vstat">
               <div className="lbl">Health <span className="desc">balance sheet · profitability</span></div>
-              <div className="val"><span className="health">{healthDots(r?.health_score)}</span></div>
+              <div className="val">{modelLocked
+                ? <span className="health rd-blur">{healthDots(4)}</span>
+                : <span className="health">{healthDots(r?.health_score)}</span>}</div>
             </div>
             <div className="dd-vstat">
               <div className="lbl">ML 5-day</div>
-              <div className={'val ' + dirCls(ml)}>{ml == null ? '—' : pct(ml)}</div>
+              {modelLocked
+                ? <div className="val rd-blur">▲ 0.00%</div>
+                : <div className={'val ' + dirCls(ml)}>{ml == null ? '—' : pct(ml)}</div>}
             </div>
             <div className="dd-vstat">
               <div className="lbl">Next earnings</div>
@@ -354,7 +377,15 @@ export default function DeepDive({ ticker, setTicker }) {
         </div>
 
         {/* ML PREDICTIONS */}
-        <div className="dd-panel">
+        <div className={'dd-panel' + (modelLocked ? ' rd-lock-wrap' : '')}>
+          {modelLocked && (
+            <div className="rd-lock-overlay">
+              <span className="rd-lock-ico"><LockGlyph size={20} /></span>
+              <div className="rd-lock-title">Vesign model</div>
+              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Pro</button>
+            </div>
+          )}
+          <div className={modelLocked ? 'rd-blur' : ''}>
           <div className="dd-panel-head">
             <h3>ML predictions</h3>
             <span className="meta">Walk-forward model</span>
@@ -382,6 +413,7 @@ export default function DeepDive({ ticker, setTicker }) {
               </div>
             </div>
           </div>
+          </div>
         </div>
       </div>
 
@@ -395,8 +427,15 @@ export default function DeepDive({ ticker, setTicker }) {
               : `No closed Vesign trades on ${ticker} yet`}
           </span>
         </div>
-        <div className="dd-panel">
-          <div className="dd-history-body">
+        <div className={'dd-panel' + (modelLocked ? ' rd-lock-wrap' : '')}>
+          {modelLocked && (
+            <div className="rd-lock-overlay">
+              <span className="rd-lock-ico"><LockGlyph size={20} /></span>
+              <div className="rd-lock-title">Vesign model</div>
+              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Pro</button>
+            </div>
+          )}
+          <div className={'dd-history-body' + (modelLocked ? ' rd-blur' : '')}>
             {histRows.length ? histRows.map((m, i) => {
               const s = (m.signal || '').toUpperCase()
               return (
