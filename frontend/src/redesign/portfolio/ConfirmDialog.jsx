@@ -7,7 +7,11 @@ export default function ConfirmDialog({ title, body, confirmLabel = 'Confirm', d
   const [busy, setBusy] = useState(false)
   const handleConfirm = async () => {
     setBusy(true)
-    await onConfirm()
+    try {
+      await onConfirm()
+    } finally {
+      setBusy(false)
+    }
   }
   return (
     <div className="confirm-overlay" onClick={() => !busy && onCancel()} role="dialog" aria-modal="true">
