@@ -1033,6 +1033,11 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
         plan = ent.get_plan(user["id"])
         unlocks = ent.get_unlocks(user["id"])
         rows = ent.gate_signals(rows, kind=signal.upper(), plan=plan, unlocks=unlocks)
+    else:
+        # Bare list or ?signal=HOLD (Research Screener): no per-card paywall, but the
+        # model classification is Pro+. Null the model fields for Free; keep ticker,
+        # price, company and the analyst upside (fair_value_upside).
+        rows = ent.redact_fields(rows, plan=ent.get_plan(user["id"]), fields=ent.MODEL_FIELDS)
     return rows
 
 
@@ -1343,7 +1348,8 @@ def signals_export(
 
 
 @protected.get("/api/signals/by-tickers")
-def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ticker symbols")):
+def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ticker symbols"),
+                       user=Depends(get_current_user)):
     """Latest signal row for each of the given tickers (used by watchlist)."""
     ticker_list = [
         t.strip().upper() for t in tickers.split(",")
@@ -1373,13 +1379,14 @@ def signals_by_tickers(tickers: str = Query(..., description="Comma-separated ti
             LEFT JOIN companies c ON s.ticker = c.ticker
             {_MARKET_CAP_JOIN}
         """), conn)
-    return _records(df)
+    return ent.redact_fields(_records(df), plan=ent.get_plan(user["id"]), fields=ent.MODEL_FIELDS)
 
 
 # --- Signal success rate ----------------------------------------------------
 
 @protected.get("/api/search")
-def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50)):
+def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50),
+                   user=Depends(get_current_user)):
     """Full-text search across ticker and company name."""
     pattern = f"%{q.strip()}%"
     with engine.connect() as conn:
@@ -1415,12 +1422,16 @@ def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default
                 f.market_cap DESC NULLS LAST
             LIMIT :lim
         """), conn, params={"pat": pattern, "q": q.strip(), "lim": limit})
-    return _records(df)
+    return ent.redact_fields(_records(df), plan=ent.get_plan(user["id"]), fields=ent.MODEL_FIELDS)
 
 
 @protected.get("/api/signals/markers")
-def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144)):
+def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144),
+                   user=Depends(get_current_user)):
     """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay)."""
+    # The marker dates + actions ARE the model's signal history — Pro+ only.
+    if ent.get_plan(user["id"]) not in ("pro", "max"):
+        return []
     with engine.connect() as conn:
         df = pd.read_sql(text("""
             SELECT DATE(date) AS date, signal, lot_seq, close,
@@ -1713,6 +1724,12 @@ def watchlist_export(
         )
 
     _prepare_export_df(df, "date", "last_update")
+
+    # Free users export their tickers + price/fundamentals, but not the Vesign-model
+    # columns (raw signals table carries the raw fair_value_upside too).
+    if ent.get_plan(user["id"]) not in ("pro", "max"):
+        drop = [c for c in (*ent.MODEL_FIELDS, "fair_value_upside") if c in df.columns]
+        df = df.drop(columns=drop, errors="ignore")
 
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", watchlist_name).strip("_") or f"list_{list_id}"
     today = datetime.now(UTC).date().isoformat()
@@ -3500,7 +3517,7 @@ def research_ticker(
     from backend.translation import translate as _tx
     health_reason_translated = _tx(_v(row.get("health_reason")) or "", lang)
 
-    return {
+    res = {
         "ticker":              ticker,
         "company":             _v(row.get("company")),
         "logo_url":            _v(row.get("logo_url")),
@@ -3545,11 +3562,18 @@ def research_ticker(
         "_volume_flag":        _v(row.get("volume_flag")),
         "_week52_condition":   _v(row.get("week52_condition")),
     }
+    # Vesign-model outputs are Pro+; Free keeps price/fundamentals, analyst targets
+    # (fair_value_upside/target*), and the public track record (trade_count/win_rate).
+    return ent.redact_fields(res, plan=ent.get_plan(user["id"]),
+                             fields=ent.MODEL_FIELDS + ("health_reason",))
 
 
 @protected.post("/api/research/{ticker}/ai-report")
 def research_ai_report(ticker: str, body: AIReportBody, user=Depends(get_current_user)):
     """Generate a Claude AI research note for a ticker."""
+    # The AI note is built from Vesign-model outputs — Pro+ only (like /explanation).
+    if ent.get_plan(user["id"]) not in ("pro", "max"):
+        raise HTTPException(status_code=403, detail={"code": "UPGRADE_REQUIRED"})
     ticker = ticker.strip().upper()
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker")

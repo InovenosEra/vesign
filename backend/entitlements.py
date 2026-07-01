@@ -226,22 +226,28 @@ def _locked_row(kind, signal_date, reason, *, price_cents=None, token=None,
     return row
 
 
-# Vesign-model fields on a Holdings row that are Pro+ only. Free users keep their
-# own portfolio data (qty/price/P&L/weight) and the analyst target (Prediction),
-# but not the model's classification (signal / company-health / ML score).
+# Vesign-model output columns gated from Free across every endpoint. Analyst-derived
+# upside (fair_value_upside aliased to (target_mean-close)/close in most queries) is
+# the allowed "Prediction" and is NOT here — except /api/signals/markers returns the
+# RAW model fair_value_upside, so that endpoint gates it explicitly.
+MODEL_FIELDS = ("signal", "health_score", "prediction_score", "vqs", "vesign_score", "tier", "score")
 HOLDING_MODEL_FIELDS = ("signal", "health_score", "prediction_score")
 
 
-def redact_holdings(rows, *, plan):
-    """Null the Vesign-model fields on each Holdings row for non-Pro/Max plans so
-    the model classification never leaves the server. Mutates and returns rows."""
+def redact_fields(rows, *, plan, fields):
+    """Return copies with the given model fields nulled for non-Pro/Max plans, so the
+    model output never leaves the server. NON-mutating (some callers pass shared/cached
+    rows). Accepts a list of dicts or a single dict; returns the same shape."""
     if plan in ("pro", "max"):
         return rows
-    for r in rows:
-        for f in HOLDING_MODEL_FIELDS:
-            if f in r:
-                r[f] = None
-    return rows
+    def _redact(d):
+        return d if not d else {**d, **{f: None for f in fields if f in d}}
+    return _redact(rows) if isinstance(rows, dict) else [_redact(r) for r in rows]
+
+
+def redact_holdings(rows, *, plan):
+    """Holdings keep the analyst target (Prediction); gate signal/health/ML."""
+    return redact_fields(rows, plan=plan, fields=HOLDING_MODEL_FIELDS)
 
 
 def gate_open_trades(rows, *, plan, unlocks):

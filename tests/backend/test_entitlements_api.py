@@ -280,3 +280,47 @@ def test_open_trades_export_is_max_only(api):
     os.environ["DEV_PLAN"] = "max"
     assert client.get("/api/trades/open/export?market=US&format=csv").status_code != 402
     del os.environ["DEV_PLAN"]
+
+
+def test_signals_today_bare_redacts_model_for_free(api):
+    # The Research Screener calls /api/signals/today with no signal param — must not
+    # leak the model classification to Free.
+    bm, client = api
+    os.environ["DEV_PLAN"] = "free"
+    rows = client.get("/api/signals/today?market=US").json()
+    assert rows
+    for r in rows:
+        assert r["ticker"]                       # ticker/price stay
+        assert r.get("signal") is None
+        assert r.get("health_score") is None
+        assert r.get("prediction_score") is None
+        assert r.get("vqs") is None
+    os.environ["DEV_PLAN"] = "max"
+    full = client.get("/api/signals/today?market=US").json()
+    assert any(r.get("signal") for r in full)    # max sees it
+    del os.environ["DEV_PLAN"]
+
+
+def test_signals_markers_empty_for_free(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "free"
+    assert client.get("/api/signals/markers?ticker=T0").json() == []
+    os.environ["DEV_PLAN"] = "pro"
+    assert len(client.get("/api/signals/markers?ticker=T0").json()) >= 1
+    del os.environ["DEV_PLAN"]
+
+
+def test_search_redacts_model_for_free(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "free"
+    r = client.get("/api/search?q=T0").json()
+    assert r and r[0]["ticker"] == "T0"
+    assert r[0].get("signal") is None and r[0].get("health_score") is None and r[0].get("prediction_score") is None
+    del os.environ["DEV_PLAN"]
+
+
+def test_ai_report_requires_pro(api):
+    bm, client = api
+    os.environ["DEV_PLAN"] = "free"
+    assert client.post("/api/research/T0/ai-report", json={}).status_code == 403
+    del os.environ["DEV_PLAN"]
