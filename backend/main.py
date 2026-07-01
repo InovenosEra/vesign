@@ -3269,7 +3269,11 @@ def portfolio_performance(
             if p is not None:
                 total_val += qty * p
                 total_base += qty * base_p
-        port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else None
+        # Before the first purchase no lots qualify (total_base == 0) → you hold
+        # nothing, so the return is a flat 0%. Returning None here made the frontend
+        # (which drops nulls) draw a straight slope from the start to the first real
+        # point, dipping the pre-investment line below zero. Keep it at 0.0.
+        port_yield = round((total_val / total_base - 1) * 100, 2) if total_base > 0 else 0.0
 
         vy = vesign_yield_at(week_date)
         vesign_yield = round(vy * 100, 2) if vy is not None else None
