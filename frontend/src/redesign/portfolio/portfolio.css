@@ -87,7 +87,12 @@
   .rd .ph-tab.active .count { background: rgba(59,130,246,0.15); color: var(--blue-2); }
 
   /* PAGE BODY */
-  .rd .body { padding: 24px; }
+  /* Pinned to its own stable compositor layer — Chrome was dynamically
+     promoting/demoting a same-sized layer here on text-input focus (tied to
+     the blinking caret getting its own layer), which left a stale paint
+     ("second background color") over this whole region until something
+     forced a recomposite. A permanent layer avoids the promote/demote churn. */
+  .rd .body { padding: 24px; transform: translateZ(0); }
 
   /* KPI STRIP — 5 cards */
   /* NET-WORTH HERO ---------------------------------------------------------- */
