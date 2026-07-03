@@ -1,11 +1,11 @@
-/* Watchlists tab — organize tickers into named lists (owned or watch-only).
- * Lot-editing and aggregate KPIs live on the Holdings tab; this tab only
- * manages lists and their ticker membership. */
+/* Watchlist tab — organize tickers into named lists. Purely forward-looking:
+ * no ownership concept lives here at all (that's the Holdings tab, backed by
+ * its own user-scoped table). Vesign's full research view (signal/health/
+ * upside) plus a user-set target price per ticker. */
 import { useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getWatchlists, getWatchlistTickers, getHoldings, getSignalsByTickers,
-  getPortfolioComparison, createWatchlist,
+  getWatchlists, getWatchlistTickers, getSignalsByTickers, createWatchlist,
 } from '../../api'
 import { useLivePrices } from '../../hooks/useLivePrices'
 import { buildCards, filterCards, sortCards } from './watchlistDerive'
@@ -24,16 +24,9 @@ export default function WatchlistsTab() {
   const tickerQueries = useQueries({
     queries: listArr.map((l) => ({ queryKey: ['watchlist-tickers', l.id], queryFn: () => getWatchlistTickers(l.id) })),
   })
-  const holdingsQueries = useQueries({
-    queries: listArr.map((l) => ({ queryKey: ['watchlist-holdings', l.id], queryFn: () => getHoldings(l.id) })),
-  })
 
   const tickersByList = {}
-  const holdingsByList = {}
-  listArr.forEach((l, i) => {
-    tickersByList[l.id] = tickerQueries[i]?.data || []
-    holdingsByList[l.id] = holdingsQueries[i]?.data || []
-  })
+  listArr.forEach((l, i) => { tickersByList[l.id] = tickerQueries[i]?.data || [] })
 
   // Recomputed every render (cheap — a few dozen tickers at most); not worth
   // memoizing since the query keys below are derived strings, not array
@@ -48,17 +41,11 @@ export default function WatchlistsTab() {
   const signalsByTicker = Object.fromEntries((signals || []).map((s) => [s.ticker, s]))
   const { prices } = useLivePrices(allTickers)
 
-  const { data: cmp } = useQuery({ queryKey: ['portfolio-comparison'], queryFn: () => getPortfolioComparison('US') })
-  const comparisonByName = Object.fromEntries(
-    (Array.isArray(cmp) ? cmp : []).filter((c) => c.name !== 'Vesign').map((c) => [c.name, c.yield]),
-  )
-
   const ready = !listsLoading
     && tickerQueries.every((tq) => !tq.isLoading)
-    && holdingsQueries.every((hq) => !hq.isLoading)
     && (allTickers.length === 0 || signals != null)
 
-  const cards = buildCards({ lists: listArr, tickersByList, holdingsByList, signalsByTicker, prices, comparisonByName })
+  const cards = buildCards({ lists: listArr, tickersByList, signalsByTicker, prices })
   const totalTickers = new Set(cards.flatMap((c) => c.rows.map((r) => r.ticker))).size
   const view = sortCards(filterCards(cards, q), sortDesc ? 'desc' : 'asc')
 
@@ -66,7 +53,6 @@ export default function WatchlistsTab() {
     mutationFn: (name) => createWatchlist(name),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['watchlists'] })
-      qc.invalidateQueries({ queryKey: ['portfolio-comparison'] })
       setNewName('')
       setCreating(false)
     },
@@ -98,7 +84,7 @@ export default function WatchlistsTab() {
               value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="sort-pill" onClick={() => setSortDesc((d) => !d)}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 6h18M6 12h12M10 18h4" /></svg>
-              Sort: Yield {sortDesc ? '↓' : '↑'}
+              Sort: Avg upside {sortDesc ? '↓' : '↑'}
             </div>
             <div className="btn-new" onClick={() => setCreating(true)}><span className="plus">+</span> New watchlist</div>
           </>
