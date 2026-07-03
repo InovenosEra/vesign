@@ -76,27 +76,31 @@ export default function GlobalSearch() {
   return (
     <>
       <div style={{ position: 'relative' }}>
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder={t('table.searchGlobal')}
-          style={{
-            width: 240,
-            padding: '6px 14px',
-            borderRadius: 20,
-            border: '1px solid var(--border)',
-            background: 'var(--surface)',
-            color: 'var(--text)',
-            fontSize: 13,
-            outline: 'none',
-            transition: 'border-color 0.15s',
-          }}
-          onFocusCapture={e => e.target.style.borderColor = 'var(--accent)'}
-          onBlurCapture={e => e.target.style.borderColor = 'var(--border)'}
-        />
+        {/* contain:paint on this wrapper only (not the dropdown below) — same fix as
+            .wl-toolbar, see project_focus_triggered_color_glitch memory. */}
+        <div style={{ contain: 'paint' }}>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => results.length > 0 && setOpen(true)}
+            placeholder={t('table.searchGlobal')}
+            style={{
+              width: 240,
+              padding: '6px 14px',
+              borderRadius: 20,
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              fontSize: 13,
+              outline: 'none',
+              transition: 'border-color 0.15s',
+            }}
+            onFocusCapture={e => e.target.style.borderColor = 'var(--accent)'}
+            onBlurCapture={e => e.target.style.borderColor = 'var(--border)'}
+          />
+        </div>
         {open && results.length > 0 && (
           <div
             ref={dropdownRef}

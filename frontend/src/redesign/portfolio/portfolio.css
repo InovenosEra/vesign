@@ -377,7 +377,9 @@
   .rd .data-table .wt-bar { width: 54px; height: 3px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
   .rd .data-table .wt-fill { display: block; height: 100%; background: var(--blue-2); }
   /* holdings section-header controls */
-  .rd .hold-controls { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  /* contain:paint — same fix as .wl-toolbar (see project_focus_triggered_color_glitch memory):
+     isolates this input's rendering from the large holdings table below it. */
+  .rd .hold-controls { margin-left: auto; display: flex; align-items: center; gap: 10px; contain: paint; }
   .rd .hold-search { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 7px; padding: 5px 9px; color: var(--ink-3); }
   .rd .hold-search input { background: transparent; border: 0; outline: none; color: var(--ink); font-size: 12.5px; width: 160px; }
   .rd .hold-add { font-size: 11.5px; color: var(--blue-2); cursor: pointer; font-weight: 500; white-space: nowrap; }

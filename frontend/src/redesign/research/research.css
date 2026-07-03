@@ -75,6 +75,8 @@
   }
 
   /* FILTER RAIL */
+  /* contain:paint — same fix as .wl-toolbar (see project_focus_triggered_color_glitch
+     memory): isolates the search input's rendering from the results grid beside it. */
   .rd .filter-rail {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -83,6 +85,7 @@
     position: sticky; top: 90px;
     max-height: calc(100vh - 110px);
     overflow-y: auto;
+    contain: paint;
   }
   .rd .filter-rail-head {
     display: flex; align-items: center; justify-content: space-between;

@@ -195,11 +195,15 @@ export default function DeepDive({ ticker, setTicker }) {
       {/* SEARCH BAR + recent */}
       <div className="dd-search-bar">
         <div style={{ flex: 1, position: 'relative' }}>
-          <input className="ticker-input" type="text" placeholder="Type a ticker — e.g. AAPL, MSFT, GOOGL…"
-            value={input}
-            onChange={(e) => { setInput(e.target.value); setSugQ(e.target.value) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') submit(input) }}
-            style={{ width: '100%' }} />
+          {/* contain:paint on this wrapper only (not the dropdown below) — same fix as
+              .wl-toolbar, see project_focus_triggered_color_glitch memory. */}
+          <div style={{ contain: 'paint' }}>
+            <input className="ticker-input" type="text" placeholder="Type a ticker — e.g. AAPL, MSFT, GOOGL…"
+              value={input}
+              onChange={(e) => { setInput(e.target.value); setSugQ(e.target.value) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') submit(input) }}
+              style={{ width: '100%' }} />
+          </div>
           {sugQ.trim() && Array.isArray(suggestions) && suggestions.length > 0 && (
             <div style={{
               position: 'absolute', top: 40, left: 0, right: 0, zIndex: 20,
