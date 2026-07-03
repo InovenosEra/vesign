@@ -37,7 +37,7 @@ const fmtDate = (w) => new Date(w).toLocaleDateString(undefined, { month: 'short
 export default function PerformanceChart() {
   const [months, setMonths] = useState(12)
   const [mode, setMode] = useState('pct')                       // 'pct' | 'value'
-  const [comparisons, setComparisons] = useState(['vesign', 'spy'])
+  const [comparisons, setComparisons] = useState(['spy'])
   const [addOpen, setAddOpen] = useState(false)
   const [sq, setSq] = useState('')
   const { symbol, rate } = useCurrency()
