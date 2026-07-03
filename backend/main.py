@@ -77,7 +77,10 @@ def _ensure_indexes():
     ]
     with engine.begin() as conn:
         for sql in indexes:
-            conn.execute(text(sql))
+            try:
+                conn.execute(text(sql))
+            except Exception:
+                pass  # table doesn't exist yet
 
 _ensure_indexes()
 
@@ -250,6 +253,16 @@ def _init_tables():
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS holdings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                buy_price REAL NOT NULL,
+                buy_date TEXT NOT NULL
+            )
+        """))
 
     # Schema migration in its own connection so a failure doesn't poison the
     # watchlist transaction above (SQLite marks a connection as "needs rollback"
@@ -279,6 +292,27 @@ def _init_tables():
                 """))
                 conn.execute(text("DROP TABLE watchlist_lists"))
                 conn.execute(text("ALTER TABLE watchlist_lists_new RENAME TO watchlist_lists"))
+    except Exception:
+        pass
+
+    # One-time migration: holdings become their own user-scoped concept,
+    # independent of watchlist_id (previously every lot had to nominally
+    # belong to one of the user's watchlists). Copies existing rows across,
+    # resolving user_id via the watchlist they used to be filed under, then
+    # drops the superseded table.
+    try:
+        with engine.begin() as conn:
+            exists = conn.execute(text(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='watchlist_holdings'"
+            )).fetchone()
+            if exists:
+                conn.execute(text("""
+                    INSERT INTO holdings (user_id, ticker, quantity, buy_price, buy_date)
+                    SELECT wl.user_id, wh.ticker, wh.quantity, wh.buy_price, wh.buy_date
+                    FROM watchlist_holdings wh
+                    JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
+                """))
+                conn.execute(text("DROP TABLE watchlist_holdings"))
     except Exception:
         pass
 
