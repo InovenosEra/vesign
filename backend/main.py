@@ -77,10 +77,7 @@ def _ensure_indexes():
     ]
     with engine.begin() as conn:
         for sql in indexes:
-            try:
-                conn.execute(text(sql))
-            except Exception:
-                pass  # table doesn't exist yet
+            conn.execute(text(sql))
 
 _ensure_indexes()
 
@@ -306,6 +303,14 @@ def _init_tables():
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='watchlist_holdings'"
             )).fetchone()
             if exists:
+                orphans = conn.execute(text("""
+                    SELECT wh.id, wh.ticker, wh.watchlist_id
+                    FROM watchlist_holdings wh
+                    LEFT JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
+                    WHERE wl.id IS NULL
+                """)).fetchall()
+                for o in orphans:
+                    print(f"[migration] Orphaned watchlist_holdings row skipped (no matching watchlist_lists): id={o[0]} ticker={o[1]} watchlist_id={o[2]}")
                 conn.execute(text("""
                     INSERT INTO holdings (user_id, ticker, quantity, buy_price, buy_date)
                     SELECT wl.user_id, wh.ticker, wh.quantity, wh.buy_price, wh.buy_date
