@@ -4,7 +4,7 @@
  * No ownership concept anywhere — that's the Holdings tab, fully independent.
  * Owns all of its own list/ticker mutations so WatchlistsTab only has to
  * render it. */
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { renameWatchlist, deleteWatchlist, addTicker, removeTicker, updateTicker, searchTickers } from '../../api'
 import { useTickerModal } from '../TickerModalContext'
@@ -27,6 +27,16 @@ function TickerCard({ r, listId, onOpen, onRemove }) {
   const qc = useQueryClient()
   const { fmtPrice } = useCurrency()
   const [draft, setDraft] = useState(r.targetPrice != null ? String(r.targetPrice) : '')
+  const inputRef = useRef(null)
+
+  // r.targetPrice can arrive after this component has already mounted (the
+  // list loads in two phases: watchlists, then each list's tickers), so the
+  // useState initializer above can miss it. Re-sync whenever it changes,
+  // unless the user is actively editing the field.
+  useEffect(() => {
+    if (document.activeElement === inputRef.current) return
+    setDraft(r.targetPrice != null ? String(r.targetPrice) : '')
+  }, [r.targetPrice])
 
   const targetMut = useMutation({
     mutationFn: (value) => updateTicker(listId, r.ticker, { target_price: value }),
@@ -59,7 +69,7 @@ function TickerCard({ r, listId, onOpen, onRemove }) {
         </div>
         <div className="cell" onClick={(e) => e.stopPropagation()}>
           <div className="lbl">Target</div>
-          <input className="wl-target-input" inputMode="decimal" placeholder="—"
+          <input ref={inputRef} className="wl-target-input" inputMode="decimal" placeholder="—"
             value={draft} onChange={(e) => setDraft(e.target.value)}
             onBlur={commitTarget}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }} />
