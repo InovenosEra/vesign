@@ -2,9 +2,18 @@
  * VesignRead.jsx pattern (whole-portfolio) to a single watchlist's rows.
  * Signal mix + avg health are Vesign-model output (gated for Free, same rule
  * as every other page); near-target count is the user's own data and biggest
- * upside is analyst-derived — neither is ever gated. */
+ * upside is analyst-derived — neither is ever gated. Each gated cell carries
+ * its own small lock scrim (never the whole 4-cell panel); the "Upgrade" CTA
+ * renders once, below the grid, so it can never cover the ungated cells. */
 import { useMe } from '../../context/MeContext'
 import { LOGO } from '../fmt'
+
+const LockGlyph = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4.5" y="11" width="15" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+)
 
 export default function WatchlistRead({ card }) {
   const me = useMe()
@@ -15,7 +24,7 @@ export default function WatchlistRead({ card }) {
   return (
     <div className="wl-read-wrap">
       <div className="wl-read">
-        <div>
+        <div className="wl-read-cell">
           <div className="lbl">Signal mix</div>
           <div className="chips">
             {modelLocked ? (
@@ -29,14 +38,15 @@ export default function WatchlistRead({ card }) {
               </>
             )}
           </div>
+          {modelLocked && <div className="wl-read-cell-scrim" aria-hidden="true"><LockGlyph /></div>}
         </div>
 
-        <div>
+        <div className="wl-read-cell">
           <div className="lbl">Near target</div>
           <div className="val">{tickerCount === 0 ? '—' : `${nearTargetCount} of ${tickerCount}`}</div>
         </div>
 
-        <div>
+        <div className="wl-read-cell">
           <div className="lbl">Avg health</div>
           <div className="val">
             {modelLocked ? (
@@ -45,9 +55,10 @@ export default function WatchlistRead({ card }) {
               <>{avgHealth.toFixed(1)}<span style={{ color: 'var(--ink-3)' }}>/5</span></>
             )}
           </div>
+          {modelLocked && <div className="wl-read-cell-scrim" aria-hidden="true"><LockGlyph /></div>}
         </div>
 
-        <div>
+        <div className="wl-read-cell">
           <div className="lbl">Biggest upside</div>
           <div className="val">
             {biggestUpside == null ? '—' : (
@@ -62,9 +73,9 @@ export default function WatchlistRead({ card }) {
       </div>
 
       {modelLocked && (
-        <div className="wl-read-locked-overlay">
-          <div className="msg">Signal + health analysis is a Pro feature</div>
-          <div className="cta">Upgrade to unlock →</div>
+        <div className="wl-read-locked-strip">
+          <span className="msg">Signal + health analysis is a Pro feature</span>
+          <span className="cta">Upgrade to unlock →</span>
         </div>
       )}
     </div>
