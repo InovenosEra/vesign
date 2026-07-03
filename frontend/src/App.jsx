@@ -20,7 +20,6 @@ const RdPortfolioPage = lazy(() => import('./redesign/PortfolioPage'))
 const RdResearchPage = lazy(() => import('./redesign/ResearchPage'))
 const RdAccountPage = lazy(() => import('./redesign/AccountPage'))
 const SignalsPage = lazy(() => import('./pages/SignalsPage'))
-const WatchlistPage = lazy(() => import('./pages/WatchlistPage'))
 const TradesPage = lazy(() => import('./pages/TradesPage'))
 const ResearchPage = lazy(() => import('./pages/ResearchPage'))
 const SignInPage = lazy(() => import('./redesign/SignInPage'))
@@ -677,7 +676,6 @@ function AppLayout() {
                     {/* Old pages kept reachable during the port (not in redesign nav). */}
                     <Route path="/signals-old" element={<SignalsPage />} />
                     <Route path="/trades" element={<TradesPage />} />
-                    <Route path="/watchlist-old" element={<WatchlistPage />} />
                     <Route path="/research-old" element={<ResearchPage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/contact" element={<ContactPage />} />
