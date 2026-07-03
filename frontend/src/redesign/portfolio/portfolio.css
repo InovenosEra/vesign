@@ -405,6 +405,12 @@
   .rd .wl-toolbar {
     display: flex; align-items: center; gap: 12px;
     margin-bottom: 18px;
+    /* Isolates this toolbar's rendering (incl. the text-input caret) from the
+       card grid below — on some Chrome/GPU/display combos, focusing a text
+       input here was making Chrome composite the whole content area below on
+       its own layer with a slightly wrong color. contain:paint tells Chrome
+       nothing here paints outside this box, so it shouldn't need to. */
+    contain: paint;
   }
   .rd .wl-toolbar .lead {
     font-size: 11.5px; color: var(--ink-3);
