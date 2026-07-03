@@ -248,7 +248,7 @@ export default function PerformancePage() {
   useEffect(() => {
     const html = document.documentElement
     const prev = html.style.background
-    html.style.background = '#0a0e15'
+    html.style.background = '#000000'
     return () => { html.style.background = prev }
   }, [])
 

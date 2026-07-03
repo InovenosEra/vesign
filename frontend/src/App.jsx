@@ -34,10 +34,10 @@ const PerformancePage = lazy(() => import('./redesign/PerformancePage'))
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 // Suspense fallback while a page's lazy JS chunk downloads (sub-second). A
-// full-bleed fill in the redesign base color (--bg #0a0e15) so the canvas
+// full-bleed fill in the redesign base color (--bg #000000) so the canvas
 // matches the .rd app that takes over — no light/legacy-bg flash in between.
 function PageFallback() {
-  return <div style={{ position: 'fixed', inset: 0, background: '#0a0e15' }} aria-hidden="true" />
+  return <div style={{ position: 'fixed', inset: 0, background: '#000000' }} aria-hidden="true" />
 }
 
 // gcTime must be ≥ persistOptions.maxAge so persisted entries aren't dropped
