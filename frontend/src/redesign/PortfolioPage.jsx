@@ -4,7 +4,7 @@
  * comparison, holdings table) + a Watchlists tab. */
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getPortfolioHoldings, getPortfolioComparison, getPortfolioPerformance } from '../api'
+import { getPortfolioHoldings, getPortfolioComparison, getPortfolioPerformance, getWatchlists } from '../api'
 import { computeRows } from './portfolio/derive'
 import NetWorthHero from './portfolio/NetWorthHero'
 import PerformanceChart from './portfolio/PerformanceChart'
@@ -24,6 +24,7 @@ export default function PortfolioPage() {
   const setTab = (t) => { navigate('/portfolio/' + t); window.scrollTo({ top: 0, behavior: 'instant' }) }
   const { data: holdings } = useQuery({ queryKey: ['portfolio-holdings'], queryFn: () => getPortfolioHoldings('US'), refetchInterval: 3_000 })
   const { data: cmp } = useQuery({ queryKey: ['portfolio-comparison'], queryFn: () => getPortfolioComparison('US') })
+  const { data: lists } = useQuery({ queryKey: ['watchlists'], queryFn: getWatchlists })
   // Gate the holdings tab so KPIs + performance chart + allocation + comparison +
   // table all appear together (perf chart fetches its own series separately).
   const holdingsReady = useReady(tab === 'holdings', [
@@ -43,7 +44,7 @@ export default function PortfolioPage() {
     if (ves && mine && mine.yield != null && ves.yield != null) vsVesign = mine.yield - ves.yield
   }
 
-  const wlCount = Array.isArray(cmp) ? Math.max(0, cmp.filter(c => c.name !== 'Vesign').length) : 0
+  const wlCount = Array.isArray(lists) ? lists.length : 0
   const day = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 
   return (

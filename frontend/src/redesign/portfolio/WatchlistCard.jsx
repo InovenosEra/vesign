@@ -96,11 +96,10 @@ function TickerCard({ r, listId, onOpen, onRemove }) {
 export default function WatchlistCard({ card }) {
   const qc = useQueryClient()
   const open = useTickerModal()
-  const { fmtPrice } = useCurrency()
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
-  const [nameDraft, setNameDraft] = useState(card.name)
+  const [nameDraft, setNameDraft] = useState('')
   const [confirmDeleteList, setConfirmDeleteList] = useState(false)
   const [adding, setAdding] = useState(false)
   const [q, setQ] = useState('')
@@ -154,7 +153,7 @@ export default function WatchlistCard({ card }) {
           </div>
           {menuOpen && (
             <div className="wl-menu-pop" onMouseLeave={() => setMenuOpen(false)}>
-              <button className="wl-menu-item" onClick={() => { setRenaming(true); setMenuOpen(false) }}>Rename</button>
+              <button className="wl-menu-item" onClick={() => { setNameDraft(card.name); setRenaming(true); setMenuOpen(false) }}>Rename</button>
               <button className="wl-menu-item danger" onClick={() => { setConfirmDeleteList(true); setMenuOpen(false) }}>Delete</button>
             </div>
           )}

@@ -480,11 +480,6 @@
     font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
     padding: 2px 7px; border-radius: 3px; background: var(--bg-3);
   }
-  .rd .wl-card-head .yield-block { display: flex; flex-direction: column; gap: 1px; align-items: flex-end; }
-  .rd .wl-card-head .yield-block .l { font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-  .rd .wl-card-head .yield-block .y { font-family: var(--mono); font-size: 14px; font-weight: 600; font-feature-settings: 'tnum' 1; }
-  .rd .wl-card-head .yield-block .y.up { color: var(--green); }
-  .rd .wl-card-head .yield-block .y.down { color: var(--red); }
   .rd .wl-card-head .menu {
     width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
     border-radius: 6px; cursor: pointer; color: var(--ink-3);
@@ -508,9 +503,6 @@
   .rd .wl-read .chip.buy { background: rgba(0,217,126,0.15); color: var(--green); }
   .rd .wl-read .chip.hold { background: rgba(255,255,255,0.08); color: var(--ink-2); }
   .rd .wl-read .chip.sell { background: rgba(255,77,92,0.15); color: var(--red); }
-  .rd .wl-read-dots { display: inline-flex; gap: 1.5px; margin-left: 4px; }
-  .rd .wl-read-dots .d { width: 5px; height: 5px; border-radius: 50%; background: var(--green); display: inline-block; }
-  .rd .wl-read-dots .d.off { background: rgba(255,255,255,0.1); }
 
   /* Each of the 4 grid cells is its own containing block, so a gated cell's
      lock scrim (below) can only ever cover that one cell — never its siblings
@@ -576,19 +568,6 @@
     gap: 6px; padding: 10px; color: var(--ink-3); font-size: 11.5px; cursor: pointer; transition: border-color .15s, color .15s;
   }
   .rd .wl-add-row:hover { border-color: var(--blue-2); color: var(--ink); }
-
-  .rd .wl-card-foot {
-    padding: 10px 18px;
-    display: flex; align-items: center; gap: 12px;
-    border-top: 1px solid var(--line);
-    background: rgba(255,255,255,0.005);
-  }
-  .rd .wl-card-foot .add {
-    color: var(--blue-2); font-size: 12px; font-weight: 500; cursor: pointer;
-    transition: color .15s;
-  }
-  .rd .wl-card-foot .add:hover { color: #93c5fd; }
-  .rd .wl-card-foot .meta { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
 
   /* Empty/add-new card */
   .rd .wl-card.add-new {
