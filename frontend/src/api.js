@@ -201,13 +201,13 @@ export const deleteWatchlist = (id) => del(`/watchlists/${id}`)
 export const getWatchlistTickers = (id) => get(`/watchlists/${id}/tickers`)
 export const addTicker = (id, ticker, note = '') =>
   post(`/watchlists/${id}/tickers`, { ticker, note })
-export const updateTickerNote = (id, ticker, note) =>
-  patch(`/watchlists/${id}/tickers/${ticker}`, { note })
+export const updateTicker = (id, ticker, body) =>
+  patch(`/watchlists/${id}/tickers/${ticker}`, body)
 export const removeTicker = (id, ticker) =>
   del(`/watchlists/${id}/tickers/${ticker}`)
-export const getHoldings = (id) => get(`/watchlists/${id}/holdings`)
-export const addHolding = (id, body) => post(`/watchlists/${id}/holdings`, body)
-export const deleteHolding = (id, holdingId) => del(`/watchlists/${id}/holdings/${holdingId}`)
+export const getUserHoldings = () => get('/holdings')
+export const addHolding = (body) => post('/holdings', body)
+export const deleteHolding = (holdingId) => del(`/holdings/${holdingId}`)
 export const getHoldingLots = (ticker, market = 'US') =>
   get(`/portfolio/holdings/lots?ticker=${encodeURIComponent(ticker)}&market=${market}`)
 
