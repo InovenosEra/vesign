@@ -193,7 +193,7 @@ export default function HoldingsTable({ rows, subhead }) {
                           )}
                         </>
                       ) : r.last_close != null ? (
-                        <><div className="muted">{fmtPrice(r.last_close)}</div><div className="muted" style={{ fontSize: 10 }}>at close</div></>
+                        <div>{fmtPrice(r.last_close)}</div>
                       ) : '—'}
                     </td>
                     <td className="r">{r.cost == null ? '—' : fmtPrice(r.cost)}</td>
