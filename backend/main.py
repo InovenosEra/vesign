@@ -321,6 +321,13 @@ def _init_tables():
     except Exception:
         pass
 
+    # Add target_price column to watchlist table
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE watchlist ADD COLUMN target_price REAL"))
+    except Exception:
+        pass  # column already exists
+
 
 _init_tables()
 
@@ -586,8 +593,9 @@ class TickerAdd(BaseModel):
     note: str = ""
 
 
-class NoteUpdate(BaseModel):
-    note: str
+class TickerPatch(BaseModel):
+    note: Optional[str] = None
+    target_price: Optional[float] = None
 
 
 class AccessRequestBody(BaseModel):
@@ -1717,7 +1725,7 @@ def get_watchlist_tickers(list_id: int, user=Depends(get_current_user)):
     with engine.connect() as conn:
         _assert_owns_list(conn, list_id, user["id"])
         df = pd.read_sql(
-            text("SELECT id, ticker, note FROM watchlist WHERE list_id = :lid ORDER BY id"),
+            text("SELECT id, ticker, note, target_price FROM watchlist WHERE list_id = :lid ORDER BY id"),
             conn, params={"lid": list_id}
         )
     return _records(df)
@@ -1804,13 +1812,21 @@ def add_ticker(list_id: int, body: TickerAdd, user=Depends(get_current_user)):
 
 
 @protected.patch("/api/watchlists/{list_id}/tickers/{ticker}")
-def update_ticker_note(list_id: int, ticker: str, body: NoteUpdate, user=Depends(get_current_user)):
+def update_ticker(list_id: int, ticker: str, body: TickerPatch, user=Depends(get_current_user)):
+    if body.target_price is not None and body.target_price <= 0:
+        raise HTTPException(status_code=400, detail="target_price must be greater than 0")
     with engine.begin() as conn:
         _assert_owns_list(conn, list_id, user["id"])
-        conn.execute(
-            text("UPDATE watchlist SET note = :note WHERE list_id = :lid AND ticker = :ticker"),
-            {"note": body.note, "lid": list_id, "ticker": ticker.upper()},
-        )
+        if body.note is not None:
+            conn.execute(
+                text("UPDATE watchlist SET note = :note WHERE list_id = :lid AND ticker = :ticker"),
+                {"note": body.note, "lid": list_id, "ticker": ticker.upper()},
+            )
+        if body.target_price is not None:
+            conn.execute(
+                text("UPDATE watchlist SET target_price = :tp WHERE list_id = :lid AND ticker = :ticker"),
+                {"tp": body.target_price, "lid": list_id, "ticker": ticker.upper()},
+            )
     return {"ok": True}
 
 
