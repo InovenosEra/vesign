@@ -26,12 +26,12 @@ html {
   height: 100%;
   /* Single flat canvas color across the whole UI (was a blue radial-gradient
      that read as a second background color below the content). */
-  background: #000000;
+  background: #0a0e15;
 }
 
 body, #root {
   height: 100%;
-  background: #000000;
+  background: #0a0e15;
   color: var(--text);
   font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 14px;
