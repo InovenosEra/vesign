@@ -151,7 +151,7 @@ function AccountMenu() {
 function WalletChip() {
   const me = useMe()
   const navigate = useNavigate()
-  if (!me.ready || me.plan === 'free') return null
+  if (!me.ready || me.plan !== 'pro') return null
   return (
     <button type="button" className="wallet-chip" title="Wallet balance" onClick={() => navigate('/account/wallet')}>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
