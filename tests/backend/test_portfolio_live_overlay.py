@@ -16,7 +16,7 @@ def portfolio_app():
     eng = create_engine(f"sqlite:///{os.environ['DB_PATH']}", poolclass=None)
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE watchlist_lists (id INTEGER PRIMARY KEY, user_id TEXT, name TEXT)"))
-        conn.execute(text("CREATE TABLE watchlist_holdings (id INTEGER PRIMARY KEY, watchlist_id INTEGER, ticker TEXT, quantity REAL, buy_price REAL, buy_date TEXT)"))
+        conn.execute(text("CREATE TABLE holdings (id INTEGER PRIMARY KEY, user_id TEXT, ticker TEXT, quantity REAL, buy_price REAL, buy_date TEXT)"))
         conn.execute(text("CREATE TABLE companies (ticker TEXT PRIMARY KEY, company TEXT, sector TEXT, market TEXT, industry TEXT, description TEXT, description_short TEXT, logo_url TEXT, domain TEXT)"))
         conn.execute(text("CREATE TABLE fundamentals (ticker TEXT, market_cap REAL)"))
         conn.execute(text("CREATE TABLE daily_prices (date DATETIME, ticker TEXT, open FLOAT, high FLOAT, low FLOAT, close FLOAT, volume BIGINT)"))
@@ -24,7 +24,7 @@ def portfolio_app():
         conn.execute(text("CREATE TABLE company_health (ticker TEXT PRIMARY KEY, score INTEGER, reason TEXT)"))
         conn.execute(text("CREATE TABLE signals (ticker TEXT, date TEXT, signal TEXT, fair_value_upside REAL, prediction_score REAL, target_mean_price REAL)"))
         conn.execute(text("INSERT INTO watchlist_lists (id, user_id, name) VALUES (1, 'dev-bypass', 'Mine')"))
-        conn.execute(text("INSERT INTO watchlist_holdings (watchlist_id, ticker, quantity, buy_price, buy_date) VALUES (1,'AAA',10,100.0,'2026-01-01')"))
+        conn.execute(text("INSERT INTO holdings (user_id, ticker, quantity, buy_price, buy_date) VALUES ('dev-bypass','AAA',10,100.0,'2026-01-01')"))
         conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES ('AAA','AAA Corp','US')"))
         conn.execute(text("INSERT INTO fundamentals (ticker, market_cap) VALUES ('AAA', 1000)"))
         conn.execute(text("INSERT INTO daily_prices (date,ticker,open,high,low,close,volume) VALUES ('2026-05-22 00:00:00','AAA',105,105,105,105,1)"))

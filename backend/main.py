@@ -1709,7 +1709,6 @@ def delete_watchlist(list_id: int, user=Depends(get_current_user)):
     with engine.begin() as conn:
         _assert_owns_list(conn, list_id, user["id"])
         conn.execute(text("DELETE FROM watchlist WHERE list_id = :lid"), {"lid": list_id})
-        conn.execute(text("DELETE FROM watchlist_holdings WHERE watchlist_id = :lid"), {"lid": list_id})
         conn.execute(text("DELETE FROM watchlist_lists WHERE id = :lid AND user_id = :uid"), {"lid": list_id, "uid": user["id"]})
 
 
@@ -1823,13 +1822,9 @@ def remove_ticker(list_id: int, ticker: str, user=Depends(get_current_user)):
             text("DELETE FROM watchlist WHERE list_id = :lid AND ticker = :ticker"),
             {"lid": list_id, "ticker": ticker.upper()},
         )
-        conn.execute(
-            text("DELETE FROM watchlist_holdings WHERE watchlist_id = :lid AND ticker = :ticker"),
-            {"lid": list_id, "ticker": ticker.upper()},
-        )
 
 
-# --- Watchlist holdings ------------------------------------------------------
+# --- Holdings (user-scoped, independent of any watchlist) -------------------
 
 class HoldingCreate(BaseModel):
     ticker: str
@@ -1837,18 +1832,7 @@ class HoldingCreate(BaseModel):
     buy_price: float
     buy_date: str
 
-@protected.get("/api/watchlists/{list_id}/holdings")
-def get_holdings(list_id: int, user=Depends(get_current_user)):
-    with engine.connect() as conn:
-        _assert_owns_list(conn, list_id, user["id"])
-        rows = conn.execute(
-            text("SELECT id, ticker, quantity, buy_price, buy_date FROM watchlist_holdings WHERE watchlist_id = :lid ORDER BY ticker, buy_date"),
-            {"lid": list_id},
-        ).fetchall()
-    return [{"id": r[0], "ticker": r[1], "quantity": r[2], "buy_price": r[3], "buy_date": r[4]} for r in rows]
-
-@protected.post("/api/watchlists/{list_id}/holdings", status_code=201)
-def add_holding(list_id: int, body: HoldingCreate, user=Depends(get_current_user)):
+def _validate_and_normalize_holding(body: HoldingCreate, conn) -> tuple[str, object]:
     tk = (body.ticker or "").strip().upper()
     if not tk:
         raise HTTPException(status_code=400, detail="ticker is required")
@@ -1866,23 +1850,35 @@ def add_holding(list_id: int, body: HoldingCreate, user=Depends(get_current_user
         raise HTTPException(status_code=400, detail="buy_date must be YYYY-MM-DD")
     if bd > date.today():
         raise HTTPException(status_code=400, detail="buy_date cannot be in the future")
+    if not conn.execute(text("SELECT 1 FROM companies WHERE ticker = :t"), {"t": tk}).fetchone():
+        raise HTTPException(status_code=400, detail=f"unknown ticker {tk}")
+    return tk, bd
+
+@protected.get("/api/holdings")
+def get_user_holdings(user=Depends(get_current_user)):
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id, ticker, quantity, buy_price, buy_date FROM holdings WHERE user_id = :uid ORDER BY ticker, buy_date"),
+            {"uid": user["id"]},
+        ).fetchall()
+    return [{"id": r[0], "ticker": r[1], "quantity": r[2], "buy_price": r[3], "buy_date": r[4]} for r in rows]
+
+@protected.post("/api/holdings", status_code=201)
+def add_user_holding(body: HoldingCreate, user=Depends(get_current_user)):
     with engine.begin() as conn:
-        _assert_owns_list(conn, list_id, user["id"])
-        if not conn.execute(text("SELECT 1 FROM companies WHERE ticker = :t"), {"t": tk}).fetchone():
-            raise HTTPException(status_code=400, detail=f"unknown ticker {tk}")
+        tk, bd = _validate_and_normalize_holding(body, conn)
         result = conn.execute(
-            text("INSERT INTO watchlist_holdings (watchlist_id, ticker, quantity, buy_price, buy_date) VALUES (:lid, :ticker, :qty, :price, :date)"),
-            {"lid": list_id, "ticker": tk, "qty": body.quantity, "price": body.buy_price, "date": bd.isoformat()},
+            text("INSERT INTO holdings (user_id, ticker, quantity, buy_price, buy_date) VALUES (:uid, :ticker, :qty, :price, :date)"),
+            {"uid": user["id"], "ticker": tk, "qty": body.quantity, "price": body.buy_price, "date": bd.isoformat()},
         )
     return {"id": result.lastrowid}
 
-@protected.delete("/api/watchlists/{list_id}/holdings/{holding_id}", status_code=204)
-def delete_holding(list_id: int, holding_id: int, user=Depends(get_current_user)):
+@protected.delete("/api/holdings/{holding_id}", status_code=204)
+def delete_user_holding(holding_id: int, user=Depends(get_current_user)):
     with engine.begin() as conn:
-        _assert_owns_list(conn, list_id, user["id"])
         conn.execute(
-            text("DELETE FROM watchlist_holdings WHERE id = :hid AND watchlist_id = :lid"),
-            {"hid": holding_id, "lid": list_id},
+            text("DELETE FROM holdings WHERE id = :hid AND user_id = :uid"),
+            {"hid": holding_id, "uid": user["id"]},
         )
 
 
@@ -2835,9 +2831,8 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
                    SUM(wh.quantity) AS total_qty,
                    SUM(wh.quantity * wh.buy_price) AS total_cost,
                    MIN(wh.buy_date) AS first_buy_date
-            FROM watchlist_holdings wh
-            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid AND {market_filter}
+            FROM holdings wh
+            WHERE wh.user_id = :uid AND {market_filter}
             GROUP BY wh.ticker
             ORDER BY total_cost DESC
         """), {"uid": uid}).fetchall()
@@ -2963,11 +2958,9 @@ def portfolio_holding_lots(ticker: str, user=Depends(get_current_user), market: 
     market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
     with engine.connect() as conn:
         rows = conn.execute(text(f"""
-            SELECT wh.id, wh.watchlist_id, wl.name AS watchlist_name,
-                   wh.ticker, wh.quantity, wh.buy_price, wh.buy_date
-            FROM watchlist_holdings wh
-            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid AND wh.ticker = :tk AND {market_filter}
+            SELECT wh.id, wh.ticker, wh.quantity, wh.buy_price, wh.buy_date
+            FROM holdings wh
+            WHERE wh.user_id = :uid AND wh.ticker = :tk AND {market_filter}
             ORDER BY wh.buy_date DESC, wh.id DESC
         """), {"uid": user["id"], "tk": tk}).mappings().all()
     return [dict(r) for r in rows]
@@ -3169,9 +3162,8 @@ def portfolio_performance(
         # User holdings — individual lots with buy_date
         user_rows = conn.execute(text(f"""
             SELECT wh.ticker, wh.quantity, wh.buy_price, DATE(wh.buy_date) AS buy_date
-            FROM watchlist_holdings wh
-            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid AND {market_filter}
+            FROM holdings wh
+            WHERE wh.user_id = :uid AND {market_filter}
               AND wh.quantity > 0
             ORDER BY wh.buy_date
         """), {"uid": uid}).fetchall()

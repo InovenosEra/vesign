@@ -16,15 +16,15 @@ def perf_app():
     eng = create_engine(f"sqlite:///{os.environ['DB_PATH']}", poolclass=None)
     with eng.begin() as c:
         c.execute(text("CREATE TABLE watchlist_lists (id INTEGER PRIMARY KEY, user_id TEXT, name TEXT)"))
-        c.execute(text("CREATE TABLE watchlist_holdings (id INTEGER PRIMARY KEY, watchlist_id INTEGER, ticker TEXT, quantity REAL, buy_price REAL, buy_date TEXT)"))
+        c.execute(text("CREATE TABLE holdings (id INTEGER PRIMARY KEY, user_id TEXT, ticker TEXT, quantity REAL, buy_price REAL, buy_date TEXT)"))
         c.execute(text("CREATE TABLE daily_prices (ticker TEXT, date TEXT, close REAL)"))
         c.execute(text("CREATE TABLE companies (ticker TEXT PRIMARY KEY, company TEXT, sector TEXT, industry TEXT, logo_url TEXT, domain TEXT)"))
         c.execute(text("CREATE TABLE company_health_history (ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT)"))
         c.execute(text("INSERT INTO watchlist_lists VALUES (1,'dev-bypass','Mine')"))
         # one lot, bought ~13 months ago so it's present across the whole window
         start = date.today() - timedelta(days=400)
-        c.execute(text("INSERT INTO watchlist_holdings (watchlist_id,ticker,quantity,buy_price,buy_date) "
-                       f"VALUES (1,'AAPL',10,100.0,'{start.isoformat()}')"))
+        c.execute(text("INSERT INTO holdings (user_id,ticker,quantity,buy_price,buy_date) "
+                       f"VALUES ('dev-bypass','AAPL',10,100.0,'{start.isoformat()}')"))
         # daily prices for AAPL + SPY + QQQ across the last 400 days (rising)
         d = start
         i = 0
