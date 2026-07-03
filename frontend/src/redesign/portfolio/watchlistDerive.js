@@ -1,50 +1,61 @@
 import { overlayLive, overlayUpside } from '../fmt'
+import { signalMix as computeSignalMix } from './derive'
 
-// One view-model per watchlist: each row is either "owned" (has lots in
-// THIS list, so it carries cost/pnl/yield) or "watch-only" (no lots, so it
-// carries the analyst upside instead) — a ticker can be owned in one list
-// and watch-only in another, since lots are attributed per watchlist_id.
-export function buildCards({ lists, tickersByList, holdingsByList, signalsByTicker, prices, comparisonByName }) {
+const NEAR_TARGET_PCT = 5   // "within 5% of target" — see design spec
+
+// One view-model per watchlist. No ownership concept at all: every row is
+// forward-looking (price + day change + analyst upside + Vesign signal/health
+// + a user-set target price). Rows never carry cost/P&L — that's Holdings'
+// job, and Holdings is a fully independent, user-scoped concept now.
+export function buildCards({ lists, tickersByList, signalsByTicker, prices }) {
   return lists.map(list => {
     const members = tickersByList[list.id] || []
-    const lots = holdingsByList[list.id] || []
-    const lotsByTicker = {}
-    for (const l of lots) (lotsByTicker[l.ticker] ??= []).push(l)
 
-    const rows = members.map(({ ticker }) => {
+    const rows = members.map(({ ticker, target_price }) => {
       const sig = signalsByTicker[ticker] || {}
       const close = sig.close ?? null
       const livePrice = prices[ticker] ?? null
       const { price, change: dayPct } = overlayLive(close, null, livePrice)
 
-      const myLots = lotsByTicker[ticker] || []
-      const owned = myLots.length > 0
-      let costBasis = null, pnlAbs = null, yieldPct = null
-      if (owned) {
-        const qty = myLots.reduce((s, l) => s + l.quantity, 0)
-        costBasis = myLots.reduce((s, l) => s + l.quantity * l.buy_price, 0)
-        if (price != null) {
-          pnlAbs = qty * price - costBasis
-          yieldPct = costBasis ? (pnlAbs / costBasis) * 100 : null
-        }
-      }
-
       let upsidePct = null
-      if (!owned && sig.fair_value_upside != null && close != null) {
+      if (sig.fair_value_upside != null && close != null) {
         upsidePct = overlayUpside(close, sig.fair_value_upside * 100, livePrice).upside
       }
 
       return {
-        ticker, company: sig.company ?? null, price, dayPct,
-        owned, lotCount: myLots.length, costBasis, pnlAbs, yieldPct, upsidePct,
+        ticker, company: sig.company ?? null, price, dayPct, upsidePct,
+        signal: sig.signal ?? null, healthScore: sig.health_score ?? null,
+        targetPrice: target_price ?? null,
       }
     })
+
+    const upsideVals = rows.map(r => r.upsidePct).filter(v => v != null)
+    const avgUpside = upsideVals.length ? upsideVals.reduce((s, v) => s + v, 0) / upsideVals.length : null
+
+    const healthVals = rows.map(r => r.healthScore).filter(v => v != null)
+    const avgHealth = healthVals.length ? healthVals.reduce((s, v) => s + v, 0) / healthVals.length : null
+
+    let biggestUpside = null
+    rows.forEach(r => {
+      if (r.upsidePct != null && (biggestUpside == null || r.upsidePct > biggestUpside.upside)) {
+        biggestUpside = { ticker: r.ticker, upside: r.upsidePct }
+      }
+    })
+
+    const nearTargetCount = rows.filter(r =>
+      r.targetPrice != null && r.price != null &&
+      Math.abs((r.price - r.targetPrice) / r.targetPrice) * 100 <= NEAR_TARGET_PCT
+    ).length
 
     return {
       id: list.id,
       name: list.name,
       tickerCount: rows.length,
-      aggregateYield: comparisonByName[list.name] ?? null,
+      avgUpside,
+      signalMix: computeSignalMix(rows.map(r => ({ signal: r.signal }))),
+      avgHealth,
+      biggestUpside,
+      nearTargetCount,
       rows,
     }
   })
@@ -60,8 +71,8 @@ export function filterCards(cards, query) {
 
 export function sortCards(cards, dir = 'desc') {
   return cards.slice().sort((a, b) => {
-    const av = a.aggregateYield ?? -Infinity
-    const bv = b.aggregateYield ?? -Infinity
+    const av = a.avgUpside ?? -Infinity
+    const bv = b.avgUpside ?? -Infinity
     return dir === 'desc' ? bv - av : av - bv
   })
 }

@@ -4,58 +4,54 @@ import { buildCards, filterCards, sortCards } from './watchlistDerive'
 const baseArgs = () => ({
   lists: [{ id: 1, name: 'Core Tech' }, { id: 2, name: 'Growth' }],
   tickersByList: {
-    1: [{ ticker: 'NVDA', note: '' }, { ticker: 'TSLA', note: '' }],
-    2: [{ ticker: 'GOOGL', note: '' }],
-  },
-  holdingsByList: {
-    1: [{ id: 10, ticker: 'NVDA', quantity: 2, buy_price: 100, buy_date: '2026-01-01' }],
-    2: [],
+    1: [
+      { ticker: 'NVDA', note: '', target_price: 220 },
+      { ticker: 'TSLA', note: '', target_price: null },
+    ],
+    2: [{ ticker: 'GOOGL', note: '', target_price: 300 }],
   },
   signalsByTicker: {
-    NVDA: { ticker: 'NVDA', company: 'NVIDIA', close: 200, fair_value_upside: null },
-    TSLA: { ticker: 'TSLA', company: 'Tesla', close: 250, fair_value_upside: 0.10 },
-    GOOGL: { ticker: 'GOOGL', company: 'Alphabet', close: 175, fair_value_upside: 0.05 },
+    NVDA: { ticker: 'NVDA', company: 'NVIDIA', close: 200, fair_value_upside: 0.10, signal: 'BUY', health_score: 4 },
+    TSLA: { ticker: 'TSLA', company: 'Tesla', close: 250, fair_value_upside: 0.05, signal: 'HOLD', health_score: 3 },
+    GOOGL: { ticker: 'GOOGL', company: 'Alphabet', close: 175, fair_value_upside: 0.20, signal: 'BUY', health_score: 5 },
   },
   prices: { NVDA: 220, TSLA: 245, GOOGL: 175 },
-  comparisonByName: { 'Core Tech': 42.18, 'Growth': 28.04 },
 })
 
 describe('buildCards', () => {
-  it('marks a ticker with lots as owned and computes cost/pnl/yield', () => {
+  it('carries price/day-change/analyst-upside/signal/health/target for every row, no ownership', () => {
     const [core] = buildCards(baseArgs())
     const nvda = core.rows.find(r => r.ticker === 'NVDA')
-    expect(nvda.owned).toBe(true)
-    expect(nvda.lotCount).toBe(1)
-    expect(nvda.costBasis).toBe(200)          // 2 * 100
-    expect(nvda.price).toBe(220)               // live price wins
-    expect(nvda.pnlAbs).toBe(240)              // 2*220 - 200
-    expect(Math.round(nvda.yieldPct)).toBe(120) // 240/200*100
-    expect(nvda.upsidePct).toBeNull()
+    expect(nvda.owned).toBeUndefined()
+    expect(nvda.price).toBe(220)          // live price wins
+    expect(nvda.targetPrice).toBe(220)
+    expect(nvda.signal).toBe('BUY')
+    expect(nvda.healthScore).toBe(4)
+    expect(nvda.upsidePct).not.toBeNull()  // overlaid vs the live price
   })
 
-  it('marks a ticker with no lots as watch-only and reports analyst upside', () => {
-    const [core] = buildCards(baseArgs())
-    const tsla = core.rows.find(r => r.ticker === 'TSLA')
-    expect(tsla.owned).toBe(false)
-    expect(tsla.lotCount).toBe(0)
-    expect(tsla.costBasis).toBeNull()
-    expect(tsla.pnlAbs).toBeNull()
-    expect(tsla.upsidePct).not.toBeNull()      // overlaid vs the live price
-  })
-
-  it('carries list metadata and the aggregate yield from the comparison map', () => {
+  it('carries list metadata and a null target_price as null targetPrice', () => {
     const cards = buildCards(baseArgs())
     expect(cards.map(c => c.name)).toEqual(['Core Tech', 'Growth'])
     expect(cards[0].tickerCount).toBe(2)
-    expect(cards[0].aggregateYield).toBe(42.18)
-    expect(cards[1].rows[0].ticker).toBe('GOOGL')
+    const tsla = cards[0].rows.find(r => r.ticker === 'TSLA')
+    expect(tsla.targetPrice).toBeNull()
   })
 
-  it('falls back to null aggregateYield when the list has no comparison entry', () => {
-    const args = baseArgs()
-    args.comparisonByName = {}
-    const [core] = buildCards(args)
-    expect(core.aggregateYield).toBeNull()
+  it('computes signalMix, avgHealth, biggestUpside, and nearTargetCount per card', () => {
+    const [core] = buildCards(baseArgs())
+    expect(core.signalMix).toEqual({ BUY: 1, HOLD: 1, SELL: 0 })
+    expect(core.avgHealth).toBeCloseTo(3.5, 5)     // (4+3)/2
+    expect(core.biggestUpside.ticker).toBe('TSLA') // higher upside than NVDA once overlaid on live price
+    // NVDA's live price (220) already sits AT its target (220) -> within any
+    // positive threshold; TSLA has no target -> only NVDA counts.
+    expect(core.nearTargetCount).toBe(1)
+  })
+
+  it('computes avgUpside per card from each row\'s upsidePct', () => {
+    const cards = buildCards(baseArgs())
+    expect(cards[1].rows[0].ticker).toBe('GOOGL')
+    expect(cards[1].avgUpside).not.toBeNull()
   })
 })
 
@@ -77,20 +73,23 @@ describe('filterCards', () => {
 })
 
 describe('sortCards', () => {
-  it('sorts descending by aggregate yield by default', () => {
+  it('sorts descending by avg upside by default', () => {
     const cards = buildCards(baseArgs())
-    expect(sortCards(cards, 'desc').map(c => c.name)).toEqual(['Core Tech', 'Growth'])
+    const sorted = sortCards(cards, 'desc')
+    expect(sorted[0].avgUpside).toBeGreaterThanOrEqual(sorted[1].avgUpside)
   })
 
   it('sorts ascending when asked', () => {
     const cards = buildCards(baseArgs())
-    expect(sortCards(cards, 'asc').map(c => c.name)).toEqual(['Growth', 'Core Tech'])
+    const sorted = sortCards(cards, 'asc')
+    expect(sorted[0].avgUpside).toBeLessThanOrEqual(sorted[1].avgUpside)
   })
 
-  it('treats a null aggregateYield as the lowest value', () => {
+  it('treats a null avgUpside as the lowest value', () => {
     const args = baseArgs()
-    args.comparisonByName = { 'Growth': 5 }   // Core Tech has no entry -> null
-    const cards = buildCards(args)
-    expect(sortCards(cards, 'desc').map(c => c.name)).toEqual(['Growth', 'Core Tech'])
+    args.signalsByTicker.GOOGL.fair_value_upside = null
+    args.signalsByTicker.GOOGL.close = null
+    const cards = sortCards(buildCards(args), 'desc')
+    expect(cards[cards.length - 1].name).toBe('Growth')
   })
 })
