@@ -8,7 +8,7 @@ import { num, pct, dirClass, LOGO } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
 import { useMe } from '../../context/MeContext'
 import { useCurrency } from '../../context/CurrencyContext'
-import { getWatchlists, getMarketStatus } from '../../api'
+import { getMarketStatus } from '../../api'
 import AddHoldingForm from './AddHoldingForm'
 import HoldingLots from './HoldingLots'
 
@@ -82,7 +82,6 @@ export default function HoldingsTable({ rows, subhead }) {
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ key: 'ticker', dir: 'asc' })   // default: A→Z by ticker
-  const { data: watchlists } = useQuery({ queryKey: ['dd-watchlists'], queryFn: getWatchlists })
   const { data: mstat } = useQuery({ queryKey: ['market-status', 'US'], queryFn: () => getMarketStatus('US') })
   const toggle = (t) => setExpanded(prev => { const n = new Set(prev); n.has(t) ? n.delete(t) : n.add(t); return n })
   const toggleSort = (key) => setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }))
@@ -112,7 +111,7 @@ export default function HoldingsTable({ rows, subhead }) {
           <a className="hold-add" onClick={() => setAdding(a => !a)}>+ Add holding</a>
         </div>
       </div>
-      {adding && <AddHoldingForm watchlists={watchlists} onDone={() => setAdding(false)} />}
+      {adding && <AddHoldingForm onDone={() => setAdding(false)} />}
       <table className="data-table">
         <thead>
           <tr>
@@ -208,7 +207,7 @@ export default function HoldingsTable({ rows, subhead }) {
                     </td>
                   </tr>
                   {expanded.has(r.ticker) && (
-                    <HoldingLots ticker={r.ticker} latestClose={r.latest_close} watchlists={watchlists} colSpan={COLS} />
+                    <HoldingLots ticker={r.ticker} latestClose={r.latest_close} colSpan={COLS} />
                   )}
                 </Fragment>
               )

@@ -1,5 +1,7 @@
 /* Add-holding / add-lot form. Used both for a brand-new ticker (no preset) and
- * for adding a lot to an existing ticker (presetTicker locks the symbol). */
+ * for adding a lot to an existing ticker (presetTicker locks the symbol).
+ * Holdings are user-scoped (not filed under any watchlist), so this form only
+ * ever asks for ticker/shares/price/date. */
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { searchTickers, addHolding, getResearch } from '../../api'
@@ -7,15 +9,13 @@ import { validateHolding } from './holdingForm'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-export default function AddHoldingForm({ watchlists, presetTicker, onDone }) {
+export default function AddHoldingForm({ presetTicker, onDone }) {
   const qc = useQueryClient()
-  const lists = Array.isArray(watchlists) ? watchlists : []
   const [ticker, setTicker] = useState(presetTicker || '')
   const [q, setQ] = useState('')
   const [shares, setShares] = useState('')
   const [price, setPrice] = useState('')
   const [date, setDate] = useState(today())
-  const [wlId, setWlId] = useState(lists[0]?.id)
   const [err, setErr] = useState(null)
 
   const { data: sug } = useQuery({
@@ -33,7 +33,7 @@ export default function AddHoldingForm({ watchlists, presetTicker, onDone }) {
   }, [liveClose])  // only when the fetched price changes; leaves user edits intact
 
   const save = useMutation({
-    mutationFn: () => addHolding(wlId ?? lists[0]?.id, {
+    mutationFn: () => addHolding({
       ticker: ticker.trim().toUpperCase(), quantity: Number(shares),
       buy_price: Number(price), buy_date: date,
     }),
@@ -49,7 +49,6 @@ export default function AddHoldingForm({ watchlists, presetTicker, onDone }) {
     setErr(null)
     const v = validateHolding({ ticker, shares, price, date })
     if (v) { setErr(v); return }
-    if (!wlId && !lists[0]?.id) { setErr('No watchlist available'); return }
     save.mutate()
   }
 
@@ -77,11 +76,6 @@ export default function AddHoldingForm({ watchlists, presetTicker, onDone }) {
         value={price} onChange={(e) => setPrice(e.target.value)} />
       <input className="ahf-input" type="date" max={today()} value={date}
         onChange={(e) => setDate(e.target.value)} />
-      {lists.length > 1 && (
-        <select className="ahf-input" value={wlId} onChange={(e) => setWlId(Number(e.target.value))}>
-          {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-      )}
       <button className="ahf-btn" disabled={save.isPending} onClick={submit}>
         {save.isPending ? 'Adding…' : 'Add'}
       </button>

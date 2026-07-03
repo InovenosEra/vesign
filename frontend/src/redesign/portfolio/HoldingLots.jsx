@@ -7,7 +7,7 @@ import { num } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
 import AddHoldingForm from './AddHoldingForm'
 
-export default function HoldingLots({ ticker, latestClose, watchlists, colSpan }) {
+export default function HoldingLots({ ticker, latestClose, colSpan }) {
   const qc = useQueryClient()
   const { fmtPrice, fmtAmount } = useCurrency()
   const [adding, setAdding] = useState(false)
@@ -15,7 +15,7 @@ export default function HoldingLots({ ticker, latestClose, watchlists, colSpan }
     queryKey: ['portfolio-lots', ticker], queryFn: () => getHoldingLots(ticker),
   })
   const del = useMutation({
-    mutationFn: (lot) => deleteHolding(lot.watchlist_id, lot.id),
+    mutationFn: (lot) => deleteHolding(lot.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['portfolio-holdings'] })
       qc.invalidateQueries({ queryKey: ['portfolio-lots', ticker] })
@@ -56,7 +56,7 @@ export default function HoldingLots({ ticker, latestClose, watchlists, colSpan }
               </table>
             )}
           {adding
-            ? <AddHoldingForm watchlists={watchlists} presetTicker={ticker} onDone={() => setAdding(false)} />
+            ? <AddHoldingForm presetTicker={ticker} onDone={() => setAdding(false)} />
             : <button className="add-lot-btn" onClick={() => setAdding(true)}>+ Add lot</button>}
         </div>
       </td>
