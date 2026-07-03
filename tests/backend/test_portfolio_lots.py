@@ -111,3 +111,27 @@ def test_delete_watchlist_does_not_touch_holdings(lots_app):
     assert list_row is None    # list itself is gone
     assert wl_rows == []       # ticker membership for that list is gone
     eng.dispose()
+
+
+def test_remove_ticker_does_not_error_and_removes_membership(lots_app):
+    """remove_ticker (DELETE /api/watchlists/{list_id}/tickers/{ticker})
+    must remove ticker from watchlist table but NOT touch holdings."""
+    bm, client = lots_app
+    from sqlalchemy import create_engine, text
+    eng = create_engine(f"sqlite:///{os.environ['DB_PATH']}")
+
+    with eng.connect() as conn:
+        before_wl = conn.execute(text("SELECT COUNT(*) FROM watchlist WHERE list_id = 1 AND ticker = 'AAPL'")).scalar()
+        before_holdings = conn.execute(text("SELECT COUNT(*) FROM holdings WHERE user_id = 'dev-bypass' AND ticker = 'AAPL'")).scalar()
+    assert before_wl == 1      # AAPL is in watchlist 1
+    assert before_holdings == 2  # dev-bypass has 2 AAPL lots
+
+    # Remove the ticker from the watchlist
+    assert client.delete("/api/watchlists/1/tickers/AAPL").status_code == 204
+
+    with eng.connect() as conn:
+        after_wl = conn.execute(text("SELECT COUNT(*) FROM watchlist WHERE list_id = 1 AND ticker = 'AAPL'")).scalar()
+        after_holdings = conn.execute(text("SELECT COUNT(*) FROM holdings WHERE user_id = 'dev-bypass' AND ticker = 'AAPL'")).scalar()
+    assert after_wl == 0       # ticker removed from watchlist
+    assert after_holdings == 2  # holdings unchanged — the fix ensures we don't touch this table
+    eng.dispose()
