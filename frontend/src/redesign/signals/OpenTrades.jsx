@@ -28,6 +28,25 @@ function Th({ label, col, sort, onSort, className, style }) {
   )
 }
 
+// Fixed column widths so the table doesn't reflow width-per-column when paging
+// (auto layout was resizing to each page's longest content, e.g. company names).
+function OtColGroup() {
+  return (
+    <colgroup>
+      <col style={{ width: '3%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '19%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '12%' }} />
+    </colgroup>
+  )
+}
+
 // Columns mirror ve-sign.com (TradesPage open-trades), in the same order:
 // logo · Ticker · Company · Market Cap · Buy date · Buy price · Last day price ·
 // Days held · Live price (phase-aware) · Yield. Live price is the only non-sortable
@@ -42,7 +61,7 @@ function HeadRow({ phase, sort, onSort }) {
       <th></th>
       {H('Ticker', 'ticker')}
       {H('Company', 'company')}
-      {H('Market Cap', 'market_cap', 'r')}
+      {H('Market Cap (B)', 'market_cap', 'r')}
       {H('Buy date', 'buy_date', 'r')}
       {H('Buy price', 'buy_price', 'r')}
       {H('Last day price', 'current_price', 'r')}
@@ -165,7 +184,8 @@ export default function OpenTrades() {
     return (
       <>
         {header()}
-        <table className="data-table">
+        <table className="data-table fixed-table">
+          <OtColGroup />
           <thead><HeadRow phase={phase} /></thead>
           <tbody>
             {slice.length
@@ -208,7 +228,8 @@ export default function OpenTrades() {
           />
         )
       })()}
-      <table className="data-table">
+      <table className="data-table fixed-table">
+        <OtColGroup />
         <thead><HeadRow phase={phase} sort={sort} onSort={toggle} /></thead>
         <tbody>
           {rows.length === 0

@@ -180,6 +180,11 @@
   /* default: transparent — matches production. .white-bg for tickers in WHITE_BG_LOGOS allowlist */
   .rd .data-table .logo-mini { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: inline-block; flex-shrink: 0; }
   .rd .data-table .logo-mini.white-bg { background: #fff; padding: 2px; }
+  /* Paged/sorted tables: fixed column widths (paired with a <colgroup> per
+     table) so paging or sorting doesn't reflow columns to the visible page's
+     longest content. Used by Open Trades and Closed Trades. */
+  .rd .fixed-table { table-layout: fixed; }
+  .rd .fixed-table th, .rd .fixed-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rd .up { color: var(--green); }
   .rd .down { color: var(--red); }
   .rd .muted { color: var(--ink-3); }

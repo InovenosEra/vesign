@@ -34,6 +34,25 @@ const yieldOf = (t) => (t.avg_cost && t.sell_price)
   ? (t.sell_price - t.avg_cost) / t.avg_cost * 100
   : (t.return_pct ?? null)
 
+// Fixed column widths so the table doesn't reflow width-per-column when paging
+// or sorting (auto layout was resizing to the visible page's longest content).
+function CtColGroup() {
+  return (
+    <colgroup>
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '22%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '12%' }} />
+    </colgroup>
+  )
+}
+
 // Sortable header cell — click to sort, ▲/▼ shows the active column + direction.
 function Th({ label, col, sort, onSort, className, style }) {
   const active = sort?.key === col
@@ -55,7 +74,7 @@ function HeadRow({ sort, onSort }) {
       <th></th>
       {H('Ticker', 'ticker')}
       {H('Company', 'company')}
-      {H('Market Cap', 'market_cap', 'r')}
+      {H('Market Cap (B)', 'market_cap', 'r')}
       {H('Buy date', 'buy_date', 'r')}
       {H('Avg Cost', 'cost', 'r')}
       {H('Sell date', 'sell_date', 'r')}
@@ -225,6 +244,8 @@ export default function ClosedTrades() {
 
       <PagedTable
         key={`${q}|${sort.key}|${sort.dir}`}
+        className="fixed-table"
+        colgroup={<CtColGroup />}
         head={<HeadRow sort={sort} onSort={toggleSort} />}
         rows={rows}
         row={(t, i) => <ClosedRow key={i} t={t} />}

@@ -5,7 +5,7 @@ import { useState } from 'react'
 
 export const PAGE_SIZE = 10
 
-export default function PagedTable({ head, rows, row, emptyLabel = 'No rows.', colspan = 1 }) {
+export default function PagedTable({ head, rows, row, emptyLabel = 'No rows.', colspan = 1, colgroup, className }) {
   const [page, setPage] = useState(1)
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const cur = Math.min(page, pages)
@@ -13,7 +13,8 @@ export default function PagedTable({ head, rows, row, emptyLabel = 'No rows.', c
 
   return (
     <>
-      <table className="data-table">
+      <table className={'data-table' + (className ? ' ' + className : '')}>
+        {colgroup}
         <thead>{head}</thead>
         <tbody>
           {rows.length
