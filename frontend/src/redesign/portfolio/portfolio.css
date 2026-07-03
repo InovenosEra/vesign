@@ -527,7 +527,7 @@
   /* Empty/add-new card */
   .rd .wl-card.add-new {
     border-style: dashed; border-color: var(--line-2);
-    background: transparent;
+    background: var(--panel);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     min-height: 240px;
     cursor: pointer;
