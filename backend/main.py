@@ -2980,20 +2980,6 @@ def portfolio_holdings_export(
     df = pd.DataFrame(rows)
 
     if not df.empty:
-        # Watchlists-per-ticker summary (comma-joined names) — useful for analysis.
-        with engine.connect() as conn:
-            wl = pd.read_sql(
-                text("""
-                    SELECT wh.ticker, GROUP_CONCAT(wll.name, ', ') AS watchlists
-                    FROM watchlist_holdings wh
-                    JOIN watchlist_lists wll ON wll.id = wh.watchlist_id
-                    WHERE wll.user_id = :uid
-                    GROUP BY wh.ticker
-                """),
-                conn, params={"uid": user["id"]},
-            )
-        df = df.merge(wl, on="ticker", how="left")
-
         _prepare_export_df(df, "first_buy_date")
 
     today = datetime.now(UTC).date().isoformat()
@@ -3339,7 +3325,7 @@ def portfolio_performance(
 
 @protected.get("/api/portfolio/comparison")
 def portfolio_comparison(user=Depends(get_current_user), market: str = Query(default="US")):
-    """Final 12M yield per watchlist + Vesign — for the bar chart."""
+    """Final 12M yield for the user's holdings + Vesign — for the bar chart."""
     from datetime import date as _date, timedelta
     from collections import defaultdict
 
@@ -3349,20 +3335,17 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
     market_filter = "wh.ticker LIKE '%.TA'" if market == "IL" else "wh.ticker NOT LIKE '%.TA'"
 
     with engine.connect() as conn:
-        # Holdings grouped by watchlist
         holdings_rows = conn.execute(text(f"""
-            SELECT wl.id, wl.name, wh.ticker, wh.quantity, wh.buy_price, DATE(wh.buy_date) AS buy_date
-            FROM watchlist_holdings wh
-            JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
-            WHERE wl.user_id = :uid AND {market_filter} AND wh.quantity > 0
-            ORDER BY wl.name, wh.buy_date
+            SELECT wh.ticker, wh.quantity, wh.buy_price, DATE(wh.buy_date) AS buy_date
+            FROM holdings wh
+            WHERE wh.user_id = :uid AND {market_filter} AND wh.quantity > 0
+            ORDER BY wh.buy_date
         """), {"uid": uid}).fetchall()
 
         if not holdings_rows:
             return []
 
-        # Price data only needed for user holdings
-        all_tickers = list({r[2] for r in holdings_rows})
+        all_tickers = list({r[0] for r in holdings_rows})
         ph = ", ".join([f":t{i}" for i in range(len(all_tickers))])
         tp = {f"t{i}": t for i, t in enumerate(all_tickers)}
         cutoff = (start_date - timedelta(days=60)).isoformat()
@@ -3374,7 +3357,6 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
             ORDER BY ticker, date
         """), {**tp, "cutoff": cutoff}).fetchall()
 
-    # Build price map
     price_map = defaultdict(list)
     for ticker, d_str, close in price_rows:
         try:
@@ -3402,11 +3384,8 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
     else:
         vesign_val = None
 
-    # Compute per-watchlist yield
-    watchlist_lots = defaultdict(list)
-    watchlist_names = {}
-    for wl_id, wl_name, ticker, qty, buy_price, buy_date_str in holdings_rows:
-        watchlist_names[wl_id] = wl_name
+    lots = []
+    for ticker, qty, buy_price, buy_date_str in holdings_rows:
         try:
             buy_d = _date.fromisoformat(str(buy_date_str)[:10])
         except Exception:
@@ -3416,17 +3395,16 @@ def portfolio_comparison(user=Depends(get_current_user), market: str = Query(def
             base_p = float(buy_price)
         cur_p = latest_price(ticker)
         if cur_p:
-            watchlist_lots[wl_id].append((float(qty), base_p, cur_p))
+            lots.append((float(qty), base_p, cur_p))
 
     result = []
     if vesign_val is not None:
         result.append({"name": "Vesign", "yield": vesign_val})
 
-    for wl_id, lots in watchlist_lots.items():
-        total_val  = sum(qty * cur_p  for qty, base_p, cur_p in lots)
-        total_base = sum(qty * base_p for qty, base_p, cur_p in lots)
-        if total_base > 0:
-            result.append({"name": watchlist_names[wl_id], "yield": round((total_val / total_base - 1) * 100, 2)})
+    total_val  = sum(qty * cur_p  for qty, base_p, cur_p in lots)
+    total_base = sum(qty * base_p for qty, base_p, cur_p in lots)
+    if total_base > 0:
+        result.append({"name": "Mine", "yield": round((total_val / total_base - 1) * 100, 2)})
 
     return result
 
