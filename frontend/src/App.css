@@ -27,9 +27,6 @@ html {
   /* Single flat canvas color across the whole UI (was a blue radial-gradient
      that read as a second background color below the content). */
   background: #0a0e15;
-  /* No elastic rubber-band scroll — bouncing past the end of the page
-     briefly exposes bare canvas next to content, reading as a second color. */
-  overscroll-behavior-y: none;
 }
 
 body, #root {
