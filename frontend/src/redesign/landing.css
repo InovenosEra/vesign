@@ -25,19 +25,33 @@
 .rd .ld-btn.lg { height: 46px; padding: 0 26px; font-size: 14.5px; border-radius: 8px; }
 
 /* ── Hero: full-bleed canvas behind a centered thesis ────────────────────── */
-.rd .ld-hero { position: relative; min-height: 88vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 96px 36px 64px; text-align: center; }
+/* Fill exactly what's left under the sticky 64px nav, on any screen — dvh
+ * keeps mobile browser chrome (address bar show/hide) from leaving gaps. */
+.rd .ld-hero { position: relative; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 64px 24px; text-align: center; }
 .rd .ld-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .rd .ld-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 900px 600px at 50% 38%, rgba(10,14,21,0) 0%, rgba(10,14,21,0.55) 72%, var(--bg) 100%); }
-.rd .ld-hero-inner { position: relative; z-index: 2; max-width: 780px; }
-.rd .ld-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-2); margin-bottom: 24px; }
-.rd .ld-eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
-.rd .ld-thesis { margin: 0 0 22px; font-size: clamp(38px, 6.4vw, 72px); font-weight: 800; line-height: 1.02; letter-spacing: -0.03em; color: var(--ink); }
+.rd .ld-hero-inner { position: relative; z-index: 2; max-width: 780px; width: 100%; }
+.rd .ld-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: clamp(10.5px, 1.6vw, 12px); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-2); margin-bottom: 24px; }
+.rd .ld-eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); flex-shrink: 0; }
+.rd .ld-thesis { margin: 0 0 22px; font-size: clamp(32px, 6.4vw, 72px); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
 .rd .ld-thesis .g { background: linear-gradient(100deg, #a5f3fc, #22d3ee 40%, #3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.rd .ld-hero-sub { margin: 0 auto 36px; max-width: 540px; font-size: 16.5px; line-height: 1.6; color: var(--ink-2); position: relative; z-index: 2; }
-.rd .ld-hero-ctas { position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.rd .ld-hero-sub { margin: 0 auto 36px; max-width: 540px; font-size: clamp(14.5px, 2.2vw, 16.5px); line-height: 1.6; color: var(--ink-2); position: relative; z-index: 2; }
+.rd .ld-hero-ctas { position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
+.rd .ld-hero-ctas .ld-btn { flex: 0 1 auto; }
 .rd .ld-scrollcue { position: relative; z-index: 2; margin-top: 46px; color: var(--ink-3); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .rd .ld-scrollcue .chev { width: 12px; height: 12px; border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3); transform: rotate(45deg); animation: ldBob 2s ease-in-out infinite; }
 @keyframes ldBob { 0%, 100% { transform: rotate(45deg) translate(0,0); } 50% { transform: rotate(45deg) translate(3px,3px); } }
+@media (max-width: 620px) {
+  .rd .ld-hero { padding: 48px 20px; }
+  .rd .ld-eyebrow { margin-bottom: 18px; text-align: center; }
+  .rd .ld-hero-sub { margin-bottom: 28px; }
+  .rd .ld-hero-ctas { gap: 10px; }
+  .rd .ld-hero-ctas .ld-btn { width: 100%; }
+  .rd .ld-scrollcue { margin-top: 30px; }
+}
+@media (max-height: 700px) and (min-width: 621px) {
+  .rd .ld-hero { min-height: auto; padding: 88px 24px 56px; }
+}
 @media (prefers-reduced-motion: reduce) { .rd .ld-scrollcue .chev { animation: none; } }
 
 /* ── Decorative ticker (aria-hidden, illustrative — see JS comment) ──────── */
