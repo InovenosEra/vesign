@@ -189,7 +189,10 @@ export default function AppShell({ children }) {
               <path d="M34 28 Q50 14 66 28" stroke="url(#rd-grad-nav)" strokeWidth="2" fill="none" opacity="0.85" />
               <path d="M28 24 Q50 6 72 24" stroke="url(#rd-grad-nav)" strokeWidth="1.8" fill="none" opacity="0.7" />
             </svg>
-            <div className="logo-text">VeSign</div>
+            <span className="logo-text-wrap">
+              <span className="logo-text">VeSign</span>
+              <span className="logo-beta">Beta</span>
+            </span>
           </NavLink>
           <nav className="nav">
             <NavLink to="/market">Market</NavLink>
