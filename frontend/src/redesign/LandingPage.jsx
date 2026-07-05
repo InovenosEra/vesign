@@ -308,9 +308,30 @@ const ENGINE_OUTPUTS = [
   { cardY: 571, node: 2, cls: 'sigOut7', verdict: 'buy', ticker: 'AVGO', dur: 6.2, delay: -1.8 },
 ]
 
+/* the four steps below feed off the same "how it works" story as the engine
+ * scene above, so they render inside it rather than as a separate section. */
+const STEPS = [
+  {
+    n: '01', t: 'Screen',
+    d: '1,800+ US-listed stocks re-scored every trading day after the close.',
+  },
+  {
+    n: '02', t: 'Score',
+    d: 'Three independent reads per stock — technicals, an ML model, analyst consensus.',
+  },
+  {
+    n: '03', t: 'Signal',
+    d: 'A BUY or SELL goes out only when the evidence lines up, with the “why” in plain language.',
+  },
+  {
+    n: '04', t: 'Track',
+    d: 'Every position is stop-managed; every closed trade — win or lose — is published.',
+  },
+]
+
 function EngineScene() {
   return (
-    <section className="ld-scene">
+    <section className="ld-scene" id="how">
       <div className="ld-scene-head">
         <div className="tag">How it works</div>
         <h2>From signals to a <span className="g">signal.</span></h2>
@@ -402,6 +423,16 @@ function EngineScene() {
           </div>
         ))}
       </div>
+
+      <div className="ld-flow">
+        {STEPS.map(s => (
+          <div className="ld-flow-item" key={s.n}>
+            <div className="n">{s.n}</div>
+            <h4>{s.t}</h4>
+            <p>{s.d}</p>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
@@ -437,47 +468,6 @@ function Proof({ stats }) {
         <Link to="/performance" className="ld-btn ghost">
           Browse all {stats?.closed_trades ? fmtInt(stats.closed_trades) : ''} trades →
         </Link>
-      </div>
-    </section>
-  )
-}
-
-/* ── How it works — open flow, not cards ──────────────────────────────────── */
-const STEPS = [
-  {
-    n: '01', t: 'Screen',
-    d: 'Every trading day, 1,800+ US-listed stocks are re-scored after the close — prices, volumes, fundamentals, and analyst estimates refreshed.',
-  },
-  {
-    n: '02', t: 'Score',
-    d: 'Three independent reads per stock: technical indicators, a machine-learning price model, and analyst consensus — cross-checked against company financial health.',
-  },
-  {
-    n: '03', t: 'Signal',
-    d: 'Only when the evidence lines up does a BUY or SELL go out — with the “why” written in plain language, not a black-box score.',
-  },
-  {
-    n: '04', t: 'Track',
-    d: 'Every open position is stop-managed, and every closed trade — winner or loser — lands in the published results.',
-  },
-]
-
-function HowItWorks() {
-  return (
-    <section className="ld-section" id="how">
-      <div className="ld-section-head">
-        <div className="tag">How a signal is made</div>
-        <h2>Systematic. No discretion.</h2>
-        <p>The same four steps run on every stock, every trading day — nothing hand-picked.</p>
-      </div>
-      <div className="ld-flow">
-        {STEPS.map(s => (
-          <div className="ld-flow-item" key={s.n}>
-            <div className="n">{s.n}</div>
-            <h4>{s.t}</h4>
-            <p>{s.d}</p>
-          </div>
-        ))}
       </div>
     </section>
   )
@@ -667,7 +657,19 @@ export default function LandingPage() {
     const html = document.documentElement
     const prev = html.style.background
     html.style.background = '#0a0e15'
-    return () => { html.style.background = prev }
+    html.classList.add('ld-snap')
+    // The browser can restore a stale non-zero scroll position across
+    // reloads; with the sticky nav that leaves the hero mis-snapped (its
+    // bottom short of the viewport, next section peeking through). Force a
+    // clean start every time the landing page mounts.
+    const prevRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    window.scrollTo(0, 0)
+    return () => {
+      html.style.background = prev
+      html.classList.remove('ld-snap')
+      window.history.scrollRestoration = prevRestoration
+    }
   }, [])
 
   const stats = useStats()
@@ -678,7 +680,6 @@ export default function LandingPage() {
         <Hero />
         <EngineScene />
         <Proof stats={stats} />
-        <HowItWorks />
         <PlatformShots />
         <Pricing />
         <Faq />
