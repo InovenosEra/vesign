@@ -34,7 +34,7 @@
 .rd .ld-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: clamp(10.5px, 1.6vw, 12px); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-2); margin-bottom: 24px; }
 .rd .ld-eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); flex-shrink: 0; }
 .rd .ld-thesis { margin: 0 0 22px; font-size: clamp(32px, 6.4vw, 72px); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
-.rd .ld-thesis .g { background: linear-gradient(100deg, #a5f3fc, #22d3ee 40%, #3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rd .g { background: linear-gradient(100deg, #a5f3fc, #22d3ee 40%, #3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .rd .ld-hero-sub { margin: 0 auto 36px; max-width: 540px; font-size: clamp(14.5px, 2.2vw, 16.5px); line-height: 1.6; color: var(--ink-2); position: relative; z-index: 2; }
 .rd .ld-hero-ctas { position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
 .rd .ld-hero-ctas .ld-btn { flex: 0 1 auto; }
@@ -62,28 +62,93 @@
 @keyframes ldTape { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .rd .ld-tape-track { animation: none; } }
 
-/* ── "Watch it think" reasoning scene ─────────────────────────────────────── */
-.rd .ld-scene { position: relative; max-width: 1180px; margin: 0 auto; padding: 90px 36px 100px; border-top: 1px solid var(--line); overflow: hidden; }
+/* ── "Watch it think" engine scene ────────────────────────────────────────
+ * Deliberately no filter:/backdrop-filter: on anything that animates
+ * infinitely — this codebase has real Chrome GPU-compositing "ghost smear"
+ * history from that exact combination (Signals page, shared header). Glow
+ * here is box-shadow/gradient only, never blur(). */
+.rd .ld-scene { position: relative; max-width: 1180px; margin: 0 auto; padding: 56px 36px 100px; border-top: 1px solid var(--line); overflow: hidden; }
 .rd .ld-scene::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 700px 400px at 50% 0%, rgba(59,130,246,0.09), transparent 65%); pointer-events: none; }
 .rd .ld-scene-head { position: relative; text-align: center; max-width: 560px; margin: 0 auto 40px; }
 .rd .ld-scene-head .tag { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
 .rd .ld-scene-head h2 { margin: 0 0 12px; font-size: clamp(26px, 4vw, 38px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
 .rd .ld-scene-head p { margin: 0; font-size: 15px; color: var(--ink-2); line-height: 1.6; }
-.rd .ld-term { position: relative; max-width: 600px; margin: 0 auto; background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent 30%), var(--panel); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: 0 30px 80px -24px rgba(0,0,0,0.6); overflow: hidden; }
-.rd .ld-term-bar { display: flex; align-items: center; gap: 8px; padding: 11px 15px; background: var(--panel-2); border-bottom: 1px solid var(--line); }
-.rd .ld-term-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--bg-3); display: inline-block; }
-.rd .ld-term-bar .lbl { margin-left: 5px; font-size: 11px; color: var(--ink-3); font-weight: 600; }
-.rd .ld-term-body { padding: 24px 24px 26px; font-family: var(--mono, monospace); font-size: 13px; line-height: 1.9; min-height: 210px; color: var(--ink-2); }
-.rd .ld-term-body .prompt { color: var(--blue-2); }
-.rd .ld-term-body .tk { color: var(--ink); font-weight: 700; }
-.rd .ld-term-body .k { color: var(--ink-3); }
-.rd .ld-term-body .verdict { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 15px; border-radius: 8px; font-weight: 800; font-size: 13px; letter-spacing: 0.03em; opacity: 0; transform: scale(0.9); transition: opacity .3s ease, transform .3s ease; }
-.rd .ld-term-body .verdict.show { opacity: 1; transform: scale(1); }
-.rd .ld-term-body .verdict.buy { color: #04241a; background: var(--green); box-shadow: 0 0 24px rgba(0,217,126,0.35); }
-.rd .ld-term-body .verdict.sell { color: #3a0d10; background: var(--red); box-shadow: 0 0 24px rgba(255,77,92,0.3); }
-.rd .ld-term-body .cursor { display: inline-block; width: 6px; height: 13px; background: var(--blue-2); vertical-align: -2px; animation: ldBlink 0.9s step-start infinite; }
-@keyframes ldBlink { 50% { opacity: 0; } }
-.rd .ld-term-foot { border-top: 1px solid var(--line); padding: 12px 18px; font-size: 11px; color: var(--ink-3); }
+
+.rd .ld-engine { position: relative; width: 100%; aspect-ratio: 1400 / 620; background: #0a0d14; border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden; }
+.rd .eng-cap { position: absolute; top: 3.5%; font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; z-index: 5; }
+.rd .eng-cap.left { left: 2%; }
+.rd .eng-cap.center { left: 50%; transform: translateX(-50%); }
+.rd .eng-cap.right { right: 2%; }
+
+.rd .eng-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; }
+
+/* input feed lines — traveling dash, one color per data type. Slow and
+ * per-line-offset duration (set inline from ENGINE_INPUTS) so the six never
+ * move in lockstep — reads as steady/constant, not a nervous pulse. */
+.rd .eng-feed { stroke-width: 1.8; stroke-dasharray: 9 13; opacity: 0.75; animation-name: engDashIn; animation-timing-function: linear; animation-iteration-count: infinite; }
+@keyframes engDashIn { from { stroke-dashoffset: 220; } to { stroke-dashoffset: 0; } }
+.rd .eng-feed.price { stroke: var(--blue-2); } .rd .eng-feed.fund { stroke: var(--green); }
+.rd .eng-feed.fin { stroke: #c084fc; } .rd .eng-feed.an { stroke: var(--gold); }
+.rd .eng-feed.news { stroke: var(--ink-3); } .rd .eng-feed.macro { stroke: #22d3ee; }
+.rd .eng-lbl { font-family: var(--mono, monospace); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.rd .eng-lbl.price { fill: var(--blue-2); } .rd .eng-lbl.fund { fill: var(--green); }
+.rd .eng-lbl.fin { fill: #c084fc; } .rd .eng-lbl.an { fill: var(--gold); }
+.rd .eng-lbl.news { fill: var(--ink-3); } .rd .eng-lbl.macro { fill: #22d3ee; }
+
+/* output signal lines — each one draws in, holds while its card is shown,
+ * then erases. Never a permanent fixture (--len is the per-line path length,
+ * set inline per instance so the draw/erase covers the exact line, and
+ * duration/delay come from the same ENGINE_OUTPUTS entry as its card, so the
+ * two can never drift out of sync). */
+.rd .eng-signal { stroke-width: 2; fill: none; stroke-dasharray: var(--len) var(--len); animation-name: engLineDraw; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+/* Wide hold window (45-85% of each cycle, vs. a brief 14% before) — with
+ * seven feeds on irregular durations this keeps several reliably overlapping
+ * at any moment, so signals read as continuous/parallel, never one-at-a-time. */
+@keyframes engLineDraw {
+  0%, 45%  { stroke-dashoffset: var(--len); opacity: 0; }
+  58%, 85% { stroke-dashoffset: 0; opacity: 0.9; }
+  100%     { stroke-dashoffset: calc(-1 * var(--len)); opacity: 0; }
+}
+.rd .eng-signal.buy { stroke: var(--green); } .rd .eng-signal.hold { stroke: var(--gold); } .rd .eng-signal.sell { stroke: var(--red); }
+
+/* the core — glow via layered radial-gradient only, never filter:blur. Wide
+ * enough to sit behind the whole net (not just one point), since a layered
+ * net has no single center the way the old hex did. */
+.rd .eng-glow { position: absolute; left: 50%; top: 50%; width: 38%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(96,165,250,0.32) 0%, rgba(96,165,250,0.12) 45%, transparent 72%); animation: engBreathe 3.2s ease-in-out infinite; z-index: 1; }
+@keyframes engBreathe { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.75; } 50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } }
+
+/* the net — dense layered feedforward wiring standing in for "the engine".
+ * Most edges are dim/static (just wiring); a curated subset carries a
+ * traveling pulse (dash+gap slid via stroke-dashoffset, same technique as
+ * eng-signal below) to read as activations flowing through, not noise. */
+.rd .net-edge { stroke: rgba(139,178,255,0.16); stroke-width: 1; fill: none; }
+.rd .net-edge.pulse { stroke: var(--blue-2); stroke-width: 1.6; stroke-dasharray: 16 var(--gap); animation-name: netPulseDraw; animation-timing-function: linear; animation-iteration-count: infinite; }
+@keyframes netPulseDraw { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--off); } }
+.rd .net-node { fill: url(#netNodeGlow); opacity: 0.75; animation: netNodePulse 3.4s ease-in-out infinite; }
+@keyframes netNodePulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+/* output signal cards — solid background, no backdrop-filter. Position and
+ * animation-duration/delay come from inline style (shared ENGINE_OUTPUTS
+ * entry with the line above it). */
+.rd .eng-card { position: absolute; right: 1.5%; display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 9px; padding: 7px 12px; opacity: 0; z-index: 5; box-shadow: 0 12px 30px rgba(0,0,0,0.45); animation-name: engCardCycle; animation-timing-function: ease; animation-iteration-count: infinite; }
+.rd .eng-card-logo { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; background: #fff; flex-shrink: 0; }
+.rd .eng-card .tk { font-size: 12.5px; font-weight: 800; color: var(--ink); }
+.rd .eng-card .pill { font-size: 9.5px; font-weight: 800; padding: 2px 8px; border-radius: 5px; letter-spacing: 0.04em; }
+.rd .eng-card.buy .pill { background: var(--green-bg); color: var(--green); }
+.rd .eng-card.hold .pill { background: rgba(245,166,35,0.16); color: var(--gold); }
+.rd .eng-card.sell .pill { background: var(--red-bg); color: var(--red); }
+@keyframes engCardCycle { 0%, 45% { opacity: 0; transform: translateX(10px); } 58%, 85% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rd .eng-feed, .rd .eng-signal, .rd .eng-glow,
+  .rd .net-edge.pulse, .rd .net-node, .rd .eng-card { animation: none; }
+  .rd .eng-card:first-of-type { opacity: 1; }
+  .rd .eng-signal:first-of-type { opacity: 0.9; stroke-dashoffset: 0; }
+}
+@media (max-width: 780px) {
+  .rd .eng-lbl, .rd .eng-cap { display: none; }
+  .rd .ld-engine { aspect-ratio: 1 / 1; }
+}
 
 /* ── Sections (shared scaffolding) ──────────────────────────────────────── */
 .rd .ld-section { max-width: 1180px; margin: 0 auto; padding: 84px 36px; border-top: 1px solid var(--line); }

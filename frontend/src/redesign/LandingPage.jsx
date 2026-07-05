@@ -218,115 +218,190 @@ function Hero() {
   )
 }
 
-/* ── "Watch it think" reasoning scene ─────────────────────────────────────── */
-/* TODO: this is a fixed illustrative example (aria-hidden), not a live model
- * call — wiring it to a real cached explanation needs getSignalExplanation()
- * confirmed reachable without auth first. */
-const REASONING_SCRIPT = [
-  {
-    tk: 'NVDA',
-    lines: [
-      'Screening 1,842 US stocks…',
-      'Technical — price reclaimed 50-day average, volume +38% vs. avg',
-      'ML 5-day model — projects +6.2%',
-      'Analyst consensus — target sits 18% above market',
-      'Financial health — strong (4/5)',
-    ],
-    verdict: 'buy', verdictText: 'BUY · NVDA',
-  },
-  {
-    tk: 'XOM',
-    lines: [
-      'Screening 1,842 US stocks…',
-      'Technical — broke below the 20-day average on rising volume',
-      'ML 5-day model — projects -3.1%',
-      'Analyst consensus — 3 downgrades in the last 30 days',
-      'Financial health — moderate (3/5)',
-    ],
-    verdict: 'sell', verdictText: 'SELL · XOM',
-  },
+/* ── Engine scene: data feeds in, a layered neural net "thinks", signals out ─
+ * TODO: everything below is a fixed illustrative example (aria-hidden), not a
+ * live model call. Kept static/CSS-driven deliberately: no per-frame JS, and
+ * no `filter`/`backdrop-filter` on anything that animates infinitely — this
+ * codebase has hit real Chrome GPU-compositing "ghost smear" bugs from that
+ * exact combination before (see project history on the Signals page + shared
+ * header). Glow here is radial-gradient/box-shadow only. */
+const ENG_VB_W = 1400, ENG_VB_H = 620
+const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1)
+
+/* Net geometry: 3 columns (6 → 7 → 5 nodes) laid out around the panel's
+ * center. Input column has one node per feed below so each dashed line lands
+ * on its own neuron; the output column doesn't need a 1:1 slot per signal
+ * since those already cycle in and out rather than all showing at once. */
+const NET_CX = 700, NET_CY = 310, NET_ROW_GAP = 65
+const NET_LAYER_X = { in: 550, hid: 700, out: 850 }
+const netColumn = (x, count, r) =>
+  Array.from({ length: count }, (_, i) => ({ x, y: NET_CY + (i - (count - 1) / 2) * NET_ROW_GAP, r }))
+const NET_IN_NODES = netColumn(NET_LAYER_X.in, 6, 5)
+const NET_HID_NODES = netColumn(NET_LAYER_X.hid, 7, 6.5)
+const NET_OUT_NODES = netColumn(NET_LAYER_X.out, 5, 5)
+const NET_ALL_NODES = [...NET_IN_NODES, ...NET_HID_NODES, ...NET_OUT_NODES]
+const NET_EDGES = [
+  ...NET_IN_NODES.flatMap((a, ai) => NET_HID_NODES.map((b, bi) => ({ id: `i${ai}h${bi}`, a, b }))),
+  ...NET_HID_NODES.flatMap((a, ai) => NET_OUT_NODES.map((b, bi) => ({ id: `h${ai}o${bi}`, a, b }))),
 ]
-
-function ReasoningTerminal() {
-  const bodyRef = useRef(null)
-  useEffect(() => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const body = bodyRef.current
-    if (!body || reduce) return
-    let idx = 0, cancelled = false, timers = []
-    const setT = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id }
-
-    function playEntry(entry) {
-      if (cancelled) return
-      body.innerHTML = ''
-      const p = document.createElement('div')
-      p.className = 'line prompt'
-      p.innerHTML = `$ read <span class="tk">${entry.tk}</span><span class="cursor"></span>`
-      body.appendChild(p)
-      let li = 0
-      function next() {
-        if (cancelled) return
-        if (li >= entry.lines.length) {
-          setT(() => {
-            if (cancelled) return
-            const v = document.createElement('div')
-            v.className = 'verdict ' + entry.verdict
-            v.textContent = entry.verdictText
-            body.appendChild(v)
-            requestAnimationFrame(() => v.classList.add('show'))
-            setT(() => { idx = (idx + 1) % REASONING_SCRIPT.length; playEntry(REASONING_SCRIPT[idx]) }, 3400)
-          }, 250)
-          return
-        }
-        const text = entry.lines[li]
-        const div = document.createElement('div')
-        div.className = 'line'
-        div.innerHTML = text + '<span class="cursor"></span>'
-        body.appendChild(div)
-        setT(() => { li++; next() }, Math.min(1300, 480 + text.length * 6))
-      }
-      setT(next, 500)
-    }
-
-    let started = false
-    let io
-    if ('IntersectionObserver' in window) {
-      io = new IntersectionObserver((entries) => {
-        entries.forEach(e => { if (e.isIntersecting && !started) { started = true; playEntry(REASONING_SCRIPT[0]) } })
-      }, { threshold: 0.4 })
-      io.observe(body.closest('.ld-term'))
-    } else {
-      playEntry(REASONING_SCRIPT[0])
-    }
-    return () => { cancelled = true; timers.forEach(clearTimeout); io?.disconnect() }
-  }, [])
-
-  return (
-    <div className="ld-term">
-      <div className="ld-term-bar"><i /><i /><i /><span className="lbl">vesign — example read</span></div>
-      <div className="ld-term-body" ref={bodyRef}>
-        <div className="line prompt">$ read <span className="tk">NVDA</span></div>
-        <div className="line k">Screening 1,842 US stocks…</div>
-        <div className="line">Technical — price reclaimed 50-day average, volume +38% vs. avg</div>
-        <div className="line">ML 5-day model — projects +6.2%</div>
-        <div className="line">Analyst consensus — target sits 18% above market</div>
-        <div className="line">Financial health — strong (4/5)</div>
-        <div className="verdict show buy">BUY · NVDA</div>
-      </div>
-      <div className="ld-term-foot"><span>Example read — the real thing runs on every signal</span></div>
-    </div>
-  )
+/* A curated subset of edges carries a traveling pulse (rest stay dim/static)
+ * — animating all 77 would read as noise instead of "thinking". */
+const NET_PULSE_META = {
+  i0h0: { dur: 2.6, delay: -0.3 }, i0h3: { dur: 3.1, delay: -1.4 },
+  i1h1: { dur: 2.8, delay: -0.8 }, i1h5: { dur: 3.4, delay: -2.1 },
+  i2h2: { dur: 2.5, delay: -1.9 }, i2h6: { dur: 3.0, delay: -0.5 },
+  i3h0: { dur: 2.9, delay: -2.6 }, i3h4: { dur: 3.3, delay: -1.1 },
+  i4h1: { dur: 2.7, delay: -0.2 }, i4h6: { dur: 3.2, delay: -1.7 },
+  i5h3: { dur: 2.6, delay: -2.3 },
+  h0o0: { dur: 2.4, delay: -0.6 }, h1o2: { dur: 2.8, delay: -1.5 },
+  h2o4: { dur: 3.1, delay: -0.9 }, h3o1: { dur: 2.5, delay: -2.0 },
+  h4o3: { dur: 2.9, delay: -1.2 }, h5o0: { dur: 3.0, delay: -0.4 },
+  h6o2: { dur: 2.7, delay: -1.8 },
 }
 
-function ReasoningScene() {
+const bezierIn = (y, tx, ty) => {
+  const x0 = 40
+  const cx1 = x0 + (tx - x0) * 0.55, cx2 = x0 + (tx - x0) * 0.85
+  return `M ${x0} ${y} C ${cx1.toFixed(0)} ${y}, ${cx2.toFixed(0)} ${ty.toFixed(0)}, ${tx.toFixed(1)} ${ty.toFixed(1)}`
+}
+const bezierOut = (ox, oy, y) => {
+  const x0 = 1350
+  const cx1 = ox + (x0 - ox) * 0.18, cx2 = ox + (x0 - ox) * 0.5
+  return `M ${ox.toFixed(1)} ${oy.toFixed(1)} C ${cx1.toFixed(0)} ${oy.toFixed(0)}, ${cx2.toFixed(0)} ${y}, ${x0} ${y}`
+}
+/* Feed lines fade to transparent right as they reach their input neuron (via
+ * a per-feed gradient) rather than stopping dead at a marker — the node's own
+ * glow takes over from there. */
+const FEED_COLORS = {
+  price: 'var(--blue-2)',
+  fund: 'var(--green)',
+  fin: '#c084fc',
+  an: 'var(--gold)',
+  news: 'var(--ink-3)',
+  macro: '#22d3ee',
+}
+/* Slow, slightly-offset durations per feed — reads as steady/constant rather
+ * than one mechanical pulse (all six moving in lockstep would look nervous,
+ * not stable). Each entry's y/target is its dedicated input-layer node, so
+ * the fan-in never crosses another line and always lands on its own neuron. */
+const ENGINE_INPUTS = [
+  { label: 'PRICE', cls: 'price', dur: 12 },
+  { label: 'FUNDAMENTALS', cls: 'fund', dur: 15 },
+  { label: 'FINANCIALS', cls: 'fin', dur: 13.5 },
+  { label: 'ANALYST', cls: 'an', dur: 11 },
+  { label: 'NEWS', cls: 'news', dur: 16 },
+  { label: 'MACRO', cls: 'macro', dur: 14 },
+].map((f, i) => ({ ...f, y: NET_IN_NODES[i].y, tx: NET_IN_NODES[i].x, ty: NET_IN_NODES[i].y }))
+/* dur/delay: each output's full appear → hold → erase cycle. Shared verbatim
+ * between the line and its card below so a signal's line can never linger
+ * (or vanish) out of sync with the card it's delivering. Seven feeds with a
+ * wide hold window (see engCardCycle/engLineDraw) and irregular durations so
+ * several are reliably overlapping at any moment — signals never "queue up"
+ * one at a time. `node` picks which output-layer neuron the line leaves from. */
+const ENGINE_OUTPUTS = [
+  { cardY: 94, node: 0, cls: 'sigOut1', verdict: 'buy', ticker: 'NVDA', dur: 6, delay: -0.5 },
+  { cardY: 171, node: 1, cls: 'sigOut2', verdict: 'hold', ticker: 'MSFT', dur: 7, delay: -2.2 },
+  { cardY: 253, node: 2, cls: 'sigOut3', verdict: 'sell', ticker: 'XOM', dur: 5.5, delay: -1.0 },
+  { cardY: 335, node: 3, cls: 'sigOut4', verdict: 'buy', ticker: 'AAPL', dur: 8, delay: -4.5 },
+  { cardY: 420, node: 4, cls: 'sigOut5', verdict: 'hold', ticker: 'GOOGL', dur: 6.5, delay: -3.0 },
+  { cardY: 498, node: 0, cls: 'sigOut6', verdict: 'sell', ticker: 'TSLA', dur: 7.5, delay: -5.8 },
+  { cardY: 571, node: 2, cls: 'sigOut7', verdict: 'buy', ticker: 'AVGO', dur: 6.2, delay: -1.8 },
+]
+
+function EngineScene() {
   return (
     <section className="ld-scene">
       <div className="ld-scene-head">
-        <div className="tag">Not a black box</div>
-        <h2>Watch it think.</h2>
-        <p>Every signal on the platform is published with reasoning like this attached — not a bare score.</p>
+        <div className="tag">How it works</div>
+        <h2>From signals to a <span className="g">signal.</span></h2>
+        <p>Every signal is the result of many independent data feeds converging into one continuously-running model — not a bare score.</p>
       </div>
-      <ReasoningTerminal />
+      <div className="ld-engine" aria-hidden="true">
+        <div className="eng-cap left">Reading the market</div>
+        <div className="eng-cap center">The engine</div>
+        <div className="eng-cap right">Signals, live</div>
+
+        <div className="eng-glow" />
+
+        <svg className="eng-svg" viewBox={`0 0 ${ENG_VB_W} ${ENG_VB_H}`} preserveAspectRatio="xMidYMid meet">
+          <defs>
+            {ENGINE_INPUTS.map((f) => (
+              <linearGradient key={'grad-' + f.cls} id={'feedFade-' + f.cls} gradientUnits="userSpaceOnUse" x1={40} y1={f.y} x2={f.tx} y2={f.ty}>
+                <stop offset="0%" style={{ stopColor: FEED_COLORS[f.cls], stopOpacity: 1 }} />
+                <stop offset="55%" style={{ stopColor: FEED_COLORS[f.cls], stopOpacity: 1 }} />
+                <stop offset="100%" style={{ stopColor: FEED_COLORS[f.cls], stopOpacity: 0 }} />
+              </linearGradient>
+            ))}
+            <radialGradient id="netNodeGlow" cx="35%" cy="30%" r="75%">
+              <stop offset="0%" style={{ stopColor: '#eafcff', stopOpacity: 1 }} />
+              <stop offset="45%" style={{ stopColor: 'var(--blue-2)', stopOpacity: 0.95 }} />
+              <stop offset="100%" style={{ stopColor: 'var(--blue-2)', stopOpacity: 0.35 }} />
+            </radialGradient>
+          </defs>
+
+          {ENGINE_INPUTS.map((f) => (
+            <g key={f.cls}>
+              <path
+                className={'eng-feed ' + f.cls}
+                d={bezierIn(f.y, f.tx, f.ty)}
+                fill="none"
+                style={{ stroke: `url(#feedFade-${f.cls})`, animationDuration: `${f.dur}s` }}
+              />
+              <text className={'eng-lbl ' + f.cls} x="40" y={f.y - 10}>{f.label}</text>
+            </g>
+          ))}
+
+          {/* the net: dim static wiring between every adjacent-layer pair, a
+           * sparse subset lit with a traveling pulse, neurons on top glowing
+           * via a shared radial gradient (no filter/blur). */}
+          <g className="net">
+            {NET_EDGES.map((e) => (
+              <line key={e.id} className="net-edge" x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} />
+            ))}
+            {NET_EDGES.filter((e) => NET_PULSE_META[e.id]).map((e) => {
+              const meta = NET_PULSE_META[e.id]
+              const len = dist(e.a.x, e.a.y, e.b.x, e.b.y)
+              return (
+                <line
+                  key={'p-' + e.id}
+                  className="net-edge pulse"
+                  x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y}
+                  style={{ '--gap': len.toFixed(0), '--off': (-(len + 16)).toFixed(0), animationDuration: `${meta.dur}s`, animationDelay: `${meta.delay}s` }}
+                />
+              )
+            })}
+            {NET_ALL_NODES.map((n, i) => (
+              <circle key={'n' + i} className="net-node" cx={n.x} cy={n.y} r={n.r} style={{ animationDelay: `-${(i * 0.31).toFixed(2)}s` }} />
+            ))}
+          </g>
+
+          {ENGINE_OUTPUTS.map((s) => {
+            const { x: ox, y: oy } = NET_OUT_NODES[s.node]
+            const len = Math.round(dist(ox, oy, 1350, s.cardY) * 1.15)
+            return (
+              <path
+                key={s.cls}
+                className={'eng-signal ' + s.verdict}
+                d={bezierOut(ox, oy, s.cardY)}
+                fill="none"
+                style={{ '--len': len, animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s` }}
+              />
+            )
+          })}
+        </svg>
+
+        {ENGINE_OUTPUTS.map((s) => (
+          <div
+            key={s.cls}
+            className={`eng-card ${s.verdict}`}
+            style={{ top: `${(s.cardY / ENG_VB_H) * 100}%`, animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s` }}
+          >
+            <img className="eng-card-logo" src={`/logos/${s.ticker}.png`} alt="" />
+            <span className="tk">{s.ticker}</span>
+            <span className="pill">{s.verdict.toUpperCase()}</span>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
@@ -601,7 +676,7 @@ export default function LandingPage() {
       <LandingNav />
       <main>
         <Hero />
-        <ReasoningScene />
+        <EngineScene />
         <Proof stats={stats} />
         <HowItWorks />
         <PlatformShots />
