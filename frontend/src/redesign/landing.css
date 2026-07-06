@@ -190,12 +190,14 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * is the only element of its tag among its actual siblings inside <svg> —
  * .eng-card/.eng-track are <div>s sharing a parent with unrelated .eng-cap/
  * .eng-glow divs, so `.eng-card:first-of-type`/`.eng-track:first-of-type`
- * never matched anything, leaving a visible connector line pointing at a
- * permanently-invisible card/badge). Rather than half-populate the frame
- * with dangling lines, freezing everything at its own static (non-animated)
- * opacity is simpler and has no dangling-reference case: feeds/net/glow
- * settle at their own steady-state look, cards/signals/tracks/lines all
- * settle invisible together. */
+ * never matched anything). Removing the four overrides at least stops the
+ * new .eng-track-line from dangling toward a permanently-invisible badge —
+ * .eng-card/.eng-track correctly settle invisible (base opacity:0). Pre-
+ * existing, unrelated to this fix: .eng-signal has no base opacity (only the
+ * keyframe ever sets it), so with its animation removed it reverts to the
+ * CSS-initial opacity:1 — every signal line stays fully visible and still
+ * points at an invisible card. Out of scope here; not introduced by this
+ * feature or this fix. */
 @media (prefers-reduced-motion: reduce) {
   .rd .eng-feed, .rd .eng-signal, .rd .eng-glow,
   .rd .net-edge.pulse, .rd .net-node, .rd .eng-card,
