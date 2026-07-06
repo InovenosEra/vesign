@@ -6,7 +6,7 @@
  * those mockups are visually identical to the real product — only the ticker
  * data in them is a fixed illustrative example, not a live fetch. */
 import { useEffect, useRef, useState } from 'react'
-import { SCROLL_DURATION_MS, nextIndex, nearestIndex, scrollYAt } from './landingScroll'
+import { SCROLL_DURATION_MS, nextIndex, scrollYAt } from './landingScroll'
 import { Link } from 'react-router-dom'
 import './redesign.css'
 import './signals/signals.css'
@@ -704,11 +704,61 @@ function mountEasedSectionScroll(html, main) {
     rafId = requestAnimationFrame(step)
   }
 
-  const go = (direction) => {
-    if (animating) return
+  // Which section the viewport's top edge currently sits inside — the
+  // largest index whose own top has been reached. Deliberately NOT
+  // landingScroll's nearestIndex (nearest-by-distance-to-any-top): once
+  // scrolled more than halfway through an oversized section's overflow
+  // (Proof/Platform/Pricing/FAQ/FinalCta have no min-height, so an expanded
+  // FAQ answer can push one well past one viewport), that section's midpoint
+  // can be closer to the NEXT section's top than to its own, mis-identifying
+  // "current" as the section ahead. Harmless for a forward gesture (nextIndex
+  // just clamps back to the same, already-last index), but for a backward
+  // gesture it resolves to a real, different index — the true current
+  // section's own top — triggering an erroneous hijack-jump that skips
+  // exactly the unscrolled content this fix exists to protect. Containment
+  // by top boundary has no such failure mode at any section height.
+  const currentSectionIndex = (tops, scrollY) => {
+    let idx = 0
+    for (let i = 1; i < tops.length; i++) {
+      if (tops[i] <= scrollY + 1) idx = i
+      else break
+    }
+    return idx
+  }
+
+  // Only worth hijacking a gesture into an animated section-jump when BOTH:
+  // (a) there's an actual next/previous section to jump to (not already at
+  // the first/last section in that direction), AND (b) the viewport is
+  // already at the edge of the CURRENT section's own content in that
+  // direction. Otherwise return null so the caller lets the native
+  // wheel/key scroll proceed instead — which reveals more of an oversized
+  // section rather than skipping over its lower content, and lets a forward
+  // gesture at the last section (FinalCta) fall through into <main>'s
+  // sibling <LandingFooter>, which sectionTops() can't see since it only
+  // reads main.children.
+  const decideTarget = (direction) => {
     const tops = sectionTops()
-    const current = nearestIndex(tops, window.scrollY)
-    animateTo(tops[nextIndex(current, direction, tops.length)])
+    const sections = Array.from(main.children)
+    const current = currentSectionIndex(tops, window.scrollY)
+    const target = nextIndex(current, direction, tops.length)
+    if (target === current) return null // first/last section, nothing further to jump to
+    const bottom = tops[current] + sections[current].offsetHeight
+    const atEdge = direction > 0
+      ? (window.scrollY + window.innerHeight) >= bottom - 1
+      : window.scrollY <= tops[current] + 1
+    return atEdge ? tops[target] : null
+  }
+
+  // Returns whether the gesture was consumed (either it started an animated
+  // jump, or an animation is already mid-flight and native scroll shouldn't
+  // fight it) — callers use this to decide whether to preventDefault, so
+  // wheel and keyboard share one hijack/pass-through decision.
+  const go = (direction) => {
+    if (animating) return true
+    const targetTop = decideTarget(direction)
+    if (targetTop == null) return false
+    animateTo(targetTop)
+    return true
   }
 
   const isTypingTarget = (el) =>
@@ -716,13 +766,13 @@ function mountEasedSectionScroll(html, main) {
 
   const onWheel = (e) => {
     if (e.ctrlKey) return // pinch-zoom gesture — leave it to the browser
-    e.preventDefault()
-    go(e.deltaY > 0 ? 1 : -1)
+    if (e.deltaY === 0) return // horizontal-only trackpad swipe — not a section gesture
+    if (go(e.deltaY > 0 ? 1 : -1)) e.preventDefault()
   }
   const onKeyDown = (e) => {
     if (isTypingTarget(document.activeElement)) return
-    if (e.key === 'PageDown' || e.key === 'ArrowDown') { e.preventDefault(); go(1) }
-    else if (e.key === 'PageUp' || e.key === 'ArrowUp') { e.preventDefault(); go(-1) }
+    if (e.key === 'PageDown' || e.key === 'ArrowDown') { if (go(1)) e.preventDefault() }
+    else if (e.key === 'PageUp' || e.key === 'ArrowUp') { if (go(-1)) e.preventDefault() }
   }
 
   window.addEventListener('wheel', onWheel, { passive: false })
