@@ -258,12 +258,14 @@ const SCREEN_CHIPS = ['MSFT', 'NVDA', 'AAPL', 'AMZN', 'GOOGL', 'TSLA', 'META', '
 function ChipsZone() {
   return (
     <div className="eng-chips-zone">
-      <div className="eng-chips-cluster">
-        {SCREEN_CHIPS.map((t, i) => (
-          <img key={t} className="eng-scr-chip" src={`/logos/${t}.png`} alt=""
-            style={{ '--i': i }} />
-        ))}
-        <FunnelIcon />
+      <div className="eng-chips-cluster-wrap">
+        <div className="eng-chips-cluster">
+          {SCREEN_CHIPS.map((t, i) => (
+            <img key={t} className="eng-scr-chip" src={`/logos/${t}.png`} alt=""
+              style={{ '--i': i }} />
+          ))}
+          <FunnelIcon />
+        </div>
       </div>
       <div className="eng-panel-foot">Daily stock universe (1,800+)</div>
     </div>

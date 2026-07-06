@@ -89,7 +89,7 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .ld-scene-head h2 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
 .rd .ld-scene-head p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
 
-.rd .eng-panels { position: relative; display: grid; grid-template-columns: 0.62fr 1fr 1fr 1fr 1fr; column-gap: 14px; align-items: start; }
+.rd .eng-panels { position: relative; display: grid; grid-template-columns: 0.62fr 1fr 1fr 1fr 1fr; column-gap: 14px; align-items: stretch; }
 .rd .eng-panel { position: relative; display: flex; flex-direction: column; }
 /* Header lives in its own floating pill above the card (see .eng-panel-head
  * below), not inside it — matches the reference's separate header-pill +
@@ -99,7 +99,7 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-panel-head .n { font-family: var(--mono, monospace); font-size: 13px; font-weight: 800; color: var(--blue-2); }
 .rd .eng-panel-head .t { font-size: 12.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
 .rd .eng-panel-arrow { position: absolute; top: 20px; right: -17px; z-index: 6; color: var(--blue-2); font-size: 18px; font-weight: 700; line-height: 1; }
-.rd .eng-panel-card { background: #0a0d14; border: 1px solid var(--line-2); border-radius: 10px; padding: 18px 16px 16px; display: flex; flex-direction: column; min-height: 420px; flex: 1; }
+.rd .eng-panel-card { background: #0a0d14; border: 1px solid var(--line-2); border-radius: 10px; padding: 18px 16px 16px; display: flex; flex-direction: column; min-height: 260px; flex: 1; }
 .rd .eng-panel-sub { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 12px; }
 .rd .eng-panel-body { flex: 1; position: relative; }
 /* min-height reserves 2 lines uniformly — at narrower widths the longest
@@ -112,7 +112,12 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 /* ── Chips zone: decorative ticker cluster + funnel, its own column to the
  * left of Panel 1 (not inside it) — matches the reference's separate
  * "universe" zone feeding into the Screen panel. ─────────────────────── */
+/* flex:1 wrap around the cluster absorbs whatever extra height
+ * align-items:stretch imposes (to match the tallest panel card), so
+ * .eng-panel-foot still lands at the same baseline as the other 4 zones'
+ * captions instead of floating right after the cluster's own fixed height. */
 .rd .eng-chips-zone { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 52px; }
+.rd .eng-chips-cluster-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; width: 100%; }
 .rd .eng-chips-cluster { position: relative; height: 170px; width: 100%; }
 .rd .eng-chips-funnel { position: absolute; right: -19px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; z-index: 6; }
 
