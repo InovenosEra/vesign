@@ -164,6 +164,28 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-card.sell .pill { background: var(--red-bg); color: var(--red); }
 @keyframes engCardCycle { 0%, 45% { opacity: 0; transform: translateX(10px); } 58%, 85% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(10px); } }
 
+/* Track-zone connector line — plain opacity fade (no stroke-dasharray draw,
+ * no CSS transform on this SVG shape — see Global Constraints). Fades in as
+ * its signal card begins fading out (80%), holds briefly, fades out right
+ * before the loop restarts — so it's gone exactly when the card begins its
+ * own next fade-in at 45%. */
+.rd .eng-track-line { stroke-width: 1.5; fill: none; opacity: 0; animation-name: engTrackLineCycle; animation-timing-function: ease; animation-iteration-count: infinite; }
+.rd .eng-track-line.win { stroke: var(--green); } .rd .eng-track-line.loss { stroke: var(--red); }
+@keyframes engTrackLineCycle { 0%, 80% { opacity: 0; } 88%, 96% { opacity: 0.8; } 100% { opacity: 0; } }
+
+/* Track-record badge — HTML, so the .eng-card translateX+opacity technique
+ * is safe here (unlike the SVG line above). Same 80/88/96/100 timing as the
+ * line so the two never desync. */
+.rd .eng-track { position: absolute; right: 1.5%; display: flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; opacity: 0; z-index: 5; animation-name: engTrackCycle; animation-timing-function: ease; animation-iteration-count: infinite; }
+.rd .eng-track .tk { font-size: 11px; font-weight: 700; color: var(--ink-3); }
+.rd .eng-track .pill { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 5px; letter-spacing: 0.04em; }
+.rd .eng-track.win .pill { background: var(--green-bg); color: var(--green); }
+.rd .eng-track.loss .pill { background: var(--red-bg); color: var(--red); }
+.rd .eng-track .pct { font-size: 11px; font-weight: 700; }
+.rd .eng-track.win .pct { color: var(--green); }
+.rd .eng-track.loss .pct { color: var(--red); }
+@keyframes engTrackCycle { 0%, 80% { opacity: 0; transform: translateX(8px); } 88%, 96% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(8px); } }
+
 @media (prefers-reduced-motion: reduce) {
   .rd .eng-feed, .rd .eng-signal, .rd .eng-glow,
   .rd .net-edge.pulse, .rd .net-node, .rd .eng-card { animation: none; }

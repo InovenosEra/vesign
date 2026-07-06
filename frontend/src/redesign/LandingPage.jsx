@@ -300,14 +300,20 @@ const ENGINE_INPUTS = [
  * several are reliably overlapping at any moment — signals never "queue up"
  * one at a time. `node` picks which output-layer neuron the line leaves from. */
 const ENGINE_OUTPUTS = [
-  { cardY: 94, node: 0, cls: 'sigOut1', verdict: 'buy', ticker: 'NVDA', dur: 6, delay: -0.5 },
-  { cardY: 171, node: 1, cls: 'sigOut2', verdict: 'hold', ticker: 'MSFT', dur: 7, delay: -2.2 },
-  { cardY: 253, node: 2, cls: 'sigOut3', verdict: 'sell', ticker: 'XOM', dur: 5.5, delay: -1.0 },
-  { cardY: 335, node: 3, cls: 'sigOut4', verdict: 'buy', ticker: 'AAPL', dur: 8, delay: -4.5 },
-  { cardY: 420, node: 4, cls: 'sigOut5', verdict: 'hold', ticker: 'GOOGL', dur: 6.5, delay: -3.0 },
-  { cardY: 498, node: 0, cls: 'sigOut6', verdict: 'sell', ticker: 'TSLA', dur: 7.5, delay: -5.8 },
-  { cardY: 571, node: 2, cls: 'sigOut7', verdict: 'buy', ticker: 'AVGO', dur: 6.2, delay: -1.8 },
+  { cardY: 94, node: 0, cls: 'sigOut1', verdict: 'buy', ticker: 'NVDA', dur: 6, delay: -0.5, track: { outcome: 'win', pct: '+18.4%' } },
+  { cardY: 171, node: 1, cls: 'sigOut2', verdict: 'hold', ticker: 'MSFT', dur: 7, delay: -2.2, track: null },
+  { cardY: 253, node: 2, cls: 'sigOut3', verdict: 'sell', ticker: 'XOM', dur: 5.5, delay: -1.0, track: { outcome: 'win', pct: '+6.1%' } },
+  { cardY: 335, node: 3, cls: 'sigOut4', verdict: 'buy', ticker: 'AAPL', dur: 8, delay: -4.5, track: { outcome: 'loss', pct: '-2.3%' } },
+  { cardY: 420, node: 4, cls: 'sigOut5', verdict: 'hold', ticker: 'GOOGL', dur: 6.5, delay: -3.0, track: null },
+  { cardY: 498, node: 0, cls: 'sigOut6', verdict: 'sell', ticker: 'TSLA', dur: 7.5, delay: -5.8, track: { outcome: 'loss', pct: '-4.8%' } },
+  { cardY: 571, node: 2, cls: 'sigOut7', verdict: 'buy', ticker: 'AVGO', dur: 6.2, delay: -1.8, track: { outcome: 'win', pct: '+14.2%' } },
 ]
+
+/* Track-zone connector: a plain horizontal line (card and its track record
+ * share the same y, so no bezier fan is needed) from just past the signal
+ * card to the new track record near the panel's right edge. */
+const TRACK_LINE_X0 = 1400
+const TRACK_X = 1820
 
 /* the four steps below feed off the same "how it works" story as the engine
  * scene above, so they render inside it rather than as a separate section. */
@@ -325,7 +331,7 @@ const STEPS = [
     d: 'A BUY or SELL goes out only when the evidence lines up, with the “why” in plain language.',
   },
   {
-    n: '04', t: 'Track',
+    n: '04', t: 'Track', tag: 'Win / loss, published',
     d: 'Every position is stop-managed; every closed trade — win or lose — is published.',
   },
 ]
@@ -350,6 +356,10 @@ function EngineScene() {
         <div className="eng-cap right">
           <span className="n"><b>{STEPS[2].n}</b>{STEPS[2].t}</span>
           <span className="tag">{STEPS[2].tag}</span>
+        </div>
+        <div className="eng-cap far">
+          <span className="n"><b>{STEPS[3].n}</b>{STEPS[3].t}</span>
+          <span className="tag">{STEPS[3].tag}</span>
         </div>
 
         <div className="eng-glow" />
@@ -419,6 +429,15 @@ function EngineScene() {
               />
             )
           })}
+
+          {ENGINE_OUTPUTS.filter((s) => s.track).map((s) => (
+            <line
+              key={'track-' + s.cls}
+              className={`eng-track-line ${s.track.outcome}`}
+              x1={TRACK_LINE_X0} y1={s.cardY} x2={TRACK_X} y2={s.cardY}
+              style={{ animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s` }}
+            />
+          ))}
         </svg>
 
         {ENGINE_OUTPUTS.map((s) => (
@@ -430,6 +449,18 @@ function EngineScene() {
             <img className="eng-card-logo" src={`/logos/${s.ticker}.png`} alt="" />
             <span className="tk">{s.ticker}</span>
             <span className="pill">{s.verdict.toUpperCase()}</span>
+          </div>
+        ))}
+
+        {ENGINE_OUTPUTS.filter((s) => s.track).map((s) => (
+          <div
+            key={'trackrec-' + s.cls}
+            className={`eng-track ${s.track.outcome}`}
+            style={{ top: `${(s.cardY / ENG_VB_H) * 100}%`, animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s` }}
+          >
+            <span className="tk">{s.ticker}</span>
+            <span className="pill">{s.track.outcome.toUpperCase()}</span>
+            <span className="pct">{s.track.pct}</span>
           </div>
         ))}
       </div>
