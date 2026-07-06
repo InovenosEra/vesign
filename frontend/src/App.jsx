@@ -386,7 +386,7 @@ function UserMenu() {
             {[
               { labelKey: 'header.editPicture', action: () => { setShowPicModal(true); setOpen(false) } },
               { labelKey: 'header.changePassword', action: () => { openUserProfile(); setOpen(false) } },
-              { labelKey: 'header.signOut', action: () => signOut({ redirectUrl: '/sign-in' }) },
+              { labelKey: 'header.signOut', action: () => signOut({ redirectUrl: '/' }) },
             ].map(item => (
               <button
                 key={item.labelKey}

@@ -12,6 +12,12 @@ import './landing.css'
  * these mirror the redesign tokens in redesign.css. clerk-js renamed its theme
  * variables at some point, so BOTH generations are shipped. */
 export const CLERK_APPEARANCE = {
+  layout: {
+    /* Silences the "Development mode" ribbon shown for pk_test_ instances.
+     * Cosmetic only — the real fix is switching to a pk_live_ key via
+     * Clerk's "Deploy to Production" flow. */
+    unsafe_disableDevelopmentModeWarnings: true,
+  },
   variables: {
     colorPrimary: '#3b82f6',           /* --blue   */
     colorBackground: '#0e131c',        /* --panel  */
