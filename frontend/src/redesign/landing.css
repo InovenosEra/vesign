@@ -151,9 +151,20 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 @media (max-width: 780px) {
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
   .rd .eng-panels { grid-template-columns: 1fr; }
-  .rd .eng-panel-card { border-left: 1px solid var(--line-2) !important; border-top: none; min-height: 0; }
-  .rd .eng-panel:not(:first-child) .eng-panel-card { margin-top: -1px; }
+  /* Border lives on .eng-panel-card (see comment above), not .eng-panel — so
+   * the stacking fix targets that card, not the bare wrapper. Desktop drops
+   * the left border on every card but the first, since side-by-side columns
+   * sit flush and share one divider line — restore it here so each stacked
+   * card is a complete standalone box. No top-border/margin surgery is
+   * needed: .eng-panel-foot (each panel's caption) always renders below the
+   * card and outside its border, so stacked cards never actually touch —
+   * there's no seam to double up or lose, each keeps its full 4-side border. */
+  .rd .eng-panel-card { border-left: 1px solid var(--line-2) !important; min-height: 0; }
   .rd .eng-panel-chevron { display: none; }
+  /* Panel 1's staggered logo-chip column (see .eng-scr-chip) needs a bit more
+   * clearance than desktop at full mobile width so its rotated corners never
+   * clip into the criteria row text. */
+  .rd .eng-scr-rows { margin-left: 52px; }
 }
 @media (max-height: 760px) and (min-width: 781px) {
   .rd .ld-scene { min-height: auto; padding: 64px 36px 32px; }
