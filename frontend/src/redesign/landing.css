@@ -78,13 +78,10 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 @keyframes ldTape { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .rd .ld-tape-track { animation: none; } }
 
-/* ── "Watch it think" engine scene ────────────────────────────────────────
+/* ── "How it works" engine scene: 4 bordered panels ──────────────────────
  * Deliberately no filter:/backdrop-filter: on anything that animates
- * infinitely — this codebase has real Chrome GPU-compositing "ghost smear"
- * history from that exact combination (Signals page, shared header). Glow
- * here is box-shadow/gradient only, never blur(). */
-/* Fills exactly what's left under the sticky 64px nav, same as .ld-hero, so
- * it reads as one full "screen" when scrolled/snapped into place. */
+ * infinitely (Panel 2's net pulse) — this codebase has real Chrome
+ * GPU-compositing "ghost smear" history from that exact combination. */
 .rd .ld-scene { position: relative; max-width: 1180px; margin: 0 auto; padding: 64px 36px 16px; border-top: 1px solid var(--line); overflow: hidden; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); display: flex; flex-direction: column; justify-content: center; }
 .rd .ld-scene::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 700px 400px at 50% 0%, rgba(59,130,246,0.09), transparent 65%); pointer-events: none; }
 .rd .ld-scene-head { position: relative; text-align: center; max-width: 560px; margin: 0 auto 14px; }
@@ -92,125 +89,23 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .ld-scene-head h2 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
 .rd .ld-scene-head p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
 
-/* Sized from the viewport's remaining height (not a flat max-width) so it
- * scales up on tall screens instead of floating in a sea of empty space, and
- * shrinks on short ones instead of overflowing — width follows via aspect-ratio. */
-.rd .ld-engine { position: relative; width: auto; max-width: 100%; height: clamp(260px, calc(100vh - 384px), 460px); height: clamp(260px, calc(100dvh - 384px), 460px); aspect-ratio: 1850 / 620; margin: 0 auto; background: #0a0d14; border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden; }
-.rd .eng-cap { position: absolute; top: 3.5%; z-index: 5; display: flex; flex-direction: column; gap: 3px; }
-.rd .eng-cap.left { left: 2%; align-items: flex-start; }
-.rd .eng-cap.center { left: 37.8%; transform: translateX(-50%); align-items: center; text-align: center; }
-.rd .eng-cap.right { right: 25%; align-items: flex-end; text-align: right; }
-.rd .eng-cap.far { right: 1.5%; align-items: flex-end; text-align: right; }
-.rd .eng-cap .n { font-size: 13px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); white-space: nowrap; }
-.rd .eng-cap .n b { color: var(--blue-2); font-family: var(--mono, monospace); font-weight: 700; margin-right: 5px; }
-.rd .eng-cap .tag { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+.rd .eng-panels { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+.rd .eng-panel { position: relative; background: #0a0d14; border: 1px solid var(--line-2); padding: 18px 16px 16px; display: flex; flex-direction: column; min-height: 420px; }
+.rd .eng-panel:not(:first-child) { border-left: none; }
+.rd .eng-panel-head { display: flex; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.rd .eng-panel-head .n { font-family: var(--mono, monospace); font-size: 13px; font-weight: 800; color: var(--blue-2); }
+.rd .eng-panel-head .t { font-size: 12.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+.rd .eng-panel-chevron { position: absolute; top: 22px; right: -13px; z-index: 6; width: 24px; height: 24px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; color: var(--blue-2); font-size: 13px; line-height: 1; }
+.rd .eng-panel-sub { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 12px; }
+.rd .eng-panel-body { flex: 1; position: relative; }
+.rd .eng-panel-foot { text-align: center; margin-top: 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; color: var(--ink-2); }
 
-.rd .eng-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; }
-
-/* input feed lines — traveling dash, one color per data type. Slow and
- * per-line-offset duration (set inline from ENGINE_INPUTS) so the six never
- * move in lockstep — reads as steady/constant, not a nervous pulse. */
-.rd .eng-feed { stroke-width: 1.8; stroke-dasharray: 9 13; opacity: 0.75; animation-name: engDashIn; animation-timing-function: linear; animation-iteration-count: infinite; }
-@keyframes engDashIn { from { stroke-dashoffset: 220; } to { stroke-dashoffset: 0; } }
-.rd .eng-feed.price { stroke: var(--blue-2); } .rd .eng-feed.fund { stroke: var(--green); }
-.rd .eng-feed.fin { stroke: #c084fc; } .rd .eng-feed.an { stroke: var(--gold); }
-.rd .eng-feed.news { stroke: var(--ink-3); } .rd .eng-feed.macro { stroke: #22d3ee; }
-.rd .eng-lbl { font-family: var(--mono, monospace); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
-.rd .eng-lbl.price { fill: var(--blue-2); } .rd .eng-lbl.fund { fill: var(--green); }
-.rd .eng-lbl.fin { fill: #c084fc; } .rd .eng-lbl.an { fill: var(--gold); }
-.rd .eng-lbl.news { fill: var(--ink-3); } .rd .eng-lbl.macro { fill: #22d3ee; }
-
-/* output signal lines — each one draws in, holds while its card is shown,
- * then erases. Never a permanent fixture (--len is the per-line path length,
- * set inline per instance so the draw/erase covers the exact line, and
- * duration/delay come from the same ENGINE_OUTPUTS entry as its card, so the
- * two can never drift out of sync). */
-.rd .eng-signal { stroke-width: 2; fill: none; stroke-dasharray: var(--len) var(--len); animation-name: engLineDraw; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
-/* Wide hold window (45-85% of each cycle, vs. a brief 14% before) — with
- * seven feeds on irregular durations this keeps several reliably overlapping
- * at any moment, so signals read as continuous/parallel, never one-at-a-time. */
-@keyframes engLineDraw {
-  0%, 45%  { stroke-dashoffset: var(--len); opacity: 0; }
-  58%, 85% { stroke-dashoffset: 0; opacity: 0.9; }
-  100%     { stroke-dashoffset: calc(-1 * var(--len)); opacity: 0; }
-}
-.rd .eng-signal.buy { stroke: var(--green); } .rd .eng-signal.hold { stroke: var(--gold); } .rd .eng-signal.sell { stroke: var(--red); }
-
-/* the core — glow via layered radial-gradient only, never filter:blur. Wide
- * enough to sit behind the whole net (not just one point), since a layered
- * net has no single center the way the old hex did. */
-.rd .eng-glow { position: absolute; left: 50%; top: 50%; width: 38%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(96,165,250,0.32) 0%, rgba(96,165,250,0.12) 45%, transparent 72%); animation: engBreathe 3.2s ease-in-out infinite; z-index: 1; }
-@keyframes engBreathe { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.75; } 50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } }
-
-/* the net — dense layered feedforward wiring standing in for "the engine".
- * Most edges are dim/static (just wiring); a curated subset carries a
- * traveling pulse (dash+gap slid via stroke-dashoffset, same technique as
- * eng-signal below) to read as activations flowing through, not noise. */
-.rd .net-edge { stroke: rgba(139,178,255,0.16); stroke-width: 1; fill: none; }
-.rd .net-edge.pulse { stroke: var(--blue-2); stroke-width: 1.6; stroke-dasharray: 16 var(--gap); animation-name: netPulseDraw; animation-timing-function: linear; animation-iteration-count: infinite; }
-@keyframes netPulseDraw { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--off); } }
-.rd .net-node { fill: url(#netNodeGlow); opacity: 0.75; animation: netNodePulse 3.4s ease-in-out infinite; }
-@keyframes netNodePulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
-
-/* output signal cards — solid background, no backdrop-filter. Position and
- * animation-duration/delay come from inline style (shared ENGINE_OUTPUTS
- * entry with the line above it). */
-.rd .eng-card { position: absolute; right: 25%; display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 9px; padding: 7px 12px; opacity: 0; z-index: 5; box-shadow: 0 12px 30px rgba(0,0,0,0.45); animation-name: engCardCycle; animation-timing-function: ease; animation-iteration-count: infinite; }
-.rd .eng-card-logo { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; background: #fff; flex-shrink: 0; }
-.rd .eng-card .tk { font-size: 12.5px; font-weight: 800; color: var(--ink); }
-.rd .eng-card .pill { font-size: 9.5px; font-weight: 800; padding: 2px 8px; border-radius: 5px; letter-spacing: 0.04em; }
-.rd .eng-card.buy .pill { background: var(--green-bg); color: var(--green); }
-.rd .eng-card.hold .pill { background: rgba(245,166,35,0.16); color: var(--gold); }
-.rd .eng-card.sell .pill { background: var(--red-bg); color: var(--red); }
-@keyframes engCardCycle { 0%, 45% { opacity: 0; transform: translateX(10px); } 58%, 85% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(10px); } }
-
-/* Track-zone connector line — plain opacity fade (no stroke-dasharray draw,
- * no CSS transform on this SVG shape — see Global Constraints). Fades in as
- * its signal card begins fading out (80%), holds briefly, fades out right
- * before the loop restarts — so it's gone exactly when the card begins its
- * own next fade-in at 45%. */
-.rd .eng-track-line { stroke-width: 1.5; fill: none; opacity: 0; animation-name: engTrackLineCycle; animation-timing-function: ease; animation-iteration-count: infinite; }
-.rd .eng-track-line.win { stroke: var(--green); } .rd .eng-track-line.loss { stroke: var(--red); }
-@keyframes engTrackLineCycle { 0%, 80% { opacity: 0; } 88%, 96% { opacity: 0.8; } 100% { opacity: 0; } }
-
-/* Track-record badge — HTML, so the .eng-card translateX+opacity technique
- * is safe here (unlike the SVG line above). Same 80/88/96/100 timing as the
- * line so the two never desync. */
-.rd .eng-track { position: absolute; right: 1.5%; display: flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; opacity: 0; z-index: 5; animation-name: engTrackCycle; animation-timing-function: ease; animation-iteration-count: infinite; }
-.rd .eng-track .tk { font-size: 11px; font-weight: 700; color: var(--ink-3); }
-.rd .eng-track .pill { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 5px; letter-spacing: 0.04em; }
-.rd .eng-track.win .pill { background: var(--green-bg); color: var(--green); }
-.rd .eng-track.loss .pill { background: var(--red-bg); color: var(--red); }
-.rd .eng-track .pct { font-size: 11px; font-weight: 700; }
-.rd .eng-track.win .pct { color: var(--green); }
-.rd .eng-track.loss .pct { color: var(--red); }
-@keyframes engTrackCycle { 0%, 80% { opacity: 0; transform: translateX(8px); } 88%, 96% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(8px); } }
-
-/* `:first-of-type` only ever matched .eng-signal/.eng-track-line here (each
- * is the only element of its tag among its actual siblings inside <svg> —
- * .eng-card/.eng-track are <div>s sharing a parent with unrelated .eng-cap/
- * .eng-glow divs, so `.eng-card:first-of-type`/`.eng-track:first-of-type`
- * never matched anything). Removing the four overrides at least stops the
- * new .eng-track-line from dangling toward a permanently-invisible badge —
- * .eng-card/.eng-track correctly settle invisible (base opacity:0). Pre-
- * existing, unrelated to this fix: .eng-signal has no base opacity (only the
- * keyframe ever sets it), so with its animation removed it reverts to the
- * CSS-initial opacity:1 — every signal line stays fully visible and still
- * points at an invisible card. Out of scope here; not introduced by this
- * feature or this fix. */
-@media (prefers-reduced-motion: reduce) {
-  .rd .eng-feed, .rd .eng-signal, .rd .eng-glow,
-  .rd .net-edge.pulse, .rd .net-node, .rd .eng-card,
-  .rd .eng-track-line, .rd .eng-track { animation: none; }
-}
 @media (max-width: 780px) {
-  .rd .eng-lbl, .rd .eng-cap { display: none; }
-  /* mobile doesn't force full-viewport (below), so go back to width-driven
-   * sizing here instead of the height-clamp used for the one-screen layout. */
-  .rd .ld-engine { width: 100%; height: auto; max-width: none; aspect-ratio: 1 / 1; }
-  /* stacked steps + a 1:1 engine no longer fit one screen at this width —
-   * let the section size to its content instead of forcing full-viewport. */
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
+  .rd .eng-panels { grid-template-columns: 1fr; }
+  .rd .eng-panel { border-left: 1px solid var(--line-2) !important; border-top: none; min-height: 0; }
+  .rd .eng-panel:not(:first-child) { border-top: none; margin-top: -1px; }
+  .rd .eng-panel-chevron { display: none; }
 }
 @media (max-height: 760px) and (min-width: 781px) {
   .rd .ld-scene { min-height: auto; padding: 64px 36px 32px; }
@@ -232,25 +127,6 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .ld-proof-cell .k { margin-top: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; color: var(--ink-3); }
 .rd .ld-proof-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 22px; }
 .rd .ld-proof-foot .note { font-size: 12px; color: var(--ink-3); line-height: 1.5; max-width: 560px; }
-
-/* ── How it works: open flow, not cards. Lives inside .ld-scene, right below
- * the engine panel, so it needs its own top margin (no section-head above it
- * providing one). ─────────────────────────────────────────────────────── */
-.rd .ld-flow { display: none; grid-template-columns: repeat(4, 1fr); gap: 30px; margin-top: 16px; }
-.rd .ld-flow-item { padding-top: 16px; border-top: 2px solid rgba(96,165,250,0.35); }
-.rd .ld-flow-item .n { font-family: var(--mono, monospace); font-size: 12px; color: var(--blue-2); font-weight: 700; margin-bottom: 8px; }
-.rd .ld-flow-item h4 { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: var(--ink); }
-.rd .ld-flow-item p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
-
-/* No caption space at 780px and below (eng-cap is hidden there, see above) —
- * fall back to the full 4-step legend. A second `max-width: 780px` block
- * (not merged into the earlier one) because it must come AFTER .ld-flow's
- * base rule in source order to win the cascade at equal specificity —
- * merging it into the earlier block let the later base rule silently
- * override it (see git history if this trips again). */
-@media (max-width: 780px) {
-  .rd .ld-flow { display: grid; }
-}
 
 /* ── Platform: the REAL Signals/Market/Portfolio component CSS (imported from
  * signals.css / redesign.css / portfolio.css), just scaled to fit a device
@@ -357,11 +233,11 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 
 /* ── Responsive (basic only — desktop-first) ────────────────────────────── */
 @media (max-width: 1020px) {
-  .rd .ld-proof-grid, .rd .ld-flow { grid-template-columns: repeat(2, 1fr); }
+  .rd .ld-proof-grid { grid-template-columns: repeat(2, 1fr); }
   .rd .ld-pricing { grid-template-columns: 1fr; }
   .rd .ld-nav-links { display: none; }
 }
 @media (max-width: 620px) {
-  .rd .ld-proof-grid, .rd .ld-flow { grid-template-columns: 1fr; }
+  .rd .ld-proof-grid { grid-template-columns: 1fr; }
   .rd .ld-proof-foot, .rd .ld-footer-top, .rd .ld-footer-legal { flex-direction: column; align-items: flex-start; }
 }
