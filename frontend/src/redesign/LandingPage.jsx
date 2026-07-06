@@ -253,16 +253,38 @@ const SCREEN_ROWS = [
     icon: <><path d="M2 3 h11 v9 h-6 l-3 3 v-3 h-2 z" /></> },
 ]
 
-const SCREEN_CHIPS = ['MSFT', 'NVDA', 'AAPL', 'AMZN', 'GOOGL', 'TSLA', 'META', 'AVGO']
+/* Scattered "pile of tickers" cluster — a handful of sharp, vivid chips
+ * (depth "fore") mixed with dimmer, blurred ones (depth "back") sitting
+ * behind/around them, evoking "there are 1,800+ of these, we're only
+ * showing a few clearly." Static (no animation), so the blur here doesn't
+ * combine with anything infinitely-animating — safe per this file's
+ * ghost-smear rule. */
+const SCREEN_CHIPS = [
+  { t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 26, y: -8, r: -4, depth: 'back' },
+  { t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 54, y: 30, r: 3, depth: 'fore' },
+  { t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 56, y: 70, r: -3, depth: 'fore' },
+  { t: 'AMZN', bg: '#e8eaf0', fg: '#111', x: 16, y: 108, r: 2, depth: 'fore' },
+  { t: 'GOOGL', bg: '#c084fc', fg: '#1c0b2e', x: 60, y: 146, r: -2, depth: 'back' },
+  { t: 'TSLA', bg: 'var(--red)', fg: '#fff', x: 6, y: 182, r: 4, depth: 'back' },
+  { t: 'AMX', bg: 'var(--gold)', fg: '#241a02', x: 38, y: 208, r: -3, depth: 'fore' },
+  { t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 60, y: 240, r: 3, depth: 'back' },
+  { t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 58, y: 268, r: -2, depth: 'back' },
+  { t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 18, y: 294, r: 2, depth: 'fore' },
+]
 
 function ChipsZone() {
   return (
     <div className="eng-chips-zone">
       <div className="eng-chips-cluster-wrap">
         <div className="eng-chips-cluster">
-          {SCREEN_CHIPS.map((t, i) => (
-            <img key={t} className="eng-scr-chip" src={`/logos/${t}.png`} alt=""
-              style={{ '--i': i }} />
+          {SCREEN_CHIPS.map((c, i) => (
+            <span
+              key={i}
+              className={`eng-scr-chip ${c.depth}`}
+              style={{ '--x': `${c.x}px`, '--y': `${c.y}px`, '--r': `${c.r}deg`, background: c.bg, color: c.fg }}
+            >
+              {c.t}
+            </span>
           ))}
           <FunnelIcon />
         </div>

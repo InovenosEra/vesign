@@ -118,11 +118,18 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * captions instead of floating right after the cluster's own fixed height. */
 .rd .eng-chips-zone { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 52px; }
 .rd .eng-chips-cluster-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; width: 100%; }
-.rd .eng-chips-cluster { position: relative; height: 170px; width: 100%; }
+.rd .eng-chips-cluster { position: relative; height: 320px; width: 100%; }
+/* Two depths: "fore" chips are sharp/vivid (the ones meant to catch the
+ * eye), "back" chips are dimmer and slightly blurred, sitting behind/around
+ * them — reads as a loose pile rather than a tidy list. Static only (no
+ * animation), so combining blur here doesn't risk the ghost-smear bug
+ * class this file avoids elsewhere. */
+.rd .eng-scr-chip { position: absolute; left: var(--x); top: var(--y); display: flex; align-items: center; justify-content: center; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 7px; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.35); transform: rotate(var(--r)); }
+.rd .eng-scr-chip.fore { opacity: 0.97; z-index: 2; }
+.rd .eng-scr-chip.back { opacity: 0.5; filter: blur(0.6px); z-index: 1; }
 .rd .eng-chips-funnel { position: absolute; right: -19px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; z-index: 6; }
 
 /* ── Panel 1: Screen ──────────────────────────────────────────────────── */
-.rd .eng-scr-chip { position: absolute; left: 14%; top: calc(var(--i) * 23px); width: 26px; height: 26px; border-radius: 6px; object-fit: contain; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.35); transform: rotate(calc((var(--i) - 3.5) * 4deg)); opacity: 0.9; }
 .rd .eng-scr-rows { display: flex; flex-direction: column; gap: 14px; }
 .rd .eng-scr-row { position: relative; display: flex; align-items: flex-start; gap: 10px; }
 .rd .eng-scr-row-text { flex: 1; }
