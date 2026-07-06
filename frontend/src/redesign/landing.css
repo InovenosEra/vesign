@@ -89,9 +89,13 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .ld-scene-head h2 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
 .rd .ld-scene-head p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
 
-.rd .eng-panels { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
-.rd .eng-panel { position: relative; background: #0a0d14; border: 1px solid var(--line-2); padding: 18px 16px 16px; display: flex; flex-direction: column; min-height: 420px; }
-.rd .eng-panel:not(:first-child) { border-left: none; }
+.rd .eng-panels { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; align-items: stretch; }
+.rd .eng-panel { position: relative; display: flex; flex-direction: column; }
+/* Border/background live on this inner wrapper (header+body only), not on
+ * .eng-panel itself — .eng-panel-foot sits below it on the page's own
+ * background, matching the reference's caption-outside-the-box treatment. */
+.rd .eng-panel-card { background: #0a0d14; border: 1px solid var(--line-2); padding: 18px 16px 16px; display: flex; flex-direction: column; min-height: 420px; flex: 1; }
+.rd .eng-panel:not(:first-child) .eng-panel-card { border-left: none; }
 .rd .eng-panel-head { display: flex; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .rd .eng-panel-head .n { font-family: var(--mono, monospace); font-size: 13px; font-weight: 800; color: var(--blue-2); }
 .rd .eng-panel-head .t { font-size: 12.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
@@ -103,8 +107,8 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 @media (max-width: 780px) {
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
   .rd .eng-panels { grid-template-columns: 1fr; }
-  .rd .eng-panel { border-left: 1px solid var(--line-2) !important; border-top: none; min-height: 0; }
-  .rd .eng-panel:not(:first-child) { border-top: none; margin-top: -1px; }
+  .rd .eng-panel-card { border-left: 1px solid var(--line-2) !important; min-height: 0; }
+  .rd .eng-panel:not(:first-child) .eng-panel-card { border-top: none; margin-top: -1px; }
   .rd .eng-panel-chevron { display: none; }
 }
 @media (max-height: 760px) and (min-width: 781px) {

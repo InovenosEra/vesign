@@ -235,8 +235,10 @@ function PanelChevron() {
 function ScreenPanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-head"><span className="n">01</span><span className="t">Screen</span></div>
-      <div className="eng-panel-body">Screen panel — Task 2 fills this in.</div>
+      <div className="eng-panel-card">
+        <div className="eng-panel-head"><span className="n">01</span><span className="t">Screen</span></div>
+        <div className="eng-panel-body">Screen panel — Task 2 fills this in.</div>
+      </div>
       <div className="eng-panel-foot">Criteria-based filtering</div>
       <PanelChevron />
     </div>
@@ -246,8 +248,10 @@ function ScreenPanel() {
 function ScorePanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-head"><span className="n">02</span><span className="t">Score</span></div>
-      <div className="eng-panel-body">Score panel — Task 3 fills this in.</div>
+      <div className="eng-panel-card">
+        <div className="eng-panel-head"><span className="n">02</span><span className="t">Score</span></div>
+        <div className="eng-panel-body">Score panel — Task 3 fills this in.</div>
+      </div>
       <div className="eng-panel-foot">Data fusion &amp; advanced modeling</div>
       <PanelChevron />
     </div>
@@ -257,8 +261,10 @@ function ScorePanel() {
 function SignalPanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-head"><span className="n">03</span><span className="t">Signal</span></div>
-      <div className="eng-panel-body">Signal panel — Task 4 fills this in.</div>
+      <div className="eng-panel-card">
+        <div className="eng-panel-head"><span className="n">03</span><span className="t">Signal</span></div>
+        <div className="eng-panel-body">Signal panel — Task 4 fills this in.</div>
+      </div>
       <div className="eng-panel-foot">Daily signal decision (BUY/HOLD/SELL)</div>
       <PanelChevron />
     </div>
@@ -268,8 +274,10 @@ function SignalPanel() {
 function TrackPanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-head"><span className="n">04</span><span className="t">Track</span></div>
-      <div className="eng-panel-body">Track panel — Task 5 fills this in.</div>
+      <div className="eng-panel-card">
+        <div className="eng-panel-head"><span className="n">04</span><span className="t">Track</span></div>
+        <div className="eng-panel-body">Track panel — Task 5 fills this in.</div>
+      </div>
       <div className="eng-panel-foot">Long-term accuracy &amp; alpha tracking</div>
     </div>
   )
