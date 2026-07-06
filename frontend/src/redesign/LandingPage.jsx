@@ -228,8 +228,16 @@ function Hero() {
  * no CSS transform on SVG shape elements. Everything here is aria-hidden,
  * fixed illustrative content — not a live model call. */
 
-function PanelChevron() {
-  return <div className="eng-panel-chevron" aria-hidden="true">›</div>
+function PanelArrow() {
+  return <div className="eng-panel-arrow" aria-hidden="true">→</div>
+}
+
+function FunnelIcon() {
+  return (
+    <svg className="eng-chips-funnel" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4h18l-7 9v6l-4 2v-8z" />
+    </svg>
+  )
 }
 
 const SCREEN_ROWS = [
@@ -247,19 +255,30 @@ const SCREEN_ROWS = [
 
 const SCREEN_CHIPS = ['MSFT', 'NVDA', 'AAPL', 'AMZN', 'GOOGL', 'TSLA', 'META', 'AVGO']
 
+function ChipsZone() {
+  return (
+    <div className="eng-chips-zone">
+      <div className="eng-chips-cluster">
+        {SCREEN_CHIPS.map((t, i) => (
+          <img key={t} className="eng-scr-chip" src={`/logos/${t}.png`} alt=""
+            style={{ '--i': i }} />
+        ))}
+        <FunnelIcon />
+      </div>
+      <div className="eng-panel-foot">Daily stock universe (1,800+)</div>
+    </div>
+  )
+}
+
 function ScreenPanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-card">
+      <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">01</span><span className="t">Screen</span></div>
+      </div>
+      <div className="eng-panel-card">
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Daily stock universe (1,800+)</div>
-          <div className="eng-scr-chips">
-            {SCREEN_CHIPS.map((t, i) => (
-              <img key={t} className="eng-scr-chip" src={`/logos/${t}.png`} alt=""
-                style={{ '--i': i }} />
-            ))}
-          </div>
           <div className="eng-scr-rows">
             {SCREEN_ROWS.map((r) => (
               <div className="eng-scr-row" key={r.label}>
@@ -268,17 +287,18 @@ function ScreenPanel() {
                     {r.icon}
                   </svg>
                 </span>
-                <div>
+                <div className="eng-scr-row-text">
                   <div className="eng-scr-row-label">{r.label}</div>
                   <div className="eng-scr-row-desc">{r.desc}</div>
                 </div>
+                <span className="eng-scr-row-stub" style={{ '--c': r.color }} />
               </div>
             ))}
           </div>
         </div>
       </div>
       <div className="eng-panel-foot">Criteria-based filtering</div>
-      <PanelChevron />
+      <PanelArrow />
     </div>
   )
 }
@@ -316,11 +336,21 @@ const NET_PULSE_META = {
   h6o2: { dur: 2.7, delay: -1.8 },
 }
 
+/* Stub connectors at the net's own left/right edges, colored to echo the
+ * neighboring panels' own colors (Screen's row colors on the left, Signal's
+ * verdict colors on the right) — a contained, self-drawn approximation of
+ * the reference's cross-panel flowing lines, without needing this panel to
+ * know the other panels' actual DOM positions. */
+const NET_IN_STUB_COLORS = ['var(--blue-2)', 'var(--green)', '#c084fc', '#22d3ee', 'var(--gold)', 'var(--blue-2)']
+const NET_OUT_STUB_COLORS = ['var(--green)', 'var(--gold)', 'var(--red)', 'var(--green)', 'var(--gold)']
+
 function ScorePanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-card">
+      <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">02</span><span className="t">Score</span></div>
+      </div>
+      <div className="eng-panel-card">
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Deep learning model</div>
           <div className="eng-net-labels">
@@ -335,6 +365,12 @@ function ScorePanel() {
                 <stop offset="100%" style={{ stopColor: 'var(--blue-2)', stopOpacity: 0.35 }} />
               </radialGradient>
             </defs>
+            {NET_IN_NODES.map((n, i) => (
+              <line key={'stub-in-' + i} className="eng-net-stub" x1={0} y1={n.y} x2={n.x} y2={n.y} stroke={NET_IN_STUB_COLORS[i]} />
+            ))}
+            {NET_OUT_NODES.map((n, i) => (
+              <line key={'stub-out-' + i} className="eng-net-stub" x1={n.x} y1={n.y} x2={NET_VB_W} y2={n.y} stroke={NET_OUT_STUB_COLORS[i]} />
+            ))}
             <g className="net">
               {NET_EDGES.map((e) => (
                 <line key={e.id} className="net-edge" x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} />
@@ -363,7 +399,7 @@ function ScorePanel() {
         </div>
       </div>
       <div className="eng-panel-foot">Data fusion &amp; advanced modeling</div>
-      <PanelChevron />
+      <PanelArrow />
     </div>
   )
 }
@@ -379,8 +415,10 @@ const SIGNAL_ROWS = [
 function SignalPanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-card">
+      <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">03</span><span className="t">Signal</span></div>
+      </div>
+      <div className="eng-panel-card">
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Daily BUY/HOLD/SELL scores</div>
           <div className="eng-sig-rows">
@@ -395,7 +433,7 @@ function SignalPanel() {
         </div>
       </div>
       <div className="eng-panel-foot">Daily signal decision (BUY/HOLD/SELL)</div>
-      <PanelChevron />
+      <PanelArrow />
     </div>
   )
 }
@@ -416,8 +454,10 @@ const TRACK_STATS = [
 function TrackPanel() {
   return (
     <div className="eng-panel">
-      <div className="eng-panel-card">
+      <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">04</span><span className="t">Track</span></div>
+      </div>
+      <div className="eng-panel-card">
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Historical signal performance</div>
           <svg className="eng-trk-chart" viewBox="0 0 300 120" preserveAspectRatio="none">
@@ -461,6 +501,7 @@ function EngineScene() {
         <p>Every signal is the result of many independent data feeds converging into one continuously-running model — not a bare score.</p>
       </div>
       <div className="eng-panels" aria-hidden="true">
+        <ChipsZone />
         <ScreenPanel />
         <ScorePanel />
         <SignalPanel />
