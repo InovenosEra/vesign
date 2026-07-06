@@ -96,10 +96,13 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * scales up on tall screens instead of floating in a sea of empty space, and
  * shrinks on short ones instead of overflowing — width follows via aspect-ratio. */
 .rd .ld-engine { position: relative; width: auto; max-width: 100%; height: clamp(260px, calc(100vh - 384px), 460px); height: clamp(260px, calc(100dvh - 384px), 460px); aspect-ratio: 1400 / 620; margin: 0 auto; background: #0a0d14; border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden; }
-.rd .eng-cap { position: absolute; top: 3.5%; font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; z-index: 5; }
-.rd .eng-cap.left { left: 2%; }
-.rd .eng-cap.center { left: 50%; transform: translateX(-50%); }
-.rd .eng-cap.right { right: 2%; }
+.rd .eng-cap { position: absolute; top: 3.5%; z-index: 5; display: flex; flex-direction: column; gap: 3px; }
+.rd .eng-cap.left { left: 2%; align-items: flex-start; }
+.rd .eng-cap.center { left: 50%; transform: translateX(-50%); align-items: center; text-align: center; }
+.rd .eng-cap.right { right: 2%; align-items: flex-end; text-align: right; }
+.rd .eng-cap .n { font-size: 13px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); white-space: nowrap; }
+.rd .eng-cap .n b { color: var(--blue-2); font-family: var(--mono, monospace); font-weight: 700; margin-right: 5px; }
+.rd .eng-cap .tag { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
 
 .rd .eng-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; }
 

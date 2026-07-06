@@ -312,15 +312,15 @@ const ENGINE_OUTPUTS = [
  * scene above, so they render inside it rather than as a separate section. */
 const STEPS = [
   {
-    n: '01', t: 'Screen',
+    n: '01', t: 'Screen', tag: '1,800+ stocks, daily',
     d: '1,800+ US-listed stocks re-scored every trading day after the close.',
   },
   {
-    n: '02', t: 'Score',
+    n: '02', t: 'Score', tag: '3 independent reads',
     d: 'Three independent reads per stock — technicals, an ML model, analyst consensus.',
   },
   {
-    n: '03', t: 'Signal',
+    n: '03', t: 'Signal', tag: 'BUY / SELL, live',
     d: 'A BUY or SELL goes out only when the evidence lines up, with the “why” in plain language.',
   },
   {
@@ -338,9 +338,18 @@ function EngineScene() {
         <p>Every signal is the result of many independent data feeds converging into one continuously-running model — not a bare score.</p>
       </div>
       <div className="ld-engine" aria-hidden="true">
-        <div className="eng-cap left">Reading the market</div>
-        <div className="eng-cap center">The engine</div>
-        <div className="eng-cap right">Signals, live</div>
+        <div className="eng-cap left">
+          <span className="n"><b>{STEPS[0].n}</b>{STEPS[0].t}</span>
+          <span className="tag">{STEPS[0].tag}</span>
+        </div>
+        <div className="eng-cap center">
+          <span className="n"><b>{STEPS[1].n}</b>{STEPS[1].t}</span>
+          <span className="tag">{STEPS[1].tag}</span>
+        </div>
+        <div className="eng-cap right">
+          <span className="n"><b>{STEPS[2].n}</b>{STEPS[2].t}</span>
+          <span className="tag">{STEPS[2].tag}</span>
+        </div>
 
         <div className="eng-glow" />
 
