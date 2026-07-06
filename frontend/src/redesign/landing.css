@@ -114,7 +114,8 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-scr-chip { position: absolute; left: 0; top: calc(var(--i) * 23px); width: 26px; height: 26px; border-radius: 6px; object-fit: contain; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.35); transform: rotate(calc((var(--i) - 3.5) * 4deg)); opacity: 0.9; }
 .rd .eng-scr-rows { display: flex; flex-direction: column; gap: 14px; margin-left: 40px; }
 .rd .eng-scr-row { display: flex; align-items: flex-start; gap: 10px; }
-.rd .eng-scr-icon { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; }
+.rd .eng-scr-icon-badge { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: color-mix(in srgb, var(--c) 16%, transparent); flex-shrink: 0; }
+.rd .eng-scr-icon { width: 15px; height: 15px; }
 .rd .eng-scr-row-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
 .rd .eng-scr-row-desc { margin-top: 2px; font-size: 11px; color: var(--ink-3); }
 
@@ -134,7 +135,10 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 
 /* ── Panel 3: Signal ──────────────────────────────────────────────────── */
 .rd .eng-sig-rows { display: flex; flex-direction: column; gap: 10px; }
-.rd .eng-sig-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 9px; padding: 9px 12px; }
+.rd .eng-sig-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-left-width: 3px; border-radius: 9px; padding: 9px 12px; }
+.rd .eng-sig-row.buy { border-left-color: var(--green); }
+.rd .eng-sig-row.hold { border-left-color: var(--gold); }
+.rd .eng-sig-row.sell { border-left-color: var(--red); }
 .rd .eng-sig-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; background: #fff; flex-shrink: 0; }
 .rd .eng-sig-tk { flex: 1; font-size: 13px; font-weight: 800; color: var(--ink); }
 .rd .eng-sig-pill { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 5px; letter-spacing: 0.04em; }

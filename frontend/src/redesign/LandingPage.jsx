@@ -263,9 +263,11 @@ function ScreenPanel() {
           <div className="eng-scr-rows">
             {SCREEN_ROWS.map((r) => (
               <div className="eng-scr-row" key={r.label}>
-                <svg className="eng-scr-icon" viewBox="0 0 17 17" fill="none" stroke={r.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-                  {r.icon}
-                </svg>
+                <span className="eng-scr-icon-badge" style={{ '--c': r.color }}>
+                  <svg className="eng-scr-icon" viewBox="0 0 17 17" fill="none" stroke={r.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                    {r.icon}
+                  </svg>
+                </span>
                 <div>
                   <div className="eng-scr-row-label">{r.label}</div>
                   <div className="eng-scr-row-desc">{r.desc}</div>
@@ -419,6 +421,13 @@ function TrackPanel() {
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Historical signal performance</div>
           <svg className="eng-trk-chart" viewBox="0 0 300 120" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="trkAlphaFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style={{ stopColor: 'var(--green)', stopOpacity: 0.32 }} />
+                <stop offset="100%" style={{ stopColor: 'var(--green)', stopOpacity: 0 }} />
+              </linearGradient>
+            </defs>
+            <polygon points={`${TRACK_ALPHA} 300,120 0,120`} fill="url(#trkAlphaFill)" stroke="none" />
             <polyline points={TRACK_BENCH} fill="none" stroke="var(--ink-3)" strokeWidth="1.5" />
             <polyline points={TRACK_ALPHA} fill="none" stroke="var(--green)" strokeWidth="2" />
             {TRACK_MARKERS.map((m, i) => (
