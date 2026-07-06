@@ -186,14 +186,20 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-track.loss .pct { color: var(--red); }
 @keyframes engTrackCycle { 0%, 80% { opacity: 0; transform: translateX(8px); } 88%, 96% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(8px); } }
 
+/* `:first-of-type` only ever matched .eng-signal/.eng-track-line here (each
+ * is the only element of its tag among its actual siblings inside <svg> —
+ * .eng-card/.eng-track are <div>s sharing a parent with unrelated .eng-cap/
+ * .eng-glow divs, so `.eng-card:first-of-type`/`.eng-track:first-of-type`
+ * never matched anything, leaving a visible connector line pointing at a
+ * permanently-invisible card/badge). Rather than half-populate the frame
+ * with dangling lines, freezing everything at its own static (non-animated)
+ * opacity is simpler and has no dangling-reference case: feeds/net/glow
+ * settle at their own steady-state look, cards/signals/tracks/lines all
+ * settle invisible together. */
 @media (prefers-reduced-motion: reduce) {
   .rd .eng-feed, .rd .eng-signal, .rd .eng-glow,
   .rd .net-edge.pulse, .rd .net-node, .rd .eng-card,
   .rd .eng-track-line, .rd .eng-track { animation: none; }
-  .rd .eng-card:first-of-type { opacity: 1; }
-  .rd .eng-signal:first-of-type { opacity: 0.9; stroke-dashoffset: 0; }
-  .rd .eng-track:first-of-type { opacity: 1; }
-  .rd .eng-track-line:first-of-type { opacity: 0.8; }
 }
 @media (max-width: 780px) {
   .rd .eng-lbl, .rd .eng-cap { display: none; }
