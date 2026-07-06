@@ -281,12 +281,84 @@ function ScreenPanel() {
   )
 }
 
+const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1)
+
+/* Net geometry, scoped to just this panel's own small viewBox (not the
+ * whole scene like before). Same node counts and all-to-all wiring as the
+ * original diagram — only the coordinates shrank to fit one panel. */
+const NET_VB_W = 460, NET_VB_H = 420
+const NET_CY = 210, NET_ROW_GAP = 46
+const NET_LAYER_X = { in: 90, hid: 230, out: 370 }
+const netColumn = (x, count, r) =>
+  Array.from({ length: count }, (_, i) => ({ x, y: NET_CY + (i - (count - 1) / 2) * NET_ROW_GAP, r }))
+const NET_IN_NODES = netColumn(NET_LAYER_X.in, 6, 4.5)
+const NET_HID_NODES = netColumn(NET_LAYER_X.hid, 7, 5.5)
+const NET_OUT_NODES = netColumn(NET_LAYER_X.out, 5, 4.5)
+const NET_ALL_NODES = [...NET_IN_NODES, ...NET_HID_NODES, ...NET_OUT_NODES]
+const NET_EDGES = [
+  ...NET_IN_NODES.flatMap((a, ai) => NET_HID_NODES.map((b, bi) => ({ id: `i${ai}h${bi}`, a, b }))),
+  ...NET_HID_NODES.flatMap((a, ai) => NET_OUT_NODES.map((b, bi) => ({ id: `h${ai}o${bi}`, a, b }))),
+]
+/* Same curated pulse subset as the original diagram — edge IDs are
+ * coordinate-independent, so this list carries over unchanged. */
+const NET_PULSE_META = {
+  i0h0: { dur: 2.6, delay: -0.3 }, i0h3: { dur: 3.1, delay: -1.4 },
+  i1h1: { dur: 2.8, delay: -0.8 }, i1h5: { dur: 3.4, delay: -2.1 },
+  i2h2: { dur: 2.5, delay: -1.9 }, i2h6: { dur: 3.0, delay: -0.5 },
+  i3h0: { dur: 2.9, delay: -2.6 }, i3h4: { dur: 3.3, delay: -1.1 },
+  i4h1: { dur: 2.7, delay: -0.2 }, i4h6: { dur: 3.2, delay: -1.7 },
+  i5h3: { dur: 2.6, delay: -2.3 },
+  h0o0: { dur: 2.4, delay: -0.6 }, h1o2: { dur: 2.8, delay: -1.5 },
+  h2o4: { dur: 3.1, delay: -0.9 }, h3o1: { dur: 2.5, delay: -2.0 },
+  h4o3: { dur: 2.9, delay: -1.2 }, h5o0: { dur: 3.0, delay: -0.4 },
+  h6o2: { dur: 2.7, delay: -1.8 },
+}
+
 function ScorePanel() {
   return (
     <div className="eng-panel">
       <div className="eng-panel-card">
         <div className="eng-panel-head"><span className="n">02</span><span className="t">Score</span></div>
-        <div className="eng-panel-body">Score panel — Task 3 fills this in.</div>
+        <div className="eng-panel-body">
+          <div className="eng-panel-sub">Deep learning model</div>
+          <div className="eng-net-labels">
+            <span>Feature engineering</span>
+            <span>Pattern recognition</span>
+          </div>
+          <svg className="eng-net-svg" viewBox={`0 0 ${NET_VB_W} ${NET_VB_H}`} preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <radialGradient id="netNodeGlow" cx="35%" cy="30%" r="75%">
+                <stop offset="0%" style={{ stopColor: '#eafcff', stopOpacity: 1 }} />
+                <stop offset="45%" style={{ stopColor: 'var(--blue-2)', stopOpacity: 0.95 }} />
+                <stop offset="100%" style={{ stopColor: 'var(--blue-2)', stopOpacity: 0.35 }} />
+              </radialGradient>
+            </defs>
+            <g className="net">
+              {NET_EDGES.map((e) => (
+                <line key={e.id} className="net-edge" x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} />
+              ))}
+              {NET_EDGES.filter((e) => NET_PULSE_META[e.id]).map((e) => {
+                const meta = NET_PULSE_META[e.id]
+                const len = dist(e.a.x, e.a.y, e.b.x, e.b.y)
+                return (
+                  <line
+                    key={'p-' + e.id}
+                    className="net-edge pulse"
+                    x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y}
+                    style={{ '--gap': len.toFixed(0), '--off': (-(len + 16)).toFixed(0), animationDuration: `${meta.dur}s`, animationDelay: `${meta.delay}s` }}
+                  />
+                )
+              })}
+              {NET_ALL_NODES.map((n, i) => (
+                <circle key={'n' + i} className="net-node" cx={n.x} cy={n.y} r={n.r} style={{ animationDelay: `-${(i * 0.31).toFixed(2)}s` }} />
+              ))}
+            </g>
+          </svg>
+          <div className="eng-net-labels eng-net-labels-sub">
+            <span>Feature extraction</span>
+            <span>Multi-factor attribution</span>
+          </div>
+        </div>
       </div>
       <div className="eng-panel-foot">Data fusion &amp; advanced modeling</div>
       <PanelChevron />
