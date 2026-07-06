@@ -177,6 +177,10 @@ html.ld-snap { scroll-snap-type: y mandatory; }
   /* stacked steps + a 1:1 engine no longer fit one screen at this width —
    * let the section size to its content instead of forcing full-viewport. */
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
+  /* no caption space at this width (eng-cap is hidden above) — fall back to
+   * the full 4-step legend instead of the desktop Track-only strip. */
+  .rd .ld-flow { display: grid; }
+  .rd .ld-track { display: none; }
 }
 @media (max-height: 760px) and (min-width: 781px) {
   .rd .ld-scene { min-height: auto; padding: 64px 36px 32px; }
@@ -202,11 +206,16 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 /* ── How it works: open flow, not cards. Lives inside .ld-scene, right below
  * the engine panel, so it needs its own top margin (no section-head above it
  * providing one). ─────────────────────────────────────────────────────── */
-.rd .ld-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 30px; margin-top: 16px; }
+.rd .ld-flow { display: none; grid-template-columns: repeat(4, 1fr); gap: 30px; margin-top: 16px; }
 .rd .ld-flow-item { padding-top: 16px; border-top: 2px solid rgba(96,165,250,0.35); }
 .rd .ld-flow-item .n { font-family: var(--mono, monospace); font-size: 12px; color: var(--blue-2); font-weight: 700; margin-bottom: 8px; }
 .rd .ld-flow-item h4 { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: var(--ink); }
 .rd .ld-flow-item p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+
+.rd .ld-track { display: flex; align-items: baseline; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.rd .ld-track .n { font-family: var(--mono, monospace); font-size: 12px; color: var(--blue-2); font-weight: 700; }
+.rd .ld-track h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
+.rd .ld-track p { margin: 0; font-size: 12.5px; color: var(--ink-2); }
 
 /* ── Platform: the REAL Signals/Market/Portfolio component CSS (imported from
  * signals.css / redesign.css / portfolio.css), just scaled to fit a device

@@ -442,6 +442,11 @@ function EngineScene() {
           </div>
         ))}
       </div>
+      <div className="ld-track">
+        <span className="n">{STEPS[3].n}</span>
+        <h4>{STEPS[3].t}</h4>
+        <p>{STEPS[3].d}</p>
+      </div>
     </section>
   )
 }
