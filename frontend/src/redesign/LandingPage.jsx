@@ -6,6 +6,7 @@
  * those mockups are visually identical to the real product — only the ticker
  * data in them is a fixed illustrative example, not a live fetch. */
 import { useEffect, useRef, useState } from 'react'
+import { SCROLL_DURATION_MS, nextIndex, nearestIndex, scrollYAt } from './landingScroll'
 import { Link } from 'react-router-dom'
 import './redesign.css'
 import './signals/signals.css'
@@ -663,6 +664,78 @@ export function LandingFooter() {
   )
 }
 
+/* Takes over section-to-section navigation from the browser's native CSS
+ * scroll-snap (which offers no control over its settle animation) so the
+ * transition glides on every input device instead of jumping. Only mounted
+ * when the user hasn't asked for reduced motion — see LandingPage's effect
+ * below, where CSS's own `ld-snap` mandatory-snap stays as the fallback
+ * otherwise. Pure math lives in landingScroll.js; this is just the
+ * wheel/keyboard/rAF glue, so it isn't unit-tested — verify manually. */
+function mountEasedSectionScroll(html, main) {
+  html.style.scrollSnapType = 'none'
+  let rafId = null
+  let animating = false
+
+  // Mirrors the native `scroll-snap-align: start` behavior it replaces: that
+  // respects each element's `scroll-margin-top`, which landing.css sets to
+  // 64px on the hero specifically to cancel out the sticky nav's flow height
+  // (the hero's real offsetTop is 64, but its intended resting scrollY is 0 —
+  // see landing.css's own comment on `.rd .ld-hero`). Reading raw offsetTop
+  // here would snap back to scrollY=64 and reintroduce the "hero mis-snapped,
+  // next section peeking through" bug the mount effect elsewhere works around.
+  const sectionTops = () => Array.from(main.children).map((el) => {
+    const marginTop = parseFloat(getComputedStyle(el).scrollMarginTop) || 0
+    return el.offsetTop - marginTop
+  })
+
+  const animateTo = (targetTop) => {
+    const startY = window.scrollY
+    const startTime = performance.now()
+    animating = true
+    const step = (now) => {
+      const elapsed = now - startTime
+      window.scrollTo(0, scrollYAt(startY, targetTop, elapsed))
+      if (elapsed < SCROLL_DURATION_MS) {
+        rafId = requestAnimationFrame(step)
+      } else {
+        animating = false
+      }
+    }
+    rafId = requestAnimationFrame(step)
+  }
+
+  const go = (direction) => {
+    if (animating) return
+    const tops = sectionTops()
+    const current = nearestIndex(tops, window.scrollY)
+    animateTo(tops[nextIndex(current, direction, tops.length)])
+  }
+
+  const isTypingTarget = (el) =>
+    !!el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable)
+
+  const onWheel = (e) => {
+    if (e.ctrlKey) return // pinch-zoom gesture — leave it to the browser
+    e.preventDefault()
+    go(e.deltaY > 0 ? 1 : -1)
+  }
+  const onKeyDown = (e) => {
+    if (isTypingTarget(document.activeElement)) return
+    if (e.key === 'PageDown' || e.key === 'ArrowDown') { e.preventDefault(); go(1) }
+    else if (e.key === 'PageUp' || e.key === 'ArrowUp') { e.preventDefault(); go(-1) }
+  }
+
+  window.addEventListener('wheel', onWheel, { passive: false })
+  window.addEventListener('keydown', onKeyDown)
+
+  return () => {
+    window.removeEventListener('wheel', onWheel)
+    window.removeEventListener('keydown', onKeyDown)
+    if (rafId) cancelAnimationFrame(rafId)
+    html.style.scrollSnapType = ''
+  }
+}
+
 /* ── Page ──────────────────────────────────────────────────────────────────── */
 export default function LandingPage() {
   // Match the document canvas to the redesign --bg while mounted (same pattern
@@ -679,10 +752,16 @@ export default function LandingPage() {
     const prevRestoration = window.history.scrollRestoration
     window.history.scrollRestoration = 'manual'
     window.scrollTo(0, 0)
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const main = html.querySelector('.rd.ld main')
+    const cleanupScroll = (!reduceMotion && main) ? mountEasedSectionScroll(html, main) : null
+
     return () => {
       html.style.background = prev
       html.classList.remove('ld-snap')
       window.history.scrollRestoration = prevRestoration
+      if (cleanupScroll) cleanupScroll()
     }
   }, [])
 
