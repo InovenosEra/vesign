@@ -104,6 +104,15 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-panel-body { flex: 1; position: relative; }
 .rd .eng-panel-foot { text-align: center; margin-top: 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; color: var(--ink-2); }
 
+/* ── Panel 1: Screen ──────────────────────────────────────────────────── */
+.rd .eng-scr-chips { position: relative; height: 0; }
+.rd .eng-scr-chip { position: absolute; left: 0; top: calc(var(--i) * 23px); width: 26px; height: 26px; border-radius: 6px; object-fit: contain; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.35); transform: rotate(calc((var(--i) - 3.5) * 4deg)); opacity: 0.9; }
+.rd .eng-scr-rows { display: flex; flex-direction: column; gap: 14px; margin-left: 40px; }
+.rd .eng-scr-row { display: flex; align-items: flex-start; gap: 10px; }
+.rd .eng-scr-icon { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; }
+.rd .eng-scr-row-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.rd .eng-scr-row-desc { margin-top: 2px; font-size: 11px; color: var(--ink-3); }
+
 @media (max-width: 780px) {
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
   .rd .eng-panels { grid-template-columns: 1fr; }

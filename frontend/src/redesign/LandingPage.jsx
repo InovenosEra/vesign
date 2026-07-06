@@ -232,12 +232,48 @@ function PanelChevron() {
   return <div className="eng-panel-chevron" aria-hidden="true">›</div>
 }
 
+const SCREEN_ROWS = [
+  { label: 'Technicals', desc: 'RSI, moving averages, volatility', color: 'var(--blue-2)',
+    icon: <><polyline points="2,15 6,9 10,12 15,4" /><circle cx="15" cy="4" r="1.4" /></> },
+  { label: 'Price action', desc: 'Trend, volume', color: 'var(--green)',
+    icon: <><rect x="2" y="9" width="3" height="6" /><rect x="7" y="5" width="3" height="10" /><rect x="12" y="2" width="3" height="13" /></> },
+  { label: 'Fundamentals', desc: 'P/E, growth, debt', color: '#c084fc',
+    icon: <><rect x="2" y="2" width="13" height="13" rx="1.2" /><line x1="5" y1="6" x2="12" y2="6" /><line x1="5" y1="9" x2="12" y2="9" /><line x1="5" y1="12" x2="9.5" y2="12" /></> },
+  { label: 'Macro data', desc: 'GDP, interest rates', color: '#22d3ee',
+    icon: <><circle cx="8.5" cy="8.5" r="6.5" /><ellipse cx="8.5" cy="8.5" rx="2.8" ry="6.5" /><line x1="2" y1="8.5" x2="15" y2="8.5" /></> },
+  { label: 'News & sentiment', desc: 'AI analysis of headlines', color: 'var(--gold)',
+    icon: <><path d="M2 3 h11 v9 h-6 l-3 3 v-3 h-2 z" /></> },
+]
+
+const SCREEN_CHIPS = ['MSFT', 'NVDA', 'AAPL', 'AMZN', 'GOOGL', 'TSLA', 'META', 'AVGO']
+
 function ScreenPanel() {
   return (
     <div className="eng-panel">
       <div className="eng-panel-card">
         <div className="eng-panel-head"><span className="n">01</span><span className="t">Screen</span></div>
-        <div className="eng-panel-body">Screen panel — Task 2 fills this in.</div>
+        <div className="eng-panel-body">
+          <div className="eng-panel-sub">Daily stock universe (1,800+)</div>
+          <div className="eng-scr-chips">
+            {SCREEN_CHIPS.map((t, i) => (
+              <img key={t} className="eng-scr-chip" src={`/logos/${t}.png`} alt=""
+                style={{ '--i': i }} />
+            ))}
+          </div>
+          <div className="eng-scr-rows">
+            {SCREEN_ROWS.map((r) => (
+              <div className="eng-scr-row" key={r.label}>
+                <svg className="eng-scr-icon" viewBox="0 0 17 17" fill="none" stroke={r.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  {r.icon}
+                </svg>
+                <div>
+                  <div className="eng-scr-row-label">{r.label}</div>
+                  <div className="eng-scr-row-desc">{r.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="eng-panel-foot">Criteria-based filtering</div>
       <PanelChevron />
