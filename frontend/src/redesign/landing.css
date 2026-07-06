@@ -170,9 +170,9 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-trk-legend .dot.buy { background: var(--green); }
 .rd .eng-trk-legend .dot.bench { background: var(--ink-3); }
 .rd .eng-trk-stats { display: flex; flex-direction: column; gap: 10px; }
-.rd .eng-trk-stat { display: flex; align-items: baseline; justify-content: space-between; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 12px; }
-.rd .eng-trk-stat .k { font-size: 11.5px; color: var(--ink-2); }
-.rd .eng-trk-stat .v { font-size: 13px; font-weight: 800; color: var(--green); }
+.rd .eng-trk-stat { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 12px; }
+.rd .eng-trk-stat .k { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; }
+.rd .eng-trk-stat .v { font-size: 13px; font-weight: 800; color: var(--green); white-space: nowrap; }
 
 @media (max-width: 780px) {
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
