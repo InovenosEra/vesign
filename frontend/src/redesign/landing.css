@@ -107,8 +107,8 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 @media (max-width: 780px) {
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
   .rd .eng-panels { grid-template-columns: 1fr; }
-  .rd .eng-panel-card { border-left: 1px solid var(--line-2) !important; min-height: 0; }
-  .rd .eng-panel:not(:first-child) .eng-panel-card { border-top: none; margin-top: -1px; }
+  .rd .eng-panel-card { border-left: 1px solid var(--line-2) !important; border-top: none; min-height: 0; }
+  .rd .eng-panel:not(:first-child) .eng-panel-card { margin-top: -1px; }
   .rd .eng-panel-chevron { display: none; }
 }
 @media (max-height: 760px) and (min-width: 781px) {
