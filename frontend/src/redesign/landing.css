@@ -127,6 +127,16 @@ html.ld-snap { scroll-snap-type: y mandatory; }
   .rd .net-edge.pulse, .rd .net-node { animation: none; }
 }
 
+/* ── Panel 3: Signal ──────────────────────────────────────────────────── */
+.rd .eng-sig-rows { display: flex; flex-direction: column; gap: 10px; }
+.rd .eng-sig-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 9px; padding: 9px 12px; }
+.rd .eng-sig-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; background: #fff; flex-shrink: 0; }
+.rd .eng-sig-tk { flex: 1; font-size: 13px; font-weight: 800; color: var(--ink); }
+.rd .eng-sig-pill { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 5px; letter-spacing: 0.04em; }
+.rd .eng-sig-row.buy .eng-sig-pill { background: var(--green-bg); color: var(--green); }
+.rd .eng-sig-row.hold .eng-sig-pill { background: rgba(245,166,35,0.16); color: var(--gold); }
+.rd .eng-sig-row.sell .eng-sig-pill { background: var(--red-bg); color: var(--red); }
+
 @media (max-width: 780px) {
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
   .rd .eng-panels { grid-template-columns: 1fr; }

@@ -366,12 +366,31 @@ function ScorePanel() {
   )
 }
 
+const SIGNAL_ROWS = [
+  { ticker: 'AAPL', verdict: 'buy' },
+  { ticker: 'GOOGL', verdict: 'hold' },
+  { ticker: 'TSLA', verdict: 'sell' },
+  { ticker: 'NVDA', verdict: 'buy' },
+  { ticker: 'AMZN', verdict: 'hold' },
+]
+
 function SignalPanel() {
   return (
     <div className="eng-panel">
       <div className="eng-panel-card">
         <div className="eng-panel-head"><span className="n">03</span><span className="t">Signal</span></div>
-        <div className="eng-panel-body">Signal panel — Task 4 fills this in.</div>
+        <div className="eng-panel-body">
+          <div className="eng-panel-sub">Daily BUY/HOLD/SELL scores</div>
+          <div className="eng-sig-rows">
+            {SIGNAL_ROWS.map((s) => (
+              <div className={`eng-sig-row ${s.verdict}`} key={s.ticker}>
+                <img className="eng-sig-logo" src={`/logos/${s.ticker}.png`} alt="" />
+                <span className="eng-sig-tk">{s.ticker}</span>
+                <span className="eng-sig-pill">{s.verdict.toUpperCase()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="eng-panel-foot">Daily signal decision (BUY/HOLD/SELL)</div>
       <PanelChevron />
