@@ -137,6 +137,17 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-sig-row.hold .eng-sig-pill { background: rgba(245,166,35,0.16); color: var(--gold); }
 .rd .eng-sig-row.sell .eng-sig-pill { background: var(--red-bg); color: var(--red); }
 
+/* ── Panel 4: Track ───────────────────────────────────────────────────── */
+.rd .eng-trk-chart { width: 100%; height: auto; aspect-ratio: 300 / 120; display: block; margin-bottom: 6px; }
+.rd .eng-trk-legend { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-3); margin-bottom: 16px; }
+.rd .eng-trk-legend .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+.rd .eng-trk-legend .dot.buy { background: var(--green); }
+.rd .eng-trk-legend .dot.bench { background: var(--ink-3); }
+.rd .eng-trk-stats { display: flex; flex-direction: column; gap: 10px; }
+.rd .eng-trk-stat { display: flex; align-items: baseline; justify-content: space-between; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 12px; }
+.rd .eng-trk-stat .k { font-size: 11.5px; color: var(--ink-2); }
+.rd .eng-trk-stat .v { font-size: 13px; font-weight: 800; color: var(--green); }
+
 @media (max-width: 780px) {
   .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
   .rd .eng-panels { grid-template-columns: 1fr; }

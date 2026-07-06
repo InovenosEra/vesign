@@ -398,12 +398,45 @@ function SignalPanel() {
   )
 }
 
+const TRACK_ALPHA = '0,110 30,100 60,105 90,80 120,85 150,60 180,65 210,40 240,45 270,20 300,25'
+const TRACK_BENCH = '0,110 30,108 60,112 90,105 120,108 150,100 180,103 210,98 240,100 270,95 300,92'
+const TRACK_MARKERS = [
+  { x: 90, y: 80, kind: 'buy' },
+  { x: 150, y: 60, kind: 'sell' },
+  { x: 270, y: 20, kind: 'buy' },
+]
+const TRACK_STATS = [
+  { k: 'Win Rate', v: '64%' },
+  { k: 'Alpha Generation', v: '+11% vs. S&P' },
+  { k: 'Sharpe Ratio', v: '1.7' },
+]
+
 function TrackPanel() {
   return (
     <div className="eng-panel">
       <div className="eng-panel-card">
         <div className="eng-panel-head"><span className="n">04</span><span className="t">Track</span></div>
-        <div className="eng-panel-body">Track panel — Task 5 fills this in.</div>
+        <div className="eng-panel-body">
+          <div className="eng-panel-sub">Historical signal performance</div>
+          <svg className="eng-trk-chart" viewBox="0 0 300 120" preserveAspectRatio="none">
+            <polyline points={TRACK_BENCH} fill="none" stroke="var(--ink-3)" strokeWidth="1.5" />
+            <polyline points={TRACK_ALPHA} fill="none" stroke="var(--green)" strokeWidth="2" />
+            {TRACK_MARKERS.map((m, i) => (
+              <circle key={i} cx={m.x} cy={m.y} r="3.2" fill={m.kind === 'buy' ? 'var(--green)' : 'var(--red)'} />
+            ))}
+          </svg>
+          <div className="eng-trk-legend">
+            <span className="dot buy" /> Alpha &nbsp; <span className="dot bench" /> Benchmark
+          </div>
+          <div className="eng-trk-stats">
+            {TRACK_STATS.map((s) => (
+              <div className="eng-trk-stat" key={s.k}>
+                <span className="k">{s.k}</span>
+                <span className="v">{s.v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="eng-panel-foot">Long-term accuracy &amp; alpha tracking</div>
     </div>
