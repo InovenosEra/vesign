@@ -226,7 +226,7 @@ function Hero() {
  * codebase has hit real Chrome GPU-compositing "ghost smear" bugs from that
  * exact combination before (see project history on the Signals page + shared
  * header). Glow here is radial-gradient/box-shadow only. */
-const ENG_VB_W = 1400, ENG_VB_H = 620
+const ENG_VB_W = 1850, ENG_VB_H = 620
 const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1)
 
 /* Net geometry: 3 columns (6 → 7 → 5 nodes) laid out around the panel's
