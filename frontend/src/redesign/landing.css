@@ -102,7 +102,12 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-panel-chevron { position: absolute; top: 22px; right: -13px; z-index: 6; width: 24px; height: 24px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; color: var(--blue-2); font-size: 13px; line-height: 1; }
 .rd .eng-panel-sub { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 12px; }
 .rd .eng-panel-body { flex: 1; position: relative; }
-.rd .eng-panel-foot { text-align: center; margin-top: 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; color: var(--ink-2); }
+/* min-height reserves 2 lines uniformly — at ~781-1050px the longest
+ * caption ("Daily signal decision (BUY/HOLD/SELL)") wraps while shorter
+ * ones don't; without a fixed reservation the bordered cards above (all
+ * equal-height via .eng-panels' align-items:stretch) would drift out of
+ * alignment since the foot's real height differs panel to panel. */
+.rd .eng-panel-foot { text-align: center; margin-top: 14px; font-size: 11px; line-height: 1.4; min-height: calc(1.4em * 2); font-weight: 600; letter-spacing: 0.03em; color: var(--ink-2); }
 
 /* ── Panel 1: Screen ──────────────────────────────────────────────────── */
 .rd .eng-scr-chips { position: relative; height: 0; }
