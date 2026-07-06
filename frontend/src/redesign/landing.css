@@ -188,9 +188,12 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 
 @media (prefers-reduced-motion: reduce) {
   .rd .eng-feed, .rd .eng-signal, .rd .eng-glow,
-  .rd .net-edge.pulse, .rd .net-node, .rd .eng-card { animation: none; }
+  .rd .net-edge.pulse, .rd .net-node, .rd .eng-card,
+  .rd .eng-track-line, .rd .eng-track { animation: none; }
   .rd .eng-card:first-of-type { opacity: 1; }
   .rd .eng-signal:first-of-type { opacity: 0.9; stroke-dashoffset: 0; }
+  .rd .eng-track:first-of-type { opacity: 1; }
+  .rd .eng-track-line:first-of-type { opacity: 0.8; }
 }
 @media (max-width: 780px) {
   .rd .eng-lbl, .rd .eng-cap { display: none; }
