@@ -253,23 +253,34 @@ const SCREEN_ROWS = [
     icon: <><path d="M2 3 h11 v9 h-6 l-3 3 v-3 h-2 z" /></> },
 ]
 
-/* Scattered "pile of tickers" cluster — a handful of sharp, vivid chips
- * (depth "fore") mixed with dimmer, blurred ones (depth "back") sitting
- * behind/around them, evoking "there are 1,800+ of these, we're only
- * showing a few clearly." Static (no animation), so the blur here doesn't
- * combine with anything infinitely-animating — safe per this file's
- * ghost-smear rule. */
+/* Scattered "pile of tickers" cluster — a handful of sharp, vivid text
+ * chips (depth "fore") layered over a denser, dimmer "back" layer: real
+ * company logo tiles (reusing the site's self-hosted /logos/{T}.png, same
+ * as everywhere else in the app) plus truncated ticker-like text fragments,
+ * evoking "there are 1,800+ of these, we're only showing a few clearly."
+ * Static (no animation), so the blur here doesn't combine with anything
+ * infinitely-animating — safe per this file's ghost-smear rule. The
+ * cluster's own overflow:hidden (see CSS) clips left-hanging back-layer
+ * items at the column edge, matching the reference's "half cut off" look. */
 const SCREEN_CHIPS = [
-  { t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 26, y: -8, r: -4, depth: 'back' },
-  { t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 54, y: 30, r: 3, depth: 'fore' },
-  { t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 56, y: 70, r: -3, depth: 'fore' },
-  { t: 'AMZN', bg: '#e8eaf0', fg: '#111', x: 16, y: 108, r: 2, depth: 'fore' },
-  { t: 'GOOGL', bg: '#c084fc', fg: '#1c0b2e', x: 60, y: 146, r: -2, depth: 'back' },
-  { t: 'TSLA', bg: 'var(--red)', fg: '#fff', x: 6, y: 182, r: 4, depth: 'back' },
-  { t: 'AMX', bg: 'var(--gold)', fg: '#241a02', x: 38, y: 208, r: -3, depth: 'fore' },
-  { t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 60, y: 240, r: 3, depth: 'back' },
-  { t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 58, y: 268, r: -2, depth: 'back' },
-  { t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 18, y: 294, r: 2, depth: 'fore' },
+  { kind: 'logo', t: 'MSFT', x: -8, y: -22, r: -6, depth: 'back' },
+  { kind: 'text', t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 26, y: -8, r: -4, depth: 'fore' },
+  { kind: 'logo', t: 'NVDA', x: -9, y: 14, r: 5, depth: 'back' },
+  { kind: 'text', t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 54, y: 30, r: 3, depth: 'fore' },
+  { kind: 'frag', t: 'YKT', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: 92, y: 44, r: 2, depth: 'back' },
+  { kind: 'logo', t: 'WMT', x: -10, y: 56, r: -4, depth: 'back' },
+  { kind: 'text', t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 56, y: 70, r: -3, depth: 'fore' },
+  { kind: 'frag', t: 'GPIT', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: 96, y: 96, r: -3, depth: 'back' },
+  { kind: 'logo', t: 'AMZN', x: -11, y: 94, r: 3, depth: 'back' },
+  { kind: 'text', t: 'AMZN', bg: '#e8eaf0', fg: '#111', x: 16, y: 108, r: 2, depth: 'fore' },
+  { kind: 'frag', t: 'TDNR', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: 84, y: 142, r: 3, depth: 'back' },
+  { kind: 'text', t: 'GOOGL', bg: '#c084fc', fg: '#1c0b2e', x: 58, y: 154, r: -2, depth: 'back' },
+  { kind: 'frag', t: 'RTS', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: -6, y: 178, r: -2, depth: 'back' },
+  { kind: 'text', t: 'TSLA', bg: 'var(--red)', fg: '#fff', x: 4, y: 202, r: 4, depth: 'back' },
+  { kind: 'text', t: 'AMX', bg: 'var(--gold)', fg: '#241a02', x: 40, y: 224, r: -3, depth: 'fore' },
+  { kind: 'text', t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 62, y: 256, r: 3, depth: 'back' },
+  { kind: 'text', t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 60, y: 284, r: -2, depth: 'back' },
+  { kind: 'text', t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 20, y: 310, r: 2, depth: 'fore' },
 ]
 
 function ChipsZone() {
@@ -278,13 +289,20 @@ function ChipsZone() {
       <div className="eng-chips-cluster-wrap">
         <div className="eng-chips-cluster">
           {SCREEN_CHIPS.map((c, i) => (
-            <span
-              key={i}
-              className={`eng-scr-chip ${c.depth}`}
-              style={{ '--x': `${c.x}px`, '--y': `${c.y}px`, '--r': `${c.r}deg`, background: c.bg, color: c.fg }}
-            >
-              {c.t}
-            </span>
+            c.kind === 'logo' ? (
+              <span key={i} className={`eng-scr-chip logo ${c.depth}`}
+                style={{ '--x': `${c.x}px`, '--y': `${c.y}px`, '--r': `${c.r}deg` }}>
+                <img src={`/logos/${c.t}.png`} alt="" />
+              </span>
+            ) : (
+              <span
+                key={i}
+                className={`eng-scr-chip ${c.depth}`}
+                style={{ '--x': `${c.x}px`, '--y': `${c.y}px`, '--r': `${c.r}deg`, background: c.bg, color: c.fg }}
+              >
+                {c.t}
+              </span>
+            )
           ))}
           <FunnelIcon />
         </div>
