@@ -89,7 +89,12 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .ld-scene-head h2 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
 .rd .ld-scene-head p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
 
-.rd .eng-panels { position: relative; display: grid; grid-template-columns: 0.62fr 1fr 1fr 1fr 1fr; column-gap: 14px; align-items: stretch; }
+/* minmax(150px, ...) floors the chips column — without it, once the other
+ * 4 panel columns hit their own text/content min-width they stop shrinking,
+ * so the flexible 0.62fr share absorbs ALL further narrowing alone and the
+ * chips column collapses toward zero width (clipping every chip's text)
+ * well before the 780px mobile breakpoint takes over. */
+.rd .eng-panels { position: relative; display: grid; grid-template-columns: minmax(150px, 0.62fr) 1fr 1fr 1fr 1fr; column-gap: 14px; align-items: stretch; }
 .rd .eng-panel { position: relative; display: flex; flex-direction: column; }
 /* Header lives in its own floating pill above the card (see .eng-panel-head
  * below), not inside it — matches the reference's separate header-pill +

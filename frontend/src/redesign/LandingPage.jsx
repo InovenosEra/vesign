@@ -263,13 +263,13 @@ const SCREEN_ROWS = [
  * cluster's own overflow:hidden (see CSS) clips left-hanging back-layer
  * items at the column edge, matching the reference's "half cut off" look. */
 const SCREEN_CHIPS = [
-  { kind: 'logo', t: 'MSFT', x: -9, y: -4, r: -6, depth: 'back' },
+  { kind: 'logo', t: 'MSFT', x: 2, y: -4, r: -6, depth: 'back' },
   { kind: 'text', t: 'MSFT', fg: 'var(--ink)', x: 24, y: 6, r: -4, depth: 'fore' },
-  { kind: 'logo', t: 'NVDA', x: -10, y: 36, r: 5, depth: 'back' },
+  { kind: 'logo', t: 'NVDA', x: 1, y: 36, r: 5, depth: 'back' },
   { kind: 'text', t: 'NVDA', fg: 'var(--green)', x: 50, y: 42, r: 3, depth: 'fore' },
   { kind: 'text', t: 'WMT', fg: 'var(--blue-2)', x: 52, y: 76, r: -3, depth: 'fore' },
   { kind: 'frag', t: 'GPIT', fg: 'var(--green)', x: 22, y: 108, r: -3, depth: 'back' },
-  { kind: 'logo', t: 'AMZN', x: -10, y: 112, r: 3, depth: 'back' },
+  { kind: 'logo', t: 'AMZN', x: 1, y: 112, r: 3, depth: 'back' },
   { kind: 'text', t: 'AMZN', fg: 'var(--ink)', x: 14, y: 124, r: 2, depth: 'fore' },
   { kind: 'text', t: 'GOOGL', fg: '#c084fc', x: 48, y: 158, r: -2, depth: 'back' },
   { kind: 'text', t: 'TSLA', fg: 'var(--red)', x: 2, y: 188, r: 4, depth: 'back' },
