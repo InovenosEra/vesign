@@ -263,24 +263,20 @@ const SCREEN_ROWS = [
  * cluster's own overflow:hidden (see CSS) clips left-hanging back-layer
  * items at the column edge, matching the reference's "half cut off" look. */
 const SCREEN_CHIPS = [
-  { kind: 'logo', t: 'MSFT', x: -8, y: -22, r: -6, depth: 'back' },
-  { kind: 'text', t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 26, y: -8, r: -4, depth: 'fore' },
-  { kind: 'logo', t: 'NVDA', x: -9, y: 14, r: 5, depth: 'back' },
-  { kind: 'text', t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 54, y: 30, r: 3, depth: 'fore' },
-  { kind: 'frag', t: 'YKT', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: 92, y: 44, r: 2, depth: 'back' },
-  { kind: 'logo', t: 'WMT', x: -10, y: 56, r: -4, depth: 'back' },
-  { kind: 'text', t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 56, y: 70, r: -3, depth: 'fore' },
-  { kind: 'frag', t: 'GPIT', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: 96, y: 96, r: -3, depth: 'back' },
-  { kind: 'logo', t: 'AMZN', x: -11, y: 94, r: 3, depth: 'back' },
-  { kind: 'text', t: 'AMZN', bg: '#e8eaf0', fg: '#111', x: 16, y: 108, r: 2, depth: 'fore' },
-  { kind: 'frag', t: 'TDNR', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: 84, y: 142, r: 3, depth: 'back' },
-  { kind: 'text', t: 'GOOGL', bg: '#c084fc', fg: '#1c0b2e', x: 58, y: 154, r: -2, depth: 'back' },
-  { kind: 'frag', t: 'RTS', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: -6, y: 178, r: -2, depth: 'back' },
-  { kind: 'text', t: 'TSLA', bg: 'var(--red)', fg: '#fff', x: 4, y: 202, r: 4, depth: 'back' },
-  { kind: 'text', t: 'AMX', bg: 'var(--gold)', fg: '#241a02', x: 40, y: 224, r: -3, depth: 'fore' },
-  { kind: 'text', t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 62, y: 256, r: 3, depth: 'back' },
-  { kind: 'text', t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 60, y: 284, r: -2, depth: 'back' },
-  { kind: 'text', t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 20, y: 310, r: 2, depth: 'fore' },
+  { kind: 'logo', t: 'MSFT', x: -9, y: -4, r: -6, depth: 'back' },
+  { kind: 'text', t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 26, y: 10, r: -4, depth: 'fore' },
+  { kind: 'logo', t: 'NVDA', x: -10, y: 48, r: 5, depth: 'back' },
+  { kind: 'text', t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 54, y: 58, r: 3, depth: 'fore' },
+  { kind: 'text', t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 56, y: 98, r: -3, depth: 'fore' },
+  { kind: 'frag', t: 'GPIT', bg: 'var(--panel-2)', fg: 'var(--ink-3)', x: 24, y: 136, r: -3, depth: 'back' },
+  { kind: 'logo', t: 'AMZN', x: -10, y: 142, r: 3, depth: 'back' },
+  { kind: 'text', t: 'AMZN', bg: '#e8eaf0', fg: '#111', x: 16, y: 156, r: 2, depth: 'fore' },
+  { kind: 'text', t: 'GOOGL', bg: '#c084fc', fg: '#1c0b2e', x: 52, y: 198, r: -2, depth: 'back' },
+  { kind: 'text', t: 'TSLA', bg: 'var(--red)', fg: '#fff', x: 4, y: 234, r: 4, depth: 'back' },
+  { kind: 'text', t: 'AMX', bg: 'var(--gold)', fg: '#241a02', x: 40, y: 262, r: -3, depth: 'fore' },
+  { kind: 'text', t: 'NVDA', bg: 'var(--green)', fg: '#04150d', x: 56, y: 298, r: 3, depth: 'back' },
+  { kind: 'text', t: 'WMT', bg: 'var(--blue-2)', fg: '#04121f', x: 54, y: 322, r: -2, depth: 'back' },
+  { kind: 'text', t: 'MSFT', bg: '#e8eaf0', fg: '#111', x: 20, y: 350, r: 2, depth: 'fore' },
 ]
 
 function ChipsZone() {

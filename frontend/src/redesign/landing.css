@@ -120,7 +120,7 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-chips-cluster-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; width: 100%; }
 /* overflow:hidden clips left-hanging back-layer items at the column's own
  * edge — the "half cut off" look the reference relies on for depth. */
-.rd .eng-chips-cluster { position: relative; height: 356px; width: 100%; overflow: hidden; }
+.rd .eng-chips-cluster { position: relative; height: 392px; width: 100%; overflow: hidden; }
 /* Two depths: "fore" chips are sharp/vivid text (the ones meant to catch
  * the eye), "back" is a denser layer of dimmer, blurred text chips + real
  * company-logo tiles + truncated ticker-like fragments sitting behind/
