@@ -330,7 +330,7 @@ function ChipsZone() {
           <ChipCol side="right" chips={CHIPS_RIGHT} duration={38} />
         </div>
       </div>
-      <div className="eng-panel-foot">Daily stock universe (1,800+)</div>
+      <div className="eng-panel-foot">Daily stock universe</div>
     </div>
   )
 }
@@ -373,11 +373,11 @@ const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1)
  * whole scene like before). Same node counts and all-to-all wiring as the
  * original diagram — only the coordinates shrank to fit one panel. */
 const NET_VB_W = 460, NET_VB_H = 420
-const NET_CY = 210, NET_ROW_GAP = 46
-const NET_LAYER_X = { in: 90, hid: 230, out: 370 }
+const NET_CY = 210, NET_ROW_GAP = 56
+const NET_LAYER_X = { in: 70, hid: 230, out: 400 }
 const netColumn = (x, count, r) =>
   Array.from({ length: count }, (_, i) => ({ x, y: NET_CY + (i - (count - 1) / 2) * NET_ROW_GAP, r }))
-const NET_IN_NODES = netColumn(NET_LAYER_X.in, 6, 4.5)
+const NET_IN_NODES = netColumn(NET_LAYER_X.in, 5, 5.5)
 const NET_HID_NODES = netColumn(NET_LAYER_X.hid, 7, 5.5)
 const NET_OUT_NODES = netColumn(NET_LAYER_X.out, 5, 4.5)
 const NET_ALL_NODES = [
@@ -412,11 +412,6 @@ function ScorePanel() {
       </div>
       <div className="eng-panel-card" data-anchor="net-card">
         <div className="eng-panel-body">
-          <div className="eng-panel-sub">Deep learning model</div>
-          <div className="eng-net-labels">
-            <span>Feature engineering</span>
-            <span>Pattern recognition</span>
-          </div>
           <svg className="eng-net-svg" viewBox={`0 0 ${NET_VB_W} ${NET_VB_H}`} preserveAspectRatio="xMidYMid meet">
             <defs>
               <radialGradient id="netNodeGlow" cx="35%" cy="30%" r="75%">
@@ -469,10 +464,6 @@ function ScorePanel() {
               </g>
             </g>
           </svg>
-          <div className="eng-net-labels eng-net-labels-sub">
-            <span>Feature extraction</span>
-            <span>Multi-factor attribution</span>
-          </div>
         </div>
       </div>
       <div className="eng-panel-foot">Data fusion &amp; advanced modeling</div>
@@ -497,7 +488,6 @@ function SignalPanel() {
       </div>
       <div className="eng-panel-card" data-anchor="score-card">
         <div className="eng-panel-body">
-          <div className="eng-panel-sub">Daily BUY/HOLD/SELL scores</div>
           <div className="eng-sig-rows">
             {SIGNAL_ROWS.map((s) => (
               <div className={`eng-sig-row ${s.verdict}`} data-anchor={`score-row-${s.ticker.toLowerCase()}`} key={s.ticker}>
@@ -536,7 +526,6 @@ function TrackPanel() {
       </div>
       <div className="eng-panel-card" data-anchor="track-card">
         <div className="eng-panel-body">
-          <div className="eng-panel-sub">Historical signal performance</div>
           <svg className="eng-trk-chart" viewBox="0 0 300 120" preserveAspectRatio="none">
             <defs>
               <linearGradient id="trkAlphaFill" x1="0" y1="0" x2="0" y2="1">

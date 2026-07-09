@@ -63,6 +63,22 @@ export function useAnchors(containerRef) {
     ro.observe(container)
     window.addEventListener('resize', scheduleMeasure)
 
+    // ResizeObserver only fires when .eng-panels' own OUTER box size changes.
+    // Content that shifts INSIDE it without changing that outer size — e.g. the
+    // net's node count/row-gap constants, which sit inside a fixed-aspect-ratio
+    // SVG whose own box doesn't depend on how many circles are drawn in it —
+    // never triggers a re-measure otherwise, silently leaving `anchors` stale
+    // after exactly that kind of edit. MutationObserver catches it generally
+    // (any node added/removed anywhere in the subtree).
+    // Deliberately NOT observing `attributes`: EngineConnectors' own paths/
+    // circles live inside this same container and update their d/cx/cy
+    // attributes on every re-render (with stable keys, so React patches them
+    // in place rather than adding/removing nodes) — observing attributes
+    // would make every measure() trigger a re-render that re-triggers the
+    // observer that triggers another measure(), forever.
+    const mo = new MutationObserver(scheduleMeasure)
+    mo.observe(container, { childList: true, subtree: true })
+
     let cancelled = false
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => { if (!cancelled) scheduleMeasure() })
@@ -73,6 +89,7 @@ export function useAnchors(containerRef) {
       if (raf1 != null) cancelAnimationFrame(raf1)
       if (raf2 != null) cancelAnimationFrame(raf2)
       ro.disconnect()
+      mo.disconnect()
       window.removeEventListener('resize', scheduleMeasure)
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
     }

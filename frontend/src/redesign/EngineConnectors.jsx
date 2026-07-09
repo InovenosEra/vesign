@@ -28,6 +28,19 @@ const leftMid = (r) => ({ x: r.x, y: r.y + r.h / 2 })
 // n evenly-spaced y positions within r's height, each centered in its own slot.
 const distributeY = (r, n) => Array.from({ length: n }, (_, i) => r.y + (i + 0.5) * (r.h / n))
 
+// `r` (netInput/netOutput) is the TIGHT bounding box of just that layer's node
+// circles — its net-space height is (count-1)*NET_ROW_GAP + 2*radius, NOT the
+// full 420-tall viewBox (that was the previous bug: dividing by 420 compressed
+// every point toward the center, since the group's real span is much smaller).
+// Node i's fraction of that actual span is (radius + i*NET_ROW_GAP) / span,
+// mapped onto the measured r.h. Matches LandingPage.jsx's netColumn(): both
+// layers have 5 real nodes now, radius 5.5 (input) / 4.5 (output), gap 56.
+const NET_ROW_GAP = 56
+const netNodeY = (r, i, count, radius) => {
+  const span = (count - 1) * NET_ROW_GAP + 2 * radius
+  return r.y + ((radius + i * NET_ROW_GAP) / span) * r.h
+}
+
 // Cubic bezier that leaves p1 and arrives at p2 horizontally — control points
 // pulled horizontally by `pull` fraction of the horizontal span.
 const bezierPath = (p1, p2, pull = 0.4) => {
@@ -96,13 +109,13 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
     : []
 
   // C — screen-card's right edge (x) at each row's vertical center (y) -> net-input-layer's
-  // horizontal center. Row anchors are still used, but only for .y now — the curve must never
-  // travel through the card's own interior/text, only along its edge. net-input-layer's edges
-  // aren't meaningful (it's a ~4px single-node column), only its center is.
+  // RIGHT edge (not center) — the curves travel left-to-right, and the visible dot (node +
+  // its glow halo) extends past the tightly-measured node-only bounding box, so stopping at
+  // the center left a visible gap before the dot. Right edge carries the curve further into it.
   const flowC = (netInput && screenCard)
     ? (() => {
-        const ys = distributeY(netInput, 5)
-        const cx = netInput.x + netInput.w / 2
+        const ys = Array.from({ length: 5 }, (_, i) => netNodeY(netInput, i, 5, 5.5))
+        const cx = netInput.x + netInput.w / 5
         const originX = screenCard.x + screenCard.w
         return SCREEN_ANCHORS.map((name, i) => {
           const row = anchors[name]
@@ -114,17 +127,19 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
       })()
     : []
 
-  // D — net-output-layer's horizontal center -> score-card's left edge (x) at each row's
-  // vertical center (y). Mirror of C: row anchors used only for .y.
+  // D — net-output-layer's LEFT edge (mirrors C's reasoning: these curves travel further
+  // right from here, so starting at the left edge instead of center carries them through
+  // more of the dot, closing the same visible gap) -> score-card's left edge (x) at each
+  // row's vertical center (y). Row anchors used only for .y.
   const flowD = (netOutput && scoreCard)
     ? (() => {
-        const ys = distributeY(netOutput, 5)
-        const cx = netOutput.x + netOutput.w / 2
-        const destX = scoreCard.x
+        const ys = Array.from({ length: 5 }, (_, i) => netNodeY(netOutput, i, 5, 4.5))
+        const cx = netOutput.x + netOutput.w
+        const destX = scoreCard.x 
         return SCORE_ANCHORS.map((name, i) => {
           const row = anchors[name]
           if (!row) return null
-          const p1 = { x: cx, y: ys[i] }
+          const p1 = { x: cx, y: ys[i]  }
           const p2 = { x: destX, y: row.y + row.h / 2 }
           return { key: name, color: SCORE_TINTS[name], d: bezierPath(p1, p2, 0.4), end: p2 }
         }).filter(Boolean)
