@@ -7,6 +7,8 @@
  * data in them is a fixed illustrative example, not a live fetch. */
 import { useEffect, useRef, useState } from 'react'
 import { SCROLL_DURATION_MS, nextIndex, scrollYAt } from './landingScroll'
+import { EngineConnectors } from './EngineConnectors'
+import { useAnchors } from './useAnchors'
 import { Link } from 'react-router-dom'
 import './redesign.css'
 import './signals/signals.css'
@@ -97,6 +99,7 @@ export function LandingNav() {
       </a>
       <nav className="ld-nav-links">
         <a href="/#how">How it works</a>
+        <a href="/#proof">The proof</a>
         <a href="/#platform">Platform</a>
         <a href="/#pricing">Pricing</a>
         <a href="/#faq">FAQ</a>
@@ -232,24 +235,16 @@ function PanelArrow() {
   return <div className="eng-panel-arrow" aria-hidden="true">→</div>
 }
 
-function FunnelIcon() {
-  return (
-    <svg className="eng-chips-funnel" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 4h18l-7 9v6l-4 2v-8z" />
-    </svg>
-  )
-}
-
 const SCREEN_ROWS = [
-  { label: 'Technicals', desc: 'RSI, moving averages, volatility', color: 'var(--blue-2)',
+  { anchor: 'screen-row-technicals', label: 'Technicals', desc: 'RSI, moving averages, volatility', color: 'var(--blue-2)',
     icon: <><polyline points="2,15 6,9 10,12 15,4" /><circle cx="15" cy="4" r="1.4" /></> },
-  { label: 'Price action', desc: 'Trend, volume', color: 'var(--green)',
+  { anchor: 'screen-row-price', label: 'Price action', desc: 'Trend, volume', color: 'var(--green)',
     icon: <><rect x="2" y="9" width="3" height="6" /><rect x="7" y="5" width="3" height="10" /><rect x="12" y="2" width="3" height="13" /></> },
-  { label: 'Fundamentals', desc: 'P/E, growth, debt', color: '#c084fc',
+  { anchor: 'screen-row-fundamentals', label: 'Fundamentals', desc: 'P/E, growth, debt', color: '#c084fc',
     icon: <><rect x="2" y="2" width="13" height="13" rx="1.2" /><line x1="5" y1="6" x2="12" y2="6" /><line x1="5" y1="9" x2="12" y2="9" /><line x1="5" y1="12" x2="9.5" y2="12" /></> },
-  { label: 'Macro data', desc: 'GDP, interest rates', color: '#22d3ee',
+  { anchor: 'screen-row-macro', label: 'Macro data', desc: 'GDP, interest rates', color: '#22d3ee',
     icon: <><circle cx="8.5" cy="8.5" r="6.5" /><ellipse cx="8.5" cy="8.5" rx="2.8" ry="6.5" /><line x1="2" y1="8.5" x2="15" y2="8.5" /></> },
-  { label: 'News & sentiment', desc: 'AI analysis of headlines', color: 'var(--gold)',
+  { anchor: 'screen-row-news', label: 'News & sentiment', desc: 'AI analysis of headlines', color: 'var(--gold)',
     icon: <><path d="M2 3 h11 v9 h-6 l-3 3 v-3 h-2 z" /></> },
 ]
 
@@ -281,7 +276,7 @@ function ChipsZone() {
   return (
     <div className="eng-chips-zone">
       <div className="eng-chips-cluster-wrap">
-        <div className="eng-chips-cluster">
+        <div className="eng-chips-cluster" data-anchor="ticker-cloud">
           {SCREEN_CHIPS.map((c, i) => (
             <span
               key={i}
@@ -291,7 +286,6 @@ function ChipsZone() {
               {c.t}
             </span>
           ))}
-          <FunnelIcon />
         </div>
       </div>
       <div className="eng-panel-foot">Daily stock universe (1,800+)</div>
@@ -305,12 +299,11 @@ function ScreenPanel() {
       <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">01</span><span className="t">Screen</span></div>
       </div>
-      <div className="eng-panel-card">
+      <div className="eng-panel-card" data-anchor="screen-card">
         <div className="eng-panel-body">
-          <div className="eng-panel-sub">Daily stock universe (1,800+)</div>
           <div className="eng-scr-rows">
             {SCREEN_ROWS.map((r) => (
-              <div className="eng-scr-row" key={r.label}>
+              <div className="eng-scr-row" data-anchor={r.anchor} key={r.label}>
                 <span className="eng-scr-icon-badge" style={{ '--c': r.color }}>
                   <svg className="eng-scr-icon" viewBox="0 0 17 17" fill="none" stroke={r.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                     {r.icon}
@@ -345,7 +338,11 @@ const netColumn = (x, count, r) =>
 const NET_IN_NODES = netColumn(NET_LAYER_X.in, 6, 4.5)
 const NET_HID_NODES = netColumn(NET_LAYER_X.hid, 7, 5.5)
 const NET_OUT_NODES = netColumn(NET_LAYER_X.out, 5, 4.5)
-const NET_ALL_NODES = [...NET_IN_NODES, ...NET_HID_NODES, ...NET_OUT_NODES]
+const NET_ALL_NODES = [
+  ...NET_IN_NODES.map((n) => ({ ...n, layer: 'in' })),
+  ...NET_HID_NODES.map((n) => ({ ...n, layer: 'hid' })),
+  ...NET_OUT_NODES.map((n) => ({ ...n, layer: 'out' })),
+]
 const NET_EDGES = [
   ...NET_IN_NODES.flatMap((a, ai) => NET_HID_NODES.map((b, bi) => ({ id: `i${ai}h${bi}`, a, b }))),
   ...NET_HID_NODES.flatMap((a, ai) => NET_OUT_NODES.map((b, bi) => ({ id: `h${ai}o${bi}`, a, b }))),
@@ -365,21 +362,13 @@ const NET_PULSE_META = {
   h6o2: { dur: 2.7, delay: -1.8 },
 }
 
-/* Stub connectors at the net's own left/right edges, colored to echo the
- * neighboring panels' own colors (Screen's row colors on the left, Signal's
- * verdict colors on the right) — a contained, self-drawn approximation of
- * the reference's cross-panel flowing lines, without needing this panel to
- * know the other panels' actual DOM positions. */
-const NET_IN_STUB_COLORS = ['var(--blue-2)', 'var(--green)', '#c084fc', '#22d3ee', 'var(--gold)', 'var(--blue-2)']
-const NET_OUT_STUB_COLORS = ['var(--green)', 'var(--gold)', 'var(--red)', 'var(--green)', 'var(--gold)']
-
 function ScorePanel() {
   return (
     <div className="eng-panel">
       <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">02</span><span className="t">Score</span></div>
       </div>
-      <div className="eng-panel-card">
+      <div className="eng-panel-card" data-anchor="net-card">
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Deep learning model</div>
           <div className="eng-net-labels">
@@ -393,13 +382,12 @@ function ScorePanel() {
                 <stop offset="45%" style={{ stopColor: 'var(--blue-2)', stopOpacity: 0.95 }} />
                 <stop offset="100%" style={{ stopColor: 'var(--blue-2)', stopOpacity: 0.35 }} />
               </radialGradient>
+              {/* Static blur (never animated) — safe per this file's ghost-smear rule;
+                  only the node's own opacity pulses, the filter value itself is constant. */}
+              <filter id="netNodeBlur" x="-120%" y="-120%" width="340%" height="340%">
+                <feGaussianBlur stdDeviation="2.5" />
+              </filter>
             </defs>
-            {NET_IN_NODES.map((n, i) => (
-              <line key={'stub-in-' + i} className="eng-net-stub" x1={0} y1={n.y} x2={n.x} y2={n.y} stroke={NET_IN_STUB_COLORS[i]} />
-            ))}
-            {NET_OUT_NODES.map((n, i) => (
-              <line key={'stub-out-' + i} className="eng-net-stub" x1={n.x} y1={n.y} x2={NET_VB_W} y2={n.y} stroke={NET_OUT_STUB_COLORS[i]} />
-            ))}
             <g className="net">
               {NET_EDGES.map((e) => (
                 <line key={e.id} className="net-edge" x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} />
@@ -417,8 +405,26 @@ function ScorePanel() {
                 )
               })}
               {NET_ALL_NODES.map((n, i) => (
-                <circle key={'n' + i} className="net-node" cx={n.x} cy={n.y} r={n.r} style={{ animationDelay: `-${(i * 0.31).toFixed(2)}s` }} />
+                <circle key={'g' + i} className={`net-node-glow layer-${n.layer}`} cx={n.x} cy={n.y} r={n.r * 1.8} fill="var(--blue-2)" filter="url(#netNodeBlur)" />
               ))}
+              {/* net-input-layer / net-output-layer wrapper groups didn't exist before this
+                  pass — added so useAnchors can measure "the leftmost/rightmost column of
+                  network nodes" as a single rect. Rendering split by layer to add them;
+                  node geometry, keys and animation-delay (still keyed to the original
+                  combined 0-17 index) are otherwise unchanged. */}
+              <g data-anchor="net-input-layer">
+                {NET_ALL_NODES.map((n, i) => n.layer === 'in' && (
+                  <circle key={'n' + i} className={`net-node layer-${n.layer}`} cx={n.x} cy={n.y} r={n.r} style={{ animationDelay: `-${(i * 0.31).toFixed(2)}s` }} />
+                ))}
+              </g>
+              {NET_ALL_NODES.map((n, i) => n.layer === 'hid' && (
+                <circle key={'n' + i} className={`net-node layer-${n.layer}`} cx={n.x} cy={n.y} r={n.r} style={{ animationDelay: `-${(i * 0.31).toFixed(2)}s` }} />
+              ))}
+              <g data-anchor="net-output-layer">
+                {NET_ALL_NODES.map((n, i) => n.layer === 'out' && (
+                  <circle key={'n' + i} className={`net-node layer-${n.layer}`} cx={n.x} cy={n.y} r={n.r} style={{ animationDelay: `-${(i * 0.31).toFixed(2)}s` }} />
+                ))}
+              </g>
             </g>
           </svg>
           <div className="eng-net-labels eng-net-labels-sub">
@@ -447,12 +453,12 @@ function SignalPanel() {
       <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">03</span><span className="t">Signal</span></div>
       </div>
-      <div className="eng-panel-card">
+      <div className="eng-panel-card" data-anchor="score-card">
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Daily BUY/HOLD/SELL scores</div>
           <div className="eng-sig-rows">
             {SIGNAL_ROWS.map((s) => (
-              <div className={`eng-sig-row ${s.verdict}`} key={s.ticker}>
+              <div className={`eng-sig-row ${s.verdict}`} data-anchor={`score-row-${s.ticker.toLowerCase()}`} key={s.ticker}>
                 <img className="eng-sig-logo" src={`/logos/${s.ticker}.png`} alt="" />
                 <span className="eng-sig-tk">{s.ticker}</span>
                 <span className="eng-sig-pill">{s.verdict.toUpperCase()}</span>
@@ -486,18 +492,23 @@ function TrackPanel() {
       <div className="eng-panel-pillrow">
         <div className="eng-panel-head"><span className="n">04</span><span className="t">Track</span></div>
       </div>
-      <div className="eng-panel-card">
+      <div className="eng-panel-card" data-anchor="track-card">
         <div className="eng-panel-body">
           <div className="eng-panel-sub">Historical signal performance</div>
           <svg className="eng-trk-chart" viewBox="0 0 300 120" preserveAspectRatio="none">
             <defs>
               <linearGradient id="trkAlphaFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" style={{ stopColor: 'var(--green)', stopOpacity: 0.32 }} />
+                <stop offset="0%" style={{ stopColor: 'var(--green)', stopOpacity: 0.25 }} />
                 <stop offset="100%" style={{ stopColor: 'var(--green)', stopOpacity: 0 }} />
               </linearGradient>
+              {/* Static blur (chart is fully static, nothing here animates). */}
+              <filter id="trkAlphaGlow" x="-20%" y="-40%" width="140%" height="180%">
+                <feGaussianBlur stdDeviation="1.4" />
+              </filter>
             </defs>
             <polygon points={`${TRACK_ALPHA} 300,120 0,120`} fill="url(#trkAlphaFill)" stroke="none" />
             <polyline points={TRACK_BENCH} fill="none" stroke="var(--ink-3)" strokeWidth="1.5" />
+            <polyline points={TRACK_ALPHA} fill="none" stroke="var(--green)" strokeWidth="3" opacity="0.55" filter="url(#trkAlphaGlow)" />
             <polyline points={TRACK_ALPHA} fill="none" stroke="var(--green)" strokeWidth="2" />
             {TRACK_MARKERS.map((m, i) => (
               <circle key={i} cx={m.x} cy={m.y} r="3.2" fill={m.kind === 'buy' ? 'var(--green)' : 'var(--red)'} />
@@ -522,6 +533,8 @@ function TrackPanel() {
 }
 
 function EngineScene() {
+  const panelsRef = useRef(null)
+  const { anchors, containerSize } = useAnchors(panelsRef)
   return (
     <section className="ld-scene" id="how">
       <div className="ld-scene-head">
@@ -529,7 +542,9 @@ function EngineScene() {
         <h2>From signals to a <span className="g">signal.</span></h2>
         <p>Every signal is the result of many independent data feeds converging into one continuously-running model — not a bare score.</p>
       </div>
-      <div className="eng-panels" aria-hidden="true">
+      <div className="eng-panels" aria-hidden="true" ref={panelsRef}>
+        {/* debug={true} temporarily to visually verify anchor measurement — remove next pass */}
+        <EngineConnectors anchors={anchors} containerSize={containerSize} containerRef={panelsRef} debug={false} />
         <ChipsZone />
         <ScreenPanel />
         <ScorePanel />
