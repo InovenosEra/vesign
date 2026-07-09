@@ -45,18 +45,30 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * scroll-snap-align:start would pull it to scrollY=64 (aligning ITS OWN top
  * to the viewport) instead of the scrollY=0 it was designed for (nav in its
  * natural spot + Hero filling the rest) — the -64px cancels that offset. */
-.rd .ld-hero { position: relative; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 64px 24px; text-align: center; scroll-margin-top: 64px; }
+/* Every vertical gap below is clamp(floor, calc(floor + (100vh - 500px) *
+ * factor), ceiling) — a straight-line interpolation that is exactly `floor`
+ * at a 500px-tall viewport, exactly `ceiling` (== the original fixed value,
+ * so tall/desktop screens are pixel-identical to before) at 900px, and
+ * anything in between scales linearly with the ACTUAL viewport height. No
+ * guessed breakpoint number — it degrades continuously for whatever screen
+ * it's actually rendered on. factor = (ceiling-floor)/400 per property. */
+/* height (not min-height) + overflow-y:auto is a hard guarantee: this box can
+ * never be taller than the screen, full stop, regardless of actual device
+ * size — if the compressed content (below) still doesn't fit some extreme
+ * viewport, it scrolls WITHIN this box instead of pushing the next section's
+ * content into view. Belt-and-suspenders alongside the vh-scaled spacing. */
+.rd .ld-hero { position: relative; height: calc(100vh - 64px); height: calc(100dvh - 64px); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; overflow-x: hidden; padding: clamp(16px, calc(16px + (100vh - 500px) * 0.12), 64px) 24px; text-align: center; scroll-margin-top: 64px; }
 .rd .ld-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .rd .ld-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 900px 600px at 50% 38%, rgba(10,14,21,0) 0%, rgba(10,14,21,0.55) 72%, var(--bg) 100%); }
 .rd .ld-hero-inner { position: relative; z-index: 2; max-width: 780px; width: 100%; }
-.rd .ld-eyebrow { display: inline-flex; align-items: center; gap: 18px; font-size: clamp(13px, 1.6vw, 12px); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-2); margin-bottom: 36px; }
+.rd .ld-eyebrow { display: inline-flex; align-items: center; gap: 18px; font-size: clamp(13px, 1.6vw, 12px); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-2); margin-bottom: clamp(12px, calc(12px + (100vh - 500px) * 0.06), 36px); }
 .rd .ld-eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); flex-shrink: 0; }
-.rd .ld-thesis { margin: 12px 32px 48px; font-size: clamp(32px, 6.4vw, 72px); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
+.rd .ld-thesis { margin: clamp(0px, calc((100vh - 500px) * 0.03), 12px) 32px clamp(12px, calc(12px + (100vh - 500px) * 0.09), 48px); font-size: clamp(32px, 6.4vw, 72px); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
 .rd .g { background: linear-gradient(100deg, #a5f3fc, #22d3ee 40%, #3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.rd .ld-hero-sub { margin: 0 auto 62px; max-width: 540px; font-size: clamp(14.5px, 2.2vw, 16.5px); line-height: 1.6; color: var(--ink-2); position: relative; z-index: 2; }
+.rd .ld-hero-sub { margin: 0 auto clamp(12px, calc(12px + (100vh - 500px) * 0.125), 62px); max-width: 540px; font-size: clamp(14.5px, 2.2vw, 16.5px); line-height: 1.6; color: var(--ink-2); position: relative; z-index: 2; }
 .rd .ld-hero-ctas { position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
 .rd .ld-hero-ctas .ld-btn { flex: 0 1 auto; }
-.rd .ld-scrollcue { position: relative; z-index: 2; margin-top: 74px; color: var(--ink-3); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.rd .ld-scrollcue { position: relative; z-index: 2; margin-top: clamp(8px, calc(8px + (100vh - 500px) * 0.165), 74px); color: var(--ink-3); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .rd .ld-scrollcue .chev { width: 12px; height: 12px; border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3); transform: rotate(45deg); animation: ldBob 2s ease-in-out infinite; }
 @keyframes ldBob { 0%, 100% { transform: rotate(45deg) translate(0,0); } 50% { transform: rotate(45deg) translate(3px,3px); } }
 @media (max-width: 620px) {
@@ -67,13 +79,10 @@ html.ld-snap { scroll-snap-type: y mandatory; }
   .rd .ld-hero-ctas .ld-btn { width: 100%; }
   .rd .ld-scrollcue { margin-top: 38px; }
 }
-@media (max-height: 700px) and (min-width: 621px) {
-  .rd .ld-hero { min-height: auto; padding: 88px 24px 56px; }
-}
 @media (prefers-reduced-motion: reduce) { .rd .ld-scrollcue .chev { animation: none; } }
 
 /* ── Decorative ticker (aria-hidden, illustrative — see JS comment) ──────── */
-.rd .ld-tape { position: relative; z-index: 2; margin-top: 56px; width: 100%; max-width: 840px; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.rd .ld-tape { position: relative; z-index: 2; margin-top: clamp(8px, calc(8px + (100vh - 500px) * 0.12), 56px); width: 100%; max-width: 840px; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
 .rd .ld-tape-track { display: flex; gap: 26px; white-space: nowrap; font-family: var(--mono, monospace); font-size: 11px; color: var(--ink-3); animation: ldTape 34s linear infinite; opacity: 0.8; }
 .rd .ld-tape-item.up { color: var(--green); }
 .rd .ld-tape-item.down { color: var(--red); }
@@ -108,16 +117,24 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * because .ld-hero is a <header>, which the section-tag selector can't
  * match at all. Bumped to a dedicated, unambiguously higher-specificity
  * rule instead of just tacking on more classes here. */
-.rd .ld-scene { position: relative; width: 100%; padding: 20px clamp(24px, 4vw, 72px) 48px; border-top: 1px solid var(--line); overflow: hidden; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); display: flex; flex-direction: column; justify-content: center; }
+/* Same clamp(floor, calc(floor + (100vh - 500px)*factor), ceiling) linear
+ * interpolation as .ld-hero above (500px viewport -> floor, 900px -> ceiling
+ * == original fixed value). See that comment block for the full rationale. */
+/* height (not min-height) + overflow-y:auto — same hard guarantee as
+ * .ld-hero above: this box physically cannot exceed the screen, so the next
+ * section's heading can never bleed into view underneath it. If the
+ * vh-scaled content below still doesn't fit some extreme viewport, IT
+ * scrolls internally instead of the section growing past the screen. */
+.rd .ld-scene { position: relative; width: 100%; padding: clamp(6px, calc(6px + (100vh - 500px) * 0.035), 20px) clamp(24px, 4vw, 72px) clamp(12px, calc(12px + (100vh - 500px) * 0.09), 48px); border-top: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; height: calc(100vh - 64px); height: calc(100dvh - 64px); display: flex; flex-direction: column; justify-content: center; }
 .rd.ld section.ld-scene { scroll-margin-top: 64px; }
 .rd .ld-scene::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 900px 700px at 50% 0%, rgba(59,130,246,0.09), transparent 65%), radial-gradient(ellipse 1100px 500px at 50% 65%, rgba(59,130,246,0.07), transparent 70%); pointer-events: none; }
 /* max-width 740 (was 660) so the larger subtitle below wraps across two
  * balanced lines instead of an awkward split; margin-bottom 68 (was 14) is
  * the head->scene gap FIX 2 targets. */
-.rd .ld-scene-head { position: relative; text-align: center; max-width: 740px; margin: 0 auto 58px; }
-.rd .ld-scene-head .tag { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 16px; }
-.rd .ld-scene-head h2 { margin: 0 0 16px; font-size: clamp(34px, 3.2vw, 50px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
-.rd .ld-scene-head p { margin: 16px; font-size: clamp(15px, 1.15vw, 16px); color: var(--ink-2); line-height: 1.5; text-wrap: balance; }
+.rd .ld-scene-head { position: relative; text-align: center; max-width: 740px; margin: 0 auto clamp(12px, calc(12px + (100vh - 500px) * 0.115), 58px); }
+.rd .ld-scene-head .tag { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); }
+.rd .ld-scene-head h2 { margin: 0 0 clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); font-size: clamp(34px, 3.2vw, 50px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.rd .ld-scene-head p { margin: clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px) 16px; font-size: clamp(15px, 1.15vw, 16px); color: var(--ink-2); line-height: 1.5; text-wrap: balance; }
 
 /* minmax(150px, ...) floors the chips column — without it, once the other
  * 4 panel columns hit their own text/content min-width they stop shrinking,
@@ -144,8 +161,8 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 /* Header lives in its own floating pill above the card (see .eng-panel-head
  * below), not inside it — matches the reference's separate header-pill +
  * arrow-connector row sitting above 4 fully independent bordered cards. */
-.rd .eng-panel-pillrow { display: flex; justify-content: center; margin-bottom: 14px; }
-.rd .eng-panel-head { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 9px 20px; white-space: nowrap; }
+.rd .eng-panel-pillrow { display: flex; justify-content: center; margin-bottom: clamp(4px, calc(4px + (100vh - 500px) * 0.025), 14px); }
+.rd .eng-panel-head { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 999px; padding: clamp(4px, calc(4px + (100vh - 500px) * 0.0125), 9px) 20px; white-space: nowrap; }
 .rd .eng-panel-head .n { font-family: var(--mono, monospace); font-size: 13px; font-weight: 800; color: var(--blue-2); }
 .rd .eng-panel-head .t { font-size: 12.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
 .rd .eng-panel-arrow { position: absolute; top: 20px; right: -17px; z-index: 6; color: var(--blue-2); font-size: 18px; font-weight: 700; line-height: 0; }
@@ -163,7 +180,7 @@ html.ld-snap { scroll-snap-type: y mandatory; }
     var(--panel) padding-box;
   border: 1px solid var(--line-2);
   box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.22), 0 20px 44px -24px rgba(59,130,246,0.32);
-  border-radius: 10px; padding: 18px 16px 16px; display: flex; flex-direction: column; min-height: 260px; flex: 1;
+  border-radius: 10px; padding: clamp(6px, calc(6px + (100vh - 500px) * 0.03), 18px) 16px clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); display: flex; flex-direction: column; min-height: clamp(130px, calc(130px + (100vh - 500px) * 0.325), 260px); flex: 1;
 }
 /* justify-content:center — when align-items:stretch (.eng-panels) makes a
  * card taller than its content needs (driven by the tallest sibling, e.g.
@@ -176,7 +193,7 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * ones don't; without a fixed reservation the bordered cards above (all
  * equal-height via .eng-panels' align-items:stretch) would drift out of
  * alignment since the foot's real height differs panel to panel. */
-.rd .eng-panel-foot { text-align: center; margin-top: 14px; font-size: 12px; line-height: 1.4; min-height: calc(1.4em * 2); font-weight: 600; letter-spacing: 0.03em; color: var(--ink-2); }
+.rd .eng-panel-foot { text-align: center; margin-top: clamp(4px, calc(4px + (100vh - 500px) * 0.025), 14px); font-size: 12px; line-height: 1.4; min-height: calc(1.4em * 2); font-weight: 600; letter-spacing: 0.03em; color: var(--ink-2); }
 
 /* ── Chips zone: decorative ticker cluster + funnel, its own column to the
  * left of Panel 1 (not inside it) — matches the reference's separate
@@ -185,12 +202,14 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * align-items:stretch imposes (to match the tallest panel card), so
  * .eng-panel-foot still lands at the same baseline as the other 4 zones'
  * captions instead of floating right after the cluster's own fixed height. */
-.rd .eng-chips-zone { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding-top: 52px; }
+.rd .eng-chips-zone { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding-top: clamp(12px, calc(12px + (100vh - 500px) * 0.1), 52px); }
 .rd .eng-chips-cols-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; width: 100%; }
-/* Fixed 332px (same as the old single cluster) so the anchor box — and
- * therefore the flow-curve origins in EngineConnectors.jsx — don't move.
+/* Height scales with viewport (clamp, same rationale as the rest of this
+ * section) instead of a fixed 332px — safe to resize because the anchor box
+ * this feeds (EngineConnectors.jsx's flow-curve origins) is measured live via
+ * useAnchors' ResizeObserver, not hardcoded against this number.
  * Two equal columns split the width. */
-.rd .eng-chips-cols { position: relative; height: 332px; width: 100%; display: flex; gap: 6px; }
+.rd .eng-chips-cols { position: relative; height: clamp(130px, calc(130px + (100vh - 500px) * 0.505), 332px); width: 100%; display: flex; gap: 6px; }
 .rd .eng-chip-col { position: relative; flex: 1; height: 100%; overflow: hidden;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%); }
@@ -212,17 +231,23 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-scr-chip-logo img { width: 100%; height: 100%; object-fit: contain; }
 
 /* ── Panel 1: Screen ──────────────────────────────────────────────────── */
-.rd .eng-scr-rows { display: flex; flex-direction: column; gap: 22px; }
+.rd .eng-scr-rows { display: flex; flex-direction: column; gap: clamp(5px, calc(5px + (100vh - 500px) * 0.0425), 22px); }
 .rd .eng-scr-row { position: relative; display: flex; align-items: flex-start; gap: 10px; }
 .rd .eng-scr-row-text { flex: 1; }
 .rd .eng-scr-row-stub { position: absolute; right: 0; top: 13px; width: 14px; height: 2px; background: var(--c); opacity: 0.8; }
-.rd .eng-scr-icon-badge { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: color-mix(in srgb, var(--c) 32%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); flex-shrink: 0; }
+.rd .eng-scr-icon-badge { display: flex; align-items: center; justify-content: center; width: clamp(20px, calc(20px + (100vh - 500px) * 0.02), 28px); height: clamp(20px, calc(20px + (100vh - 500px) * 0.02), 28px); border-radius: 7px; background: color-mix(in srgb, var(--c) 32%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); flex-shrink: 0; }
 .rd .eng-scr-icon { width: 15px; height: 15px; }
 .rd .eng-scr-row-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
 .rd .eng-scr-row-desc { margin-top: 2px; font-size: 11px; color: var(--ink-3); }
 
 /* ── Panel 2: Score (neural net) ──────────────────────────────────────── */
-.rd .eng-net-svg { width: 100%; height: auto; aspect-ratio: 460 / 420; display: block; }
+/* max-height caps this at short viewports — width:100% + aspect-ratio alone
+ * sizes it purely off the grid COLUMN's width, with no relationship to
+ * available vertical space, so on a short-but-wide viewport it could still
+ * render taller than the screen. The cap makes width follow height (via the
+ * same aspect-ratio) once vh gets tight, instead of the reverse. Ceiling
+ * (450px) is set high enough to never bind at normal/tall viewport widths. */
+.rd .eng-net-svg { width: 100%; height: auto; aspect-ratio: 460 / 420; display: block; max-height: clamp(110px, calc(110px + (100vh - 500px) * 0.85), 450px); }
 /* Edges dimmed to ~15% so nodes visually dominate the mesh (was 34%). */
 .rd .net-edge { stroke: rgba(139,178,255,0.15); stroke-width: 2; fill: none; }
 .rd .net-edge.pulse { stroke: var(--blue-2); stroke-width: 1.6; stroke-dasharray: 14 var(--gap); animation-name: netPulseDraw; animation-timing-function: linear; animation-iteration-count: infinite; }
@@ -250,14 +275,14 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 }
 
 /* ── Panel 3: Signal ──────────────────────────────────────────────────── */
-.rd .eng-sig-rows { display: flex; flex-direction: column; gap: 10px; }
-.rd .eng-sig-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-left-width: 3px; border-radius: 9px; padding: 9px 12px; }
+.rd .eng-sig-rows { display: flex; flex-direction: column; gap: clamp(3px, calc(3px + (100vh - 500px) * 0.0175), 10px); }
+.rd .eng-sig-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-left-width: 3px; border-radius: 9px; padding: clamp(3px, calc(3px + (100vh - 500px) * 0.015), 9px) 12px; }
 .rd .eng-sig-row.buy { border-left-color: var(--green); }
 .rd .eng-sig-row.hold { border-left-color: var(--gold); }
 .rd .eng-sig-row.sell { border-left-color: var(--red); }
 /* Full-color logos in a dark translucent chip instead of a flat white plate
  * (the white background was washing the logos out against the dark card). */
-.rd .eng-sig-logo { width: 24px; height: 24px; padding: 3px; border-radius: 8px; object-fit: contain; background: rgba(255,255,255,0.06); border: 1px solid var(--line-2); flex-shrink: 0; }
+.rd .eng-sig-logo { width: clamp(16px, calc(16px + (100vh - 500px) * 0.02), 24px); height: clamp(16px, calc(16px + (100vh - 500px) * 0.02), 24px); padding: 3px; border-radius: 8px; object-fit: contain; background: rgba(255,255,255,0.06); border: 1px solid var(--line-2); flex-shrink: 0; }
 .rd .eng-sig-tk { flex: 1; font-size: 13px; font-weight: 800; color: var(--ink); }
 .rd .eng-sig-pill { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 5px; letter-spacing: 0.04em; }
 .rd .eng-sig-row.buy .eng-sig-pill { background: var(--green-bg); color: var(--green); }
@@ -265,18 +290,25 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-sig-row.sell .eng-sig-pill { background: var(--red-bg); color: var(--red); }
 
 /* ── Panel 4: Track ───────────────────────────────────────────────────── */
-.rd .eng-trk-chart { width: 100%; height: auto; aspect-ratio: 300 / 120; display: block; margin-bottom: 6px; }
-.rd .eng-trk-legend { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-3); margin-bottom: 16px; }
+/* max-height cap — same rationale as .eng-net-svg above (aspect-ratio alone
+ * only responds to column width, not to available vertical space). */
+.rd .eng-trk-chart { width: 100%; height: auto; aspect-ratio: 300 / 120; display: block; margin-bottom: clamp(2px, calc(2px + (100vh - 500px) * 0.01), 6px); max-height: clamp(55px, calc(55px + (100vh - 500px) * 0.3625), 200px); }
+.rd .eng-trk-legend { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-3); margin-bottom: clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); }
 .rd .eng-trk-legend .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
 .rd .eng-trk-legend .dot.buy { background: var(--green); }
 .rd .eng-trk-legend .dot.bench { background: var(--ink-3); }
-.rd .eng-trk-stats { display: flex; flex-direction: column; gap: 10px; }
-.rd .eng-trk-stat { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 12px; }
+.rd .eng-trk-stats { display: flex; flex-direction: column; gap: clamp(3px, calc(3px + (100vh - 500px) * 0.0175), 10px); }
+.rd .eng-trk-stat { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: clamp(3px, calc(3px + (100vh - 500px) * 0.015), 9px) 12px; }
 .rd .eng-trk-stat .k { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; }
 .rd .eng-trk-stat .v { font-size: 13px; font-weight: 800; color: var(--green); white-space: nowrap; }
 
 @media (max-width: 780px) {
-  .rd .ld-scene { min-height: auto; padding: 64px 20px 32px; }
+  /* height:auto + overflow visible — the base rule's hard one-screen cap
+   * (added for the multi-column desktop layout) is wrong here: below 780px
+   * the panels stack into a single tall column by design (below) and are
+   * meant to be part of the page's normal scroll, not squeezed into one
+   * screen with an internal scrollbar. */
+  .rd .ld-scene { height: auto; overflow-y: visible; padding: 64px 20px 32px; }
   /* Every card already carries its own full 4-side border by default now
    * (each of the 5 zones is a fully independent rounded box, not a merged
    * strip) — stacking to one column needs no border surgery, just drop the
@@ -289,10 +321,6 @@ html.ld-snap { scroll-snap-type: y mandatory; }
    * multi-column layout — hide once cards stack to one column. */
   .rd .eng-connectors { display: none; }
 }
-@media (max-height: 760px) and (min-width: 781px) {
-  .rd .ld-scene { min-height: auto; padding: 64px 36px 32px; }
-}
-
 /* ── Sections (shared scaffolding) ────────────────────────────────────────
  * .ld-section is full-bleed (padding-inline as gutter, no max-width of its
  * own); .ld-section-inner is the actual content container (max-width 1600,
