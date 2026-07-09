@@ -248,28 +248,30 @@ const SCREEN_ROWS = [
     icon: <><path d="M2 3 h11 v9 h-6 l-3 3 v-3 h-2 z" /></> },
 ]
 
-/* Scattered "pile of tickers" cluster — a handful of sharp, vivid text
- * chips (depth "fore") layered over a denser, dimmer "back" layer of more
- * text chips + truncated ticker-like text fragments, evoking "there are
- * 1,800+ of these, we're only showing a few clearly." Every entry is a
- * distinct ticker (no repeats) — text only, no logo images. Static (no
- * animation), so the blur here doesn't combine with anything infinitely-
- * animating — safe per this file's ghost-smear rule. */
+/* Scattered "pile of tickers" cluster — logo + ticker chips, "fore" (sharp,
+ * full opacity, scale 1) layered over "back" (dimmer, scale 0.85) for depth,
+ * evoking "there are 1,800+ of these, we're only showing a few clearly."
+ * Positions are hand-placed in a 2-column x 7-row grid (x: 2%/52%, y: 14%
+ * bands) — deliberately wide margins (each column has ~50% width to work
+ * with against a ~30%-wide chip at most) so it holds with zero collisions
+ * even if the actual rendered chip width differs from what's assumed here.
+ * Static (no animation, no filter) — safe per this file's ghost-smear rule,
+ * and satisfies this pass's "no filters" constraint. */
 const SCREEN_CHIPS = [
-  { t: 'META', fg: '#f472b6', x: 2, y: -4, r: -6, depth: 'back' },
-  { t: 'MSFT', fg: 'var(--ink)', x: 24, y: 6, r: -4, depth: 'fore' },
-  { t: 'AVGO', fg: 'var(--gold)', x: 1, y: 36, r: 5, depth: 'back' },
-  { t: 'NVDA', fg: 'var(--green)', x: 50, y: 42, r: 3, depth: 'fore' },
-  { t: 'WMT', fg: 'var(--blue-2)', x: 52, y: 76, r: -3, depth: 'fore' },
-  { kind: 'frag', t: 'GPIT', fg: 'var(--green)', x: 22, y: 108, r: -3, depth: 'back' },
-  { t: 'NFLX', fg: 'var(--red)', x: 1, y: 112, r: 3, depth: 'back' },
-  { t: 'AMZN', fg: 'var(--ink)', x: 14, y: 124, r: 2, depth: 'fore' },
-  { t: 'GOOGL', fg: '#c084fc', x: 48, y: 158, r: -2, depth: 'back' },
-  { t: 'TSLA', fg: 'var(--red)', x: 2, y: 188, r: 4, depth: 'back' },
-  { t: 'AMX', fg: 'var(--gold)', x: 36, y: 210, r: -3, depth: 'fore' },
-  { t: 'JPM', fg: 'var(--blue-2)', x: 50, y: 240, r: 3, depth: 'back' },
-  { t: 'LLY', fg: 'var(--green)', x: 48, y: 262, r: -2, depth: 'back' },
-  { t: 'KO', fg: 'var(--ink)', x: 16, y: 286, r: 2, depth: 'fore' },
+  { t: 'META', fg: '#f472b6', x: 2, y: 2, r: -5, depth: 'back', opacity: 0.42 },
+  { t: 'NVDA', fg: 'var(--green)', x: 52, y: 2, r: 4, depth: 'fore' },
+  { t: 'MSFT', fg: 'var(--ink)', x: 2, y: 16, r: -3, depth: 'fore' },
+  { t: 'AVGO', fg: 'var(--gold)', x: 52, y: 16, r: 5, depth: 'back', opacity: 0.38 },
+  { t: 'WMT', fg: 'var(--blue-2)', x: 2, y: 30, r: 3, depth: 'fore' },
+  { t: 'NFLX', fg: 'var(--red)', x: 52, y: 30, r: -4, depth: 'back', opacity: 0.45 },
+  { t: 'AMZN', fg: 'var(--ink)', x: 2, y: 44, r: -2, depth: 'back', opacity: 0.5 },
+  { t: 'GOOGL', fg: '#c084fc', x: 52, y: 44, r: 3, depth: 'fore' },
+  { t: 'TSLA', fg: 'var(--red)', x: 2, y: 58, r: -3, depth: 'back', opacity: 0.4 },
+  { t: 'JPM', fg: 'var(--blue-2)', x: 52, y: 58, r: 2, depth: 'fore' },
+  { t: 'LLY', fg: 'var(--green)', x: 2, y: 72, r: 4, depth: 'back', opacity: 0.47 },
+  { t: 'KO', fg: 'var(--ink)', x: 52, y: 72, r: -2, depth: 'fore' },
+  { t: 'AAPL', fg: 'var(--ink)', x: 2, y: 86, r: -3, depth: 'back', opacity: 0.42 },
+  { t: 'BAC', fg: 'var(--blue-2)', x: 52, y: 86, r: 3, depth: 'back', opacity: 0.36 },
 ]
 
 function ChipsZone() {
@@ -281,9 +283,18 @@ function ChipsZone() {
             <span
               key={i}
               className={`eng-scr-chip ${c.depth}`}
-              style={{ '--x': `${c.x}px`, '--y': `${c.y}px`, '--r': `${c.r}deg`, color: c.fg }}
+              style={{
+                '--x': `${c.x}%`,
+                '--y': `${c.y}%`,
+                '--r': `${c.r}deg`,
+                '--s': c.depth === 'back' ? 0.85 : 1,
+                opacity: c.depth === 'back' ? c.opacity : 1,
+              }}
             >
-              {c.t}
+              <span className="eng-scr-chip-logo">
+                <img src={`/logos/${c.t}.png`} alt="" />
+              </span>
+              <span style={{ color: c.fg }}>{c.t}</span>
             </span>
           ))}
         </div>

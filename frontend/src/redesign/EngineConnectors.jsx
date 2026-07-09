@@ -115,7 +115,8 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
     : []
 
   // E — score-card -> track-card.
-  const flowE = (scoreCard && trackCard) ? bezierPath(rightMid(scoreCard), leftMid(trackCard), 0.5) : null
+  const flowEEnd = (scoreCard && trackCard) ? leftMid(trackCard) : null
+  const flowE = (scoreCard && trackCard) ? bezierPath(rightMid(scoreCard), flowEEnd, 0.5) : null
 
   return (
     <svg
@@ -128,8 +129,8 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
       <defs>
         {flowA.map((f) => (
           <linearGradient key={f.id} id={f.id} gradientUnits="userSpaceOnUse" x1={f.p1.x} y1={f.p1.y} x2={f.p2.x} y2={f.p2.y}>
-            <stop offset="0%" stopColor="var(--blue-2)" stopOpacity="0.10" />
-            <stop offset="100%" stopColor="var(--blue-2)" stopOpacity="0.45" />
+            <stop offset="0%" stopColor="var(--blue-2)" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="var(--blue-2)" stopOpacity="0.55" />
           </linearGradient>
         ))}
         {funnel && (
@@ -141,11 +142,11 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
       </defs>
 
       {flowA.map((f) => (
-        <path key={f.id} d={f.d} fill="none" stroke={`url(#${f.id})`} strokeWidth="1" />
+        <path key={f.id} d={f.d} fill="none" stroke={`url(#${f.id})`} strokeWidth="1.2" />
       ))}
 
       {funnel && (
-        <path d={funnel.path} fill="url(#ecFunnelFill)" stroke="var(--blue-2)" strokeWidth="1" strokeOpacity="0.30" />
+        <path d={funnel.path} fill="url(#ecFunnelFill)" stroke="var(--blue-2)" strokeWidth="1" strokeOpacity="0.40" />
       )}
 
       {flowC.map((f) => (
@@ -160,7 +161,10 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
       ))}
 
       {flowE && (
-        <path d={flowE} fill="none" stroke="var(--blue-2)" strokeWidth="1" strokeOpacity="0.30" />
+        <g>
+          <path d={flowE} fill="none" stroke="var(--blue-2)" strokeWidth="1.2" strokeOpacity="0.40" />
+          <circle cx={flowEEnd.x} cy={flowEEnd.y} r="2.5" fill="var(--blue-2)" opacity="0.8" />
+        </g>
       )}
 
       {/* Debug overlay — every measured anchor, independent of whether any

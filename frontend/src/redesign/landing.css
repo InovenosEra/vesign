@@ -162,29 +162,22 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 /* overflow:hidden clips left-hanging back-layer items at the column's own
  * edge — the "half cut off" look the reference relies on for depth. */
 .rd .eng-chips-cluster { position: relative; height: 332px; width: 100%; overflow: hidden; }
-/* Uniform frosted-glass tile for every chip (same rgba(255,255,255,0.06)/
- * 0.10 translucent-panel pattern used elsewhere in this app, e.g.
- * signal-modal.css) — color comes from the TEXT per ticker, never the
- * tile's own background. Two depths: "fore" tiles are sharp (the ones
- * meant to catch the eye), "back" is a denser, dimmer, blurred layer
- * (text chips + real company-logo tiles + truncated ticker-like
- * fragments) sitting behind/around them — reads as one continuous glass
- * pile, not a rainbow of separately-colored blocks. Static only (no
- * animation), so combining blur here doesn't risk the ghost-smear bug
- * class this file avoids elsewhere. */
-.rd .eng-scr-chip { position: absolute; left: var(--x); top: var(--y); display: flex; align-items: center; justify-content: center; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 7px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.35); transform: rotate(var(--r)); }
-.rd .eng-scr-chip.fore { opacity: 0.97; z-index: 2; }
-.rd .eng-scr-chip.back { opacity: 0.6; filter: blur(0.6px); z-index: 1; }
-/* Fragments: short, deliberately truncated ticker-like strings (this
- * diagram is fixed illustrative content throughout, not live data) that
- * read as "more tickers, cut off" rather than a complete label. */
-.rd .eng-scr-chip.frag { font-size: 9.5px; opacity: 0.35; filter: blur(0.5px); border: 1px solid var(--line-2); box-shadow: none; }
+/* Chip = small logo tile + ticker text. Position (--x/--y, percentages of
+ * the cluster box) and depth (--s scale, per-chip opacity) come from
+ * SCREEN_CHIPS — hand-placed with zero overlaps, not algorithmic. Depth is
+ * opacity/scale ONLY (no blur/filter — this pass excludes filters, and blur
+ * was working against "background chips must still be legible" anyway). */
+.rd .eng-scr-chip { position: absolute; left: var(--x); top: var(--y); display: flex; align-items: center; gap: 4px; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line-2); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; transform: rotate(var(--r)) scale(var(--s)); }
+.rd .eng-scr-chip.fore { z-index: 2; }
+.rd .eng-scr-chip.back { z-index: 1; }
+.rd .eng-scr-chip-logo { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex-shrink: 0; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--line-2); overflow: hidden; }
+.rd .eng-scr-chip-logo img { width: 100%; height: 100%; object-fit: contain; }
 
 /* ── Panel 1: Screen ──────────────────────────────────────────────────── */
 .rd .eng-scr-rows { display: flex; flex-direction: column; gap: 14px; }
 .rd .eng-scr-row { position: relative; display: flex; align-items: flex-start; gap: 10px; }
 .rd .eng-scr-row-text { flex: 1; }
-.rd .eng-scr-row-stub { position: absolute; right: 0; top: 13px; width: 14px; height: 2px; background: var(--c); opacity: 0.6; }
+.rd .eng-scr-row-stub { position: absolute; right: 0; top: 13px; width: 14px; height: 2px; background: var(--c); opacity: 0.8; }
 .rd .eng-scr-icon-badge { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: color-mix(in srgb, var(--c) 32%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); flex-shrink: 0; }
 .rd .eng-scr-icon { width: 15px; height: 15px; }
 .rd .eng-scr-row-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
