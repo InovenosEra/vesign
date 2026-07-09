@@ -88,12 +88,36 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * cap lived here, not on any ancestor). Inner content is capped/centered on
  * .eng-panels instead (max-width:1600px below) so the section's own edge-to-
  * edge padding still applies underneath that cap. */
-.rd .ld-scene { position: relative; width: 100%; padding: 64px clamp(24px, 4vw, 72px) 16px; border-top: 1px solid var(--line); overflow: hidden; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); display: flex; flex-direction: column; justify-content: center; }
+/* Top padding (40) is deliberately less than the head->scene gap (68) below —
+ * was 64px, reading as a large empty void above the eyebrow at this section's
+ * full-viewport min-height. Bottom (28) was already tight (16px) rather than
+ * cavernous; nudged up slightly for a "comfortable" close instead of reducing
+ * further, since there wasn't excess there to remove. */
+/* scroll-margin-top:64px — same fix as .ld-hero, for the same reason: the
+ * site-wide invariant this depends on (landing.css:7-11) is "every section's
+ * own top padding is >=64px, so snapping to its true top never hides content
+ * under the sticky nav." Reducing this section's top padding to 40px (the
+ * FIX-2 rhythm pass) broke that invariant — the nav then overlapped 24px
+ * into the eyebrow/heading, making the section look mis-landed / short.
+ * This decouples the snap-position compensation from the padding value so
+ * it holds regardless of future padding changes, instead of just reverting
+ * the padding back to >=64px.
+ * NOT set inline below — .rd.ld section (line 11, specificity 0-2-1) beats
+ * .rd .ld-scene (specificity 0-2-0) for the SAME property, so a declaration
+ * here would be silently overridden back to 0. .rd .ld-hero never hit this
+ * because .ld-hero is a <header>, which the section-tag selector can't
+ * match at all. Bumped to a dedicated, unambiguously higher-specificity
+ * rule instead of just tacking on more classes here. */
+.rd .ld-scene { position: relative; width: 100%; padding: 40px clamp(24px, 4vw, 72px) 28px; border-top: 1px solid var(--line); overflow: hidden; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); display: flex; flex-direction: column; justify-content: center; }
+.rd.ld section.ld-scene { scroll-margin-top: 64px; }
 .rd .ld-scene::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 900px 700px at 50% 0%, rgba(59,130,246,0.09), transparent 65%), radial-gradient(ellipse 1100px 500px at 50% 65%, rgba(59,130,246,0.07), transparent 70%); pointer-events: none; }
-.rd .ld-scene-head { position: relative; text-align: center; max-width: 560px; margin: 0 auto 14px; }
+/* max-width 740 (was 660) so the larger subtitle below wraps across two
+ * balanced lines instead of an awkward split; margin-bottom 68 (was 14) is
+ * the head->scene gap FIX 2 targets. */
+.rd .ld-scene-head { position: relative; text-align: center; max-width: 740px; margin: 0 auto 68px; }
 .rd .ld-scene-head .tag { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
-.rd .ld-scene-head h2 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
-.rd .ld-scene-head p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.rd .ld-scene-head h2 { margin: 0 0 8px; font-size: clamp(34px, 3.2vw, 50px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.rd .ld-scene-head p { margin: 0; font-size: clamp(15px, 1.15vw, 16px); color: var(--ink-2); line-height: 1.5; text-wrap: balance; }
 
 /* minmax(150px, ...) floors the chips column — without it, once the other
  * 4 panel columns hit their own text/content min-width they stop shrinking,
@@ -124,7 +148,7 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .eng-panel-head { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 9px 20px; white-space: nowrap; }
 .rd .eng-panel-head .n { font-family: var(--mono, monospace); font-size: 13px; font-weight: 800; color: var(--blue-2); }
 .rd .eng-panel-head .t { font-size: 12.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
-.rd .eng-panel-arrow { position: absolute; top: 20px; right: -17px; z-index: 6; color: var(--blue-2); font-size: 18px; font-weight: 700; line-height: 1; }
+.rd .eng-panel-arrow { position: absolute; top: 20px; right: -17px; z-index: 6; color: var(--blue-2); font-size: 18px; font-weight: 700; line-height: 0; }
 /* Real, always-visible border: 1px solid var(--line-2) on every edge, at
  * rest, no hover gate. The previous pass made a border-box gradient the ONLY
  * border color (border:1px solid transparent) — with nothing else painting
@@ -158,18 +182,28 @@ html.ld-snap { scroll-snap-type: y mandatory; }
  * .eng-panel-foot still lands at the same baseline as the other 4 zones'
  * captions instead of floating right after the cluster's own fixed height. */
 .rd .eng-chips-zone { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding-top: 52px; }
-.rd .eng-chips-cluster-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; width: 100%; }
-/* overflow:hidden clips left-hanging back-layer items at the column's own
- * edge — the "half cut off" look the reference relies on for depth. */
-.rd .eng-chips-cluster { position: relative; height: 332px; width: 100%; overflow: hidden; }
-/* Chip = small logo tile + ticker text. Position (--x/--y, percentages of
- * the cluster box) and depth (--s scale, per-chip opacity) come from
- * SCREEN_CHIPS — hand-placed with zero overlaps, not algorithmic. Depth is
- * opacity/scale ONLY (no blur/filter — this pass excludes filters, and blur
- * was working against "background chips must still be legible" anyway). */
-.rd .eng-scr-chip { position: absolute; left: var(--x); top: var(--y); display: flex; align-items: center; gap: 4px; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line-2); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; transform: rotate(var(--r)) scale(var(--s)); }
-.rd .eng-scr-chip.fore { z-index: 2; }
-.rd .eng-scr-chip.back { z-index: 1; }
+.rd .eng-chips-cols-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; width: 100%; }
+/* Fixed 332px (same as the old single cluster) so the anchor box — and
+ * therefore the flow-curve origins in EngineConnectors.jsx — don't move.
+ * Two equal columns split the width. */
+.rd .eng-chips-cols { position: relative; height: 332px; width: 100%; display: flex; gap: 6px; }
+.rd .eng-chip-col { position: relative; flex: 1; height: 100%; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%); }
+/* Duplicated-track infinite scroll: the track holds the chip array TWICE in
+ * a row; translateY(-50%) always equals exactly one copy's height (both
+ * copies are identical), so the loop point is invisible. transform only —
+ * no JS/rAF/scroll listeners. */
+.rd .eng-chip-track { display: flex; flex-direction: column; animation-name: eng-chip-scroll; animation-timing-function: linear; animation-iteration-count: infinite; }
+@keyframes eng-chip-scroll { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+.rd .eng-chips-zone:hover .eng-chip-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .rd .eng-chip-track { animation: none; }
+}
+/* Chip = small logo tile + ticker text, normal flex-flow now (not
+ * absolutely positioned) — marginLeft/marginBottom per chip (SCREEN_CHIPS
+ * data) give irregular horizontal offset and vertical gap. */
+.rd .eng-scr-chip { display: flex; align-items: center; gap: 4px; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line-2); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; transform: rotate(var(--r)) scale(var(--s)); flex-shrink: 0; }
 .rd .eng-scr-chip-logo { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex-shrink: 0; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--line-2); overflow: hidden; }
 .rd .eng-scr-chip-logo img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -257,9 +291,21 @@ html.ld-snap { scroll-snap-type: y mandatory; }
   .rd .ld-scene { min-height: auto; padding: 64px 36px 32px; }
 }
 
-/* ── Sections (shared scaffolding) ──────────────────────────────────────── */
-.rd .ld-section { max-width: 1180px; margin: 0 auto; padding: 84px 36px; border-top: 1px solid var(--line); }
-.rd .ld-section.narrow { max-width: 860px; }
+/* ── Sections (shared scaffolding) ────────────────────────────────────────
+ * .ld-section is full-bleed (padding-inline as gutter, no max-width of its
+ * own); .ld-section-inner is the actual content container (max-width 1600,
+ * centered) — same two-layer pattern as .ld-scene / .eng-panels. The divider
+ * (border-top) lives on .ld-section-inner, NOT the outer full-bleed section,
+ * so its rendered width is exactly 1600px, matching .eng-panels — the old
+ * bug was the divider rendering at a specific WRONG width (1180px, the
+ * page's original container), not an unbounded one, so the fix keeps it a
+ * specific width, just the same one .eng-panels uses. (Note: .ld-scene's
+ * own top border, separating Hero from How-it-works, is a different,
+ * untouched border that still spans the full viewport — not addressed here,
+ * out of this pass's scope.) */
+.rd .ld-section { width: 100%; padding-inline: clamp(24px, 4vw, 72px); }
+.rd .ld-section-inner { max-width: 1600px; margin: 0 auto; width: 100%; padding: 84px 0; border-top: 1px solid var(--line); }
+.rd .ld-section.narrow .ld-section-inner { max-width: 860px; }
 .rd .ld-section-head { max-width: 640px; margin-bottom: 44px; }
 .rd .ld-section-head .tag { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
 .rd .ld-section-head h2 { margin: 0 0 12px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); line-height: 1.18; }

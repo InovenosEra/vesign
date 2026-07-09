@@ -248,55 +248,86 @@ const SCREEN_ROWS = [
     icon: <><path d="M2 3 h11 v9 h-6 l-3 3 v-3 h-2 z" /></> },
 ]
 
-/* Scattered "pile of tickers" cluster — logo + ticker chips, "fore" (sharp,
- * full opacity, scale 1) layered over "back" (dimmer, scale 0.85) for depth,
- * evoking "there are 1,800+ of these, we're only showing a few clearly."
- * Positions are hand-placed in a 2-column x 7-row grid (x: 2%/52%, y: 14%
- * bands) — deliberately wide margins (each column has ~50% width to work
- * with against a ~30%-wide chip at most) so it holds with zero collisions
- * even if the actual rendered chip width differs from what's assumed here.
- * Static (no animation, no filter) — safe per this file's ghost-smear rule,
- * and satisfies this pass's "no filters" constraint. */
-const SCREEN_CHIPS = [
-  { t: 'META', fg: '#f472b6', x: 2, y: 2, r: -5, depth: 'back', opacity: 0.42 },
-  { t: 'NVDA', fg: 'var(--green)', x: 52, y: 2, r: 4, depth: 'fore' },
-  { t: 'MSFT', fg: 'var(--ink)', x: 2, y: 16, r: -3, depth: 'fore' },
-  { t: 'AVGO', fg: 'var(--gold)', x: 52, y: 16, r: 5, depth: 'back', opacity: 0.38 },
-  { t: 'WMT', fg: 'var(--blue-2)', x: 2, y: 30, r: 3, depth: 'fore' },
-  { t: 'NFLX', fg: 'var(--red)', x: 52, y: 30, r: -4, depth: 'back', opacity: 0.45 },
-  { t: 'AMZN', fg: 'var(--ink)', x: 2, y: 44, r: -2, depth: 'back', opacity: 0.5 },
-  { t: 'GOOGL', fg: '#c084fc', x: 52, y: 44, r: 3, depth: 'fore' },
-  { t: 'TSLA', fg: 'var(--red)', x: 2, y: 58, r: -3, depth: 'back', opacity: 0.4 },
-  { t: 'JPM', fg: 'var(--blue-2)', x: 52, y: 58, r: 2, depth: 'fore' },
-  { t: 'LLY', fg: 'var(--green)', x: 2, y: 72, r: 4, depth: 'back', opacity: 0.47 },
-  { t: 'KO', fg: 'var(--ink)', x: 52, y: 72, r: -2, depth: 'fore' },
-  { t: 'AAPL', fg: 'var(--ink)', x: 2, y: 86, r: -3, depth: 'back', opacity: 0.42 },
-  { t: 'BAC', fg: 'var(--blue-2)', x: 52, y: 86, r: 3, depth: 'back', opacity: 0.36 },
+/* Two infinitely-scrolling ticker columns — the "duplicated-track" pattern:
+ * each column's array renders TWICE in sequence, the track animates
+ * translateY(0) -> translateY(-50%), and since both copies are the exact
+ * same data rendered the exact same way, the track's total height is
+ * mathematically exactly 2x one copy's height — so -50% always lands the
+ * second copy exactly where the first one started. No JS, transform only.
+ * Irregular per-chip marginLeft/marginBottom keep it from reading as a
+ * rigid grid; depth (opacity/scale) is mixed down each column, not
+ * alternating. Different tickers per column. */
+const CHIPS_LEFT = [
+  { t: 'META', fg: '#f472b6', r: -5, depth: 'back', opacity: 0.42, ml: 6, mb: 8 },
+  { t: 'MSFT', fg: 'var(--ink)', r: -3, depth: 'fore', ml: 16, mb: 14 },
+  { t: 'WMT', fg: 'var(--blue-2)', r: 3, depth: 'fore', ml: 2, mb: 6 },
+  { t: 'AMZN', fg: 'var(--ink)', r: -2, depth: 'back', opacity: 0.48, ml: 20, mb: 16 },
+  { t: 'TSLA', fg: 'var(--red)', r: -3, depth: 'back', opacity: 0.4, ml: 8, mb: 10 },
+  { t: 'LLY', fg: 'var(--green)', r: 4, depth: 'fore', ml: 0, mb: 12 },
+  { t: 'AAPL', fg: 'var(--ink)', r: -3, depth: 'back', opacity: 0.44, ml: 18, mb: 7 },
+  { t: 'XOM', fg: 'var(--gold)', r: 2, depth: 'fore', ml: 4, mb: 15 },
+  { t: 'HD', fg: 'var(--red)', r: 3, depth: 'back', opacity: 0.38, ml: 12, mb: 9 },
+  { t: 'PG', fg: 'var(--ink)', r: -4, depth: 'fore', ml: 20, mb: 11 },
+  { t: 'UNH', fg: 'var(--blue-2)', r: 2, depth: 'back', opacity: 0.46, ml: 6, mb: 6 },
+  { t: 'COST', fg: 'var(--green)', r: -2, depth: 'fore', ml: 14, mb: 14 },
+  { t: 'CVX', fg: 'var(--gold)', r: 4, depth: 'back', opacity: 0.36, ml: 0, mb: 8 },
 ]
+const CHIPS_RIGHT = [
+  { t: 'NVDA', fg: 'var(--green)', r: 4, depth: 'fore', ml: 10, mb: 10 },
+  { t: 'AVGO', fg: 'var(--gold)', r: 5, depth: 'back', opacity: 0.38, ml: 0, mb: 15 },
+  { t: 'NFLX', fg: 'var(--red)', r: -4, depth: 'back', opacity: 0.45, ml: 18, mb: 7 },
+  { t: 'GOOGL', fg: '#c084fc', r: 3, depth: 'fore', ml: 4, mb: 16 },
+  { t: 'JPM', fg: 'var(--blue-2)', r: 2, depth: 'fore', ml: 22, mb: 9 },
+  { t: 'KO', fg: 'var(--ink)', r: -2, depth: 'back', opacity: 0.48, ml: 6, mb: 12 },
+  { t: 'BAC', fg: 'var(--blue-2)', r: 3, depth: 'back', opacity: 0.36, ml: 14, mb: 6 },
+  { t: 'JNJ', fg: 'var(--red)', r: -3, depth: 'fore', ml: 0, mb: 14 },
+  { t: 'V', fg: 'var(--blue-2)', r: 4, depth: 'back', opacity: 0.44, ml: 20, mb: 11 },
+  { t: 'MA', fg: 'var(--gold)', r: -3, depth: 'fore', ml: 8, mb: 8 },
+  { t: 'PEP', fg: 'var(--blue-2)', r: 2, depth: 'back', opacity: 0.4, ml: 16, mb: 13 },
+  { t: 'ADBE', fg: 'var(--red)', r: -4, depth: 'fore', ml: 2, mb: 7 },
+  { t: 'CSCO', fg: '#22d3ee', r: 3, depth: 'back', opacity: 0.46, ml: 12, mb: 15 },
+]
+
+function ChipCol({ side, chips, duration }) {
+  const doubled = [...chips, ...chips]
+  return (
+    <div className={`eng-chip-col ${side}`}>
+      <div className="eng-chip-track" style={{ animationDuration: `${duration}s` }}>
+        {doubled.map((c, i) => (
+          <span
+            key={i}
+            className={`eng-scr-chip ${c.depth}`}
+            style={{
+              '--r': `${c.r}deg`,
+              '--s': c.depth === 'back' ? 0.85 : 1,
+              opacity: c.depth === 'back' ? c.opacity : 1,
+              marginLeft: `${c.ml}px`,
+              marginBottom: `${c.mb}px`,
+            }}
+          >
+            <span className="eng-scr-chip-logo">
+              <img src={`/logos/${c.t}.png`} alt="" />
+            </span>
+            <span style={{ color: c.fg }}>{c.t}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function ChipsZone() {
   return (
     <div className="eng-chips-zone">
-      <div className="eng-chips-cluster-wrap">
-        <div className="eng-chips-cluster" data-anchor="ticker-cloud">
-          {SCREEN_CHIPS.map((c, i) => (
-            <span
-              key={i}
-              className={`eng-scr-chip ${c.depth}`}
-              style={{
-                '--x': `${c.x}%`,
-                '--y': `${c.y}%`,
-                '--r': `${c.r}deg`,
-                '--s': c.depth === 'back' ? 0.85 : 1,
-                opacity: c.depth === 'back' ? c.opacity : 1,
-              }}
-            >
-              <span className="eng-scr-chip-logo">
-                <img src={`/logos/${c.t}.png`} alt="" />
-              </span>
-              <span style={{ color: c.fg }}>{c.t}</span>
-            </span>
-          ))}
+      {/* Fixed-height wrapper (matches the old cluster's 332px) carries the
+          anchor — NOT .eng-chips-zone itself, which the grid's
+          align-items:stretch pads taller to match sibling cards, and which
+          also contains the caption below. Anchoring here keeps the curve
+          origins exactly where they were before this rewrite. */}
+      <div className="eng-chips-cols-wrap">
+        <div className="eng-chips-cols" data-anchor="ticker-cloud">
+          <ChipCol side="left" chips={CHIPS_LEFT} duration={44} />
+          <ChipCol side="right" chips={CHIPS_RIGHT} duration={38} />
         </div>
       </div>
       <div className="eng-panel-foot">Daily stock universe (1,800+)</div>
@@ -570,33 +601,35 @@ function EngineScene() {
 function Proof({ stats }) {
   return (
     <section className="ld-section ld-proof" id="proof">
-      <div className="ld-section-head">
-        <div className="tag">The proof</div>
-        <h2>Every trade, accounted for.</h2>
-        <p>
-          These are the results our model produced running its strategy on historical
-          US market data — every trade it generated, winners and losers, nothing
-          cherry-picked. The full list and an equity curve against the S&amp;P 500
-          are public.
-        </p>
-      </div>
-      <div className="ld-proof-grid">
-        {proofStats(stats).map(s => (
-          <div className="ld-proof-cell" key={s.k}>
-            <div className="v">{s.v}</div>
-            <div className="k">{s.k}</div>
-          </div>
-        ))}
-      </div>
-      <div className="ld-proof-foot">
-        <span className="note">
-          Results from running the model's strategy on historical data — not
-          live-traded or real-money returns. Past performance does not
-          guarantee future results.
-        </span>
-        <Link to="/performance" className="ld-btn ghost">
-          Browse all {stats?.closed_trades ? fmtInt(stats.closed_trades) : ''} trades →
-        </Link>
+      <div className="ld-section-inner">
+        <div className="ld-section-head">
+          <div className="tag">The proof</div>
+          <h2>Every trade, accounted for.</h2>
+          <p>
+            These are the results our model produced running its strategy on historical
+            US market data — every trade it generated, winners and losers, nothing
+            cherry-picked. The full list and an equity curve against the S&amp;P 500
+            are public.
+          </p>
+        </div>
+        <div className="ld-proof-grid">
+          {proofStats(stats).map(s => (
+            <div className="ld-proof-cell" key={s.k}>
+              <div className="v">{s.v}</div>
+              <div className="k">{s.k}</div>
+            </div>
+          ))}
+        </div>
+        <div className="ld-proof-foot">
+          <span className="note">
+            Results from running the model's strategy on historical data — not
+            live-traded or real-money returns. Past performance does not
+            guarantee future results.
+          </span>
+          <Link to="/performance" className="ld-btn ghost">
+            Browse all {stats?.closed_trades ? fmtInt(stats.closed_trades) : ''} trades →
+          </Link>
+        </div>
       </div>
     </section>
   )
@@ -607,6 +640,7 @@ function Proof({ stats }) {
 function PlatformShots() {
   return (
     <section className="ld-section" id="platform">
+      <div className="ld-section-inner">
       <div className="ld-section-head">
         <div className="tag">The platform</div>
         <h2>A full workspace, not a mailing list</h2>
@@ -687,6 +721,7 @@ function PlatformShots() {
           </div>
         </div>
       </div>
+      </div>
     </section>
   )
 }
@@ -695,24 +730,26 @@ function PlatformShots() {
 function Pricing() {
   return (
     <section className="ld-section" id="pricing">
-      <div className="ld-section-head">
-        <div className="tag">Pricing</div>
-        <h2>Start free. Upgrade when the signals earn it.</h2>
-        <p><span className="ld-placeholder-tag">Placeholder pricing — final tiers TBD</span></p>
-      </div>
-      <div className="ld-pricing">
-        {PRICING.map(p => (
-          <div className={'ld-plan' + (p.featured ? ' featured' : '')} key={p.name}>
-            {p.featured && <div className="ld-plan-flag">Most popular</div>}
-            <div className="ld-plan-name">{p.name}</div>
-            <div className="ld-plan-price">{p.price}<span>{p.period}</span></div>
-            <div className="ld-plan-blurb">{p.blurb}</div>
-            <ul>
-              {p.features.map(f => <li key={f}>{f}</li>)}
-            </ul>
-            <Link to="/sign-up" className={'ld-btn ' + (p.featured ? 'primary' : 'ghost')}>{p.cta}</Link>
-          </div>
-        ))}
+      <div className="ld-section-inner">
+        <div className="ld-section-head">
+          <div className="tag">Pricing</div>
+          <h2>Start free. Upgrade when the signals earn it.</h2>
+          <p><span className="ld-placeholder-tag">Placeholder pricing — final tiers TBD</span></p>
+        </div>
+        <div className="ld-pricing">
+          {PRICING.map(p => (
+            <div className={'ld-plan' + (p.featured ? ' featured' : '')} key={p.name}>
+              {p.featured && <div className="ld-plan-flag">Most popular</div>}
+              <div className="ld-plan-name">{p.name}</div>
+              <div className="ld-plan-price">{p.price}<span>{p.period}</span></div>
+              <div className="ld-plan-blurb">{p.blurb}</div>
+              <ul>
+                {p.features.map(f => <li key={f}>{f}</li>)}
+              </ul>
+              <Link to="/sign-up" className={'ld-btn ' + (p.featured ? 'primary' : 'ghost')}>{p.cta}</Link>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
@@ -722,17 +759,19 @@ function Pricing() {
 function Faq() {
   return (
     <section className="ld-section narrow" id="faq">
-      <div className="ld-section-head">
-        <div className="tag">Questions</div>
-        <h2>Answered straight</h2>
-      </div>
-      <div className="ld-faq">
-        {FAQS.map(f => (
-          <details className="ld-faq-item" key={f.q}>
-            <summary>{f.q}<span className="ld-faq-caret">▾</span></summary>
-            <p>{f.a}</p>
-          </details>
-        ))}
+      <div className="ld-section-inner">
+        <div className="ld-section-head">
+          <div className="tag">Questions</div>
+          <h2>Answered straight</h2>
+        </div>
+        <div className="ld-faq">
+          {FAQS.map(f => (
+            <details className="ld-faq-item" key={f.q}>
+              <summary>{f.q}<span className="ld-faq-caret">▾</span></summary>
+              <p>{f.a}</p>
+            </details>
+          ))}
+        </div>
       </div>
     </section>
   )

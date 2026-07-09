@@ -56,27 +56,44 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
   const scoreCard = anchors['score-card']
   const trackCard = anchors['track-card']
 
-  // A — ticker-cloud -> screen-card: 4 curves, 4 origins converging on one destination.
-  const flowA = (tickerCloud && screenCard)
-    ? distributeY(tickerCloud, 4).map((y, i) => {
-        const p1 = { x: tickerCloud.x + tickerCloud.w, y }
-        const p2 = leftMid(screenCard)
-        return { id: `ecFlowA${i}`, p1, p2, d: bezierPath(p1, p2, 0.4) }
-      })
-    : []
-
-  // B — funnel: centered in the ticker-cloud -> screen-card gap, on screen-card's
-  // vertical center (same Y the flowA curves converge to, so they read as passing
-  // through it). Wide left edge, narrow right "spout".
-  const funnel = (tickerCloud && screenCard) ? (() => {
-    const gapX = (tickerCloud.x + tickerCloud.w + screenCard.x) / 2
+  // B — funnel: horizontally centered ON screen-card's left border (its own
+  // center x === screenCard.x, straddling the border, derived from the
+  // anchors object — not a hardcoded offset), vertically on screen-card's
+  // center. Wide left edge (the "mouth"), narrow right "spout" pointing
+  // into the card. Opaque var(--panel) backing first (it overlaps the card
+  // now, so the border must not show through), gradient fill on top.
+  const funnel = (screenCard) ? (() => {
+    const gapX = screenCard.x
     const cy = screenCard.y + screenCard.h / 2
     const halfW = 17, wideH = 24, narrowH = 4
     return {
+      mouthX: gapX - halfW,
+      mouthTop: cy - wideH,
+      mouthBottom: cy + wideH,
       path: `M ${gapX - halfW} ${cy - wideH} L ${gapX + halfW} ${cy - narrowH} `
           + `L ${gapX + halfW} ${cy + narrowH} L ${gapX - halfW} ${cy + wideH} Z`,
     }
   })() : null
+
+  // A — ticker-cloud -> funnel's mouth (its wide left edge). Origins are 4
+  // FIXED points on the ticker-cloud anchor box's right edge (middle 60% of
+  // its height) — not tied to any individual chip, since chips scroll
+  // continuously and their measured positions would be stale within a
+  // single frame. Destinations are 4 points spread across the mouth's
+  // vertical span, so the curves visibly converge/taper the way the funnel
+  // itself does. Nothing is drawn past the mouth — the funnel is the
+  // terminus, not a waypoint on the way to the card.
+  const flowA = (tickerCloud && funnel)
+    ? (() => {
+        const originYs = distributeY({ y: tickerCloud.y + tickerCloud.h * 0.2, h: tickerCloud.h * 0.6 }, 4)
+        const destYs = distributeY({ y: funnel.mouthTop, h: funnel.mouthBottom - funnel.mouthTop }, 4)
+        return originYs.map((y, i) => {
+          const p1 = { x: tickerCloud.x + tickerCloud.w, y }
+          const p2 = { x: funnel.mouthX, y: destYs[i] }
+          return { id: `ecFlowA${i}`, p1, p2, d: bezierPath(p1, p2, 0.4) }
+        })
+      })()
+    : []
 
   // C — screen-card's right edge (x) at each row's vertical center (y) -> net-input-layer's
   // horizontal center. Row anchors are still used, but only for .y now — the curve must never
@@ -129,8 +146,8 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
       <defs>
         {flowA.map((f) => (
           <linearGradient key={f.id} id={f.id} gradientUnits="userSpaceOnUse" x1={f.p1.x} y1={f.p1.y} x2={f.p2.x} y2={f.p2.y}>
-            <stop offset="0%" stopColor="var(--blue-2)" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="var(--blue-2)" stopOpacity="0.55" />
+            <stop offset="0%" stopColor="var(--blue-2)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--blue-2)" stopOpacity="0.65" />
           </linearGradient>
         ))}
         {funnel && (
@@ -146,7 +163,12 @@ export function EngineConnectors({ anchors, containerSize, containerRef, debug =
       ))}
 
       {funnel && (
-        <path d={funnel.path} fill="url(#ecFunnelFill)" stroke="var(--blue-2)" strokeWidth="1" strokeOpacity="0.40" />
+        <>
+          {/* Opaque backing first — the funnel now overlaps screen-card's
+              border, so the border must not show through its interior. */}
+          <path d={funnel.path} fill="var(--panel)" stroke="none" />
+          <path d={funnel.path} fill="url(#ecFunnelFill)" stroke="var(--blue-2)" strokeWidth="1" strokeOpacity="0.40" />
+        </>
       )}
 
       {flowC.map((f) => (
