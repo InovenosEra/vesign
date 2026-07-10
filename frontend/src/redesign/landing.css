@@ -18,24 +18,44 @@
  * behind the nav (auth/performance) look effectively identical regardless
  * of this opacity value; only where there's real contrast underneath (the
  * hero) does the difference show, which is exactly the intended effect. */
-.rd .ld-nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 36px; height: 64px; padding-inline: 36px; background: rgba(10,14,21,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-block-end: 1px solid transparent; box-shadow: none; transition: background-color .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.rd .ld-nav {
+  position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 36px; height: 64px; padding-inline: 36px;
+  background: rgba(10,14,21,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-block-end: 1px solid transparent;
+  /* Permanent subtle inner top highlight (a glass panel catching light along
+   * its own top edge) + a soft ambient shadow underneath, present even
+   * unscrolled — the bar reads as a real floating panel with depth instead
+   * of a flat translucent strip, regardless of scroll state. */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 24px -16px rgba(0,0,0,0.4);
+  transition: background-color .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
 /* Once scrolled past the hero, the nav needs to hold its own against
- * whatever content is running underneath it — solidifying + a real border/
+ * whatever content is running underneath it — solidifying + a stronger
  * shadow read as "elevated over content" rather than "floating over empty
  * hero space." */
-.rd .ld-nav.scrolled { background: rgba(10,14,21,0.95); border-block-end-color: var(--line); box-shadow: 0 4px 32px rgba(0,0,0,0.5); }
+.rd .ld-nav.scrolled { background: rgba(10,14,21,0.95); border-block-end-color: var(--line); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 32px rgba(0,0,0,0.5); }
 .rd .ld-nav-logo { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--ink); }
-.rd .ld-logo-mark { width: 32px; height: 36px; display: block; filter: drop-shadow(0 0 8px rgba(59,130,246,0.45)); }
+.rd .ld-logo-mark { width: 32px; height: 36px; display: block; filter: drop-shadow(0 0 8px rgba(59,130,246,0.45)); transition: filter .2s ease, transform .2s ease; }
 .rd .ld-logo-mark.sm { width: 26px; height: 30px; }
+.rd .ld-nav-logo:hover .ld-logo-mark { filter: drop-shadow(0 0 14px rgba(59,130,246,0.7)); transform: scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-nav-logo:hover .ld-logo-mark { transform: none; } }
 .rd .ld-logo-text { font-size: 17px; font-weight: 600; letter-spacing: -0.012em; }
 .rd .ld-nav-links { display: flex; gap: 4px; }
-.rd .ld-nav-links a { position: relative; padding: 8px 14px; font-size: 13.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; transition: color .15s; }
-.rd .ld-nav-links a::after { content: ''; position: absolute; inset-inline: 50%; bottom: 2px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--blue-2), var(--blue)); transition: inset-inline .18s ease; }
+/* Pill hover — a soft rounded highlight fading in behind the link, replacing
+ * the previous underline treatment. The ::before paints behind the link's
+ * own text by default stacking order (pseudo-elements are the element's
+ * first "child" in paint order), so no z-index juggling is needed. */
+.rd .ld-nav-links a { position: relative; padding: 8px 14px; font-size: 13.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; border-radius: 8px; transition: color .15s; }
+.rd .ld-nav-links a::before { content: ''; position: absolute; inset: 2px; border-radius: 7px; background: var(--bg-2); opacity: 0; transition: opacity .18s ease; }
 .rd .ld-nav-links a:hover { color: var(--ink); }
-.rd .ld-nav-links a:hover::after { inset-inline: 14px; }
+.rd .ld-nav-links a:hover::before { opacity: 1; }
 .rd .ld-nav-links a:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; border-radius: 4px; }
 .rd .ld-nav-logo:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 3px; border-radius: 6px; }
 .rd .ld-nav-ctas { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+/* Visual grouping — separates the language switcher from the log-in/sign-up
+ * cluster so the nav reads as distinct zones rather than one undifferentiated
+ * row of controls. */
+.rd .ld-nav-divider { width: 1px; height: 20px; background: var(--line-2); flex-shrink: 0; }
 /* Scroll progress bar — transform:scaleX only (see Nav.jsx's useScrollProgress),
  * never width, so it repaints without triggering layout on every scroll
  * frame. transform-origin is a physical value (not inline-start) and

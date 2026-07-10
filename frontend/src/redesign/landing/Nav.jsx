@@ -189,6 +189,7 @@ export function LandingNav() {
       </nav>
       <div className="ld-nav-ctas">
         <LangSwitcher />
+        <span className="ld-nav-divider" aria-hidden="true" />
         <Link to="/sign-in" className="ld-btn ghost" onClick={cta('nav', 'log_in')}>{t('ld.nav.logIn')}</Link>
         <Link to="/sign-up" className="ld-btn primary" onClick={cta('nav', 'sign_up')}>{t('ld.nav.signUp')}</Link>
       </div>
