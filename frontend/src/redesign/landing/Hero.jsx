@@ -216,7 +216,6 @@ export function Hero() {
           >
             {t('ld.hero.ctaPrimary')}
           </Link>
-          <a href="#pricing" className="ld-btn ghost lg">{t('ld.hero.ctaSecondary')}</a>
         </div>
         <p className="ld-hero-trust">{t('ld.hero.trustLine')}</p>
       </div>
