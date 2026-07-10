@@ -17,17 +17,17 @@
  * uses (Hero excluded — hero.js js hero canvas is its own orchestrated
  * moment). Respects reduced motion globally: with it on, everything is
  * simply visible/final-state immediately, no transition at all. */
-.rd .ld [data-reveal], .rd .ld .ld-how-step, .rd .ld .ld-final {
+.rd .ld [data-reveal], .rd .ld .ld-how-step, .rd .ld .ld-final, .rd .ld .ld-statement {
   opacity: 0;
   transform: translateY(18px);
   transition: opacity .7s cubic-bezier(0.16,1,0.3,1), transform .7s cubic-bezier(0.16,1,0.3,1);
 }
-.rd .ld [data-reveal].visible, .rd .ld .ld-how-step.visible, .rd .ld .ld-final.visible {
+.rd .ld [data-reveal].visible, .rd .ld .ld-how-step.visible, .rd .ld .ld-final.visible, .rd .ld .ld-statement.visible {
   opacity: 1;
   transform: translateY(0);
 }
 @media (prefers-reduced-motion: reduce) {
-  .rd .ld [data-reveal], .rd .ld .ld-how-step, .rd .ld .ld-final {
+  .rd .ld [data-reveal], .rd .ld .ld-how-step, .rd .ld .ld-final, .rd .ld .ld-statement {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
@@ -53,6 +53,16 @@
  * rising line reads as "up" regardless of writing direction, flipping it
  * horizontally would just reverse the timeline for no benefit. */
 .rd .ld-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; direction: ltr; }
+/* Cursor spotlight — position driven by --px/--py (set on .ld-hero itself by
+ * usePointerGlow, in px relative to the hero box). Falls back to dead-center
+ * when unset, which is exactly the touch/reduced-motion/no-JS-yet state
+ * (the hook never runs there), so it always reads as an intentional glow,
+ * never a mispositioned one. `background` only — no `filter` — so this never
+ * pairs with an animation the way the backdrop-filter ghost-smear bug needs. */
+.rd .ld-hero-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(560px circle at var(--px, 50%) var(--py, 32%), rgba(59,130,246,0.16), transparent 68%);
+}
 .rd .ld-hero::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 900px 600px at 50% 38%, rgba(10,14,21,0) 0%, rgba(10,14,21,0.55) 72%, var(--bg) 100%);
@@ -252,14 +262,50 @@
 @media (max-width: 1020px) { .rd .ld-proof-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .rd .ld-proof-grid { grid-template-columns: 1fr; } .rd .ld-proof-foot { flex-direction: column; align-items: flex-start; } }
 
+/* ── Statement — one big-type pacing beat between Proof and Platform, no
+ * card/stat/CTA. Purely a rhythm device (the way Stripe/Linear break up a
+ * long page with an oversized single line) so the page doesn't read as an
+ * unbroken chain of card grids. Reuses the Hero's `.g` gradient-text
+ * treatment so the two loudest typographic moments share one recipe
+ * instead of introducing a second gradient. */
+.rd .ld-statement { max-width: 1100px; margin-inline: auto; padding: clamp(72px, 11vw, 128px) 36px; text-align: center; }
+.rd .ld-statement p { margin: 0; font-size: clamp(28px, 4.6vw, 56px); font-weight: 800; line-height: 1.18; letter-spacing: -0.03em; color: var(--ink); }
+
 /* ── Platform: real Signals/Market/Portfolio component CSS in device
  * frames (imported from signals.css / portfolio.css / redesign.css). ──── */
 .rd .ld-shots { position: relative; }
-.rd .ld-shots-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; align-items: start; }
+.rd .ld-shots-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; align-items: start; perspective: 1400px; }
 .rd .ld-shots-side { display: flex; flex-direction: column; gap: 22px; }
-.rd .ld-device { border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; background: var(--panel); box-shadow: 0 26px 60px -22px rgba(0,0,0,0.5); transition: border-color .22s ease, box-shadow .22s ease, transform .22s ease; }
-.rd .ld-device:hover { border-color: var(--ink-3); box-shadow: 0 34px 76px -22px rgba(0,0,0,0.62); transform: translateY(-4px); }
-@media (prefers-reduced-motion: reduce) { .rd .ld-device { transition: border-color .22s ease, box-shadow .22s ease; } .rd .ld-device:hover { transform: none; } }
+/* Tilt-in reveal: starts rotated back + down + faded (one-shot, via
+ * useReveal's IntersectionObserver, same pattern as .ld-how-step/.ld-final),
+ * settles flat on `.visible`. transform-style/perspective make this read as
+ * a card leaning up out of the page rather than a flat slide-up. RTL-neutral
+ * on purpose — rotateX has no left/right meaning, so no [dir="rtl"] override
+ * is needed here unlike the directional-glyph cases elsewhere in this file. */
+.rd .ld-device {
+  position: relative;
+  border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; background: var(--panel);
+  box-shadow: 0 26px 60px -22px rgba(0,0,0,0.5);
+  opacity: 0; transform: perspective(1400px) rotateX(10deg) translateY(28px); transform-style: preserve-3d;
+  transition: border-color .22s ease, box-shadow .22s ease, transform .6s cubic-bezier(0.16,1,0.3,1), opacity .6s ease;
+}
+.rd .ld-device.visible { opacity: 1; transform: perspective(1400px) rotateX(0deg) translateY(0); }
+.rd .ld-device.visible:hover { border-color: var(--ink-3); box-shadow: 0 34px 76px -22px rgba(0,0,0,0.62); transform: perspective(1400px) rotateX(0deg) translateY(-4px); }
+/* Glare sweep — --px/--py set by usePointerGlow (DeviceFrame in
+ * Platform.jsx), background/opacity only so this stays clear of the
+ * filter+infinite-animation ghost-smear bug class. Sits above the device
+ * screenshot content (z-index) but below nothing needs to sit above it. */
+.rd .ld-device-glare {
+  position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  background: radial-gradient(240px circle at var(--px, 50%) var(--py, 0%), rgba(255,255,255,0.10), transparent 70%);
+  opacity: 0; transition: opacity .25s ease;
+}
+.rd .ld-device:hover .ld-device-glare { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .rd .ld-device { opacity: 1; transform: none; transition: border-color .22s ease, box-shadow .22s ease; }
+  .rd .ld-device.visible:hover { transform: none; }
+  .rd .ld-device-glare { display: none; }
+}
 .rd .ld-device-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: var(--panel-2); border-block-end: 1px solid var(--line); }
 .rd .ld-device-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--bg-3); }
 .rd .ld-device-bar .u { margin-inline-start: 8px; font-size: 10.5px; color: var(--ink-3); }

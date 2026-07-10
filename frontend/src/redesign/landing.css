@@ -30,6 +30,19 @@
 .rd .ld-nav-links a:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; border-radius: 4px; }
 .rd .ld-nav-logo:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 3px; border-radius: 6px; }
 .rd .ld-nav-ctas { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+/* Scroll progress bar — transform:scaleX only (see Nav.jsx's useScrollProgress),
+ * never width, so it repaints without triggering layout on every scroll
+ * frame. transform-origin is a physical value (not inline-start) and
+ * explicitly mirrored under RTL — same reasoning as .ld-how-signal .row in
+ * ./landing/landing.css: growth direction must track reading-start, and a
+ * logical property alone doesn't flip a transform's origin point. */
+.rd .ld-nav-progress {
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  transform-origin: 0 50%; transform: scaleX(0);
+  background: linear-gradient(90deg, var(--green), var(--blue-2), var(--blue));
+  pointer-events: none;
+}
+[dir="rtl"] .rd .ld-nav-progress { transform-origin: 100% 50%; }
 
 /* ── Buttons (marketing sizing; landing/auth/performance share these) ───── */
 .rd .ld-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding-inline: 18px; border-radius: 7px; font-size: 13.5px; font-weight: 600; font-family: var(--sans); text-decoration: none; cursor: pointer; border: 1px solid var(--line-2); color: var(--ink); background: transparent; transition: all .15s; white-space: nowrap; touch-action: manipulation; }

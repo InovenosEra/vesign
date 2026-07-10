@@ -339,6 +339,7 @@
   "ld.proof.disclaimer": "Risultati ottenuti applicando la strategia del modello a dati storici — non si tratta di operazioni eseguite in tempo reale né di rendimenti con denaro reale. I rendimenti passati non garantiscono risultati futuri.",
   "ld.proof.browseTrades": "Sfoglia tutte le {{count}} operazioni",
   "ld.proof.browseTradesGeneric": "Sfoglia tutte le operazioni",
+  "ld.statement.text": "I mercati si muovono per emozione. <g>Il modello no.</g>",
   "ld.platform.tag": "La piattaforma",
   "ld.platform.title": "Un ambiente di lavoro completo, non una newsletter",
   "ld.platform.sub": "Mercato, Segnali, Portafoglio e Ricerca — un'unica destinazione coerente per il segnale, una volta pubblicato. Questi sono i componenti reali del prodotto, non semplici illustrazioni.",

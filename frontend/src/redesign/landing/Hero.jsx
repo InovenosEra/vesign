@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { track } from './analytics'
-import { useSectionView } from './hooks'
+import { useSectionView, usePointerGlow } from './hooks'
 
 /* ── Hero backdrop: two smoothed curves drawing themselves once on load —
  * one climbing with real drawdowns, one flatter beneath it. This is the
@@ -163,9 +163,21 @@ function DecorativeTape() {
 
 export function Hero() {
   const { t } = useTranslation()
-  const sectionRef = useSectionView('hero')
+  const gaRef = useSectionView('hero')
+  const glowRef = useRef(null)
+  usePointerGlow(glowRef)
   return (
-    <header className="ld-hero" id="top" ref={sectionRef}>
+    <header
+      className="ld-hero"
+      id="top"
+      ref={(el) => { gaRef.current = el; glowRef.current = el }}
+    >
+      {/* Cursor-tracked radial glow — CSS var driven (see usePointerGlow),
+       * so this repaints via `background`, never `filter`, keeping it clear
+       * of the backdrop-filter+infinite-animation ghost-smear bug class
+       * this page has hit before. Its own layer under the canvas/content so
+       * it never competes with the drawn curve for contrast. */}
+      <div className="ld-hero-glow" aria-hidden="true" />
       <HeroCanvas />
       <div className="ld-hero-inner">
         <p className="ld-eyebrow">{t('ld.hero.eyebrow')}</p>

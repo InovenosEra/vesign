@@ -364,6 +364,7 @@
   "ld.proof.disclaimer": "Results from running the model's strategy on historical data — not live-traded or real-money returns. Past performance does not guarantee future results.",
   "ld.proof.browseTrades": "Browse all {{count}} trades",
   "ld.proof.browseTradesGeneric": "Browse all trades",
+  "ld.statement.text": "Markets move on emotion. <g>The model doesn't.</g>",
   "ld.platform.tag": "The platform",
   "ld.platform.title": "A full workspace, not a mailing list",
   "ld.platform.sub": "Market, Signals, Portfolio and Research — one consistent home for the signal once it's published. These are the actual product components, not illustrations.",

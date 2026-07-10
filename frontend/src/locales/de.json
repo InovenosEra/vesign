@@ -339,6 +339,7 @@
   "ld.proof.disclaimer": "Diese Ergebnisse stammen aus der Anwendung der Modellstrategie auf historische Daten — es handelt sich nicht um live gehandelte Ergebnisse oder Renditen mit echtem Kapital. Vergangene Wertentwicklung garantiert keine zukünftigen Ergebnisse.",
   "ld.proof.browseTrades": "Alle {{count}} Trades ansehen",
   "ld.proof.browseTradesGeneric": "Alle Trades ansehen",
+  "ld.statement.text": "Märkte bewegen sich durch Emotionen. <g>Das Modell nicht.</g>",
   "ld.platform.tag": "Die Plattform",
   "ld.platform.title": "Ein vollständiger Arbeitsbereich, keine Mailingliste",
   "ld.platform.sub": "Markt, Signale, Portfolio und Research — ein durchgängiges Zuhause für das Signal, sobald es veröffentlicht ist. Dies sind die tatsächlichen Produktkomponenten, keine Illustrationen.",

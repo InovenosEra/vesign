@@ -51,6 +51,68 @@ export function useSectionView(sectionName, extraEvent = null) {
   return ref
 }
 
+// Tracks pointer position as CSS custom properties (--px/--py, px relative
+// to the element's own box) directly on the DOM node via ref, rAF-throttled
+// — never through setState, so a fast mouse doesn't trigger React re-renders
+// per pixel. Purely a hover embellishment (spotlight/glare effects), never a
+// functional affordance, so it's disabled outright — not degraded — on
+// coarse/touch pointers and under reduced-motion rather than left running
+// pointlessly in the background.
+export function usePointerGlow(ref) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (prefersReducedMotion() || !window.matchMedia('(pointer: fine)').matches) return
+    let raf = null
+    let last = null
+    const apply = () => {
+      raf = null
+      if (!last) return
+      const rect = el.getBoundingClientRect()
+      el.style.setProperty('--px', `${last.clientX - rect.left}px`)
+      el.style.setProperty('--py', `${last.clientY - rect.top}px`)
+    }
+    const onMove = (e) => {
+      last = e
+      if (raf == null) raf = requestAnimationFrame(apply)
+    }
+    el.addEventListener('pointermove', onMove)
+    return () => {
+      el.removeEventListener('pointermove', onMove)
+      if (raf != null) cancelAnimationFrame(raf)
+    }
+  }, [ref])
+}
+
+// Scroll progress as a 0..1 fraction of the page's scrollable height,
+// rAF-throttled the same way useScrolled (Nav.jsx) is — one listener, one
+// pending frame at a time, never layout work per raw scroll event.
+export function useScrollProgress() {
+  const [progress, setProgress] = useState(0)
+  useEffect(() => {
+    let ticking = false
+    const check = () => {
+      const doc = document.documentElement
+      const scrollable = doc.scrollHeight - doc.clientHeight
+      setProgress(scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0)
+      ticking = false
+    }
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(check)
+    }
+    check()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [])
+  return progress
+}
+
 // Eases a number from 0 to `target` over `duration`ms once `trigger` flips
 // true — null target (stats not loaded yet) is a no-op until it resolves.
 // Under prefers-reduced-motion the hook never animates at all: it just

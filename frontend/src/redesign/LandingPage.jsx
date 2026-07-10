@@ -10,6 +10,7 @@ import { LandingNav } from './landing/Nav'
 import { Hero } from './landing/Hero'
 import { HowItWorks } from './landing/HowItWorks'
 import { Proof } from './landing/Proof'
+import { Statement } from './landing/Statement'
 import { Platform } from './landing/Platform'
 import { Pricing } from './landing/Pricing'
 import { Faq } from './landing/Faq'
@@ -96,6 +97,7 @@ export default function LandingPage() {
         <Hero />
         <HowItWorks stats={stats} />
         <Proof stats={stats} />
+        <Statement />
         <Platform />
         <Pricing />
         <Faq />

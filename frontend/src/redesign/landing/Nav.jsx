@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { track } from './analytics'
+import { useScrollProgress } from './hooks'
 
 /* Same V-mark used across landing/auth/app shells; each mounted instance
  * parameterizes the gradient id so multiple copies on one page never
@@ -161,6 +162,7 @@ export function LandingNav() {
   const toggleRef = useRef(null)
   const menuId = useId()
   const scrolled = useScrolled()
+  const progress = useScrollProgress()
   useMobileMenuA11y(open, () => setOpen(false), panelRef, toggleRef)
 
   // Body scroll lock while the mobile panel is open.
@@ -201,6 +203,15 @@ export function LandingNav() {
       >
         <span /><span /><span />
       </button>
+      {/* Scroll progress — width tracks page scroll fraction (useScrollProgress,
+       * same rAF-throttled pattern as useScrolled above). transform: scaleX,
+       * not width, so this never triggers layout on scroll; set inline since
+       * it changes every frame and doesn't belong in a stylesheet rule. */}
+      <div
+        className="ld-nav-progress"
+        style={{ transform: `scaleX(${progress})` }}
+        aria-hidden="true"
+      />
       {/* Portaled to document.body — .ld-nav has backdrop-filter (the sticky
        * header's frosted-glass look), which establishes a new containing
        * block for any position:fixed descendant. Left in place, this panel's

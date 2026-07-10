@@ -1,5 +1,26 @@
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSectionView } from './hooks'
+import { useSectionView, useReveal, usePointerGlow } from './hooks'
+
+/* One-shot tilt-in reveal (rotateX/rotateY + translateY, via the .visible
+ * class — see landing.css) plus a cursor-tracked glare sweep on hover
+ * (usePointerGlow driving --px/--py on this same node, background only,
+ * never filter). Both hooks/effects live once per card instance here
+ * rather than duplicated three times inline in Platform(). */
+function DeviceFrame({ tall, children }) {
+  const [revealRef, visible] = useReveal({ threshold: 0.2 })
+  const glowRef = useRef(null)
+  usePointerGlow(glowRef)
+  return (
+    <figure
+      className={'ld-device' + (tall ? ' tall' : '') + (visible ? ' visible' : '')}
+      ref={(el) => { revealRef.current = el; glowRef.current = el }}
+    >
+      <span className="ld-device-glare" aria-hidden="true" />
+      {children}
+    </figure>
+  )
+}
 
 /* ── Platform: the REAL Signals/Market/Portfolio component CSS (imported
  * from signals.css / portfolio.css) inside device frames — these are the
@@ -24,12 +45,12 @@ export function Platform() {
         </div>
         <div className="ld-shots">
           <div className="ld-shots-grid">
-            <figure className="ld-device tall">
+            <DeviceFrame tall>
               <div className="ld-device-bar"><i /><i /><i /><span className="u" dir="ltr">ve-sign.com/signals</span></div>
               <div className="ld-device-body">
                 <div className="sigcard buy">
                   <div className="sc-head">
-                    <img className="sc-logo" src="/logos/NVDA.png" alt="" />
+                    <img className="sc-logo" src="/logos/NVDA.png" alt="" loading="lazy" />
                     <div className="sc-id"><div className="trow"><span className="tk" dir="ltr">NVDA</span></div><div className="co">NVIDIA Corp</div></div>
                     <div className="sig-why"><div className="sig-why-head">{t('ld.platform.sampleReasonNvda')}</div></div>
                   </div>
@@ -42,7 +63,7 @@ export function Platform() {
                 </div>
                 <div className="sigcard buy">
                   <div className="sc-head">
-                    <img className="sc-logo" src="/logos/AVGO.png" alt="" />
+                    <img className="sc-logo" src="/logos/AVGO.png" alt="" loading="lazy" />
                     <div className="sc-id"><div className="trow"><span className="tk" dir="ltr">AVGO</span></div><div className="co">Broadcom Inc</div></div>
                     <div className="sig-why"><div className="sig-why-head">{t('ld.platform.sampleReasonAvgo')}</div></div>
                   </div>
@@ -55,10 +76,10 @@ export function Platform() {
                 </div>
               </div>
               <figcaption><b>{t('ld.platform.captionSignalsTitle')}</b>{t('ld.platform.captionSignalsBody')}</figcaption>
-            </figure>
+            </DeviceFrame>
 
             <div className="ld-shots-side">
-              <figure className="ld-device">
+              <DeviceFrame>
                 <div className="ld-device-bar"><i /><i /><i /><span className="u" dir="ltr">ve-sign.com/market</span></div>
                 <div className="ld-device-body">
                   <div className="ld-indices-mini">
@@ -69,15 +90,15 @@ export function Platform() {
                   <div className="mover-panel">
                     <div className="mover-head"><h3>{t('ld.platform.mostActive')}</h3></div>
                     <div className="mover-list">
-                      <div className="mover-row"><img className="logo-mini" src="/logos/NVDA.png" alt="" /><div className="mname"><div className="tk" dir="ltr">NVDA</div><div className="co">NVIDIA Corp</div></div><div className="px" dir="ltr">194.83</div><div className="ch up" dir="ltr">+2.41%</div></div>
-                      <div className="mover-row"><img className="logo-mini" src="/logos/AAPL.png" alt="" /><div className="mname"><div className="tk" dir="ltr">AAPL</div><div className="co">Apple Inc</div></div><div className="px" dir="ltr">308.63</div><div className="ch up" dir="ltr">+4.84%</div></div>
+                      <div className="mover-row"><img className="logo-mini" src="/logos/NVDA.png" alt="" loading="lazy" /><div className="mname"><div className="tk" dir="ltr">NVDA</div><div className="co">NVIDIA Corp</div></div><div className="px" dir="ltr">194.83</div><div className="ch up" dir="ltr">+2.41%</div></div>
+                      <div className="mover-row"><img className="logo-mini" src="/logos/AAPL.png" alt="" loading="lazy" /><div className="mname"><div className="tk" dir="ltr">AAPL</div><div className="co">Apple Inc</div></div><div className="px" dir="ltr">308.63</div><div className="ch up" dir="ltr">+4.84%</div></div>
                     </div>
                   </div>
                 </div>
                 <figcaption><b>{t('ld.platform.captionMarketTitle')}</b>{t('ld.platform.captionMarketBody')}</figcaption>
-              </figure>
+              </DeviceFrame>
 
-              <figure className="ld-device">
+              <DeviceFrame>
                 <div className="ld-device-bar"><i /><i /><i /><span className="u" dir="ltr">ve-sign.com/portfolio</span></div>
                 <div className="ld-device-body">
                   <div className="nw-hero ld-nw-mini">
@@ -93,7 +114,7 @@ export function Platform() {
                   </div>
                 </div>
                 <figcaption><b>{t('ld.platform.captionPortfolioTitle')}</b>{t('ld.platform.captionPortfolioBody')}</figcaption>
-              </figure>
+              </DeviceFrame>
             </div>
           </div>
         </div>
