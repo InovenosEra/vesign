@@ -52,6 +52,24 @@
 /* Canvas fills the hero but is deliberately never mirrored under RTL — a
  * rising line reads as "up" regardless of writing direction, flipping it
  * horizontally would just reverse the timeline for no benefit. */
+/* Ambient signal-bar field — furthest-back hero layer (see Hero.jsx's
+ * FIELD_BARS). Vertical-only mask (solid up top, fading to nothing by ~78%
+ * down) rather than a dual horizontal+vertical mask-composite: a single
+ * mask-image is far more cross-browser-robust, and the existing
+ * .ld-hero::after radial vignette already handles horizontal/edge blending,
+ * so a second mask layer here would be redundant complexity in territory
+ * (background compositing effects) this page has been burned by before. */
+.rd .ld-hero-field {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  display: flex; align-items: flex-end; gap: 3px; padding-inline: 6%;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, transparent 78%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, transparent 78%);
+}
+.rd .ld-hero-field span {
+  flex: 1 1 0; max-width: 6px; height: var(--h); border-radius: 2px 2px 0 0;
+  background: linear-gradient(to top, var(--blue) 0%, var(--blue-2) 45%, var(--green) 100%);
+  opacity: 0.3;
+}
 .rd .ld-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; direction: ltr; }
 /* Cursor spotlight — position driven by --px/--py (set on .ld-hero itself by
  * usePointerGlow, in px relative to the hero box). Falls back to dead-center
@@ -80,8 +98,8 @@
 }
 .rd .ld-thesis {
   margin: 0 0 26px;
-  font-size: clamp(38px, 6.2vw, 84px);
-  font-weight: 800; line-height: 1.04; letter-spacing: -0.035em;
+  font-size: clamp(42px, 7.5vw, 108px);
+  font-weight: 900; line-height: 1.01; letter-spacing: -0.04em;
   color: var(--ink);
 }
 .rd .g {
@@ -95,6 +113,7 @@
 }
 .rd .ld-hero-ctas { position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
 .rd .ld-hero-ctas .ld-btn { flex: 0 1 auto; }
+.rd .ld-hero-trust { position: relative; z-index: 2; margin: 16px 0 0; font-size: 12px; color: var(--ink-3); }
 .rd .ld-scrollcue {
   position: relative; z-index: 2; margin-top: 56px;
   color: var(--ink-3); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
@@ -150,6 +169,25 @@
   inset-inline-start: 27px;
   width: 1px; background: var(--line-2);
 }
+/* Accent overlay — identical geometry to the track above, drawn progressively
+ * as steps reveal. Driven entirely by :has() reading each step's own
+ * IntersectionObserver `.visible` class (the same one already driving that
+ * step's other reveal motion) — no separate measurement/JS, so nothing here
+ * can drift on resize the way the removed DOM-measured EngineConnectors rig
+ * could. transform-origin is physical `top` on purpose: it's a vertical
+ * axis with no inline/RTL meaning. */
+.rd .ld-how-steps::after {
+  content: ''; position: absolute; top: 30px; bottom: 30px;
+  inset-inline-start: 27px;
+  width: 1px; background: linear-gradient(var(--green), var(--blue-2));
+  transform: scaleY(0); transform-origin: top;
+  transition: transform .6s cubic-bezier(0.16,1,0.3,1);
+}
+.rd .ld-how-steps:has(.ld-how-step:nth-child(1).visible)::after { transform: scaleY(0.25); }
+.rd .ld-how-steps:has(.ld-how-step:nth-child(2).visible)::after { transform: scaleY(0.5); }
+.rd .ld-how-steps:has(.ld-how-step:nth-child(3).visible)::after { transform: scaleY(0.75); }
+.rd .ld-how-steps:has(.ld-how-step:nth-child(4).visible)::after { transform: scaleY(1); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-how-steps::after { transition: none; } }
 .rd .ld-how-step {
   position: relative;
   display: grid; grid-template-columns: 56px 1fr; gap: 24px;
@@ -235,10 +273,18 @@
 @media (max-width: 640px) {
   .rd .ld-how-step { grid-template-columns: 44px 1fr; gap: 16px; }
   .rd .ld-how-num { width: 44px; height: 44px; font-size: 12px; }
-  .rd .ld-how-steps::before { inset-inline-start: 21px; }
+  .rd .ld-how-steps::before, .rd .ld-how-steps::after { inset-inline-start: 21px; }
 }
 
 /* ── Proof — biggest number treatment on the page ──────────────────────── */
+.rd .ld-proof-spark { display: block; width: 100%; height: 52px; margin-bottom: 18px; overflow: visible; }
+.rd .ld-proof-spark path {
+  fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 460; stroke-dashoffset: 460; opacity: 0.55;
+  transition: stroke-dashoffset 1.1s cubic-bezier(0.16,1,0.3,1);
+}
+.rd .ld-proof-spark.visible path { stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: reduce) { .rd .ld-proof-spark path { transition: none; stroke-dashoffset: 0; } }
 .rd .ld-proof-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
   background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;

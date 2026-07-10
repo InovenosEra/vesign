@@ -93,14 +93,14 @@ function HeroCanvas() {
       const benchPts = pathAt(BENCH_Y, false, progress)
       drawSmooth(benchPts, 'rgba(168,176,190,0.30)', 1.5, 0)
       const modelPts = pathAt(MODEL_Y, true, progress)
-      drawSmooth(modelPts, 'rgba(0,217,126,0.85)', 2.4, 10)
+      drawSmooth(modelPts, 'rgba(0,217,126,0.9)', 3, 16)
       if (modelPts.length) {
         const [x, y] = modelPts[modelPts.length - 1]
         const r = 3 + (pulsePhase != null ? Math.sin(pulsePhase) * 1.4 + 1.4 : 0)
         ctx.beginPath()
         ctx.fillStyle = 'rgba(0,217,126,0.95)'
         ctx.shadowColor = 'rgba(0,217,126,0.9)'
-        ctx.shadowBlur = 14
+        ctx.shadowBlur = 18
         ctx.arc(x, y, r, 0, Math.PI * 2)
         ctx.fill()
         ctx.shadowBlur = 0
@@ -141,6 +141,25 @@ function HeroCanvas() {
   return <canvas className="ld-hero-canvas" ref={ref} aria-hidden="true" />
 }
 
+// Ambient signal-bar field — a wide band of bars behind the drawn curve,
+// giving the top of the hero real visual density (the composition move
+// borrowed from cinematic hero treatments — dense texture up top, fading to
+// nothing, huge type in the middle). Heights come from a fixed sine
+// composition, not Math.random: same "fixed, hand-tuned shape, not
+// live/random data" rule as MODEL_Y/BENCH_Y above, computed once at module
+// scope so the shape never differs between reloads.
+const FIELD_BARS = Array.from({ length: 48 }, (_, i) =>
+  Math.round(Math.abs(Math.sin(i * 0.7)) * 55 + Math.abs(Math.sin(i * 0.31)) * 30 + 8)
+)
+
+function SignalField() {
+  return (
+    <div className="ld-hero-field" aria-hidden="true">
+      {FIELD_BARS.map((h, i) => <span key={i} style={{ '--h': h + '%' }} />)}
+    </div>
+  )
+}
+
 const TAPE_ITEMS = [
   ['NVDA', '+2.41%', 'up'], ['AAPL', '+0.84%', 'up'], ['GOOGL', '+1.12%', 'up'],
   ['TSLA', '-1.94%', 'down'], ['MSFT', '+0.63%', 'up'], ['AVGO', '+1.87%', 'up'],
@@ -174,6 +193,7 @@ export function Hero() {
       id="top"
       ref={(el) => { gaRef.current = el; glowRef.current = el }}
     >
+      <SignalField />
       {/* Cursor-tracked radial glow — CSS var driven (see usePointerGlow),
        * so this repaints via `background`, never `filter`, keeping it clear
        * of the backdrop-filter+infinite-animation ghost-smear bug class
@@ -198,6 +218,7 @@ export function Hero() {
           </Link>
           <a href="#pricing" className="ld-btn ghost lg">{t('ld.hero.ctaSecondary')}</a>
         </div>
+        <p className="ld-hero-trust">{t('ld.hero.trustLine')}</p>
       </div>
       <DecorativeTape />
       <div className="ld-scrollcue">{t('ld.hero.scrollCue')}<div className="chev" /></div>

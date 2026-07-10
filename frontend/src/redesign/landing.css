@@ -12,12 +12,18 @@
 .rd.ld section { scroll-margin-top: 64px; }
 
 /* ── Nav (shared: Landing + AuthLayout) ──────────────────────────────────── */
-.rd .ld-nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 36px; height: 64px; padding-inline: 36px; background: rgba(10,14,21,0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-block-end: 1px solid var(--line); box-shadow: 0 1px 24px rgba(0,0,0,0.35); transition: background-color .25s ease, box-shadow .25s ease; }
+/* Near-transparent by default so the nav reads as floating directly over
+ * the hero's art (signal-bar field/curve) rather than sitting on its own
+ * solid bar — same base color as --bg either way, so pages without hero art
+ * behind the nav (auth/performance) look effectively identical regardless
+ * of this opacity value; only where there's real contrast underneath (the
+ * hero) does the difference show, which is exactly the intended effect. */
+.rd .ld-nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 36px; height: 64px; padding-inline: 36px; background: rgba(10,14,21,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-block-end: 1px solid transparent; box-shadow: none; transition: background-color .25s ease, box-shadow .25s ease, border-color .25s ease; }
 /* Once scrolled past the hero, the nav needs to hold its own against
- * whatever content is running underneath it — a touch more opacity and a
- * deeper shadow read as "elevated over content" rather than "floating over
- * empty hero space." */
-.rd .ld-nav.scrolled { background: rgba(10,14,21,0.95); box-shadow: 0 4px 32px rgba(0,0,0,0.5); }
+ * whatever content is running underneath it — solidifying + a real border/
+ * shadow read as "elevated over content" rather than "floating over empty
+ * hero space." */
+.rd .ld-nav.scrolled { background: rgba(10,14,21,0.95); border-block-end-color: var(--line); box-shadow: 0 4px 32px rgba(0,0,0,0.5); }
 .rd .ld-nav-logo { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--ink); }
 .rd .ld-logo-mark { width: 32px; height: 36px; display: block; filter: drop-shadow(0 0 8px rgba(59,130,246,0.45)); }
 .rd .ld-logo-mark.sm { width: 26px; height: 30px; }
@@ -47,7 +53,15 @@
 /* ── Buttons (marketing sizing; landing/auth/performance share these) ───── */
 .rd .ld-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding-inline: 18px; border-radius: 7px; font-size: 13.5px; font-weight: 600; font-family: var(--sans); text-decoration: none; cursor: pointer; border: 1px solid var(--line-2); color: var(--ink); background: transparent; transition: all .15s; white-space: nowrap; touch-action: manipulation; }
 .rd .ld-btn.ghost:hover { border-color: var(--ink-3); background: var(--bg-2); }
-.rd .ld-btn.primary { background: linear-gradient(135deg, var(--blue-2), var(--blue)); border-color: var(--blue); color: #fff; box-shadow: 0 4px 20px -6px rgba(59,130,246,0.6); }
+/* Chamfered "flag" silhouette — rounded left (the existing border-radius,
+ * left untouched so it still applies), pointed right via clip-path. The
+ * polygon's left-side vertices sit at the plain bounding-box corners (0,0 /
+ * 0,100%), which is a no-op against border-radius: border-radius already
+ * excludes those corner pixels at the paint stage, so clip-path has nothing
+ * left to cut there and the rounding survives untouched — only the right
+ * edge, which the polygon actually reshapes, loses its radius. */
+.rd .ld-btn.primary { background: linear-gradient(135deg, var(--blue-2), var(--blue)); border-color: var(--blue); color: #fff; box-shadow: 0 4px 20px -6px rgba(59,130,246,0.6); clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%); }
+.rd .ld-btn.primary.lg { clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%); }
 .rd .ld-btn.primary:hover { background: linear-gradient(135deg, #7dabfb, var(--blue-2)); border-color: var(--blue-2); box-shadow: 0 6px 26px -6px rgba(59,130,246,0.75); transform: translateY(-1px); }
 /* Press feedback — hover alone never fires on touch, so without this,
  * mobile taps on the biggest CTAs on the page give zero visual response. */
