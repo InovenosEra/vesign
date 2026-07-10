@@ -93,3 +93,35 @@ def test_migration_logs_and_skips_orphaned_watchlist_holdings_rows(migration_db_
     assert tickers == ["AAPL"]
     assert "ORPHAN" in captured.out
     assert "999" in captured.out
+
+
+def test_migration_does_not_duplicate_if_source_table_reappears(migration_db):
+    """Reproduces the real-world bug: production still runs pre-migration code,
+    so its watchlist_holdings table is never dropped there. A local dev DB sync
+    (vesign-daily-sync.sh) can pull a fresh, un-migrated watchlist_holdings
+    snapshot back into a local DB that already completed this migration once.
+    The next app restart must not re-copy those rows into holdings a second
+    time — this is what actually doubled a user's local Holdings total."""
+    import importlib, backend.main as bm
+    importlib.reload(bm)  # first run: migrates + drops watchlist_holdings
+
+    # Simulate a DB sync reintroducing the (still un-migrated, from prod's
+    # point of view) watchlist_holdings table with the same rows as before.
+    eng = create_engine(f"sqlite:///{migration_db}")
+    with eng.begin() as c:
+        c.execute(text("CREATE TABLE watchlist_holdings (id INTEGER PRIMARY KEY, watchlist_id INTEGER, ticker TEXT, quantity REAL, buy_price REAL, buy_date TEXT)"))
+        c.execute(text("INSERT INTO watchlist_holdings (watchlist_id,ticker,quantity,buy_price,buy_date) VALUES "
+                        "(1,'AAPL',10,100.0,'2026-01-01'), (2,'MSFT',3,300.0,'2026-02-01')"))
+    eng.dispose()
+
+    importlib.reload(bm)  # second run: must not duplicate already-migrated rows
+
+    eng = create_engine(f"sqlite:///{migration_db}")
+    with eng.connect() as conn:
+        rows = conn.execute(text("SELECT user_id, ticker, quantity, buy_price, buy_date FROM holdings ORDER BY ticker")).fetchall()
+    eng.dispose()
+
+    assert [tuple(r) for r in rows] == [
+        ("user-a", "AAPL", 10.0, 100.0, "2026-01-01"),
+        ("user-b", "MSFT", 3.0, 300.0, "2026-02-01"),
+    ]

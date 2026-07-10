@@ -311,11 +311,24 @@ def _init_tables():
                 """)).fetchall()
                 for o in orphans:
                     print(f"[migration] Orphaned watchlist_holdings row skipped (no matching watchlist_lists): id={o[0]} ticker={o[1]} watchlist_id={o[2]}")
+                # NOT EXISTS guard: production has never deployed this migration,
+                # so its watchlist_holdings table is never dropped there — a local
+                # dev DB sync can pull that still-live, un-migrated table back in
+                # after this migration already ran and dropped it locally once.
+                # Without this guard, the next app restart would blindly re-copy
+                # every row again, duplicating a user's holdings (this exact class
+                # of bug doubled a real user's local Holdings total on 2026-07-10).
                 conn.execute(text("""
                     INSERT INTO holdings (user_id, ticker, quantity, buy_price, buy_date)
                     SELECT wl.user_id, wh.ticker, wh.quantity, wh.buy_price, wh.buy_date
                     FROM watchlist_holdings wh
                     JOIN watchlist_lists wl ON wh.watchlist_id = wl.id
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM holdings h
+                        WHERE h.user_id = wl.user_id AND h.ticker = wh.ticker
+                          AND h.quantity = wh.quantity AND h.buy_price = wh.buy_price
+                          AND h.buy_date = wh.buy_date
+                    )
                 """))
                 conn.execute(text("DROP TABLE watchlist_holdings"))
     except Exception:
