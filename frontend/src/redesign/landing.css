@@ -1,437 +1,88 @@
-/* VeSign public landing page — every rule scoped under .rd (see redesign.css).
- * Uses ONLY the shared design tokens; no new colors or fonts. Desktop-first;
- * minimal responsive fallbacks at the bottom. */
+/* VeSign — shared marketing chrome. Scoped under .rd (see redesign.css for
+ * tokens). This file is intentionally NOT landing-page-only: AuthLayout.jsx
+ * (sign-in/sign-up) duplicates the nav markup against these exact classes,
+ * and PerformancePage.jsx imports LandingNav/LandingFooter as components
+ * plus reuses .ld-section/.ld-section-head/.ld-btn directly — so everything
+ * in this file must keep working for those two pages too, not just Landing.
+ * All landing-page-only section content (hero, how-it-works, proof,
+ * platform, pricing, faq, final CTA) lives in ./landing/landing.css instead.
+ * Desktop-first; minimal responsive fallbacks at the bottom. */
 
-.rd.ld { scroll-behavior: smooth; }
 .rd.ld main { display: block; }
-/* No extra scroll-margin needed: every section already reserves >=64px of its
- * own top padding (matching the sticky nav's height, same trick .ld-hero
- * uses) so snapping straight to a section's true top never hides content
- * under the nav. */
-.rd.ld section { scroll-margin-top: 0; }
+.rd.ld section { scroll-margin-top: 64px; }
 
-/* Scroll-by-section: toggled only while the landing page is mounted (see
- * LandingPage's useEffect, which adds/removes this class on <html> — never
- * applied globally, so the rest of the app's pages are unaffected). Each
- * direct child of <main> (hero header + every section) is a snap point. */
-html.ld-snap { scroll-snap-type: y mandatory; }
-.rd.ld main > * { scroll-snap-align: start; }
-@media (prefers-reduced-motion: reduce) { html.ld-snap { scroll-snap-type: none; } }
-
-/* ── Nav ────────────────────────────────────────────────────────────────── */
-.rd .ld-nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 36px; height: 64px; padding: 0 36px; background: rgba(10,14,21,0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); box-shadow: 0 1px 24px rgba(0,0,0,0.35); }
+/* ── Nav (shared: Landing + AuthLayout) ──────────────────────────────────── */
+.rd .ld-nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 36px; height: 64px; padding-inline: 36px; background: rgba(10,14,21,0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-block-end: 1px solid var(--line); box-shadow: 0 1px 24px rgba(0,0,0,0.35); transition: background-color .25s ease, box-shadow .25s ease; }
+/* Once scrolled past the hero, the nav needs to hold its own against
+ * whatever content is running underneath it — a touch more opacity and a
+ * deeper shadow read as "elevated over content" rather than "floating over
+ * empty hero space." */
+.rd .ld-nav.scrolled { background: rgba(10,14,21,0.95); box-shadow: 0 4px 32px rgba(0,0,0,0.5); }
 .rd .ld-nav-logo { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--ink); }
 .rd .ld-logo-mark { width: 32px; height: 36px; display: block; filter: drop-shadow(0 0 8px rgba(59,130,246,0.45)); }
 .rd .ld-logo-mark.sm { width: 26px; height: 30px; }
 .rd .ld-logo-text { font-size: 17px; font-weight: 600; letter-spacing: -0.012em; }
 .rd .ld-nav-links { display: flex; gap: 4px; }
 .rd .ld-nav-links a { position: relative; padding: 8px 14px; font-size: 13.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; transition: color .15s; }
-.rd .ld-nav-links a::after { content: ''; position: absolute; left: 50%; right: 50%; bottom: 2px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--blue-2), var(--blue)); transition: left .18s ease, right .18s ease; }
+.rd .ld-nav-links a::after { content: ''; position: absolute; inset-inline: 50%; bottom: 2px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--blue-2), var(--blue)); transition: inset-inline .18s ease; }
 .rd .ld-nav-links a:hover { color: var(--ink); }
-.rd .ld-nav-links a:hover::after { left: 14px; right: 14px; }
-.rd .ld-nav-ctas { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.rd .ld-nav-links a:hover::after { inset-inline: 14px; }
+.rd .ld-nav-links a:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; border-radius: 4px; }
+.rd .ld-nav-logo:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 3px; border-radius: 6px; }
+.rd .ld-nav-ctas { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
 
-/* ── Buttons (landing-local; mirrors .btn but with marketing sizing) ─────── */
-.rd .ld-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 18px; border-radius: 7px; font-size: 13.5px; font-weight: 600; font-family: var(--sans); text-decoration: none; cursor: pointer; border: 1px solid var(--line-2); color: var(--ink); background: transparent; transition: all .15s; white-space: nowrap; }
+/* ── Buttons (marketing sizing; landing/auth/performance share these) ───── */
+.rd .ld-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding-inline: 18px; border-radius: 7px; font-size: 13.5px; font-weight: 600; font-family: var(--sans); text-decoration: none; cursor: pointer; border: 1px solid var(--line-2); color: var(--ink); background: transparent; transition: all .15s; white-space: nowrap; touch-action: manipulation; }
 .rd .ld-btn.ghost:hover { border-color: var(--ink-3); background: var(--bg-2); }
 .rd .ld-btn.primary { background: linear-gradient(135deg, var(--blue-2), var(--blue)); border-color: var(--blue); color: #fff; box-shadow: 0 4px 20px -6px rgba(59,130,246,0.6); }
 .rd .ld-btn.primary:hover { background: linear-gradient(135deg, #7dabfb, var(--blue-2)); border-color: var(--blue-2); box-shadow: 0 6px 26px -6px rgba(59,130,246,0.75); transform: translateY(-1px); }
-.rd .ld-btn.lg { height: 46px; padding: 0 26px; font-size: 14.5px; border-radius: 8px; }
+/* Press feedback — hover alone never fires on touch, so without this,
+ * mobile taps on the biggest CTAs on the page give zero visual response. */
+.rd .ld-btn:active { transform: scale(0.97); transition-duration: .08s; }
+.rd .ld-btn:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .rd .ld-btn:active { transform: none; } }
+.rd .ld-btn.lg { height: 46px; padding-inline: 26px; font-size: 14.5px; border-radius: 8px; }
 
-/* ── Hero: full-bleed canvas behind a centered thesis ────────────────────── */
-/* Fill exactly what's left under the sticky 64px nav, on any screen — dvh
- * keeps mobile browser chrome (address bar show/hide) from leaving gaps. */
-/* Hero's true document position is right after the 64px nav, so a plain
- * scroll-snap-align:start would pull it to scrollY=64 (aligning ITS OWN top
- * to the viewport) instead of the scrollY=0 it was designed for (nav in its
- * natural spot + Hero filling the rest) — the -64px cancels that offset. */
-/* Every vertical gap below is clamp(floor, calc(floor + (100vh - 500px) *
- * factor), ceiling) — a straight-line interpolation that is exactly `floor`
- * at a 500px-tall viewport, exactly `ceiling` (== the original fixed value,
- * so tall/desktop screens are pixel-identical to before) at 900px, and
- * anything in between scales linearly with the ACTUAL viewport height. No
- * guessed breakpoint number — it degrades continuously for whatever screen
- * it's actually rendered on. factor = (ceiling-floor)/400 per property. */
-/* height (not min-height) + overflow-y:auto is a hard guarantee: this box can
- * never be taller than the screen, full stop, regardless of actual device
- * size — if the compressed content (below) still doesn't fit some extreme
- * viewport, it scrolls WITHIN this box instead of pushing the next section's
- * content into view. Belt-and-suspenders alongside the vh-scaled spacing. */
-.rd .ld-hero { position: relative; height: calc(100vh - 64px); height: calc(100dvh - 64px); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; overflow-x: hidden; padding: clamp(16px, calc(16px + (100vh - 500px) * 0.12), 64px) 24px; text-align: center; scroll-margin-top: 64px; }
-.rd .ld-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.rd .ld-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 900px 600px at 50% 38%, rgba(10,14,21,0) 0%, rgba(10,14,21,0.55) 72%, var(--bg) 100%); }
-.rd .ld-hero-inner { position: relative; z-index: 2; max-width: 780px; width: 100%; }
-.rd .ld-eyebrow { display: inline-flex; align-items: center; gap: 18px; font-size: clamp(13px, 1.6vw, 12px); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-2); margin-bottom: clamp(12px, calc(12px + (100vh - 500px) * 0.06), 36px); }
-.rd .ld-eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); flex-shrink: 0; }
-.rd .ld-thesis { margin: clamp(0px, calc((100vh - 500px) * 0.03), 12px) 32px clamp(12px, calc(12px + (100vh - 500px) * 0.09), 48px); font-size: clamp(32px, 6.4vw, 72px); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
-.rd .g { background: linear-gradient(100deg, #a5f3fc, #22d3ee 40%, #3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.rd .ld-hero-sub { margin: 0 auto clamp(12px, calc(12px + (100vh - 500px) * 0.125), 62px); max-width: 540px; font-size: clamp(14.5px, 2.2vw, 16.5px); line-height: 1.6; color: var(--ink-2); position: relative; z-index: 2; }
-.rd .ld-hero-ctas { position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
-.rd .ld-hero-ctas .ld-btn { flex: 0 1 auto; }
-.rd .ld-scrollcue { position: relative; z-index: 2; margin-top: clamp(8px, calc(8px + (100vh - 500px) * 0.165), 74px); color: var(--ink-3); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.rd .ld-scrollcue .chev { width: 12px; height: 12px; border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3); transform: rotate(45deg); animation: ldBob 2s ease-in-out infinite; }
-@keyframes ldBob { 0%, 100% { transform: rotate(45deg) translate(0,0); } 50% { transform: rotate(45deg) translate(3px,3px); } }
-@media (max-width: 620px) {
-  .rd .ld-hero { padding: 48px 20px; }
-  .rd .ld-eyebrow { margin-bottom: 24px; text-align: center; }
-  .rd .ld-hero-sub { margin-bottom: 36px; }
-  .rd .ld-hero-ctas { gap: 10px; }
-  .rd .ld-hero-ctas .ld-btn { width: 100%; }
-  .rd .ld-scrollcue { margin-top: 38px; }
-}
-@media (prefers-reduced-motion: reduce) { .rd .ld-scrollcue .chev { animation: none; } }
-
-/* ── Decorative ticker (aria-hidden, illustrative — see JS comment) ──────── */
-.rd .ld-tape { position: relative; z-index: 2; margin-top: clamp(8px, calc(8px + (100vh - 500px) * 0.12), 56px); width: 100%; max-width: 840px; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
-.rd .ld-tape-track { display: flex; gap: 26px; white-space: nowrap; font-family: var(--mono, monospace); font-size: 11px; color: var(--ink-3); animation: ldTape 34s linear infinite; opacity: 0.8; }
-.rd .ld-tape-item.up { color: var(--green); }
-.rd .ld-tape-item.down { color: var(--red); }
-@keyframes ldTape { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) { .rd .ld-tape-track { animation: none; } }
-
-/* ── "How it works" engine scene: 4 bordered panels ──────────────────────
- * Deliberately no filter:/backdrop-filter: on anything that animates
- * infinitely (Panel 2's net pulse) — this codebase has real Chrome
- * GPU-compositing "ghost smear" history from that exact combination. */
-/* Full-bleed: was max-width:1180px + margin:0 auto (the whole page-container
- * cap lived here, not on any ancestor). Inner content is capped/centered on
- * .eng-panels instead (max-width:1600px below) so the section's own edge-to-
- * edge padding still applies underneath that cap. */
-/* Top padding (40) is deliberately less than the head->scene gap (68) below —
- * was 64px, reading as a large empty void above the eyebrow at this section's
- * full-viewport min-height. Bottom (28) was already tight (16px) rather than
- * cavernous; nudged up slightly for a "comfortable" close instead of reducing
- * further, since there wasn't excess there to remove. */
-/* scroll-margin-top:64px — same fix as .ld-hero, for the same reason: the
- * site-wide invariant this depends on (landing.css:7-11) is "every section's
- * own top padding is >=64px, so snapping to its true top never hides content
- * under the sticky nav." Reducing this section's top padding to 40px (the
- * FIX-2 rhythm pass) broke that invariant — the nav then overlapped 24px
- * into the eyebrow/heading, making the section look mis-landed / short.
- * This decouples the snap-position compensation from the padding value so
- * it holds regardless of future padding changes, instead of just reverting
- * the padding back to >=64px.
- * NOT set inline below — .rd.ld section (line 11, specificity 0-2-1) beats
- * .rd .ld-scene (specificity 0-2-0) for the SAME property, so a declaration
- * here would be silently overridden back to 0. .rd .ld-hero never hit this
- * because .ld-hero is a <header>, which the section-tag selector can't
- * match at all. Bumped to a dedicated, unambiguously higher-specificity
- * rule instead of just tacking on more classes here. */
-/* Same clamp(floor, calc(floor + (100vh - 500px)*factor), ceiling) linear
- * interpolation as .ld-hero above (500px viewport -> floor, 900px -> ceiling
- * == original fixed value). See that comment block for the full rationale. */
-/* height (not min-height) + overflow-y:auto — same hard guarantee as
- * .ld-hero above: this box physically cannot exceed the screen, so the next
- * section's heading can never bleed into view underneath it. If the
- * vh-scaled content below still doesn't fit some extreme viewport, IT
- * scrolls internally instead of the section growing past the screen. */
-.rd .ld-scene { position: relative; width: 100%; padding: clamp(6px, calc(6px + (100vh - 500px) * 0.035), 20px) clamp(24px, 4vw, 72px) clamp(12px, calc(12px + (100vh - 500px) * 0.09), 48px); border-top: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; height: calc(100vh - 64px); height: calc(100dvh - 64px); display: flex; flex-direction: column; justify-content: center; }
-.rd.ld section.ld-scene { scroll-margin-top: 64px; }
-.rd .ld-scene::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 900px 700px at 50% 0%, rgba(59,130,246,0.09), transparent 65%), radial-gradient(ellipse 1100px 500px at 50% 65%, rgba(59,130,246,0.07), transparent 70%); pointer-events: none; }
-/* max-width 740 (was 660) so the larger subtitle below wraps across two
- * balanced lines instead of an awkward split; margin-bottom 68 (was 14) is
- * the head->scene gap FIX 2 targets. */
-.rd .ld-scene-head { position: relative; text-align: center; max-width: 740px; margin: 0 auto clamp(12px, calc(12px + (100vh - 500px) * 0.115), 58px); }
-.rd .ld-scene-head .tag { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); }
-.rd .ld-scene-head h2 { margin: 0 0 clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); font-size: clamp(34px, 3.2vw, 50px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
-.rd .ld-scene-head p { margin: clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px) 16px; font-size: clamp(15px, 1.15vw, 16px); color: var(--ink-2); line-height: 1.5; text-wrap: balance; }
-
-/* minmax(150px, ...) floors the chips column — without it, once the other
- * 4 panel columns hit their own text/content min-width they stop shrinking,
- * so the flexible 0.62fr share absorbs ALL further narrowing alone and the
- * chips column collapses toward zero width (clipping every chip's text)
- * well before the 780px mobile breakpoint takes over. */
-/* Inner content cap so the now-full-bleed section doesn't stretch the grid
- * absurdly wide on ultrawide displays — column ratios untouched, the grid
- * just has more (or, above 1600px, a capped amount of) room to grow into. */
-.rd .eng-panels { position: relative; width: 100%; max-width: 1600px; margin: 0 auto; display: grid; grid-template-columns: minmax(150px, 0.62fr) 1fr 1fr 1fr 1fr; column-gap: 14px; align-items: stretch; }
-/* Decorative connective SVG (EngineConnectors.jsx) — absolute so it's removed
- * from grid flow (doesn't affect column sizing). z-index:10 paints it ABOVE
- * every card (cards + ticker cloud sit at z-index:1) — was z-index:0 (under
- * them), which clipped every curve at each card's edge, leaving only the
- * gap fragments visible. Chose "above everything" over "above background,
- * below text" because the latter needs each card's background split into
- * its own DOM layer (a card-structure change, out of scope here); curves
- * are thin/translucent and — per the Fix 2 pass — terminate at card EDGES
- * rather than crossing card interiors, so overlap with real text is
- * minimal. pointer-events:none (already set) keeps it from ever
- * intercepting hover regardless of stacking. */
-.rd .eng-connectors { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: var(--blue-2); }
-.rd .eng-panel { position: relative; display: flex; flex-direction: column; z-index: 1; }
-/* Header lives in its own floating pill above the card (see .eng-panel-head
- * below), not inside it — matches the reference's separate header-pill +
- * arrow-connector row sitting above 4 fully independent bordered cards. */
-.rd .eng-panel-pillrow { display: flex; justify-content: center; margin-bottom: clamp(4px, calc(4px + (100vh - 500px) * 0.025), 14px); }
-.rd .eng-panel-head { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 999px; padding: clamp(4px, calc(4px + (100vh - 500px) * 0.0125), 9px) 20px; white-space: nowrap; }
-.rd .eng-panel-head .n { font-family: var(--mono, monospace); font-size: 13px; font-weight: 800; color: var(--blue-2); }
-.rd .eng-panel-head .t { font-size: 12.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
-.rd .eng-panel-arrow { position: absolute; top: 20px; right: -17px; z-index: 6; color: var(--blue-2); font-size: 18px; font-weight: 700; line-height: 0; }
-/* Real, always-visible border: 1px solid var(--line-2) on every edge, at
- * rest, no hover gate. The previous pass made a border-box gradient the ONLY
- * border color (border:1px solid transparent) — with nothing else painting
- * that ring, its own near-zero alpha (down to 2% white at the bottom) was
- * indistinguishable from the page background. Fixed by keeping a real solid
- * border as the guaranteed baseline, and adding the "brighter top, fading
- * down" enhancement as an independent inset box-shadow layered on top of it
- * — a separate property that can never zero out the base border. */
-.rd .eng-panel-card {
-  background:
-    radial-gradient(ellipse 140% 55% at 50% 0%, rgba(255,255,255,0.05), transparent 65%) padding-box,
-    var(--panel) padding-box;
-  border: 1px solid var(--line-2);
-  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.22), 0 20px 44px -24px rgba(59,130,246,0.32);
-  border-radius: 10px; padding: clamp(6px, calc(6px + (100vh - 500px) * 0.03), 18px) 16px clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); display: flex; flex-direction: column; min-height: clamp(130px, calc(130px + (100vh - 500px) * 0.325), 260px); flex: 1;
-}
-/* justify-content:center — when align-items:stretch (.eng-panels) makes a
- * card taller than its content needs (driven by the tallest sibling, e.g.
- * the ticker cloud), content used to sit at the top with all the extra
- * stretched height as dead space below it. Centering it as a group instead
- * fills the card evenly. Shared by all 4 cards. */
-.rd .eng-panel-body { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: center; }
-/* min-height reserves 2 lines uniformly — at narrower widths the longest
- * caption ("Daily signal decision (BUY/HOLD/SELL)") wraps while shorter
- * ones don't; without a fixed reservation the bordered cards above (all
- * equal-height via .eng-panels' align-items:stretch) would drift out of
- * alignment since the foot's real height differs panel to panel. */
-.rd .eng-panel-foot { text-align: center; margin-top: clamp(4px, calc(4px + (100vh - 500px) * 0.025), 14px); font-size: 12px; line-height: 1.4; min-height: calc(1.4em * 2); font-weight: 600; letter-spacing: 0.03em; color: var(--ink-2); }
-
-/* ── Chips zone: decorative ticker cluster + funnel, its own column to the
- * left of Panel 1 (not inside it) — matches the reference's separate
- * "universe" zone feeding into the Screen panel. ─────────────────────── */
-/* flex:1 wrap around the cluster absorbs whatever extra height
- * align-items:stretch imposes (to match the tallest panel card), so
- * .eng-panel-foot still lands at the same baseline as the other 4 zones'
- * captions instead of floating right after the cluster's own fixed height. */
-.rd .eng-chips-zone { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding-top: clamp(12px, calc(12px + (100vh - 500px) * 0.1), 52px); }
-.rd .eng-chips-cols-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; width: 100%; }
-/* Height scales with viewport (clamp, same rationale as the rest of this
- * section) instead of a fixed 332px — safe to resize because the anchor box
- * this feeds (EngineConnectors.jsx's flow-curve origins) is measured live via
- * useAnchors' ResizeObserver, not hardcoded against this number.
- * Two equal columns split the width. */
-.rd .eng-chips-cols { position: relative; height: clamp(130px, calc(130px + (100vh - 500px) * 0.505), 332px); width: 100%; display: flex; gap: 6px; }
-.rd .eng-chip-col { position: relative; flex: 1; height: 100%; overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%); }
-/* Duplicated-track infinite scroll: the track holds the chip array TWICE in
- * a row; translateY(-50%) always equals exactly one copy's height (both
- * copies are identical), so the loop point is invisible. transform only —
- * no JS/rAF/scroll listeners. */
-.rd .eng-chip-track { display: flex; flex-direction: column; animation-name: eng-chip-scroll; animation-timing-function: linear; animation-iteration-count: infinite; }
-@keyframes eng-chip-scroll { from { transform: translateY(0); } to { transform: translateY(-50%); } }
-.rd .eng-chips-zone:hover .eng-chip-track { animation-play-state: paused; }
-@media (prefers-reduced-motion: reduce) {
-  .rd .eng-chip-track { animation: none; }
-}
-/* Chip = small logo tile + ticker text, normal flex-flow now (not
- * absolutely positioned) — marginLeft/marginBottom per chip (SCREEN_CHIPS
- * data) give irregular horizontal offset and vertical gap. */
-.rd .eng-scr-chip { display: flex; align-items: center; gap: 4px; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line-2); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; transform: rotate(var(--r)) scale(var(--s)); flex-shrink: 0; }
-.rd .eng-scr-chip-logo { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex-shrink: 0; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--line-2); overflow: hidden; }
-.rd .eng-scr-chip-logo img { width: 100%; height: 100%; object-fit: contain; }
-
-/* ── Panel 1: Screen ──────────────────────────────────────────────────── */
-.rd .eng-scr-rows { display: flex; flex-direction: column; gap: clamp(5px, calc(5px + (100vh - 500px) * 0.0425), 22px); }
-.rd .eng-scr-row { position: relative; display: flex; align-items: flex-start; gap: 10px; }
-.rd .eng-scr-row-text { flex: 1; }
-.rd .eng-scr-row-stub { position: absolute; right: 0; top: 13px; width: 14px; height: 2px; background: var(--c); opacity: 0.8; }
-.rd .eng-scr-icon-badge { display: flex; align-items: center; justify-content: center; width: clamp(20px, calc(20px + (100vh - 500px) * 0.02), 28px); height: clamp(20px, calc(20px + (100vh - 500px) * 0.02), 28px); border-radius: 7px; background: color-mix(in srgb, var(--c) 32%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); flex-shrink: 0; }
-.rd .eng-scr-icon { width: 15px; height: 15px; }
-.rd .eng-scr-row-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
-.rd .eng-scr-row-desc { margin-top: 2px; font-size: 11px; color: var(--ink-3); }
-
-/* ── Panel 2: Score (neural net) ──────────────────────────────────────── */
-/* max-height caps this at short viewports — width:100% + aspect-ratio alone
- * sizes it purely off the grid COLUMN's width, with no relationship to
- * available vertical space, so on a short-but-wide viewport it could still
- * render taller than the screen. The cap makes width follow height (via the
- * same aspect-ratio) once vh gets tight, instead of the reverse. Ceiling
- * (450px) is set high enough to never bind at normal/tall viewport widths. */
-.rd .eng-net-svg { width: 100%; height: auto; aspect-ratio: 460 / 420; display: block; max-height: clamp(110px, calc(110px + (100vh - 500px) * 0.85), 450px); }
-/* Edges dimmed to ~15% so nodes visually dominate the mesh (was 34%). */
-.rd .net-edge { stroke: rgba(139,178,255,0.15); stroke-width: 2; fill: none; }
-.rd .net-edge.pulse { stroke: var(--blue-2); stroke-width: 1.6; stroke-dasharray: 14 var(--gap); animation-name: netPulseDraw; animation-timing-function: linear; animation-iteration-count: infinite; }
-@keyframes netPulseDraw { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--off); } }
-/* Static glow disc behind each node — constant feGaussianBlur (never
- * animated), only its own opacity is set per layer, no keyframe on it. */
-.rd .net-node-glow { pointer-events: none; }
-.rd .net-node-glow.layer-in { opacity: 0.12; }
-.rd .net-node-glow.layer-hid { opacity: 0.2; }
-.rd .net-node-glow.layer-out { opacity: 0.32; }
-/* Opacity gradient across layers: input dimmest, output brightest — three
- * duration/timing-identical keyframe variants so each layer pulses within
- * its own ceiling instead of sharing one range. */
-.rd .net-node { fill: url(#netNodeGlow); animation-duration: 3.4s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
-.rd .net-node.layer-in { animation-name: netNodePulseIn; }
-.rd .net-node.layer-hid { animation-name: netNodePulseHid; }
-.rd .net-node.layer-out { animation-name: netNodePulseOut; }
-@keyframes netNodePulseIn { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.55; } }
-@keyframes netNodePulseHid { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.8; } }
-@keyframes netNodePulseOut { 0%, 100% { opacity: 0.78; } 50% { opacity: 1; } }
-
-@media (prefers-reduced-motion: reduce) {
-  .rd .net-edge.pulse,
-  .rd .net-node, .rd .net-node.layer-in, .rd .net-node.layer-hid, .rd .net-node.layer-out { animation: none; }
-}
-
-/* ── Panel 3: Signal ──────────────────────────────────────────────────── */
-.rd .eng-sig-rows { display: flex; flex-direction: column; gap: clamp(3px, calc(3px + (100vh - 500px) * 0.0175), 10px); }
-.rd .eng-sig-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-left-width: 3px; border-radius: 9px; padding: clamp(3px, calc(3px + (100vh - 500px) * 0.015), 9px) 12px; }
-.rd .eng-sig-row.buy { border-left-color: var(--green); }
-.rd .eng-sig-row.hold { border-left-color: var(--gold); }
-.rd .eng-sig-row.sell { border-left-color: var(--red); }
-/* Full-color logos in a dark translucent chip instead of a flat white plate
- * (the white background was washing the logos out against the dark card). */
-.rd .eng-sig-logo { width: clamp(16px, calc(16px + (100vh - 500px) * 0.02), 24px); height: clamp(16px, calc(16px + (100vh - 500px) * 0.02), 24px); padding: 3px; border-radius: 8px; object-fit: contain; background: rgba(255,255,255,0.06); border: 1px solid var(--line-2); flex-shrink: 0; }
-.rd .eng-sig-tk { flex: 1; font-size: 13px; font-weight: 800; color: var(--ink); }
-.rd .eng-sig-pill { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 5px; letter-spacing: 0.04em; }
-.rd .eng-sig-row.buy .eng-sig-pill { background: var(--green-bg); color: var(--green); }
-.rd .eng-sig-row.hold .eng-sig-pill { background: rgba(245,166,35,0.16); color: var(--gold); }
-.rd .eng-sig-row.sell .eng-sig-pill { background: var(--red-bg); color: var(--red); }
-
-/* ── Panel 4: Track ───────────────────────────────────────────────────── */
-/* max-height cap — same rationale as .eng-net-svg above (aspect-ratio alone
- * only responds to column width, not to available vertical space). */
-.rd .eng-trk-chart { width: 100%; height: auto; aspect-ratio: 300 / 120; display: block; margin-bottom: clamp(2px, calc(2px + (100vh - 500px) * 0.01), 6px); max-height: clamp(55px, calc(55px + (100vh - 500px) * 0.3625), 200px); }
-.rd .eng-trk-legend { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-3); margin-bottom: clamp(4px, calc(4px + (100vh - 500px) * 0.03), 16px); }
-.rd .eng-trk-legend .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
-.rd .eng-trk-legend .dot.buy { background: var(--green); }
-.rd .eng-trk-legend .dot.bench { background: var(--ink-3); }
-.rd .eng-trk-stats { display: flex; flex-direction: column; gap: clamp(3px, calc(3px + (100vh - 500px) * 0.0175), 10px); }
-.rd .eng-trk-stat { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: clamp(3px, calc(3px + (100vh - 500px) * 0.015), 9px) 12px; }
-.rd .eng-trk-stat .k { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; }
-.rd .eng-trk-stat .v { font-size: 13px; font-weight: 800; color: var(--green); white-space: nowrap; }
-
-@media (max-width: 780px) {
-  /* height:auto + overflow visible — the base rule's hard one-screen cap
-   * (added for the multi-column desktop layout) is wrong here: below 780px
-   * the panels stack into a single tall column by design (below) and are
-   * meant to be part of the page's normal scroll, not squeezed into one
-   * screen with an internal scrollbar. */
-  .rd .ld-scene { height: auto; overflow-y: visible; padding: 64px 20px 32px; }
-  /* Every card already carries its own full 4-side border by default now
-   * (each of the 5 zones is a fully independent rounded box, not a merged
-   * strip) — stacking to one column needs no border surgery, just drop the
-   * column count and hide the arrows (there's no gap for them to sit in). */
-  .rd .eng-panels { grid-template-columns: 1fr; }
-  .rd .eng-panel-card { min-height: 0; }
-  .rd .eng-panel-arrow { display: none; }
-  .rd .eng-chips-zone { padding-top: 0; align-items: flex-start; }
-  /* Connective SVG (funnel + flow lines) only makes sense spanning the
-   * multi-column layout — hide once cards stack to one column. */
-  .rd .eng-connectors { display: none; }
-}
-/* ── Sections (shared scaffolding) ────────────────────────────────────────
- * .ld-section is full-bleed (padding-inline as gutter, no max-width of its
- * own); .ld-section-inner is the actual content container (max-width 1600,
- * centered) — same two-layer pattern as .ld-scene / .eng-panels. The divider
- * (border-top) lives on .ld-section-inner, NOT the outer full-bleed section,
- * so its rendered width is exactly 1600px, matching .eng-panels — the old
- * bug was the divider rendering at a specific WRONG width (1180px, the
- * page's original container), not an unbounded one, so the fix keeps it a
- * specific width, just the same one .eng-panels uses. (Note: .ld-scene's
- * own top border, separating Hero from How-it-works, is a different,
- * untouched border that still spans the full viewport — not addressed here,
- * out of this pass's scope.) */
+/* ── Sections (shared scaffolding — Landing's Proof/Platform/Pricing/FAQ
+ * AND PerformancePage both build on this two-layer pattern): .ld-section
+ * is full-bleed (padding-inline as gutter, no max-width of its own);
+ * .ld-section-inner is the actual content container (max-width 1600,
+ * centered), divider lives on the inner element so its rendered width
+ * matches content, not the raw viewport. ─────────────────────────────── */
 .rd .ld-section { width: 100%; padding-inline: clamp(24px, 4vw, 72px); }
-.rd .ld-section-inner { max-width: 1600px; margin: 0 auto; width: 100%; padding: 84px 0; border-top: 1px solid var(--line); }
+.rd .ld-section-inner { max-width: 1600px; margin-inline: auto; width: 100%; padding-block: clamp(64px, 9vw, 108px); border-block-start: 1px solid var(--line); }
 .rd .ld-section.narrow .ld-section-inner { max-width: 860px; }
 .rd .ld-section-head { max-width: 640px; margin-bottom: 44px; }
-.rd .ld-section-head .tag { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
-.rd .ld-section-head h2 { margin: 0 0 12px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); line-height: 1.18; }
+.rd .ld-section-head .tag { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px; }
+.rd .ld-section-head h2 { margin: 0 0 12px; font-size: clamp(28px, 3.4vw, 38px); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); line-height: 1.18; }
 .rd .ld-section-head p { margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--ink-2); }
-.rd .ld-placeholder-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 4px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: var(--gold); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: 1px; }
-
-/* ── Proof ──────────────────────────────────────────────────────────────── */
-.rd .ld-proof-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.rd .ld-proof-cell { background: var(--panel); padding: 26px 28px; }
-.rd .ld-proof-cell .v { font-size: 34px; font-weight: 600; letter-spacing: -0.015em; color: var(--ink); }
-.rd .ld-proof-cell .k { margin-top: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; color: var(--ink-3); }
-.rd .ld-proof-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 22px; }
-.rd .ld-proof-foot .note { font-size: 12px; color: var(--ink-3); line-height: 1.5; max-width: 560px; }
-
-/* ── Platform: the REAL Signals/Market/Portfolio component CSS (imported from
- * signals.css / redesign.css / portfolio.css), just scaled to fit a device
- * frame — see LandingPage.jsx header comment. ──────────────────────────── */
-.rd .ld-shots { position: relative; }
-.rd .ld-shots-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; align-items: start; }
-.rd .ld-shots-side { display: flex; flex-direction: column; gap: 22px; }
-.rd .ld-device { border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; background: var(--panel); box-shadow: 0 26px 60px -22px rgba(0,0,0,0.5); }
-.rd .ld-device-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: var(--panel-2); border-bottom: 1px solid var(--line); }
-.rd .ld-device-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--bg-3); }
-.rd .ld-device-bar .u { margin-left: 8px; font-size: 10.5px; color: var(--ink-3); font-family: var(--mono, monospace); }
-.rd .ld-device-body { padding: 16px; }
-.rd .ld-device figcaption { padding: 12px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
-.rd .ld-device figcaption b { color: var(--ink); display: block; margin-bottom: 2px; font-size: 12.5px; }
-/* Signals cockpit: real .sigcard/.sc-* from signals.css, stacked. */
-.rd .ld-device-body .sigcard { margin-bottom: 10px; }
-.rd .ld-device-body .sigcard:last-child { margin-bottom: 0; }
-/* Market: real .idx-card in a compact 3-up row (real .indices is a 5-up grid meant for the full page). */
-.rd .ld-indices-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-.rd .ld-indices-mini .idx-card { padding: 10px 11px 9px; }
-.rd .ld-indices-mini .idx-card .spark { display: none; }
-/* Portfolio: real .nw-hero, narrowed to 2 chips instead of the full page's 4. */
-.rd .ld-nw-mini { margin-bottom: 0; flex-direction: column; align-items: stretch; }
-.rd .ld-nw-mini .nw-chips { grid-template-columns: repeat(2, 1fr); flex: none; }
-@media (max-width: 1020px) {
-  .rd .ld-shots-grid { grid-template-columns: 1fr; }
-}
-
-/* ── Pricing ────────────────────────────────────────────────────────────── */
-.rd .ld-pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-items: stretch; }
-.rd .ld-plan { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 28px 26px; }
-.rd .ld-plan.featured { background: var(--panel-2); border-color: rgba(59,130,246,0.45); box-shadow: 0 18px 60px -30px rgba(59,130,246,0.45); }
-.rd .ld-plan-flag { position: absolute; top: -11px; left: 24px; padding: 3px 10px; border-radius: 999px; background: var(--blue); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-.rd .ld-plan-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
-.rd .ld-plan-price { margin-top: 12px; font-size: 36px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
-.rd .ld-plan-price span { margin-left: 5px; font-size: 13px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; }
-.rd .ld-plan-blurb { margin-top: 6px; font-size: 13px; color: var(--ink-2); }
-.rd .ld-plan ul { margin: 20px 0 26px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.rd .ld-plan li { position: relative; padding-left: 22px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
-.rd .ld-plan li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 700; font-size: 12px; }
-.rd .ld-plan .ld-btn { width: 100%; }
-
-/* ── FAQ ────────────────────────────────────────────────────────────────── */
-.rd .ld-faq { display: flex; flex-direction: column; gap: 10px; }
-.rd .ld-faq-item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.rd .ld-faq-item summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 22px; font-size: 14.5px; font-weight: 600; color: var(--ink); cursor: pointer; list-style: none; transition: color .12s; }
-.rd .ld-faq-item summary::-webkit-details-marker { display: none; }
-.rd .ld-faq-item summary:hover { color: var(--blue-2); }
-.rd .ld-faq-caret { color: var(--ink-3); font-size: 12px; transition: transform .18s; flex-shrink: 0; }
-.rd .ld-faq-item[open] .ld-faq-caret { transform: rotate(180deg); }
-.rd .ld-faq-item p { margin: 0; padding: 0 22px 19px; font-size: 13.5px; line-height: 1.68; color: var(--ink-2); }
-
-/* ── Final CTA ──────────────────────────────────────────────────────────── */
-.rd .ld-final { position: relative; max-width: 1180px; margin: 0 auto; padding: 110px 36px; text-align: center; border-top: 1px solid var(--line); overflow: hidden; }
-.rd .ld-final::before { content: ''; position: absolute; left: 50%; bottom: -340px; transform: translateX(-50%); width: 760px; height: 560px; pointer-events: none; background: radial-gradient(ellipse at center, rgba(59,130,246,0.13) 0%, transparent 64%); }
-.rd .ld-final h2 { position: relative; margin: 0 0 14px; font-size: 38px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; color: var(--ink); }
-.rd .ld-final p { position: relative; margin: 0 0 30px; font-size: 14.5px; color: var(--ink-2); }
-.rd .ld-final .ld-btn { position: relative; }
+.rd .ld-placeholder-tag { display: inline-block; margin-inline-start: 6px; padding: 2px 8px; border-radius: 4px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: var(--gold); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: 1px; }
 
 /* ── Footer ─────────────────────────────────────────────────────────────── */
-.rd .ld-footer { border-top: 1px solid var(--line); background: var(--bg-2); }
-.rd .ld-footer-top { display: flex; align-items: center; justify-content: space-between; gap: 24px; max-width: 1180px; margin: 0 auto; padding: 30px 36px 0; }
+.rd .ld-footer { border-block-start: 1px solid var(--line); background: var(--bg-2); }
+.rd .ld-footer-top { display: flex; align-items: center; justify-content: space-between; gap: 24px; max-width: 1180px; margin-inline: auto; padding: 30px 36px 0; }
 .rd .ld-footer-brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
 .rd .ld-footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
-.rd .ld-footer-links a { font-size: 12.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; transition: color .12s; }
+.rd .ld-footer-links a { position: relative; padding-block-end: 3px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; transition: color .12s; }
+.rd .ld-footer-links a::after { content: ''; position: absolute; inset-inline: 50%; bottom: 0; height: 1.5px; border-radius: 2px; background: linear-gradient(90deg, var(--blue-2), var(--blue)); transition: inset-inline .18s ease; }
 .rd .ld-footer-links a:hover { color: var(--ink); }
-.rd .ld-footer-legal { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; max-width: 1180px; margin: 0 auto; padding: 18px 36px 30px; }
+.rd .ld-footer-links a:hover::after { inset-inline: 0; }
+.rd .ld-footer-links a:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 3px; border-radius: 3px; }
+.rd .ld-footer-legal { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; max-width: 1180px; margin-inline: auto; padding: 18px 36px 30px; }
 .rd .ld-disclaimer { margin: 0; max-width: 640px; font-size: 11.5px; line-height: 1.6; color: var(--ink-3); }
 .rd .ld-copy { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
 
-/* ── Auth pages (/sign-up) — centered Clerk card under the marketing nav ── */
+/* ── Auth pages (/sign-in, /sign-up) — centered Clerk card under the
+ * marketing nav. Untouched by the landing redesign; kept exactly as the
+ * shapes AuthLayout.jsx / SignUpPage.jsx already depend on. ────────────── */
 .rd.ld-auth { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
-/* .rd.ld prefix beats the generic `.rd.ld main { display: block }` above */
 .rd.ld .ld-auth-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 48px 24px 64px; }
 .rd .ld-auth-head { text-align: center; }
 .rd .ld-auth-head h1 { margin: 0 0 8px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .rd .ld-auth-head p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
 .rd .ld-auth-hint { font-size: 12.5px; color: var(--ink-3); }
 .rd .ld-auth-legal { max-width: 380px; margin: 0; text-align: center; font-size: 11.5px; line-height: 1.55; color: var(--ink-3); }
-/* Clerk mounts its card inside .cl-rootBox; keep it centered in the column. */
-.rd .ld-auth-main .cl-rootBox { margin: 0 auto; width: auto; }
-
-/* Sign-up two-column: plan explainer left, Clerk form right. */
+.rd .ld-auth-main .cl-rootBox { margin-inline: auto; width: auto; }
 .rd .ld-auth-grid { display: grid; grid-template-columns: minmax(0, 420px) auto; gap: 56px; align-items: start; justify-content: center; }
 .rd .ld-auth-form { display: flex; justify-content: center; }
 .rd .ld-auth-plans h2 { margin: 0 0 8px; font-size: 19px; font-weight: 700; letter-spacing: -0.015em; color: var(--ink); line-height: 1.3; }
@@ -442,24 +93,22 @@ html.ld-snap { scroll-snap-type: y mandatory; }
 .rd .ld-auth-tier-head .nm { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
 .rd .ld-auth-tier.featured .ld-auth-tier-head .nm { color: var(--blue-2); }
 .rd .ld-auth-tier-head .pr { font-size: 17px; font-weight: 600; color: var(--ink); }
-.rd .ld-auth-tier-head .pr em { font-style: normal; margin-left: 4px; font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.rd .ld-auth-tier-head .pr em { font-style: normal; margin-inline-start: 4px; font-size: 11px; font-weight: 500; color: var(--ink-3); }
 .rd .ld-auth-tier .bl { margin-top: 3px; font-size: 12px; color: var(--ink-2); }
 .rd .ld-auth-tier ul { margin: 9px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
-.rd .ld-auth-tier li { position: relative; padding-left: 18px; font-size: 11.5px; line-height: 1.45; color: var(--ink-2); }
-.rd .ld-auth-tier li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 700; font-size: 10.5px; }
+.rd .ld-auth-tier li { position: relative; padding-inline-start: 18px; font-size: 11.5px; line-height: 1.45; color: var(--ink-2); }
+.rd .ld-auth-tier li::before { content: '✓'; position: absolute; inset-inline-start: 0; color: var(--green); font-weight: 700; font-size: 10.5px; }
 @media (max-width: 980px) {
   .rd .ld-auth-grid { grid-template-columns: 1fr; gap: 40px; }
-  .rd .ld-auth-plans { order: 2; max-width: 420px; margin: 0 auto; }
+  .rd .ld-auth-plans { order: 2; max-width: 420px; margin-inline: auto; }
   .rd .ld-auth-form { order: 1; }
 }
 
-/* ── Responsive (basic only — desktop-first) ────────────────────────────── */
-@media (max-width: 1020px) {
-  .rd .ld-proof-grid { grid-template-columns: repeat(2, 1fr); }
-  .rd .ld-pricing { grid-template-columns: 1fr; }
-  .rd .ld-nav-links { display: none; }
-}
-@media (max-width: 620px) {
-  .rd .ld-proof-grid { grid-template-columns: 1fr; }
-  .rd .ld-proof-foot, .rd .ld-footer-top, .rd .ld-footer-legal { flex-direction: column; align-items: flex-start; }
+/* ── Responsive (shared nav — Landing's own burger/mobile-menu machinery
+ * lives in ./landing/landing.css; this just keeps AuthLayout's simpler
+ * nav, and the shared .ld-section rhythm, from overflowing at 320px). ── */
+@media (max-width: 640px) {
+  .rd .ld-nav { padding-inline: 16px; gap: 16px; }
+  .rd .ld-auth-hint { display: none; }
+  .rd .ld-footer-top, .rd .ld-footer-legal { flex-direction: column; align-items: flex-start; }
 }

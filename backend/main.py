@@ -781,6 +781,7 @@ def public_stats():
         "avg_yield": round(row["avg_ret"] * 100, 1) if row["avg_ret"] is not None else None,
         "avg_hold_days": round(row["avg_days"]) if row["avg_days"] is not None else None,
         "tickers_tracked": int(tickers or 0),
+        "as_of": _latest_price_date(),
     }
 
 

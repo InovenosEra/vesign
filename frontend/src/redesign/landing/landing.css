@@ -1,0 +1,414 @@
+/* ── VeSign landing page — section styles (rebuild) ─────────────────────────
+ * Everything here is scoped under `.rd .ld`. Tokens come only from
+ * redesign.css (see that file for the --bg/--ink/--green/etc. values) —
+ * nothing here introduces a new color outside a gradient interpolating
+ * between existing tokens. Logical properties (margin-inline,
+ * padding-inline, inset-inline-*, text-align: start/end) are used
+ * throughout instead of left/right so the whole page mirrors correctly
+ * under [dir="rtl"] with no section-by-section RTL overrides needed —
+ * the few genuine exceptions (canvas, tape direction, chevrons) are
+ * called out explicitly near the bottom of this file.
+ *
+ * Shared chrome (nav shell, buttons, .ld-section scaffolding, footer, auth
+ * pages) lives in ../landing.css, NOT here — this file is section-specific
+ * content only. See that file's header comment for why the split exists. */
+
+/* ── Motion base: one shared reveal recipe every section-scoped component
+ * uses (Hero excluded — hero.js js hero canvas is its own orchestrated
+ * moment). Respects reduced motion globally: with it on, everything is
+ * simply visible/final-state immediately, no transition at all. */
+.rd .ld [data-reveal], .rd .ld .ld-how-step, .rd .ld .ld-final {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .7s cubic-bezier(0.16,1,0.3,1), transform .7s cubic-bezier(0.16,1,0.3,1);
+}
+.rd .ld [data-reveal].visible, .rd .ld .ld-how-step.visible, .rd .ld .ld-final.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rd .ld [data-reveal], .rd .ld .ld-how-step, .rd .ld .ld-final {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────
+ * Full-bleed section under the sticky nav. min-height (not height/overflow
+ * hidden) — this design doesn't force sections to fit exactly one screen,
+ * so there's no hard cap needed; content simply flows. */
+.rd .ld-hero {
+  position: relative;
+  min-height: calc(100vh - 64px);
+  min-height: calc(100dvh - 64px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  overflow: hidden;
+  padding-block: clamp(48px, 8vh, 96px);
+  padding-inline: 24px;
+  text-align: center;
+  scroll-margin-top: 64px;
+}
+/* Canvas fills the hero but is deliberately never mirrored under RTL — a
+ * rising line reads as "up" regardless of writing direction, flipping it
+ * horizontally would just reverse the timeline for no benefit. */
+.rd .ld-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; direction: ltr; }
+.rd .ld-hero::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 900px 600px at 50% 38%, rgba(10,14,21,0) 0%, rgba(10,14,21,0.55) 72%, var(--bg) 100%);
+}
+.rd .ld-hero-inner { position: relative; z-index: 2; max-width: 820px; width: 100%; }
+.rd .ld-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin: 0 0 28px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--blue-2);
+}
+.rd .ld-eyebrow::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 10px var(--green); flex-shrink: 0;
+}
+.rd .ld-thesis {
+  margin: 0 0 26px;
+  font-size: clamp(38px, 6.2vw, 84px);
+  font-weight: 800; line-height: 1.04; letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.rd .g {
+  background: linear-gradient(100deg, var(--green) 0%, var(--blue-2) 55%, var(--blue) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.rd .ld-hero-sub {
+  margin: 0 auto 40px; max-width: 560px;
+  font-size: clamp(15px, 1.6vw, 17.5px); line-height: 1.65; color: var(--ink-2);
+  position: relative; z-index: 2;
+}
+.rd .ld-hero-ctas { position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
+.rd .ld-hero-ctas .ld-btn { flex: 0 1 auto; }
+.rd .ld-scrollcue {
+  position: relative; z-index: 2; margin-top: 56px;
+  color: var(--ink-3); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+/* Physical border-right/border-bottom (not inline/block) is deliberate: this
+ * is a "scroll down" chevron, a vertical indicator with no left/right
+ * meaning — border-inline-end flips to the LEFT side under RTL, turning a
+ * downward chevron into a sideways one. Same class of bug as the .ld-final
+ * centering glow above: logical properties are the wrong tool whenever the
+ * shape itself should look identical regardless of direction. */
+.rd .ld-scrollcue .chev {
+  width: 12px; height: 12px;
+  border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
+  transform: rotate(45deg); animation: ldBob 2s ease-in-out infinite;
+}
+@keyframes ldBob { 0%, 100% { transform: rotate(45deg) translate(0,0); } 50% { transform: rotate(45deg) translate(3px,3px); } }
+@media (prefers-reduced-motion: reduce) { .rd .ld-scrollcue .chev { animation: none; } }
+
+/* Decorative ticker tape — aria-hidden, illustrative. marquee direction is
+ * intentionally NOT mirrored under RTL (a ticker tape scrolling the same
+ * physical direction everywhere reads as more natural than one that
+ * reverses per layout direction); individual price figures inside stay
+ * `dir="ltr"` (set in Hero.jsx) since digits/signs must not mirror. */
+.rd .ld-tape {
+  position: relative; z-index: 2; margin-top: 44px; width: 100%; max-width: 860px; overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  direction: ltr;
+}
+.rd .ld-tape-track {
+  display: flex; gap: 28px; white-space: nowrap;
+  font-size: 11.5px; font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
+  color: var(--ink-3); animation: ldTape 36s linear infinite; opacity: 0.85;
+}
+.rd .ld-tape:hover .ld-tape-track { animation-play-state: paused; }
+@keyframes ldTape { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.rd .ld-tape-item.up { color: var(--green); }
+.rd .ld-tape-item.down { color: var(--red); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-tape-track { animation: none; } }
+@media (max-width: 640px) { .rd .ld-hero-ctas .ld-btn { width: 100%; } .rd .ld-hero-ctas { flex-direction: column; } }
+
+/* ── How it works — vertical scroll-driven narrative ────────────────────── */
+.rd .ld-how-steps {
+  position: relative;
+  list-style: none; margin: 0; padding: 0;
+  max-width: 880px; margin-inline: auto;
+  display: flex; flex-direction: column; gap: clamp(40px, 6vw, 72px);
+}
+/* Connecting line down the number column — pure CSS, no measurement: the
+ * column is a fixed inline-size so this only ever needs a fixed offset. */
+.rd .ld-how-steps::before {
+  content: ''; position: absolute; top: 30px; bottom: 30px;
+  inset-inline-start: 27px;
+  width: 1px; background: var(--line-2);
+}
+.rd .ld-how-step {
+  position: relative;
+  display: grid; grid-template-columns: 56px 1fr; gap: 24px;
+  align-items: start;
+}
+.rd .ld-how-num {
+  position: relative; z-index: 1;
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--line-2);
+  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+.rd .ld-how-body h3 { margin: 6px 0 8px; font-size: clamp(19px, 2.2vw, 24px); font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
+.rd .ld-how-body p { margin: 0; max-width: 560px; font-size: 14.5px; line-height: 1.65; color: var(--ink-2); }
+.rd .ld-how-visual { grid-column: 2; margin-top: 18px; }
+
+/* Step 1 — screen: 4x4 dot matrix, staggered fade/scale on reveal. */
+.rd .ld-how-screen { display: grid; grid-template-columns: repeat(4, 10px); gap: 8px; }
+.rd .ld-how-screen span {
+  width: 10px; height: 10px; border-radius: 3px; background: var(--bg-3);
+  opacity: 0; transform: scale(0.4);
+  transition: opacity .4s ease, transform .4s ease, background .4s ease;
+  transition-delay: calc(var(--i) * 45ms);
+}
+.rd .ld-how-step.visible .ld-how-screen span { opacity: 1; transform: scale(1); background: var(--blue-2); }
+.rd .ld-how-step.visible .ld-how-screen span:nth-child(3n) { background: var(--green); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-how-screen span { transition: none; opacity: 1; transform: none; background: var(--blue-2); } }
+
+/* Step 2 — score: 4 factor dots converging on a core, one subtle pulse. */
+.rd .ld-how-score { position: relative; display: flex; align-items: center; gap: 14px; height: 40px; }
+.rd .ld-how-score .f {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity .45s ease, transform .45s ease;
+  transition-delay: calc(var(--i) * 90ms);
+}
+.rd .ld-how-score .f-technicals { background: var(--blue-2); }
+.rd .ld-how-score .f-ml { background: var(--purple); }
+.rd .ld-how-score .f-analyst { background: var(--gold); }
+.rd .ld-how-score .f-health { background: var(--green); }
+.rd .ld-how-score .core {
+  width: 16px; height: 16px; border-radius: 50%; margin-inline-start: 6px;
+  background: var(--ink); box-shadow: 0 0 0 0 rgba(96,165,250,0.5);
+  opacity: 0; transform: scale(0.6);
+  transition: opacity .45s ease .4s, transform .45s ease .4s, box-shadow 1.8s ease-out .85s;
+}
+.rd .ld-how-step.visible .ld-how-score .f { opacity: 1; transform: translateY(0); }
+.rd .ld-how-step.visible .ld-how-score .core { opacity: 1; transform: scale(1); box-shadow: 0 0 0 10px rgba(96,165,250,0); }
+@media (prefers-reduced-motion: reduce) {
+  .rd .ld-how-score .f, .rd .ld-how-score .core { transition: none; opacity: 1; transform: none; box-shadow: none; }
+}
+
+/* Step 3 — signal: 3 abstract verdict bars (no ticker/company text — the
+ * copy already says "one BUY/SELL with the reasoning," the visual doesn't
+ * need to imply a specific real trade). */
+.rd .ld-how-signal { display: flex; flex-direction: column; gap: 8px; width: 160px; }
+.rd .ld-how-signal .row {
+  height: 8px; border-radius: 4px; background: var(--bg-3);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .5s cubic-bezier(0.16,1,0.3,1);
+}
+[dir="rtl"] .rd .ld-how-signal .row { transform-origin: right; }
+.rd .ld-how-signal .row.buy { background: var(--green); width: 100%; transition-delay: .05s; }
+.rd .ld-how-signal .row.hold { background: var(--gold); width: 68%; transition-delay: .18s; }
+.rd .ld-how-signal .row.sell { background: var(--red); width: 42%; transition-delay: .31s; }
+.rd .ld-how-step.visible .ld-how-signal .row { transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-how-signal .row { transition: none; transform: scaleX(1); } }
+
+/* Step 4 — track: a row of ticks suggesting a running ledger. */
+.rd .ld-how-track { display: flex; align-items: flex-end; gap: 4px; height: 32px; }
+.rd .ld-how-track span {
+  width: 6px; border-radius: 2px 2px 0 0;
+  opacity: 0; transform: scaleY(0); transform-origin: bottom;
+  transition: opacity .4s ease, transform .4s ease;
+  transition-delay: calc(var(--i) * 55ms);
+}
+.rd .ld-how-track span.pos { height: 100%; background: var(--green); }
+.rd .ld-how-track span.neg { height: 55%; background: var(--ink-3); }
+.rd .ld-how-step.visible .ld-how-track span { opacity: 1; transform: scaleY(1); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-how-track span { transition: none; opacity: 1; transform: none; } }
+
+@media (max-width: 640px) {
+  .rd .ld-how-step { grid-template-columns: 44px 1fr; gap: 16px; }
+  .rd .ld-how-num { width: 44px; height: 44px; font-size: 12px; }
+  .rd .ld-how-steps::before { inset-inline-start: 21px; }
+}
+
+/* ── Proof — biggest number treatment on the page ──────────────────────── */
+.rd .ld-proof-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+}
+.rd .ld-proof-cell { background: var(--panel); padding: clamp(24px, 3vw, 34px) clamp(20px, 2.6vw, 30px); }
+.rd .ld-proof-cell .v {
+  font-size: clamp(38px, 6vw, 64px); font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+  color: var(--ink); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
+  direction: ltr; text-align: start;
+}
+.rd .ld-proof-skel { height: 1em; width: 70%; border-radius: 6px; }
+.rd .ld-proof-cell .k { margin-top: 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; color: var(--ink-3); }
+.rd .ld-proof-asof { margin: 14px 0 0; font-size: 11.5px; color: var(--ink-3); }
+.rd .ld-proof-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 26px; flex-wrap: wrap; }
+.rd .ld-proof-foot .note { font-size: 12px; color: var(--ink-3); line-height: 1.55; max-width: 580px; }
+/* Directional glyph, not a CSS-drawn shape — mirror it under RTL like the
+ * FAQ caret below, since a "→" pointing away from reading-start needs to
+ * become "←" when reading-start flips. */
+.rd .ld-arrow { display: inline-block; }
+[dir="rtl"] .rd .ld-arrow { transform: scaleX(-1); }
+@media (max-width: 1020px) { .rd .ld-proof-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .rd .ld-proof-grid { grid-template-columns: 1fr; } .rd .ld-proof-foot { flex-direction: column; align-items: flex-start; } }
+
+/* ── Platform: real Signals/Market/Portfolio component CSS in device
+ * frames (imported from signals.css / portfolio.css / redesign.css). ──── */
+.rd .ld-shots { position: relative; }
+.rd .ld-shots-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; align-items: start; }
+.rd .ld-shots-side { display: flex; flex-direction: column; gap: 22px; }
+.rd .ld-device { border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; background: var(--panel); box-shadow: 0 26px 60px -22px rgba(0,0,0,0.5); transition: border-color .22s ease, box-shadow .22s ease, transform .22s ease; }
+.rd .ld-device:hover { border-color: var(--ink-3); box-shadow: 0 34px 76px -22px rgba(0,0,0,0.62); transform: translateY(-4px); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-device { transition: border-color .22s ease, box-shadow .22s ease; } .rd .ld-device:hover { transform: none; } }
+.rd .ld-device-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: var(--panel-2); border-block-end: 1px solid var(--line); }
+.rd .ld-device-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--bg-3); }
+.rd .ld-device-bar .u { margin-inline-start: 8px; font-size: 10.5px; color: var(--ink-3); }
+.rd .ld-device-body { padding: 16px; }
+.rd .ld-device figcaption { padding: 12px 16px; border-block-start: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.rd .ld-device figcaption b { color: var(--ink); display: block; margin-bottom: 2px; font-size: 12.5px; }
+.rd .ld-device-body .sigcard { margin-bottom: 10px; }
+.rd .ld-device-body .sigcard:last-child { margin-bottom: 0; }
+.rd .ld-indices-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.rd .ld-indices-mini .idx-card { padding: 10px 11px 9px; }
+.rd .ld-indices-mini .idx-card .spark { display: none; }
+.rd .ld-nw-mini { margin-bottom: 0; flex-direction: column; align-items: stretch; }
+.rd .ld-nw-mini .nw-chips { grid-template-columns: repeat(2, 1fr); flex: none; }
+@media (max-width: 1020px) { .rd .ld-shots-grid { grid-template-columns: 1fr; } }
+
+/* ── Pricing ────────────────────────────────────────────────────────────── */
+.rd .ld-pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-items: stretch; }
+.rd .ld-plan { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 30px 26px; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.rd .ld-plan:hover { border-color: var(--line-2); box-shadow: 0 16px 44px -26px rgba(0,0,0,0.55); transform: translateY(-3px); }
+.rd .ld-plan.featured { background: var(--panel-2); border-color: rgba(59,130,246,0.45); box-shadow: 0 18px 60px -30px rgba(59,130,246,0.45); transform: translateY(-6px); }
+.rd .ld-plan.featured:hover { border-color: rgba(59,130,246,0.7); box-shadow: 0 24px 72px -28px rgba(59,130,246,0.6); transform: translateY(-9px); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-plan, .rd .ld-plan.featured { transition: border-color .18s ease, box-shadow .18s ease; } .rd .ld-plan:hover, .rd .ld-plan.featured:hover { transform: none; } }
+.rd .ld-plan-flag { position: absolute; top: -11px; inset-inline-start: 24px; padding: 3px 10px; border-radius: 999px; background: var(--blue); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.rd .ld-plan-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
+.rd .ld-plan-price { margin-top: 14px; font-size: 38px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rd .ld-plan-price span { margin-inline-start: 5px; font-size: 13px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; }
+.rd .ld-plan-blurb { margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+.rd .ld-plan ul { margin: 22px 0 26px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.rd .ld-plan li { position: relative; padding-inline-start: 22px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.rd .ld-plan li::before { content: '✓'; position: absolute; inset-inline-start: 0; color: var(--green); font-weight: 700; font-size: 12px; }
+.rd .ld-plan .ld-btn { width: 100%; }
+@media (max-width: 1020px) { .rd .ld-pricing { grid-template-columns: 1fr; } }
+
+/* ── FAQ ────────────────────────────────────────────────────────────────── */
+.rd .ld-faq { display: flex; flex-direction: column; gap: 10px; }
+.rd .ld-faq-item { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; transition: border-color .15s ease, background .15s ease; }
+.rd .ld-faq-item:hover { border-color: var(--line-2); background: var(--panel-2); }
+.rd .ld-faq-item[open] { border-color: var(--line-2); }
+.rd .ld-faq-item summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; font-size: 14.5px; font-weight: 600; color: var(--ink);
+  cursor: pointer; list-style: none; transition: color .12s;
+}
+.rd .ld-faq-item summary::-webkit-details-marker { display: none; }
+.rd .ld-faq-item summary:hover { color: var(--blue-2); }
+.rd .ld-faq-item summary:active { background: var(--panel-2); }
+/* outline-offset is negative (not the usual positive 2px) because
+ * .ld-faq-item has overflow:hidden for the grid-rows reveal trick below —
+ * an outset ring would get clipped at the card edge and become invisible
+ * to keyboard users. */
+.rd .ld-faq-item summary:focus-visible { outline: 2px solid var(--blue-2); outline-offset: -3px; border-radius: 8px; }
+.rd .ld-faq-caret { color: var(--ink-3); font-size: 12px; transition: transform .2s ease; flex-shrink: 0; }
+.rd .ld-faq-item[open] .ld-faq-caret { transform: rotate(180deg); }
+[dir="rtl"] .rd .ld-faq-caret { transform: scaleX(-1); }
+[dir="rtl"] .rd .ld-faq-item[open] .ld-faq-caret { transform: scaleX(-1) rotate(180deg); }
+.rd .ld-faq-item p { margin: 0; padding: 0 22px 20px; font-size: 13.5px; line-height: 1.7; color: var(--ink-2); }
+/* Animated open (grid-template-rows trick — no JS height measurement). */
+.rd .ld-faq-item > p { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease; overflow: hidden; }
+.rd .ld-faq-item[open] > p { grid-template-rows: 1fr; }
+.rd .ld-faq-item > p > * { min-height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .rd .ld-faq-item > p { transition: none; } }
+
+/* ── Final CTA ──────────────────────────────────────────────────────────── */
+.rd .ld-final { position: relative; max-width: 1180px; margin-inline: auto; padding: clamp(80px, 12vw, 130px) 36px; text-align: center; border-block-start: 1px solid var(--line); overflow: hidden; }
+.rd .ld-final::before {
+  /* Physical `left` (not inset-inline-start) is deliberate here: this is a
+   * purely decorative glow centered behind the CTA, and centering has no
+   * directional meaning — inset-inline-start:50% + translateX(-50%) would
+   * double-offset under RTL (right-anchored 50% shifted further left
+   * instead of toward center), so logical properties are the wrong tool
+   * for this specific "always dead-center" case. */
+  content: ''; position: absolute; left: 50%; bottom: -340px; transform: translateX(-50%);
+  width: 760px; height: 560px; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(59,130,246,0.13) 0%, transparent 64%);
+}
+.rd .ld-final h2 { position: relative; margin: 0 0 16px; font-size: clamp(28px, 4vw, 42px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; color: var(--ink); }
+.rd .ld-final p { position: relative; margin: 0 0 32px; font-size: 14.5px; color: var(--ink-2); }
+.rd .ld-final .ld-btn { position: relative; }
+
+/* ── Mobile nav (hamburger + panel) ────────────────────────────────────── */
+.rd .ld-nav-burger { display: none; flex-direction: column; justify-content: center; gap: 4px; width: 44px; height: 44px; padding: 0; background: none; border: none; border-radius: 8px; cursor: pointer; }
+.rd .ld-nav-burger:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; }
+.rd .ld-nav-burger span { display: block; width: 20px; height: 1.5px; background: var(--ink-2); margin-inline: auto; transition: transform .2s ease, opacity .2s ease; }
+.rd .ld-nav-burger[aria-expanded="true"] span:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
+.rd .ld-nav-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.rd .ld-nav-burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
+.rd .ld-mobile-menu { display: none; }
+.rd .ld-skip-link {
+  position: absolute; top: -48px; inset-inline-start: 12px; z-index: 300;
+  background: var(--blue); color: #fff; padding: 10px 16px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; text-decoration: none; transition: top .15s ease;
+}
+.rd .ld-skip-link:focus { top: 12px; }
+
+/* ── Language switcher ─────────────────────────────────────────────────── */
+.rd .ld-lang-switcher { position: relative; }
+.rd .ld-lang-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 9px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--ink-2); font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.rd .ld-lang-btn:hover { border-color: var(--line-2); color: var(--ink); }
+.rd .ld-lang-btn:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; }
+.rd .ld-lang-flag { font-size: 14px; line-height: 1; }
+.rd .ld-lang-menu {
+  position: absolute; top: calc(100% + 6px); inset-inline-end: 0; width: max-content; min-width: 128px;
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px;
+  box-shadow: 0 18px 48px -14px rgba(0,0,0,0.6); padding: 5px; z-index: 200;
+  display: none;
+}
+.rd .ld-lang-switcher.open .ld-lang-menu { display: block; }
+.rd .ld-lang-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;
+  background: none; border: none; border-radius: 6px; color: var(--ink-2);
+  font-size: 12.5px; text-align: start; cursor: pointer;
+}
+.rd .ld-lang-row:hover { background: var(--bg-2); color: var(--ink); }
+.rd .ld-lang-row:focus-visible { outline: 2px solid var(--blue-2); outline-offset: -2px; }
+.rd .ld-lang-row.sel { color: var(--ink); font-weight: 600; }
+.rd .ld-lang-switcher.in-menu { margin-top: 18px; }
+.rd .ld-lang-switcher.in-menu .ld-lang-menu { position: static; display: block; box-shadow: none; border: none; background: none; padding: 0; margin-top: 8px; }
+/* Touch-target minimum (44px) — this variant renders inside the mobile
+ * hamburger panel where it's the real interactive size, unlike the compact
+ * mouse-driven dropdown trigger on desktop. */
+.rd .ld-lang-switcher.in-menu .ld-lang-btn { width: 100%; height: 44px; justify-content: space-between; }
+.rd .ld-lang-switcher.in-menu .ld-lang-row { min-height: 44px; }
+
+/* ── Responsive: tablet ───────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .rd .ld-nav-links { display: none; }
+}
+
+/* ── Responsive: mobile ───────────────────────────────────────────────── */
+@media (max-width: 780px) {
+  .rd .ld-nav-ctas { display: none; }
+  .rd .ld-nav-burger { display: flex; }
+  .rd .ld-mobile-menu {
+    display: block;
+    position: fixed; inset: 64px 0 0 0; z-index: 150;
+    background: var(--bg); border-block-start: 1px solid var(--line);
+    padding: 28px 24px; overflow-y: auto;
+    transform: translateY(-8px); opacity: 0; pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  .rd .ld-mobile-menu.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .rd .ld-mobile-links { display: flex; flex-direction: column; gap: 4px; margin-bottom: 24px; }
+  .rd .ld-mobile-links a { padding: 14px 4px; font-size: 16px; font-weight: 600; color: var(--ink); text-decoration: none; border-block-end: 1px solid var(--line); }
+  .rd .ld-mobile-links a:focus-visible { outline: 2px solid var(--blue-2); outline-offset: -2px; }
+  .rd .ld-mobile-ctas { display: flex; flex-direction: column; gap: 10px; }
+  @media (prefers-reduced-motion: reduce) { .rd .ld-mobile-menu { transition: none; } }
+}
