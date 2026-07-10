@@ -83,7 +83,10 @@
 }
 .rd .ld-hero::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse 900px 600px at 50% 38%, rgba(10,14,21,0) 0%, rgba(10,14,21,0.55) 72%, var(--bg) 100%);
+  /* Center stop is NOT fully transparent — the headline sits at roughly
+   * this same point, so the vignette needs to give it real contrast
+   * against the curve/signal-bar field behind it, not just fade the edges. */
+  background: radial-gradient(ellipse 900px 600px at 50% 38%, rgba(10,14,21,0.4) 0%, rgba(10,14,21,0.6) 72%, var(--bg) 100%);
 }
 .rd .ld-hero-inner { position: relative; z-index: 2; max-width: 820px; width: 100%; }
 .rd .ld-eyebrow {
@@ -98,8 +101,8 @@
 }
 .rd .ld-thesis {
   margin: 0 0 26px;
-  font-size: clamp(42px, 7.5vw, 108px);
-  font-weight: 900; line-height: 1.01; letter-spacing: -0.04em;
+  font-size: clamp(38px, 6.2vw, 84px);
+  font-weight: 800; line-height: 1.04; letter-spacing: -0.035em;
   color: var(--ink);
 }
 .rd .g {

@@ -93,14 +93,14 @@ function HeroCanvas() {
       const benchPts = pathAt(BENCH_Y, false, progress)
       drawSmooth(benchPts, 'rgba(168,176,190,0.30)', 1.5, 0)
       const modelPts = pathAt(MODEL_Y, true, progress)
-      drawSmooth(modelPts, 'rgba(0,217,126,0.9)', 3, 16)
+      drawSmooth(modelPts, 'rgba(0,217,126,0.85)', 2.4, 10)
       if (modelPts.length) {
         const [x, y] = modelPts[modelPts.length - 1]
         const r = 3 + (pulsePhase != null ? Math.sin(pulsePhase) * 1.4 + 1.4 : 0)
         ctx.beginPath()
         ctx.fillStyle = 'rgba(0,217,126,0.95)'
         ctx.shadowColor = 'rgba(0,217,126,0.9)'
-        ctx.shadowBlur = 18
+        ctx.shadowBlur = 14
         ctx.arc(x, y, r, 0, Math.PI * 2)
         ctx.fill()
         ctx.shadowBlur = 0
