@@ -19,6 +19,33 @@ function Cell({ label, loading, display }) {
   )
 }
 
+/* ── Echo of the Hero canvas's rising curve — same "fixed, hand-tuned shape,
+ * not live/random data" rule applies here even more strictly than in Hero:
+ * this sits directly above the section whose entire premise is "real
+ * numbers only." So it stays aria-hidden, low-opacity, unlabeled (no axes,
+ * no tick marks, nothing that could read as a second, competing dataset),
+ * and draws in once via the section's own reveal state — no independent
+ * animation loop of its own. */
+function ProofSparkline({ visible }) {
+  return (
+    <svg
+      className={'ld-proof-spark' + (visible ? ' visible' : '')}
+      viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="proofSparkGrad" x1="0" y1="0" x2="300" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="var(--blue-2)" />
+          <stop offset="100%" stopColor="var(--green)" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M0,50 Q30,46 45,47 Q60,48 75,44 Q90,40 105,41.5 Q120,43 135,37.5 Q150,32 165,33.5 Q180,35 195,29.5 Q210,24 225,25.5 Q240,27 255,21 Q270,15 285,12 L300,9"
+        stroke="url(#proofSparkGrad)"
+      />
+    </svg>
+  )
+}
+
 export function Proof({ stats }) {
   const { t, i18n } = useTranslation()
   const [sectionRef, visible] = useReveal({ threshold: 0.2 })
@@ -52,6 +79,7 @@ export function Proof({ stats }) {
           <h2>{t('ld.proof.title')}</h2>
           <p>{t('ld.proof.sub')}</p>
         </div>
+        <ProofSparkline visible={visible} />
         <div className="ld-proof-grid">
           {cells.map((c) => <Cell key={c.label} {...c} />)}
         </div>

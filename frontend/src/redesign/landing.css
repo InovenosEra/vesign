@@ -55,6 +55,17 @@
 .rd .ld-btn:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .rd .ld-btn:active { transform: none; } }
 .rd .ld-btn.lg { height: 46px; padding-inline: 26px; font-size: 14.5px; border-radius: 8px; }
+/* Magnetic hover — --mx/--my set by useMagnetic (landing/hooks.js), composed
+ * with the existing hover-lift/press transforms rather than replacing them,
+ * so a magnetic button still lifts on hover and compresses on click exactly
+ * like a non-magnetic one. Only applied where the `magnetic` class + hook
+ * are both present (primary CTAs) — every other .ld-btn is untouched. */
+.rd .ld-btn.magnetic { transform: translate(var(--mx, 0px), var(--my, 0px)); transition: transform .2s cubic-bezier(0.16,1,0.3,1), background .15s, border-color .15s, box-shadow .15s; }
+.rd .ld-btn.magnetic:hover { transform: translate(var(--mx, 0px), var(--my, 0px)) translateY(-1px); }
+.rd .ld-btn.magnetic:active { transform: translate(var(--mx, 0px), var(--my, 0px)) scale(0.96); transition-duration: .08s; }
+@media (prefers-reduced-motion: reduce) {
+  .rd .ld-btn.magnetic, .rd .ld-btn.magnetic:hover, .rd .ld-btn.magnetic:active { transform: none; }
+}
 
 /* ── Sections (shared scaffolding — Landing's Proof/Platform/Pricing/FAQ
  * AND PerformancePage both build on this two-layer pattern): .ld-section

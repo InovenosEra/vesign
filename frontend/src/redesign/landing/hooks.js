@@ -84,6 +84,48 @@ export function usePointerGlow(ref) {
   }, [ref])
 }
 
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+
+// Magnetic hover: the element eases toward the cursor within its own bounds
+// (translate only, capped at `max`px), snapping back on pointerleave. Same
+// disable-outright-on-touch/reduced-motion posture as usePointerGlow — this
+// is pure delight, never load-bearing for the click itself (onClick still
+// fires identically with or without it).
+export function useMagnetic(ref, { strength = 0.3, max = 14 } = {}) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (prefersReducedMotion() || !window.matchMedia('(pointer: fine)').matches) return
+    let raf = null
+    let last = null
+    const apply = () => {
+      raf = null
+      if (!last) return
+      const rect = el.getBoundingClientRect()
+      const dx = clamp((last.clientX - (rect.left + rect.width / 2)) * strength, -max, max)
+      const dy = clamp((last.clientY - (rect.top + rect.height / 2)) * strength, -max, max)
+      el.style.setProperty('--mx', `${dx}px`)
+      el.style.setProperty('--my', `${dy}px`)
+    }
+    const onMove = (e) => {
+      last = e
+      if (raf == null) raf = requestAnimationFrame(apply)
+    }
+    const onLeave = () => {
+      last = null
+      el.style.setProperty('--mx', '0px')
+      el.style.setProperty('--my', '0px')
+    }
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerleave', onLeave)
+    return () => {
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerleave', onLeave)
+      if (raf != null) cancelAnimationFrame(raf)
+    }
+  }, [ref, strength, max])
+}
+
 // Scroll progress as a 0..1 fraction of the page's scrollable height,
 // rAF-throttled the same way useScrolled (Nav.jsx) is — one listener, one
 // pending frame at a time, never layout work per raw scroll event.

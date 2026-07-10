@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { track } from './analytics'
-import { useSectionView, usePointerGlow } from './hooks'
+import { useSectionView, usePointerGlow, useMagnetic } from './hooks'
 
 /* ── Hero backdrop: two smoothed curves drawing themselves once on load —
  * one climbing with real drawdowns, one flatter beneath it. This is the
@@ -166,6 +166,8 @@ export function Hero() {
   const gaRef = useSectionView('hero')
   const glowRef = useRef(null)
   usePointerGlow(glowRef)
+  const ctaRef = useRef(null)
+  useMagnetic(ctaRef)
   return (
     <header
       className="ld-hero"
@@ -188,7 +190,8 @@ export function Hero() {
         <div className="ld-hero-ctas">
           <Link
             to="/sign-up"
-            className="ld-btn primary lg"
+            className="ld-btn primary lg magnetic"
+            ref={ctaRef}
             onClick={() => track('landing_cta_click', { location: 'hero', label: 'sign_up' })}
           >
             {t('ld.hero.ctaPrimary')}

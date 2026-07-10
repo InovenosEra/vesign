@@ -1,12 +1,15 @@
+import { useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { track } from './analytics'
-import { useReveal, useSectionView } from './hooks'
+import { useReveal, useSectionView, useMagnetic } from './hooks'
 
 export function FinalCta() {
   const { t } = useTranslation()
   const [revealRef, visible] = useReveal({ threshold: 0.3 })
   const gaRef = useSectionView('finalCta')
+  const ctaRef = useRef(null)
+  useMagnetic(ctaRef)
   return (
     <section
       className={'ld-final' + (visible ? ' visible' : '')}
@@ -16,7 +19,8 @@ export function FinalCta() {
       <p>{t('ld.cta.sub')}</p>
       <Link
         to="/sign-up"
-        className="ld-btn primary lg"
+        className="ld-btn primary lg magnetic"
+        ref={ctaRef}
         onClick={() => track('landing_cta_click', { location: 'final_cta', label: 'sign_up' })}
       >
         {t('ld.cta.button')}
