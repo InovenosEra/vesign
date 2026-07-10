@@ -48,6 +48,21 @@ function applyLanguage(i18n, code) {
   document.documentElement.lang = code
 }
 
+// Trigger uses a generic globe glyph rather than the current language's flag
+// — a flag-as-icon reads as decorative/emoji rather than a UI control, and a
+// single fixed icon is clearer as "this button changes language" than a
+// flag that changes meaning depending on what's currently selected. Flags
+// stay in the open dropdown's rows, where they're a genuinely useful
+// per-language visual aid once you're actively choosing.
+function GlobeIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.7 12h16.6M12 3.5c2.3 2.4 3.6 5.4 3.6 8.5s-1.3 6.1-3.6 8.5c-2.3-2.4-3.6-5.4-3.6-8.5s1.3-6.1 3.6-8.5Z" />
+    </svg>
+  )
+}
+
 function LangSwitcher({ inMenu = false }) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -77,7 +92,7 @@ function LangSwitcher({ inMenu = false }) {
         aria-label={t('ld.nav.language')}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="ld-lang-flag" aria-hidden="true">{current.flag}</span>
+        <GlobeIcon className="ld-lang-globe" />
         <span className="ld-lang-code">{t(`lang.${current.code}`)}</span>
       </button>
       <div className="ld-lang-menu" role="listbox">
@@ -190,7 +205,7 @@ export function LandingNav() {
       <div className="ld-nav-ctas">
         <LangSwitcher />
         <span className="ld-nav-divider" aria-hidden="true" />
-        <Link to="/sign-in" className="ld-btn ghost" onClick={cta('nav', 'log_in')}>{t('ld.nav.logIn')}</Link>
+        <Link to="/sign-in" className="ld-nav-login" onClick={cta('nav', 'log_in')}>{t('ld.nav.logIn')}</Link>
         <Link to="/sign-up" className="ld-btn primary" onClick={cta('nav', 'sign_up')}>{t('ld.nav.signUp')}</Link>
       </div>
       <button

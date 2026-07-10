@@ -51,11 +51,16 @@
  * paints on top of its parent's in-flow text regardless of DOM/source order
  * — that's just how positioned-vs-static painting order works — so without
  * this the pill covers the text instead of sitting behind it. */
-.rd .ld-nav-links a { position: relative; z-index: 0; padding: 8px 14px; font-size: 13.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; border-radius: 8px; transition: color .15s; }
-.rd .ld-nav-links a::before { content: ''; position: absolute; z-index: -1; inset: 2px; border-radius: 7px; background: var(--bg-2); opacity: 0; transition: opacity .18s ease; }
-.rd .ld-nav-links a:hover { color: var(--ink); }
-.rd .ld-nav-links a:hover::before { opacity: 1; }
-.rd .ld-nav-links a:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; border-radius: 4px; }
+/* .ld-nav-login (desktop "Log in") shares this exact pill-hover treatment —
+ * a plain minimal text link, not a bordered button, so the only button-shaped
+ * element in the nav is the primary Sign Up CTA. Mobile keeps its own boxed
+ * .ld-btn.ghost.lg for Log in (a clear tap-target boundary matters more in
+ * an expanded mobile menu than nav-bar minimalism does). */
+.rd .ld-nav-links a, .rd .ld-nav-login { position: relative; z-index: 0; padding: 8px 14px; font-size: 13.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; border-radius: 8px; transition: color .15s; }
+.rd .ld-nav-links a::before, .rd .ld-nav-login::before { content: ''; position: absolute; z-index: -1; inset: 2px; border-radius: 7px; background: var(--bg-2); opacity: 0; transition: opacity .18s ease; }
+.rd .ld-nav-links a:hover, .rd .ld-nav-login:hover { color: var(--ink); }
+.rd .ld-nav-links a:hover::before, .rd .ld-nav-login:hover::before { opacity: 1; }
+.rd .ld-nav-links a:focus-visible, .rd .ld-nav-login:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; border-radius: 4px; }
 .rd .ld-nav-logo:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 3px; border-radius: 6px; }
 .rd .ld-nav-ctas { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
 /* Visual grouping — separates the language switcher from the log-in/sign-up
