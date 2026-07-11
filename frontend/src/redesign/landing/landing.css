@@ -390,9 +390,21 @@
 
 /* ── FAQ ────────────────────────────────────────────────────────────────── */
 .rd .ld-faq { display: flex; flex-direction: column; gap: 10px; }
-.rd .ld-faq-item { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; transition: border-color .15s ease, background .15s ease; }
+.rd .ld-faq-item { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; transition: border-color .15s ease, background .15s ease; }
 .rd .ld-faq-item:hover { border-color: var(--line-2); background: var(--panel-2); }
 .rd .ld-faq-item[open] { border-color: var(--line-2); }
+/* Open-state accent — a gradient bar growing in on the inline-start edge,
+ * a clearer "this one's expanded" signal than the caret rotation alone.
+ * Separate overlay rather than resizing the item's own uniform border, so
+ * the border stays a consistent 1px all around. */
+.rd .ld-faq-item::before {
+  content: ''; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(var(--blue-2), var(--green));
+  transform: scaleY(0); transform-origin: top;
+  transition: transform .25s cubic-bezier(0.16,1,0.3,1);
+}
+.rd .ld-faq-item[open]::before { transform: scaleY(1); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-faq-item::before { transition: none; } }
 .rd .ld-faq-item summary {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 18px 22px; font-size: 14.5px; font-weight: 600; color: var(--ink);
@@ -406,10 +418,12 @@
  * an outset ring would get clipped at the card edge and become invisible
  * to keyboard users. */
 .rd .ld-faq-item summary:focus-visible { outline: 2px solid var(--blue-2); outline-offset: -3px; border-radius: 8px; }
-.rd .ld-faq-caret { color: var(--ink-3); font-size: 12px; transition: transform .2s ease; flex-shrink: 0; }
-.rd .ld-faq-item[open] .ld-faq-caret { transform: rotate(180deg); }
-[dir="rtl"] .rd .ld-faq-caret { transform: scaleX(-1); }
-[dir="rtl"] .rd .ld-faq-item[open] .ld-faq-caret { transform: scaleX(-1) rotate(180deg); }
+/* Plain "+" rotating 45deg into an "x" — a symmetric glyph, so unlike the
+ * old arrow caret this needs no [dir="rtl"] mirroring at all. */
+.rd .ld-faq-caret { display: inline-flex; width: 18px; height: 18px; color: var(--ink-3); transition: transform .25s cubic-bezier(0.16,1,0.3,1), color .15s; flex-shrink: 0; }
+.rd .ld-faq-caret svg { width: 100%; height: 100%; }
+.rd .ld-faq-item[open] .ld-faq-caret { transform: rotate(45deg); color: var(--blue-2); }
+@media (prefers-reduced-motion: reduce) { .rd .ld-faq-caret { transition: color .15s; } }
 .rd .ld-faq-item p { margin: 0; padding: 0 22px 20px; font-size: 13.5px; line-height: 1.7; color: var(--ink-2); }
 /* Animated open (grid-template-rows trick — no JS height measurement). */
 .rd .ld-faq-item > p { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease; overflow: hidden; }
