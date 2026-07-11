@@ -110,15 +110,15 @@ const DEFAULTS = {
 // name is the one column with genuinely variable-length content (truncated
 // with an ellipsis + hover title, not reflowed).
 const COLUMNS = [
-  { key: 'ticker', label: 'Ticker', hideable: false, sortable: true, width: '21%',
+  { key: 'ticker', label: 'Ticker', hideable: false, sortable: true, width: '19%',
     cell: (r) => (
       <div className="ticker-cell">
         <img className={'logo-mini' + (WHITE_BG_LOGOS.has(r.ticker) ? ' white-bg' : '')} src={LOGO(r.ticker)} alt={r.ticker} />
         <div className="tc-text"><div className="tk">{r.ticker}</div><div className="co" title={r.company || ''}>{r.company || ''}</div></div>
       </div>),
     csv: (r) => r.ticker },
-  { key: 'sector', label: 'Sector', width: '7%',
-    cell: (r) => <span className="sector-pill">{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span>,
+  { key: 'sector', label: 'Sector', width: '9%',
+    cell: (r) => <span className="sector-pill" title={r.sector || ''}>{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span>,
     csv: (r) => r.sector || '' },
   { key: 'close', label: 'Price', align: 'r', sortable: true, width: '8%',
     cell: (r, c) => r.close == null ? '—' : c.fmtPrice(r.close) },

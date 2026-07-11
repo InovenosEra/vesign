@@ -288,10 +288,15 @@
   .rd .data-table .ticker-cell .tc-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
   .rd .data-table .logo-mini { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: inline-block; flex-shrink: 0; }
   .rd .data-table .logo-mini.white-bg { background: #fff; padding: 2px; }
+  /* max-width + ellipsis as a safety net: the column is sized generously for
+   * the abbreviated labels (SECTOR_ABBR), but this keeps it graceful rather
+   * than an ugly hard clip on any viewport where it's still tight. Full
+   * sector name available via the `title` tooltip (Screener.jsx). */
   .rd .data-table .sector-pill {
-    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 3px;
     font-family: var(--mono); font-size: 10.5px; font-weight: 500;
     background: var(--bg-3); color: var(--ink-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
   }
   .rd .data-table .sig-tag { padding: 2px 8px; border-radius: 3px; font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; display: inline-block; }
   .rd .data-table .sig-tag.buy { background: var(--green-bg); color: var(--green); }
