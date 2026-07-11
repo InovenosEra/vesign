@@ -110,7 +110,7 @@ const DEFAULTS = {
 // name is the one column with genuinely variable-length content (truncated
 // with an ellipsis + hover title, not reflowed).
 const COLUMNS = [
-  { key: 'ticker', label: 'Ticker', hideable: false, sortable: true, width: '19%',
+  { key: 'ticker', label: 'Ticker', hideable: false, sortable: true, width: '16%',
     cell: (r) => (
       <div className="ticker-cell">
         <img className={'logo-mini' + (WHITE_BG_LOGOS.has(r.ticker) ? ' white-bg' : '')} src={LOGO(r.ticker)} alt={r.ticker} />
@@ -120,7 +120,7 @@ const COLUMNS = [
   { key: 'sector', label: 'Sector', width: '9%',
     cell: (r) => <span className="sector-pill" title={r.sector || ''}>{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span>,
     csv: (r) => r.sector || '' },
-  { key: 'close', label: 'Price', align: 'r', sortable: true, width: '8%',
+  { key: 'close', label: 'Price', align: 'r', sortable: true, width: '10%',
     cell: (r, c) => r.close == null ? '—' : c.fmtPrice(r.close) },
   { key: 'day_change_pct', label: 'Day', align: 'r', sortable: true, width: '7%',
     cell: (r) => <span className={dirClass(r.day_change_pct)}>{r.day_change_pct == null ? '—' : pct(r.day_change_pct)}</span> },
@@ -150,9 +150,9 @@ const COLUMNS = [
       return <span className={dirClass(ml)}>{ml == null ? '—' : pct(ml)}</span>
     },
     csv: (r) => r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(2) },
-  { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true, width: '6%',
+  { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true, width: '5%',
     cell: (r) => r.pe_ttm == null ? <span className="muted">—</span> : num(r.pe_ttm, { fd: 1 }) },
-  { key: 'week52_high', label: '52w high', align: 'r', sortable: true, width: '8%',
+  { key: 'week52_high', label: '52w high', align: 'r', sortable: true, width: '10%',
     cell: (r, c) => r.week52_high == null ? <span className="muted">—</span> : c.fmtPrice(r.week52_high) },
 ]
 const COL_BY_KEY = Object.fromEntries(COLUMNS.map(c => [c.key, c]))

@@ -69,7 +69,7 @@
   /* RESEARCH LAYOUT — filter rail + main */
   .rd .research-layout {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 240px 1fr;
     gap: 16px;
     padding: 24px;
   }
