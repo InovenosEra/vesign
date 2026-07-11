@@ -1096,9 +1096,14 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
         rows = ent.gate_signals(rows, kind=signal.upper(), plan=plan, unlocks=unlocks)
     else:
         # Bare list or ?signal=HOLD (Research Screener): no per-card paywall, but the
-        # model classification is Pro+. Null the model fields for Free; keep ticker,
-        # price, company and the analyst upside (fair_value_upside).
-        rows = ent.redact_fields(rows, plan=ent.get_plan(user["id"]), fields=ent.MODEL_FIELDS)
+        # model classification is Max-only here. redact_fields treats "pro"/"max"
+        # alike (its generic Free-vs-rest gate, shared by Holdings/markers/etc.) —
+        # collapse Pro to the "free" branch for THIS endpoint only, rather than
+        # changing that shared function, so Holdings/markers/other callers keep
+        # their existing Pro+ access. Keep ticker, price, company and the analyst
+        # upside (fair_value_upside) visible regardless of plan.
+        plan = ent.get_plan(user["id"])
+        rows = ent.redact_fields(rows, plan=(plan if plan == "max" else "free"), fields=ent.MODEL_FIELDS)
     return rows
 
 

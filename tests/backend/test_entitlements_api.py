@@ -301,6 +301,23 @@ def test_signals_today_bare_redacts_model_for_free(api):
     del os.environ["DEV_PLAN"]
 
 
+def test_signals_today_bare_redacts_model_for_pro(api):
+    # Screener model columns are Max-only -- unlike most Pro+ endpoints, Pro
+    # must see the same redacted shape as Free here, matching Screener.jsx's
+    # modelLocked = plan !== 'max' gate.
+    bm, client = api
+    os.environ["DEV_PLAN"] = "pro"
+    rows = client.get("/api/signals/today?market=US").json()
+    assert rows
+    for r in rows:
+        assert r["ticker"]
+        assert r.get("signal") is None
+        assert r.get("health_score") is None
+        assert r.get("prediction_score") is None
+        assert r.get("vqs") is None
+    del os.environ["DEV_PLAN"]
+
+
 def test_signals_markers_empty_for_free(api):
     bm, client = api
     os.environ["DEV_PLAN"] = "free"

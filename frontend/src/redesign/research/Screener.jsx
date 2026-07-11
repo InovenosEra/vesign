@@ -164,9 +164,13 @@ const loadJSON = (k) => { try { return JSON.parse(localStorage.getItem(k)) } cat
 export default function Screener({ onCount }) {
   const openTicker = useTickerModal()
   const me = useMe()
-  // Vesign-model fields (signal/health/ML) are Pro+; the server nulls them for
-  // Free, so a Free plan renders locked/blurred placeholders instead of data.
-  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
+  // Vesign-model fields (signal/health/ML) are Max-only on the Screener —
+  // Free AND Pro both render locked/blurred placeholders here. Matches the
+  // server-side redaction in backend/main.py's signals_today bare-list
+  // branch (also Max-only for this endpoint), so Pro can't read real values
+  // via the network tab either — this flag only controls the UI treatment
+  // of data that's already nulled server-side for anyone below Max.
+  const modelLocked = me.plan !== 'max'
   const { fmtPrice } = useCurrency()
   const { data: rows } = useQuery({ queryKey: ['signals-today', 'US'], queryFn: () => getSignalsToday(null, 'US') })
   const all = Array.isArray(rows) ? rows : []
