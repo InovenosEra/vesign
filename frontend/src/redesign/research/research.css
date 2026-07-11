@@ -225,12 +225,17 @@
   .rd .active-chip .x:hover { opacity: 1; }
   .rd .active-chip .lbl { font-family: var(--mono); font-size: 10px; opacity: 0.7; }
 
-  /* TABLE — scrolls horizontally within its own box (rather than pushing
-   * the whole page wider) once the nowrap columns' combined width exceeds
-   * the available space; pairs with .results-area's min-width:0 above. */
+  /* TABLE — table-layout:fixed + the <colgroup> % widths (see COLUMNS'
+   * `width` field in Screener.jsx) means column widths come ONLY from that
+   * colgroup, never from cell content — so they stay fixed across sorts/
+   * filters instead of reflowing when different rows (different-length
+   * company names) land in view. Widths sum to 100%, so the whole table
+   * fits within .results-area's own width with nothing to scroll; the
+   * overflow-x:auto wrapper is kept only as a defensive fallback for
+   * unusually narrow viewports, not the primary fit mechanism. */
   .rd .data-table-scroll { overflow-x: auto; border-radius: 10px; }
   .rd .data-table {
-    width: 100%; border-collapse: collapse;
+    width: 100%; table-layout: fixed; border-collapse: collapse;
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 10px; overflow: hidden;
@@ -240,7 +245,7 @@
     color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em;
     padding: 12px 14px; border-bottom: 1px solid var(--line);
     background: var(--bg-2);
-    white-space: nowrap;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .rd .data-table thead th.r { text-align: right; }
   .rd .data-table thead th.sortable { cursor: pointer; transition: color .15s; }
@@ -261,13 +266,26 @@
     font-family: var(--mono); font-size: 12.5px;
     vertical-align: middle;
     font-feature-settings: 'tnum' 1;
-    white-space: nowrap;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .rd .data-table td.r { text-align: right; }
   .rd .data-table .tk { color: var(--ink); font-weight: 600; }
-  .rd .data-table .co { font-family: var(--sans); color: var(--ink-3); font-size: 11.5px; }
-  .rd .data-table .ticker-cell { display: flex; align-items: center; gap: 10px; min-width: 180px; }
-  .rd .data-table .ticker-cell .tc-text { display: flex; flex-direction: column; gap: 1px; }
+  /* Truncates with an ellipsis instead of wrapping or overflowing — the
+   * `title` attribute (set in Screener.jsx) shows the full company name on
+   * hover via the native browser tooltip. This is the one column whose
+   * content genuinely varies in length ("MSTR" vs "Bitmine Immersion
+   * Technologies, Inc."), so it's the one that absorbs the squeeze under
+   * the Ticker column's fixed width rather than the whole table growing. */
+  .rd .data-table .co {
+    font-family: var(--sans); color: var(--ink-3); font-size: 11.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* min-width: 0 on both the flex container and its shrinking child —
+   * without it, flex items default to min-width:auto (their content's
+   * natural width), which would force the row wider than the fixed-width
+   * column instead of letting .co ellipsize within it. */
+  .rd .data-table .ticker-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .rd .data-table .ticker-cell .tc-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
   .rd .data-table .logo-mini { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: inline-block; flex-shrink: 0; }
   .rd .data-table .logo-mini.white-bg { background: #fff; padding: 2px; }
   .rd .data-table .sector-pill {

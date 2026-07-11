@@ -103,27 +103,33 @@ const DEFAULTS = {
 // picker, and CSV export. `cell` renders the table cell; `csv` returns the raw
 // value for export (defaults to the row's `key`). `sortable`/`hideable` gate the
 // header click + the picker.
+// `width` is a fixed % of the table (table-layout:fixed — see research.css)
+// so column widths never shift when sorting/filtering changes which rows
+// (and which company names) land in view. Sums to 100% across the default
+// visible set; Ticker gets the largest, squeezable share since its company
+// name is the one column with genuinely variable-length content (truncated
+// with an ellipsis + hover title, not reflowed).
 const COLUMNS = [
-  { key: 'ticker', label: 'Ticker', hideable: false, sortable: true,
+  { key: 'ticker', label: 'Ticker', hideable: false, sortable: true, width: '21%',
     cell: (r) => (
       <div className="ticker-cell">
         <img className={'logo-mini' + (WHITE_BG_LOGOS.has(r.ticker) ? ' white-bg' : '')} src={LOGO(r.ticker)} alt={r.ticker} />
-        <div className="tc-text"><div className="tk">{r.ticker}</div><div className="co">{r.company || ''}</div></div>
+        <div className="tc-text"><div className="tk">{r.ticker}</div><div className="co" title={r.company || ''}>{r.company || ''}</div></div>
       </div>),
     csv: (r) => r.ticker },
-  { key: 'sector', label: 'Sector',
+  { key: 'sector', label: 'Sector', width: '7%',
     cell: (r) => <span className="sector-pill">{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span>,
     csv: (r) => r.sector || '' },
-  { key: 'close', label: 'Price', align: 'r', sortable: true,
+  { key: 'close', label: 'Price', align: 'r', sortable: true, width: '8%',
     cell: (r, c) => r.close == null ? '—' : c.fmtPrice(r.close) },
-  { key: 'day_change_pct', label: 'Day', align: 'r', sortable: true,
+  { key: 'day_change_pct', label: 'Day', align: 'r', sortable: true, width: '7%',
     cell: (r) => <span className={dirClass(r.day_change_pct)}>{r.day_change_pct == null ? '—' : pct(r.day_change_pct)}</span> },
-  { key: 'market_cap', label: 'Mkt cap', align: 'r', sortable: true, cell: (r) => capB(r.market_cap) },
-  { key: 'signal', label: 'Signal', sortable: true,
+  { key: 'market_cap', label: 'Mkt cap', align: 'r', sortable: true, width: '8%', cell: (r) => capB(r.market_cap) },
+  { key: 'signal', label: 'Signal', sortable: true, width: '7%',
     cell: (r, c) => c.modelLocked
       ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>
       : <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
-  { key: 'fair_value_upside', label: 'Pred. upside', align: 'r', sortable: true,
+  { key: 'fair_value_upside', label: 'Pred. upside', align: 'r', sortable: true, width: '13%',
     cell: (r, c) => {
       if (r.fair_value_upside == null) return <span className="muted">—</span>
       const up = r.fair_value_upside * 100
@@ -133,20 +139,20 @@ const COLUMNS = [
       </>)
     },
     csv: (r) => r.fair_value_upside == null ? '' : (r.fair_value_upside * 100).toFixed(2) },
-  { key: 'health_score', label: 'Health', align: 'r', sortable: true,
+  { key: 'health_score', label: 'Health', align: 'r', sortable: true, width: '8%',
     cell: (r, c) => c.modelLocked
       ? <span className="health rd-blur">{healthDots(4)}</span>
       : <span className="health">{healthDots(r.health_score)}</span> },
-  { key: 'prediction_score', label: 'ML 5d', align: 'r', sortable: true,
+  { key: 'prediction_score', label: 'ML 5d', align: 'r', sortable: true, width: '7%',
     cell: (r, c) => {
       if (c.modelLocked) return <span className="rd-blur">▲ 00%</span>
       const ml = r.prediction_score == null ? null : r.prediction_score * 100
       return <span className={dirClass(ml)}>{ml == null ? '—' : pct(ml)}</span>
     },
     csv: (r) => r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(2) },
-  { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true,
+  { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true, width: '6%',
     cell: (r) => r.pe_ttm == null ? <span className="muted">—</span> : num(r.pe_ttm, { fd: 1 }) },
-  { key: 'week52_high', label: '52w high', align: 'r', sortable: true,
+  { key: 'week52_high', label: '52w high', align: 'r', sortable: true, width: '8%',
     cell: (r, c) => r.week52_high == null ? <span className="muted">—</span> : c.fmtPrice(r.week52_high) },
 ]
 const COL_BY_KEY = Object.fromEntries(COLUMNS.map(c => [c.key, c]))
@@ -403,6 +409,9 @@ export default function Screener({ onCount }) {
 
         <div className="data-table-scroll">
         <table className="data-table">
+          <colgroup>
+            {visibleCols.map(c => <col key={c.key} style={{ width: c.width }} />)}
+          </colgroup>
           <thead>
             <tr>
               {visibleCols.map(c => (
