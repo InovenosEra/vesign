@@ -4,17 +4,17 @@ import { Link } from 'react-router-dom'
 import { track } from './analytics'
 import { useSectionView, usePointerGlow, useMagnetic } from './hooks'
 
-/* ── Hero backdrop: two smoothed curves drawing themselves once on load —
- * one climbing with real drawdowns, one flatter beneath it. This is the
- * page's signature moment (the visual form of "every signal comes with its
- * receipts"), but it is DECORATIVE, not data: aria-hidden, no axes, no tick
- * labels, no percentages or dollar figures, no legend text ("Alpha"/"vs
- * S&P"), no ticker symbols implying a real trade. The Proof section below
- * is the only place actual numbers appear, sourced from /api/stats — this
- * canvas must never look like it's asserting one. Draws once (~1.6s
- * ease-out reveal), then rests with a single slow ambient glow pulse at the
- * lead point — ONE orchestrated moment, not a scattered/looping effect.
- * Pauses on tab-hidden, DPR clamped to 2, frame-gated to ~60fps. */
+/* ── Hero backdrop: a field of glowing points draws in once on load, each
+ * one standing for "a signal, somewhere in the market" — not a specific
+ * trade. Replaces the prior two-line equity chart (removed per feedback:
+ * read as distracting green/grey lines competing with the headline); pure
+ * blue/green points, no grey, no lines at all. Still DECORATIVE, not data:
+ * aria-hidden, no axes, no labels, nothing that could be mistaken for a
+ * real chart — the Proof section below is the only place actual numbers
+ * appear, sourced from /api/stats. Draws once (~1.6s staggered reveal,
+ * center outward), then rests with a slow synchronized glow pulse across a
+ * handful of anchor points — ONE orchestrated moment, not scattered
+ * twinkling. Pauses on tab-hidden, DPR clamped to 2, frame-gated to ~60fps. */
 function HeroCanvas() {
   const ref = useRef(null)
   useEffect(() => {
@@ -33,55 +33,26 @@ function HeroCanvas() {
     window.addEventListener('resize', resize)
     resize()
 
-    // Fixed, hand-tuned point sequences (fraction of width/height, not
-    // literal values) — a deliberate shape, not live/random data. A gentle
-    // random jitter is layered on at draw time so it doesn't read as a
-    // rigid, obviously-synthetic zigzag, but the underlying path is fixed.
-    const MODEL_Y = [0.72, 0.68, 0.70, 0.60, 0.63, 0.52, 0.55, 0.44, 0.47, 0.36, 0.40, 0.27, 0.30, 0.18, 0.22, 0.10]
-    const BENCH_Y = [0.74, 0.73, 0.75, 0.72, 0.74, 0.70, 0.72, 0.68, 0.70, 0.66, 0.68, 0.64, 0.66, 0.61, 0.63, 0.58]
-    const N = MODEL_Y.length
-    const jitter = MODEL_Y.map(() => (Math.random() - 0.5) * 0.012)
-
-    const pathAt = (ys, jit, progress) => {
-      const count = Math.max(2, Math.floor(progress * (N - 1)) + 2)
-      const pts = []
-      for (let i = 0; i < Math.min(count, N); i++) {
-        const x = (i / (N - 1)) * W
-        const y = (ys[i] + (jit ? jitter[i] : 0)) * H
-        pts.push([x, y])
+    // Fixed point field (fraction of width/height) laid out via a golden-
+    // angle spiral — an organic, non-grid scatter with zero randomness, so
+    // the shape is identical on every load (same "fixed, hand-tuned, not
+    // live/random data" rule the removed curve arrays followed).
+    const N = 46
+    const GOLD = 2.399963229728653
+    const POINTS = Array.from({ length: N }, (_, i) => {
+      const r = Math.sqrt((i + 0.5) / N)
+      const theta = i * GOLD
+      return {
+        x: 0.5 + r * Math.cos(theta) * 0.58,
+        y: 0.4 + r * Math.sin(theta) * 0.5,
+        size: 1.3 + ((i * 53) % 7) * 0.28,
+        green: i % 3 === 0,
       }
-      // Partial-segment interpolation for the leading edge so the draw
-      // reveal is smooth rather than snapping point-to-point.
-      const exact = progress * (N - 1)
-      const frac = exact - Math.floor(exact)
-      if (frac > 0 && pts.length < N) {
-        const i = pts.length - 1
-        const x0 = ((i - 1) / (N - 1)) * W, y0 = (ys[i - 1] + (jit ? jitter[i - 1] : 0)) * H
-        const x1 = (i / (N - 1)) * W, y1 = (ys[i] + (jit ? jitter[i] : 0)) * H
-        pts[pts.length - 1] = [x0 + (x1 - x0) * frac, y0 + (y1 - y0) * frac]
-      }
-      return pts
-    }
-
-    const drawSmooth = (pts, strokeStyle, lineWidth, glow) => {
-      if (pts.length < 2) return
-      ctx.beginPath()
-      ctx.moveTo(pts[0][0], pts[0][1])
-      for (let i = 1; i < pts.length - 1; i++) {
-        const mx = (pts[i][0] + pts[i + 1][0]) / 2
-        const my = (pts[i][1] + pts[i + 1][1]) / 2
-        ctx.quadraticCurveTo(pts[i][0], pts[i][1], mx, my)
-      }
-      const last = pts[pts.length - 1]
-      ctx.lineTo(last[0], last[1])
-      ctx.strokeStyle = strokeStyle
-      ctx.lineWidth = lineWidth
-      ctx.lineJoin = 'round'
-      ctx.lineCap = 'round'
-      if (glow) { ctx.shadowColor = strokeStyle; ctx.shadowBlur = glow }
-      ctx.stroke()
-      ctx.shadowBlur = 0
-    }
+    })
+    // A few anchor points (spread across the field, not clustered) that
+    // breathe together on the SAME phase once revealed — a small, cohesive
+    // moment rather than independent scattered blinking.
+    const PULSE_IDX = new Set([2, 13, 24, 37])
 
     const REVEAL_MS = 1600
     let startTime = null
@@ -90,21 +61,22 @@ function HeroCanvas() {
 
     function render(progress, pulsePhase) {
       ctx.clearRect(0, 0, W, H)
-      const benchPts = pathAt(BENCH_Y, false, progress)
-      drawSmooth(benchPts, 'rgba(168,176,190,0.30)', 1.5, 0)
-      const modelPts = pathAt(MODEL_Y, true, progress)
-      drawSmooth(modelPts, 'rgba(0,217,126,0.85)', 2.4, 10)
-      if (modelPts.length) {
-        const [x, y] = modelPts[modelPts.length - 1]
-        const r = 3 + (pulsePhase != null ? Math.sin(pulsePhase) * 1.4 + 1.4 : 0)
+      POINTS.forEach((p, i) => {
+        // Staggered pop-in, center point (i=0) first, outward by index.
+        const appear = Math.min(1, Math.max(0, progress * N - i + 1))
+        if (appear <= 0) return
+        const x = p.x * W, y = p.y * H
+        const color = p.green ? '0,217,126' : '96,165,250'
+        const pulsing = pulsePhase != null && PULSE_IDX.has(i)
+        const pulse = pulsing ? Math.sin(pulsePhase) * 0.25 + 0.75 : 1
         ctx.beginPath()
-        ctx.fillStyle = 'rgba(0,217,126,0.95)'
-        ctx.shadowColor = 'rgba(0,217,126,0.9)'
-        ctx.shadowBlur = 14
-        ctx.arc(x, y, r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(${color},${0.65 * appear * pulse})`
+        ctx.shadowColor = `rgba(${color},0.8)`
+        ctx.shadowBlur = (pulsing ? 8 + pulse * 4 : 5) * appear
+        ctx.arc(x, y, p.size * (pulsing ? pulse : 1), 0, Math.PI * 2)
         ctx.fill()
         ctx.shadowBlur = 0
-      }
+      })
     }
 
     function frame(now) {
