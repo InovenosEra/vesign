@@ -55,6 +55,78 @@ def indices_app():
         pass
 
 
+@pytest.fixture
+def indices_app_no_optional_tables():
+    """Same as indices_app but WITHOUT index_prices/vix -- simulates a
+    prod-synced DB predating those tables (both are populated by a pipeline/
+    overlay script that never runs in production), which is what caused the
+    500 this fixture guards against."""
+    tmpdir = tempfile.mkdtemp()
+    db_path = os.path.join(tmpdir, "test_market_indices_no_opt.db")
+    os.environ["DB_PATH"] = db_path
+    os.environ["BYPASS_AUTH"] = "1"
+
+    from sqlalchemy import create_engine, text
+    temp_engine = create_engine(f"sqlite:///{db_path}", poolclass=None)
+    with temp_engine.begin() as conn:
+        conn.execute(text("CREATE TABLE daily_prices (date DATETIME, ticker TEXT, open FLOAT, high FLOAT, low FLOAT, close FLOAT, volume BIGINT)"))
+        conn.execute(text("""
+            CREATE TABLE companies (
+                ticker TEXT PRIMARY KEY, company TEXT, domain TEXT,
+                market TEXT, logo_url TEXT, industry TEXT,
+                description TEXT, description_short TEXT
+            )
+        """))
+        conn.execute(text("CREATE TABLE company_health_history (ticker TEXT, recorded_at TEXT, score INTEGER, reason TEXT)"))
+    temp_engine.dispose()
+
+    import importlib
+    import backend.main as bm
+    importlib.reload(bm)
+    with patch.object(bm, "_fetch_yf_intraday", return_value={}):
+        yield bm, TestClient(bm.app)
+
+    for fname in os.listdir(tmpdir):
+        try:
+            os.remove(os.path.join(tmpdir, fname))
+        except OSError:
+            pass
+    try:
+        os.rmdir(tmpdir)
+    except OSError:
+        pass
+
+
+def test_returns_200_with_empty_shape_when_index_prices_and_vix_absent(indices_app_no_optional_tables):
+    bm, client = indices_app_no_optional_tables
+    with patch.object(bm, "_fetch_yf_quotes", return_value={}):
+        resp = client.get("/api/market/indices")
+    assert resp.status_code == 200
+    body = resp.json()
+    by = {row["ticker"]: row for row in body["indices"]}
+    assert set(by.keys()) == {"^GSPC", "^NDX", "^DJI", "^RUT", "VIX"}
+    for row in body["indices"]:
+        assert row["close"] is None
+        assert row["change_pct"] is None
+        assert row["sparkline"] == []
+
+
+def test_live_quotes_still_served_when_index_prices_and_vix_absent(indices_app_no_optional_tables):
+    """The degrade path must still overlay a live quote when one is available --
+    absent tables mean no sparkline history, not a fully blank card."""
+    bm, client = indices_app_no_optional_tables
+    live = {"^GSPC": {"price": 7150.0, "prev_close": 7100.0},
+            "^NDX": {"price": 1.0, "prev_close": 1.0}, "^DJI": {"price": 1.0, "prev_close": 1.0},
+            "^RUT": {"price": 1.0, "prev_close": 1.0}, "^VIX": {"price": 18.5, "prev_close": 18.0}}
+    with patch.object(bm, "_fetch_yf_quotes", return_value=live):
+        resp = client.get("/api/market/indices")
+    assert resp.status_code == 200
+    by = {row["ticker"]: row for row in resp.json()["indices"]}
+    assert by["^GSPC"]["close"] == 7150.0
+    assert by["^GSPC"]["sparkline"] == [7150.0]  # no table history, just the live point
+    assert by["VIX"]["close"] == 18.5
+
+
 def _insert_price(bm, *, date, ticker, close):
     from sqlalchemy import text
     with bm.engine.begin() as conn:

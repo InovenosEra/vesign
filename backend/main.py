@@ -3877,6 +3877,29 @@ _yf_ticker_last_good: dict[str, dict] = {}  # {strip_key: {ticker: {price, chang
 _fx_last_good: dict[str, dict] = {}         # {base: {currency: {price, prev_close}}}
 _index_quote_last_good: dict[str, dict] = {}  # {ticker: {price, prev_close}} for index cards
 
+_table_exists_cache: dict[str, tuple[bool, float]] = {}  # {table: (exists, checked_at)}
+_TABLE_EXISTS_TTL_SECONDS = 60  # short TTL: cheap enough to re-check regularly, but
+# avoids a sqlite_master hit on every call. Some tables (index_prices, vix) are
+# populated by a pipeline/overlay script that can run mid-process (e.g. a local
+# dev overlay), so a missing-table result must not be cached forever — this lets
+# it be picked up within a minute, without needing a process restart.
+
+
+def _table_exists(name: str) -> bool:
+    """Cached check for whether a table exists, so endpoints that degrade
+    gracefully when an optional table (index_prices, vix, ...) is absent don't
+    pay a sqlite_master query on every request."""
+    now = time.time()
+    cached = _table_exists_cache.get(name)
+    if cached is not None and now - cached[1] < _TABLE_EXISTS_TTL_SECONDS:
+        return cached[0]
+    with engine.connect() as conn:
+        exists = conn.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=:n"), {"n": name}
+        ).fetchone() is not None
+    _table_exists_cache[name] = (exists, now)
+    return exists
+
 # --- Live universe baseline (rebuilt once per trading day) -------------------
 _baseline_cache: dict[str, dict] = {}
 _baseline_date = None
@@ -4110,13 +4133,14 @@ def _build_market_indices() -> dict:
     # prints in extended hours) showed a full ~79-bar day — an inconsistent mix.
     intraday: dict = {}
     out = []
+    # Both index_prices and vix are populated by the daily pipeline (update_indices()
+    # / the VIX fetch); guard each in case it hasn't run yet (e.g. a prod-synced DB
+    # predating this feature) so the endpoint still serves live-quote cards instead
+    # of 500-ing the page. _table_exists is cached, so this isn't a sqlite_master
+    # hit on every request.
+    has_idx = _table_exists("index_prices")
+    has_vix = _table_exists("vix")
     with engine.connect() as conn:
-        # index_prices is populated by the daily pipeline's update_indices(); guard
-        # in case it hasn't run yet (e.g. a prod-synced DB predating this feature) so
-        # the endpoint still serves live-quote cards instead of 500-ing the page.
-        has_idx = conn.execute(text(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_prices'"
-        )).fetchone() is not None
         for ticker in _INDICES_TICKERS:
             if has_idx:
                 rows = conn.execute(text(
@@ -4126,8 +4150,11 @@ def _build_market_indices() -> dict:
             else:
                 closes = []
             out.append(_index_entry_live(ticker, closes, live.get(ticker), intraday.get(ticker)))
-        vix_rows = conn.execute(text("SELECT close FROM vix ORDER BY date DESC LIMIT 30")).fetchall()
-        vix_closes = [r[0] for r in vix_rows][::-1]
+        if has_vix:
+            vix_rows = conn.execute(text("SELECT close FROM vix ORDER BY date DESC LIMIT 30")).fetchall()
+            vix_closes = [r[0] for r in vix_rows][::-1]
+        else:
+            vix_closes = []
         out.append(_index_entry_live("VIX", vix_closes, live.get("^VIX"), intraday.get("^VIX")))
     return {"indices": out}
 
