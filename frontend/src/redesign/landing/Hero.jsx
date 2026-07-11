@@ -1,116 +1,23 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { track } from './analytics'
 import { useSectionView, usePointerGlow, useMagnetic } from './hooks'
 
-/* ── Hero backdrop: a field of glowing points draws in once on load, each
- * one standing for "a signal, somewhere in the market" — not a specific
- * trade. Replaces the prior two-line equity chart (removed per feedback:
- * read as distracting green/grey lines competing with the headline); pure
- * blue/green points, no grey, no lines at all. Still DECORATIVE, not data:
- * aria-hidden, no axes, no labels, nothing that could be mistaken for a
- * real chart — the Proof section below is the only place actual numbers
- * appear, sourced from /api/stats. Draws once (~1.6s staggered reveal,
- * center outward), then rests with a slow synchronized glow pulse across a
- * handful of anchor points — ONE orchestrated moment, not scattered
- * twinkling. Pauses on tab-hidden, DPR clamped to 2, frame-gated to ~60fps. */
-function HeroCanvas() {
-  const ref = useRef(null)
-  useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let W, H, DPR, raf, visible = true
-
-    function resize() {
-      DPR = Math.min(2, window.devicePixelRatio || 1)
-      W = canvas.clientWidth; H = canvas.clientHeight
-      canvas.width = W * DPR; canvas.height = H * DPR
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
-    }
-    window.addEventListener('resize', resize)
-    resize()
-
-    // Fixed point field (fraction of width/height) laid out via a golden-
-    // angle spiral — an organic, non-grid scatter with zero randomness, so
-    // the shape is identical on every load (same "fixed, hand-tuned, not
-    // live/random data" rule the removed curve arrays followed).
-    const N = 46
-    const GOLD = 2.399963229728653
-    const POINTS = Array.from({ length: N }, (_, i) => {
-      const r = Math.sqrt((i + 0.5) / N)
-      const theta = i * GOLD
-      return {
-        x: 0.5 + r * Math.cos(theta) * 0.58,
-        y: 0.4 + r * Math.sin(theta) * 0.5,
-        size: 1.3 + ((i * 53) % 7) * 0.28,
-        green: i % 3 === 0,
-      }
-    })
-    // A few anchor points (spread across the field, not clustered) that
-    // breathe together on the SAME phase once revealed — a small, cohesive
-    // moment rather than independent scattered blinking.
-    const PULSE_IDX = new Set([2, 13, 24, 37])
-
-    const REVEAL_MS = 1600
-    let startTime = null
-    let lastFrame = 0
-    const FRAME_MIN = 1000 / 60
-
-    function render(progress, pulsePhase) {
-      ctx.clearRect(0, 0, W, H)
-      POINTS.forEach((p, i) => {
-        // Staggered pop-in, center point (i=0) first, outward by index.
-        const appear = Math.min(1, Math.max(0, progress * N - i + 1))
-        if (appear <= 0) return
-        const x = p.x * W, y = p.y * H
-        const color = p.green ? '0,217,126' : '96,165,250'
-        const pulsing = pulsePhase != null && PULSE_IDX.has(i)
-        const pulse = pulsing ? Math.sin(pulsePhase) * 0.25 + 0.75 : 1
-        ctx.beginPath()
-        ctx.fillStyle = `rgba(${color},${0.65 * appear * pulse})`
-        ctx.shadowColor = `rgba(${color},0.8)`
-        ctx.shadowBlur = (pulsing ? 8 + pulse * 4 : 5) * appear
-        ctx.arc(x, y, p.size * (pulsing ? pulse : 1), 0, Math.PI * 2)
-        ctx.fill()
-        ctx.shadowBlur = 0
-      })
-    }
-
-    function frame(now) {
-      if (!visible) { raf = requestAnimationFrame(frame); return }
-      if (now - lastFrame < FRAME_MIN) { raf = requestAnimationFrame(frame); return }
-      lastFrame = now
-      if (startTime == null) startTime = now
-      const elapsed = now - startTime
-      const revealP = Math.min(1, elapsed / REVEAL_MS)
-      const eased = 1 - Math.pow(1 - revealP, 3)
-      if (revealP < 1) {
-        render(eased, null)
-      } else {
-        render(1, elapsed / 900)
-      }
-      raf = requestAnimationFrame(frame)
-    }
-
-    if (reduce) {
-      render(1, null)
-    } else {
-      raf = requestAnimationFrame(frame)
-    }
-
-    const onVisibility = () => { visible = document.visibilityState === 'visible' }
-    document.addEventListener('visibilitychange', onVisibility)
-
-    return () => {
-      window.removeEventListener('resize', resize)
-      document.removeEventListener('visibilitychange', onVisibility)
-      if (raf) cancelAnimationFrame(raf)
-    }
-  }, [])
-  return <canvas className="ld-hero-canvas" ref={ref} aria-hidden="true" />
+/* ── Hero backdrop: two large, soft ambient color blobs (pure CSS radial-
+ * gradient, no canvas/JS at all). Replaces both prior attempts — a two-line
+ * equity chart (read as distracting lines) and a scattered point field
+ * (read as "dirt"/noise). Maximum restraint this time: just soft diffuse
+ * blue/green atmosphere behind the headline, nothing granular or linear
+ * enough to read as a graphic in its own right. Static — no entrance
+ * animation, no pulse, nothing to get busy. */
+function HeroGlowBlobs() {
+  return (
+    <div className="ld-hero-blobs" aria-hidden="true">
+      <span className="b1" />
+      <span className="b2" />
+    </div>
+  )
 }
 
 // Ambient signal-bar field — a wide band of bars behind the drawn curve,
@@ -172,7 +79,7 @@ export function Hero() {
        * this page has hit before. Its own layer under the canvas/content so
        * it never competes with the drawn curve for contrast. */}
       <div className="ld-hero-glow" aria-hidden="true" />
-      <HeroCanvas />
+      <HeroGlowBlobs />
       <div className="ld-hero-inner">
         <p className="ld-eyebrow">{t('ld.hero.eyebrow')}</p>
         <h1 className="ld-thesis">

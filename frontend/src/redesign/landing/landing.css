@@ -70,7 +70,21 @@
   background: linear-gradient(to top, var(--blue) 0%, var(--blue-2) 45%, var(--green) 100%);
   opacity: 0.3;
 }
-.rd .ld-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; direction: ltr; }
+/* Two large, soft, static color blobs — pure radial-gradient softness (no
+ * `filter: blur`, so this stays clear of the backdrop-filter/animation
+ * ghost-smear bug class), no entrance animation, no pulse. Deliberately the
+ * plainest possible ambient backdrop after two busier attempts (a two-line
+ * chart, then a scattered point field) both read as too much. */
+.rd .ld-hero-blobs { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.rd .ld-hero-blobs .b1, .rd .ld-hero-blobs .b2 { position: absolute; border-radius: 50%; }
+.rd .ld-hero-blobs .b1 {
+  width: 620px; height: 620px; inset-inline-start: 4%; top: -12%;
+  background: radial-gradient(circle, rgba(0,217,126,0.14) 0%, transparent 70%);
+}
+.rd .ld-hero-blobs .b2 {
+  width: 680px; height: 680px; inset-inline-end: 2%; top: 4%;
+  background: radial-gradient(circle, rgba(59,130,246,0.16) 0%, transparent 70%);
+}
 /* Cursor spotlight — position driven by --px/--py (set on .ld-hero itself by
  * usePointerGlow, in px relative to the hero box). Falls back to dead-center
  * when unset, which is exactly the touch/reduced-motion/no-JS-yet state
