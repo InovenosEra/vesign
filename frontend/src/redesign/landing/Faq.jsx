@@ -21,7 +21,17 @@ export function Faq() {
               key={id}
               onToggle={(e) => { if (e.target.open) track('landing_faq_open', { question_id: id }) }}
             >
-              <summary>{t(`ld.faq.items.${id}.q`)}<span className="ld-faq-caret" aria-hidden="true">▾</span></summary>
+              <summary>
+                {t(`ld.faq.items.${id}.q`)}
+                {/* Plain "+" that rotates 45deg into an "x" on open (CSS-driven,
+                 * see .ld-faq-item[open] .ld-faq-caret) — a symmetric glyph, so
+                 * unlike the old arrow caret it needs no RTL mirroring. */}
+                <span className="ld-faq-caret" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                    <path d="M10 4v12M4 10h12" />
+                  </svg>
+                </span>
+              </summary>
               <p>{t(`ld.faq.items.${id}.a`)}</p>
             </details>
           ))}
