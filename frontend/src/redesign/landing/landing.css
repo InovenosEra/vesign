@@ -451,15 +451,21 @@
 
 /* ── Language switcher ─────────────────────────────────────────────────── */
 .rd .ld-lang-switcher { position: relative; }
+/* Transparent by default, same pill-on-hover language as the nav links/Log
+ * in — keeps Sign Up as the only permanently bordered/filled element in the
+ * desktop nav. `.open` gets the same treatment as hover so the trigger
+ * still reads as "active" while its menu is showing, not just on hover. */
 .rd .ld-lang-btn {
   display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 9px;
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; border: 1px solid transparent; border-radius: 7px;
   color: var(--ink-2); font-size: 12.5px; font-weight: 500; cursor: pointer;
-  transition: border-color .15s, color .15s;
+  transition: background-color .15s, border-color .15s, color .15s;
 }
-.rd .ld-lang-btn:hover { border-color: var(--line-2); color: var(--ink); }
+.rd .ld-lang-btn:hover { background: var(--bg-2); border-color: var(--line); color: var(--ink); }
+.rd .ld-lang-switcher.open .ld-lang-btn { background: var(--bg-2); border-color: var(--line-2); color: var(--ink); }
 .rd .ld-lang-btn:focus-visible { outline: 2px solid var(--blue-2); outline-offset: 2px; }
 .rd .ld-lang-flag { font-size: 14px; line-height: 1; }
+.rd .ld-lang-globe { width: 15px; height: 15px; flex-shrink: 0; color: inherit; }
 .rd .ld-lang-menu {
   position: absolute; top: calc(100% + 6px); inset-inline-end: 0; width: max-content; min-width: 128px;
   background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px;
@@ -479,8 +485,11 @@
 .rd .ld-lang-switcher.in-menu .ld-lang-menu { position: static; display: block; box-shadow: none; border: none; background: none; padding: 0; margin-top: 8px; }
 /* Touch-target minimum (44px) — this variant renders inside the mobile
  * hamburger panel where it's the real interactive size, unlike the compact
- * mouse-driven dropdown trigger on desktop. */
-.rd .ld-lang-switcher.in-menu .ld-lang-btn { width: 100%; height: 44px; justify-content: space-between; }
+ * mouse-driven dropdown trigger on desktop. Kept as a visible boxed chip
+ * (unlike the desktop trigger's transparent-until-hover treatment) for the
+ * same reason mobile Log in stays a real button: a clear tap-target
+ * boundary matters more in an expanded menu than nav-bar minimalism does. */
+.rd .ld-lang-switcher.in-menu .ld-lang-btn { width: 100%; height: 44px; justify-content: space-between; background: var(--bg-2); border-color: var(--line); }
 .rd .ld-lang-switcher.in-menu .ld-lang-row { min-height: 44px; }
 
 /* ── Responsive: tablet ───────────────────────────────────────────────── */
