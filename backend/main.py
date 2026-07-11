@@ -5126,15 +5126,6 @@ def market_analyst_consensus(tickers: str = ""):
     return _build_market_analyst_consensus(tickers.split(",") if tickers else [])
 
 
-# Macro strip (cross-market): currency / yield / crypto. Commodities live in
-# their own strip below (so Gold/Oil aren't duplicated here).
-_CROSS_TICKERS = [
-    ("DX-Y.NYB", "USD Index"),
-    ("^TNX",     "10Y Yield"),
-    ("BTC-USD",  "Bitcoin"),
-    ("USDILS=X", "USD / ILS"),
-]
-
 _COMMODITY_TICKERS = [
     ("GC=F", "Gold"),
     ("SI=F", "Silver"),
@@ -5200,11 +5191,6 @@ def _fetch_yf_intraday(tickers: list[str]) -> dict:
         except Exception:
             continue
     return out
-
-
-# Back-compat alias — test_market_cross patches this name.
-def _fetch_cross_quotes() -> dict | None:
-    return _fetch_yf_quotes(_CROSS_TICKERS)
 
 
 def _db_quote_baseline(tickers: list[str]) -> dict:
@@ -5301,12 +5287,6 @@ def _get_yf_strip_cached(pairs: list[tuple[str, str]], key: str, fetch=None) -> 
         data = _build_yf_strip(pairs, key, fetch=fetch)
         _market_cache[key] = {"t": now, "data": data}
         return data
-
-
-@protected.get("/api/market/cross")
-def market_cross():
-    """USD/10Y/BTC/USD-ILS macro strip via yfinance; stale=true on fetch failure."""
-    return _get_yf_strip_cached(_CROSS_TICKERS, "cross", fetch=lambda p: _fetch_cross_quotes())
 
 
 @protected.get("/api/market/commodities")

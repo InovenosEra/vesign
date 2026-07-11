@@ -11,7 +11,6 @@ const lastUrl = () => global.fetch.mock.calls.at(-1)[0]
 
 test('market fetchers hit the right /api paths', async () => {
   await api.getIndices();              expect(lastUrl()).toBe('/api/market/indices')
-  await api.getCrossMarket();          expect(lastUrl()).toBe('/api/market/cross')
   await api.getMovers('gainers', 5);   expect(lastUrl()).toBe('/api/market/movers?type=gainers&limit=5')
   await api.getBreadth();              expect(lastUrl()).toBe('/api/market/breadth')
   await api.getValuation(6);           expect(lastUrl()).toBe('/api/market/valuation?limit=6')
