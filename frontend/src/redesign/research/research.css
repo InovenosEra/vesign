@@ -73,6 +73,14 @@
     gap: 16px;
     padding: 24px;
   }
+  /* Grid tracks default to min-width:auto, i.e. they refuse to shrink below
+   * their content's min-content width. The table below has ~11 nowrap
+   * columns whose combined min-content width comfortably exceeds viewport
+   * minus the 280px filter rail — without this, that forced the 1fr track
+   * (and the whole page) wider than the viewport instead of letting the
+   * table scroll within its own box. Same fix pattern as .sig-col in
+   * signals.css. */
+  .rd .results-area { min-width: 0; }
 
   /* FILTER RAIL */
   /* contain:paint — same fix as .wl-toolbar (see project_focus_triggered_color_glitch
@@ -217,7 +225,10 @@
   .rd .active-chip .x:hover { opacity: 1; }
   .rd .active-chip .lbl { font-family: var(--mono); font-size: 10px; opacity: 0.7; }
 
-  /* TABLE */
+  /* TABLE — scrolls horizontally within its own box (rather than pushing
+   * the whole page wider) once the nowrap columns' combined width exceeds
+   * the available space; pairs with .results-area's min-width:0 above. */
+  .rd .data-table-scroll { overflow-x: auto; border-radius: 10px; }
   .rd .data-table {
     width: 100%; border-collapse: collapse;
     background: var(--panel);

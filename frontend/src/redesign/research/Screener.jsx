@@ -401,6 +401,7 @@ export default function Screener({ onCount }) {
           </span>
         </div>
 
+        <div className="data-table-scroll">
         <table className="data-table">
           <thead>
             <tr>
@@ -428,6 +429,7 @@ export default function Screener({ onCount }) {
             )}
           </tbody>
         </table>
+        </div>
 
         <div className="pager">
           <span className={'p' + (curPage === 1 ? ' disabled' : '')} onClick={() => curPage > 1 && setPage(curPage - 1)}>‹</span>
