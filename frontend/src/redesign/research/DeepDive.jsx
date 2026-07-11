@@ -12,7 +12,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getResearch, getPriceHistory, getEarnings, getNews, getSignalMarkers, searchTickers,
-  getWatchlists, getWatchlistTickers, addTicker, removeTicker } from '../../api'
+  getWatchlists, getWatchlistTickers, addTicker, removeTicker, WHITE_BG_LOGOS } from '../../api'
 import { num, pct, dateFmt, ago, LOGO } from '../fmt'
 import { useCurrency } from '../../context/CurrencyContext'
 import { useMe } from '../../context/MeContext'
@@ -234,7 +234,7 @@ export default function DeepDive({ ticker, setTicker }) {
       {/* HERO */}
       <div className="dd-hero">
         <div className="dd-hero-left">
-          <img className="dd-hero-logo" src={LOGO(ticker)} alt={ticker} />
+          <img className={'dd-hero-logo' + (WHITE_BG_LOGOS.has(ticker) ? ' white-bg' : '')} src={LOGO(ticker)} alt={ticker} />
           <div className="dd-hero-id">
             <div className="tk">{r?.ticker || ticker}</div>
             <div className="co">{r?.company || '—'}</div>

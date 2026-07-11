@@ -347,8 +347,13 @@
     pointer-events: none;
   }
   .rd .dd-hero-left { display: flex; align-items: center; gap: 18px; position: relative; z-index: 1; }
-  .rd .dd-hero-logo { width: 64px; height: 64px; border-radius: 12px; object-fit: contain; background: #fff; padding: 6px; flex-shrink: 0; }
-  .rd .dd-hero-logo.transparent { background: transparent; padding: 0; }
+  /* Transparent by default — was unconditionally white, which put a white
+   * square behind every logo including ones (e.g. NVDA) with their own
+   * transparent PNG and no need for a backdrop. White is now opt-in via
+   * .white-bg, driven by the same WHITE_BG_LOGOS allowlist (frontend/src/api.js)
+   * every other logo instance in the app already uses. */
+  .rd .dd-hero-logo { width: 64px; height: 64px; border-radius: 12px; object-fit: contain; flex-shrink: 0; }
+  .rd .dd-hero-logo.white-bg { background: #fff; padding: 6px; }
   .rd .dd-hero-id { display: flex; flex-direction: column; gap: 4px; }
   .rd .dd-hero-id .tk { font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; line-height: 1; }
   .rd .dd-hero-id .co { font-family: var(--sans); font-size: 15px; color: var(--ink-2); font-weight: 500; }
