@@ -129,14 +129,22 @@ const COLUMNS = [
     cell: (r, c) => c.modelLocked
       ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>
       : <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
-  { key: 'fair_value_upside', label: 'Pred. upside', align: 'r', sortable: true, width: '13%',
+  { key: 'fair_value_upside', label: 'Pred. upside', sortable: true, width: '13%',
+    // Left-aligned (not the usual `align:'r'` numeric-column convention) and
+    // wrapped in a flex row so the bar — always first, always fixed-width —
+    // starts at the exact same x on every row. Right-aligning this column
+    // (as text-align:right on a bar+variable-width-text inline group) anchors
+    // the RIGHT edge instead, so a longer/shorter percentage next to the bar
+    // shifted the bar's own start position left/right row to row.
     cell: (r, c) => {
       if (r.fair_value_upside == null) return <span className="muted">—</span>
       const up = r.fair_value_upside * 100
-      return (<>
-        <span className="upside-bar"><span className={'fill' + (up < 0 ? ' down' : '')} style={{ width: Math.max(0, Math.min(100, up / c.maxUp * 100)).toFixed(0) + '%' }} /></span>
-        <span className={dirClass(up)}>{pct(up)}</span>
-      </>)
+      return (
+        <div className="upside-cell">
+          <span className="upside-bar"><span className={'fill' + (up < 0 ? ' down' : '')} style={{ width: Math.max(0, Math.min(100, up / c.maxUp * 100)).toFixed(0) + '%' }} /></span>
+          <span className={dirClass(up)}>{pct(up)}</span>
+        </div>
+      )
     },
     csv: (r) => r.fair_value_upside == null ? '' : (r.fair_value_upside * 100).toFixed(2) },
   { key: 'health_score', label: 'Health', align: 'r', sortable: true, width: '8%',
