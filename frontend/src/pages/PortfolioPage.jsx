@@ -67,9 +67,17 @@ export default function PortfolioPage() {
     const pnlAbs = currentValue != null ? currentValue - h.total_cost : null
     const pnlPct = pnlAbs != null && h.total_cost ? (pnlAbs / h.total_cost) * 100 : null
     const refPrice = livePrice ?? h.latest_close
-    const dailyPnlAbs = refPrice != null && h.prev_close != null
-      ? (refPrice - h.prev_close) * h.total_qty : null
-    return { ...h, livePrice, currentValue, pnlAbs, pnlPct, dailyPnlAbs }
+    // Baseline must match what refPrice represents. While a live intraday price is
+    // showing, today's bar isn't in daily_prices yet, so latest_close IS the prior
+    // completed session's close — that's the correct "since last close" baseline.
+    // Only once the market is idle does latest_close become TODAY's own close, at
+    // which point prev_close (the session before it) is the right baseline. Using
+    // prev_close unconditionally (the old behavior) compared live prices against a
+    // close from two sessions back, roughly doubling the apparent daily move.
+    const baseClose = livePrice != null ? h.latest_close : h.prev_close
+    const dailyPnlAbs = refPrice != null && baseClose != null
+      ? (refPrice - baseClose) * h.total_qty : null
+    return { ...h, livePrice, currentValue, pnlAbs, pnlPct, dailyPnlAbs, baseClose }
   }), [holdings, prices])
 
   // Summary totals
@@ -81,7 +89,7 @@ export default function PortfolioPage() {
     ? null
     : enriched.reduce((s, h) => s + (h.dailyPnlAbs ?? 0), 0)
   const prevTotalValue = enriched.reduce((s, h) => {
-    const prev = h.prev_close != null ? h.prev_close * h.total_qty : (h.currentValue ?? 0)
+    const prev = h.baseClose != null ? h.baseClose * h.total_qty : (h.currentValue ?? 0)
     return s + prev
   }, 0)
   const dailyPnlPct = dailyPnlAbs != null && prevTotalValue > 0
@@ -154,7 +162,7 @@ export default function PortfolioPage() {
         />
         <SummaryCard
           label={t('portfolio.dailyPnl')}
-          value={dailyPnlAbs != null ? `${dailyPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(dailyPnlAbs))}` : '—'}
+          value={dailyPnlAbs != null ? `${dailyPnlAbs >= 0 ? '+' : '-'}${fmtPrice(Math.abs(dailyPnlAbs))}` : '—'}
           sub={dailyPnlPct != null ? `${dailyPnlPct >= 0 ? '+' : ''}${fmt(dailyPnlPct)}% today` : undefined}
           color={dailyPnlAbs != null ? (dailyPnlAbs >= 0 ? 'var(--green)' : 'var(--red)') : undefined}
         />
