@@ -43,8 +43,7 @@ def portfolio_app():
 
 def test_holdings_use_live_price(portfolio_app):
     bm, client = portfolio_app
-    with patch.object(bm, "_phase_info", return_value={"phase": "regular"}), \
-         patch.object(bm, "fetch_live_prices", return_value={"AAA": 120.0}):
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": {"AAA": 120.0}}):
         body = client.get("/api/portfolio/holdings?market=US").json()
     h = next(x for x in body if x["ticker"] == "AAA")
     assert h["latest_close"] == 120.0      # live price, not the 105 daily close
@@ -53,7 +52,7 @@ def test_holdings_use_live_price(portfolio_app):
 
 def test_holdings_fallback_to_daily_close(portfolio_app):
     bm, client = portfolio_app
-    with patch.object(bm, "_phase_info", return_value={"phase": "idle"}):
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
         body = client.get("/api/portfolio/holdings?market=US").json()
     h = next(x for x in body if x["ticker"] == "AAA")
     assert h["latest_close"] == 105.0      # no live -> daily close
@@ -73,8 +72,7 @@ def test_today_baseline_is_latest_daily_close_during_live(portfolio_app):
     (rn=2 = 100). Mirrors the Market panel baseline (_build_universe_baseline)."""
     bm, client = portfolio_app
     _add_prior_days(bm)   # daily closes: 05-22=105 (latest), 05-21=100, 05-20=90
-    with patch.object(bm, "_phase_info", return_value={"phase": "regular"}), \
-         patch.object(bm, "fetch_live_prices", return_value={"AAA": 120.0}):
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "regular", "prices": {"AAA": 120.0}}):
         body = client.get("/api/portfolio/holdings?market=US").json()
     h = next(x for x in body if x["ticker"] == "AAA")
     assert h["latest_close"] == 120.0      # live intraday price
@@ -86,7 +84,7 @@ def test_today_baseline_is_prior_close_when_idle(portfolio_app):
     baseline is the prior session (rn=2 = 100) — the last completed session's move."""
     bm, client = portfolio_app
     _add_prior_days(bm)
-    with patch.object(bm, "_phase_info", return_value={"phase": "idle"}):
+    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
         body = client.get("/api/portfolio/holdings?market=US").json()
     h = next(x for x in body if x["ticker"] == "AAA")
     assert h["latest_close"] == 105.0      # daily close

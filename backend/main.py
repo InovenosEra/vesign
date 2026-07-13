@@ -1633,17 +1633,16 @@ def analyst_history_endpoint(
 
 @protected.get("/api/prices/live")
 def live_prices(tickers: str = Query(..., description="Comma-separated ticker symbols")):
-    """Per-ticker live prices for a bounded, caller-supplied ticker list (a page's
-    visible rows, a user's holdings, one ticker's modal) — fetched directly, NOT
-    from the whole-universe snapshot, so pre/post-market prices are the real last
-    trade rather than a bid/ask mid (matches production). Safe here because every
-    caller passes a small list; see _get_page_live_prices for the scale ceiling."""
+    """Per-ticker live prices, read from the shared whole-universe snapshot — the
+    SAME source the BUY/SELL cards and market panels use — so every live price in
+    the app is identical for a given ticker (no mid-vs-last-trade / timing drift).
+    Phase-aware via the snapshot itself."""
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="No tickers provided")
-    phase = _phase_info()["phase"]
-    px = _get_page_live_prices(ticker_list, phase)
-    return {"phase": phase, "prices": {t: px.get(t) for t in ticker_list}}
+    snap = _get_live_snapshot()
+    px = snap["prices"]
+    return {"phase": snap["phase"], "prices": {t: px.get(t) for t in ticker_list}}
 
 
 # --- Watchlists -------------------------------------------------------------
@@ -2925,11 +2924,9 @@ def portfolio_holdings(user=Depends(get_current_user), market: str = Query(defau
             WHERE c.ticker IN ({ph})
         """), tp).fetchall()}
 
-    phase = _phase_info()["phase"]
-    live_phase = phase != "idle"
-    # Bounded to this user's own holdings (small) — real last-trade price,
-    # not the whole-universe bid/ask-mid snapshot. See _get_page_live_prices.
-    live_prices = _get_page_live_prices(tickers, phase)
+    snap = _get_live_snapshot()
+    live_phase = snap["phase"] != "idle"
+    live_prices = snap["prices"]
 
     result = []
     for r in rows:
@@ -4060,37 +4057,6 @@ def _get_live_snapshot() -> dict:
     _do_snapshot_refresh(phase, tickers)
     with _snapshot_lock:
         return {"phase": phase, "prices": _snapshot_cache}
-
-
-# --- Live price for a BOUNDED ticker list (a user's holdings, one ticker's modal,
-# a page's visible rows) — NOT the whole universe. FMP's pre/post endpoint is
-# per-ticker only (no batch variant), so this is safe for tens of tickers but
-# would rate-limit at whole-universe scale (~1,800 tickers) — that's what
-# _get_live_snapshot's batched bid/ask-mid exists for; the two are NOT
-# interchangeable. Per-ticker TTL cache so a page polling every few seconds
-# doesn't refire an FMP call each time. Mirrors production's per-page pattern.
-_page_live_cache: dict = {}          # ticker -> price
-_page_live_cache_ts: dict = {}       # ticker -> last-fetched time
-_page_live_lock = threading.Lock()
-_PAGE_LIVE_TTL_SECONDS = 2
-
-
-def _get_page_live_prices(tickers: list[str], phase: str) -> dict:
-    if not tickers or phase == "idle":
-        return {}
-    now = time.time()
-    with _page_live_lock:
-        stale = [t for t in tickers
-                 if t not in _page_live_cache_ts or now - _page_live_cache_ts[t] > _PAGE_LIVE_TTL_SECONDS]
-    if stale:
-        fresh = fetch_live_prices(stale) if phase == "regular" else fetch_aftermarket_trades(stale)
-        with _page_live_lock:
-            for t in stale:
-                if fresh.get(t):
-                    _page_live_cache[t] = fresh[t]
-                _page_live_cache_ts[t] = now
-    with _page_live_lock:
-        return {t: _page_live_cache[t] for t in tickers if t in _page_live_cache}
 
 
 def _display_universe_rows() -> list:
