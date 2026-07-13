@@ -419,7 +419,7 @@ export default function WatchlistPage() {
             <div className="metric-card">
               <div className="label">{t('watchlist.totalPnlAbs', { symbol })}</div>
               <div className={`value ${portPnlAbs >= 0 ? 'up' : 'down'}`} style={{ whiteSpace: 'nowrap' }}>
-                {`${portPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(portPnlAbs))}`}
+                {`${portPnlAbs >= 0 ? '+' : '-'}${fmtPrice(Math.abs(portPnlAbs))}`}
               </div>
             </div>
             <div className="metric-card">
@@ -432,7 +432,7 @@ export default function WatchlistPage() {
             <div className="metric-card">
               <div className="label">{t('portfolio.dailyPnlAbs', { symbol })}</div>
               <div className={`value ${portDailyPnlAbs != null && portDailyPnlAbs >= 0 ? 'up' : 'down'}`} style={{ whiteSpace: 'nowrap' }}>
-                {portDailyPnlAbs != null ? `${portDailyPnlAbs >= 0 ? '+' : ''}${fmtPrice(Math.abs(portDailyPnlAbs))}` : '—'}
+                {portDailyPnlAbs != null ? `${portDailyPnlAbs >= 0 ? '+' : '-'}${fmtPrice(Math.abs(portDailyPnlAbs))}` : '—'}
               </div>
             </div>
             <div className="metric-card">
