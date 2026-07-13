@@ -112,6 +112,8 @@ def test_prices_live_returns_phase_field(monkeypatch):
     from fastapi.testclient import TestClient
     from backend import main as backend_main
     backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+    backend_main._page_live_cache.clear()
+    backend_main._page_live_cache_ts.clear()
 
     monkeypatch.setattr(backend_main, "_phase_info",
         lambda now_utc=None: {"phase": "idle", "next_event_name": "pre_open",
@@ -126,15 +128,18 @@ def test_prices_live_returns_phase_field(monkeypatch):
     backend_main.app.dependency_overrides.clear()
 
 
-def test_prices_live_reads_the_shared_snapshot(monkeypatch):
-    """The endpoint returns prices straight from _get_live_snapshot (the same source
-    the BUY/SELL cards + market panels use), with its phase."""
+def test_prices_live_reads_bounded_last_trade(monkeypatch):
+    """The endpoint fetches a real last-trade price for the requested (bounded)
+    ticker list directly — not the whole-universe bid/ask-mid snapshot."""
     from fastapi.testclient import TestClient
     from backend import main as backend_main
     backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+    backend_main._page_live_cache.clear()
+    backend_main._page_live_cache_ts.clear()
 
-    monkeypatch.setattr(backend_main, "_get_live_snapshot",
-        lambda: {"phase": "regular", "prices": {"AAPL": 298.99, "MSFT": 410.0}})
+    monkeypatch.setattr(backend_main, "_phase_info", lambda now_utc=None: {"phase": "regular"})
+    monkeypatch.setattr(backend_main, "fetch_live_prices",
+        lambda tickers: {"AAPL": 298.99, "MSFT": 410.0})
 
     client = TestClient(backend_main.app)
     body = client.get("/api/prices/live?tickers=AAPL").json()
@@ -144,14 +149,17 @@ def test_prices_live_reads_the_shared_snapshot(monkeypatch):
     backend_main.app.dependency_overrides.clear()
 
 
-def test_prices_live_passes_through_snapshot_phase(monkeypatch):
-    """Phase comes from the snapshot itself (e.g. pre/post extended hours)."""
+def test_prices_live_uses_aftermarket_trades_in_pre_post(monkeypatch):
+    """Pre/post phase uses the real last aftermarket trade, not a bid/ask mid."""
     from fastapi.testclient import TestClient
     from backend import main as backend_main
     backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+    backend_main._page_live_cache.clear()
+    backend_main._page_live_cache_ts.clear()
 
-    monkeypatch.setattr(backend_main, "_get_live_snapshot",
-        lambda: {"phase": "pre", "prices": {"AAPL": 297.55}})
+    monkeypatch.setattr(backend_main, "_phase_info", lambda now_utc=None: {"phase": "pre"})
+    monkeypatch.setattr(backend_main, "fetch_aftermarket_trades",
+        lambda tickers: {"AAPL": 297.55})
 
     client = TestClient(backend_main.app)
     body = client.get("/api/prices/live?tickers=AAPL").json()
@@ -162,13 +170,16 @@ def test_prices_live_passes_through_snapshot_phase(monkeypatch):
 
 
 def test_prices_live_filters_to_requested_tickers(monkeypatch):
-    """Only the requested tickers are returned; one missing from the snapshot → None."""
+    """Only the requested tickers are returned; one missing from the fetch → None."""
     from fastapi.testclient import TestClient
     from backend import main as backend_main
     backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: {"id": "test"}
+    backend_main._page_live_cache.clear()
+    backend_main._page_live_cache_ts.clear()
 
-    monkeypatch.setattr(backend_main, "_get_live_snapshot",
-        lambda: {"phase": "regular", "prices": {"AAPL": 100.0, "MSFT": 200.0}})
+    monkeypatch.setattr(backend_main, "_phase_info", lambda now_utc=None: {"phase": "regular"})
+    monkeypatch.setattr(backend_main, "fetch_live_prices",
+        lambda tickers: {"AAPL": 100.0, "MSFT": 200.0})
 
     client = TestClient(backend_main.app)
     body = client.get("/api/prices/live?tickers=AAPL,GOOG").json()

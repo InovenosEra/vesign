@@ -65,7 +65,8 @@ def all_tiers_price_cents(locked_by_tier: dict) -> int:
 
 PRO_PREVIEW_ROWS = 10          # open-trades preview (Pro) + free top-N yield reveal
 PRO_SELL_PREVIEW_ROWS = 5      # Pro: free SELL signals before pay-to-unlock kicks in
-OPEN_UNLOCK_ALL_CENTS = 200    # Pro: flat $2 to unlock ALL open trades (one bundle, no per-row)
+OPEN_UNLOCK_ALL_CENTS = 100    # Pro: flat $1 to permanently unlock ALL open trades (page 1 is
+                                # always free; page 2+ is fully locked until this is bought)
 SELL_UNLOCK_ALL_CENTS = 100    # Pro: flat $1 to unlock ALL SELL signals, regardless of count
 
 _UNLOCK_SECRET = (
@@ -250,11 +251,19 @@ def redact_holdings(rows, *, plan):
     return redact_fields(rows, plan=plan, fields=HOLDING_MODEL_FIELDS)
 
 
+OPEN_ALL_UNLOCK_KEY = ("open", "*", "*")   # sentinel written by the flat "unlock all" purchase
+
+
 def gate_open_trades(rows, *, plan, unlocks):
-    """Redact the open-trades list. `rows` MUST already be sorted by yield desc
-    (the endpoint does this). Free: top-10 reveal yield only; rest fully locked.
-    Pro: first-10 preview, rest bulk-lockable."""
+    """Redact the open-trades list. `rows` MUST already be sorted (the endpoint
+    does this) — that order defines what counts as "page 1". Free: top-10
+    reveal yield only; rest fully locked. Pro: page 1 (first PRO_PREVIEW_ROWS)
+    is always free; every row after that is fully locked (no per-row unlocks)
+    until OPEN_ALL_UNLOCK_KEY is in `unlocks`, which then grants every row —
+    including ones opened after the purchase."""
     if plan == "max":
+        return list(rows)
+    if plan == "pro" and OPEN_ALL_UNLOCK_KEY in unlocks:
         return list(rows)
     out = []
     for i, r in enumerate(rows):
@@ -267,11 +276,11 @@ def gate_open_trades(rows, *, plan, unlocks):
             else:
                 out.append(_locked_row("open", date, "upgrade"))
             continue
-        # pro
-        if ("open", ticker, date) in unlocks or i < PRO_PREVIEW_ROWS:
+        # pro, full-unlock not purchased
+        if i < PRO_PREVIEW_ROWS:
             out.append(r)
-            continue
-        out.append(_locked_row("open", date, "pay", token=lock_token("open", ticker, date)))
+        else:
+            out.append(_locked_row("open", date, "pay", token=lock_token("open", ticker, date)))
     return out
 
 

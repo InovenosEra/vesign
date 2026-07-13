@@ -162,11 +162,21 @@ def test_open_pro_previews_ten_then_bulk_locks(ent):
     assert "lock_token" in out[10]
 
 
-def test_open_pro_unlocked_row_is_full(ent):
+def test_open_pro_stale_per_row_unlock_not_honored(ent):
+    # Per-row unlocks are no longer a thing for open trades (bulk-only) — a
+    # leftover per-row entry from before the redesign must NOT unlock the row.
     rows = [_open(f"T{i}", float(20 - i)) for i in range(12)]
     unlocks = {("open", "T10", "2026-05-01")}
     out = ent.gate_open_trades(rows, plan="pro", unlocks=unlocks)
+    assert out[10]["locked"] is True and out[10]["reason"] == "pay"
+
+
+def test_open_pro_full_unlock_via_sentinel(ent):
+    rows = [_open(f"T{i}", float(20 - i)) for i in range(12)]
+    unlocks = {ent.OPEN_ALL_UNLOCK_KEY}
+    out = ent.gate_open_trades(rows, plan="pro", unlocks=unlocks)
     assert out[10]["ticker"] == "T10" and not out[10].get("locked")
+    assert out[11]["ticker"] == "T11" and not out[11].get("locked")
 
 
 def test_multidate_only_latest_buy_sell_gated(ent):

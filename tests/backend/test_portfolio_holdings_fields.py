@@ -46,7 +46,7 @@ def hold_app():
 
 def test_holdings_includes_sector_and_latest_signal(hold_app):
     bm, client = hold_app
-    with patch.object(bm, "_get_live_snapshot", return_value={"phase": "idle", "prices": {}}):
+    with patch.object(bm, "_phase_info", return_value={"phase": "idle"}):
         rows = client.get("/api/portfolio/holdings").json()
     assert len(rows) == 1
     r = rows[0]

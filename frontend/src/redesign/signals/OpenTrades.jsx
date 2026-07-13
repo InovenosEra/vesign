@@ -12,7 +12,7 @@ import { UnlockAllButton, ConfirmUnlockDialog } from './UnlockAll'
 
 const PAGE_SIZE = 10
 const FREE_PREVIEW = 10           // free users see the top-10 by yield, yield-only, no pager
-const OPEN_UNLOCK_ALL_CENTS = 200 // flat $2 to unlock ALL open trades — mirrors backend ent.OPEN_UNLOCK_ALL_CENTS
+const OPEN_UNLOCK_ALL_CENTS = 100 // flat $1 to unlock ALL open trades, permanently — mirrors backend ent.OPEN_UNLOCK_ALL_CENTS
 const COLSPAN = 10
 
 // Market cap in billions, 1 decimal (matches ve-sign.com's open-trades column).
