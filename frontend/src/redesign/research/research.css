@@ -408,14 +408,55 @@
   .rd .dd-hero-price .delta.up { color: var(--green); }
   .rd .dd-hero-price .delta.down { color: var(--red); }
 
-  .rd .dd-hero-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+  .rd .dd-hero-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
   /* Buttons here use the canonical .btn / .btn.sm system (redesign.css). */
-
-  /* CHART + VERDICT TWO-UP */
-  .rd .dd-chart-row {
-    display: grid; grid-template-columns: 1.7fr 1fr;
-    gap: 16px;
+  .rd .dd-hero-wl-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rd .dd-hero-wl-chips span {
+    padding: 2px 8px; border-radius: 3px;
+    font-family: var(--mono); font-size: 10.5px;
+    background: var(--bg-3); color: var(--ink-2);
   }
+
+  /* VERDICT BAND — synthesized, no-LLM readout above the chart. The single
+     accent color (border + wash, driven by the signal) is this component's
+     one deliberate flourish: the verdict is felt in the color before it's
+     read in the text, everything else on the band stays quiet. */
+  .rd .dd-verdict-band {
+    position: relative;
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line-2);
+    border-radius: 10px; padding: 16px 20px 16px 22px; margin-bottom: 16px;
+  }
+  .rd .dd-verdict-band.buy { border-left-color: var(--green); background: linear-gradient(115deg, var(--green-bg), var(--panel) 55%); }
+  .rd .dd-verdict-band.sell { border-left-color: var(--red); background: linear-gradient(115deg, var(--red-bg), var(--panel) 55%); }
+  .rd .dd-verdict-band.hold { border-left-color: var(--ink-3); }
+  .rd .vb-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .rd .vb-head .sig-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 15px; border-radius: 6px;
+    font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+  }
+  .rd .vb-head .sig-tag.buy { background: var(--green-bg); color: var(--green); border: 1px solid rgba(0,217,126,0.3); }
+  .rd .vb-head .sig-tag.sell { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,77,92,0.3); }
+  .rd .vb-head .sig-tag.hold { background: rgba(255,255,255,0.06); color: var(--ink-2); border: 1px solid var(--line-2); }
+  .rd .vb-since { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .rd .vb-sentence { font-size: 16px; line-height: 1.75; color: var(--ink-2); font-weight: 400; letter-spacing: -0.005em; }
+  .rd .vb-sentence > span { margin-right: 6px; }
+  .rd .vb-sentence b.vb-num { font-family: var(--mono); font-weight: 700; color: var(--ink); font-feature-settings: 'tnum' 1; font-size: 15.5px; }
+  .rd .vb-sentence b.vb-num.up { color: var(--green); }
+  .rd .vb-sentence b.vb-num.down { color: var(--red); }
+  .rd .vb-sentence .muted { color: var(--ink-3); }
+  .rd .vb-locked { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-3); }
+  .rd .vb-locked a { color: var(--blue-2); cursor: pointer; text-decoration: underline; }
+  .rd .vb-tail {
+    display: flex; align-items: center; gap: 16px;
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
+  }
+  .rd .vb-earnings { display: flex; flex-direction: column; gap: 2px; }
+  .rd .vb-earnings .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
+  .rd .vb-earnings .v { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  .rd .vb-tail .btn { margin-left: auto; }
+
+  /* CHART */
   .rd .dd-chart-panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -437,46 +478,14 @@
   .rd .dd-chart-body svg { width: 100%; height: 100%; }
   .rd .dd-y-axis { position: absolute; right: 18px; top: 12px; bottom: 26px; display: flex; flex-direction: column; justify-content: space-between; font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); pointer-events: none; padding-left: 6px; }
   .rd .dd-x-axis { padding: 0 22px 14px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); }
-
-  /* VERDICT */
-  .rd .dd-verdict {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    overflow: hidden;
-    display: flex; flex-direction: column;
+  .rd .dd-chart-tooltip {
+    position: absolute; top: 10px; transform: translateX(-50%);
+    background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 6px;
+    padding: 6px 11px; pointer-events: none; white-space: nowrap; z-index: 5;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
   }
-  .rd .dd-verdict-head {
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--line);
-    display: flex; align-items: center; gap: 12px;
-  }
-  .rd .dd-verdict-head .sig-tag {
-    padding: 6px 14px; border-radius: 6px;
-    font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
-  }
-  .rd .dd-verdict-head .sig-tag.buy { background: var(--green-bg); color: var(--green); border: 1px solid rgba(0,217,126,0.3); }
-  .rd .dd-verdict-head .sig-tag.sell { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,77,92,0.3); }
-  .rd .dd-verdict-head .sig-tag.hold { background: rgba(255,255,255,0.06); color: var(--ink-2); border: 1px solid var(--line-2); }
-  .rd .dd-verdict-head .since { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
-
-  .rd .dd-verdict-body { padding: 4px 0; flex: 1; }
-  .rd .dd-vstat {
-    display: grid; grid-template-columns: 1fr auto;
-    align-items: center; gap: 14px;
-    padding: 12px 18px;
-    border-bottom: 1px solid var(--line);
-  }
-  .rd .dd-vstat:last-child { border-bottom: none; }
-  .rd .dd-vstat .lbl { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
-  .rd .dd-vstat .lbl .desc { display: block; margin-top: 2px; font-family: var(--mono); color: var(--ink-3); text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 10.5px; }
-  .rd .dd-vstat .val { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--ink); text-align: right; font-feature-settings: 'tnum' 1; }
-  .rd .dd-vstat .val.up { color: var(--green); }
-  .rd .dd-vstat .val.down { color: var(--red); }
-  .rd .dd-vstat .val.purple { color: var(--purple); }
-  .rd .dd-vstat .health { display: inline-flex; gap: 3px; }
-  .rd .dd-vstat .health .s { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
-  .rd .dd-vstat .health .s.off { background: rgba(255,255,255,0.10); }
+  .rd .dd-chart-tooltip .d { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+  .rd .dd-chart-tooltip .p { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--ink); margin-top: 2px; font-feature-settings: 'tnum' 1; }
 
   /* FUNDAMENTALS */
   .rd .dd-fund-grid {
@@ -497,6 +506,17 @@
   .rd .dd-fund-cell .l { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
   .rd .dd-fund-cell .v { margin-top: 4px; font-family: var(--mono); font-size: 16px; color: var(--ink); font-feature-settings: 'tnum' 1; letter-spacing: -0.01em; }
   .rd .dd-fund-cell .v small { color: var(--ink-3); font-size: 11px; margin-left: 3px; }
+  /* Group headers turn 12 undifferentiated cells into 3 legible categories —
+     structure that reflects a real distinction (valuation vs. profitability
+     vs. technicals), not decoration. grid-column:1/-1 spans the full row;
+     the grid's normal auto-flow just continues after each one. */
+  .rd .dd-fund-group-label {
+    grid-column: 1 / -1;
+    background: var(--bg-2);
+    padding: 7px 16px;
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-3);
+  }
 
   /* TWO-COL: analyst + ML */
   .rd .dd-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -510,11 +530,16 @@
   .rd .dd-an-target-bar {
     position: relative; height: 28px;
     background: var(--bg-2); border-radius: 6px;
-    margin: 14px 0 8px;
+    /* top spacing comes from .dd-an-edge-header's own margin-bottom above;
+       bottom margin is set inline (varies with whether the point-labels stagger) */
   }
   .rd .dd-an-range {
+    /* Plain neutral track — it previously carried a green→blue→purple gradient
+       that mapped to nothing (not a risk scale, not a data value), which read
+       as meaningful when it wasn't. The only colors on this bar now are the
+       two markers below, each with a label in the same color right under it. */
     position: absolute; top: 0; bottom: 0;
-    background: linear-gradient(90deg, rgba(0,217,126,0.18), rgba(59,130,246,0.18), rgba(168,85,247,0.18));
+    background: var(--bg-3);
     border-radius: 6px;
   }
   .rd .dd-an-mark {
@@ -523,16 +548,42 @@
   }
   .rd .dd-an-mark.cur { background: var(--gold); width: 3px; box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
   .rd .dd-an-mark.mean { background: var(--blue-2); }
-  .rd .dd-an-tooltip {
-    position: absolute; bottom: 32px;
-    padding: 4px 8px;
-    background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 4px;
-    font-family: var(--mono); font-size: 10.5px; color: var(--ink);
-    white-space: nowrap;
+  /* Current/Mean callouts hang directly below their own marker (same left%
+     as the mark itself), so the line and its label are visibly one thing —
+     not a separately-laid-out row that only lines up by coincidence.
+     .stagger drops the Mean callout lower when the two are close enough
+     together (< 14% apart) that side-by-side text would collide. */
+  .rd .dd-an-point-label {
+    position: absolute; top: 100%; margin-top: 9px;
     transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center;
+    font-family: var(--mono); white-space: nowrap; line-height: 1.3;
   }
-  .rd .dd-an-labels { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 12px; }
-  .rd .dd-an-labels .v { color: var(--ink); font-weight: 600; }
+  .rd .dd-an-point-label .pv { font-size: 12.5px; font-weight: 700; color: var(--ink); font-feature-settings: 'tnum' 1; }
+  .rd .dd-an-point-label .pl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+  .rd .dd-an-point-label.cur .pl { color: var(--gold); }
+  .rd .dd-an-point-label.mean .pl { color: var(--blue-2); }
+  .rd .dd-an-point-label.stagger { margin-top: 40px; }
+  /* Low/High reuse the exact same value+caption look as Current/Mean below —
+     one visual language for all four numbers on this card — just laid out in
+     the header row (not pinned to the bar) since they're always the fixed
+     0%/100% ends, not a computed position. */
+  .rd .dd-an-point-label.static { position: static; margin-top: 0; transform: none; align-items: flex-start; }
+  .rd .dd-an-point-label.static .pl { color: var(--ink-3); }
+  /* .static.cur (the off-range badge below) needs gold to win over the
+     generic gray .static rule above — both are 2-class descendant selectors
+     so source order would otherwise decide it; this is 3 classes, unambiguous. */
+  .rd .dd-an-point-label.static.cur .pl { color: var(--gold); }
+  .rd .dd-an-edge-header { display: flex; justify-content: space-between; margin-bottom: 14px; }
+  .rd .dd-an-edge-header .dd-an-point-label.static:last-child { align-items: flex-end; }
+  /* Current price outside the analyst range entirely (below Low or above
+     High) — rendered as a badge beside the bar instead of a marker clamped
+     onto an edge it doesn't truly sit at (see the comment on rawCurPos in
+     DeepDive.jsx). Arrow points away from the bar, toward "further this way". */
+  .rd .dd-an-track-row { display: flex; align-items: center; gap: 10px; }
+  .rd .dd-an-track-row .dd-an-target-bar { flex: 1; min-width: 0; }
+  .rd .dd-an-offrange { display: flex; align-items: center; gap: 6px; flex-shrink: 0; color: var(--gold); }
+  .rd .dd-an-offrange-note { margin-top: 10px; font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
   .rd .dd-an-rec {
     margin-top: 18px;
     display: grid; grid-template-columns: 1fr 1fr;
@@ -548,19 +599,22 @@
   .rd .dd-an-rec .cell .v.down { color: var(--red); }
   .rd .dd-an-rec .cell .sub { font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
 
-  /* ML PREDICTIONS */
-  .rd .dd-ml-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+  /* ML PREDICTIONS — one row since the redundant "Direction (5d)" line was
+     removed (it was just this row's own sign, restated). Given more room to
+     breathe so the panel doesn't read as an afterthought next to the fuller
+     Analyst-targets panel beside it, rather than inventing a second stat. */
+  .rd .dd-ml-body { padding: 26px 22px; display: flex; flex-direction: column; gap: 14px; }
   .rd .dd-ml-row {
-    padding: 14px 16px;
+    padding: 18px 18px;
     background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px;
   }
   .rd .dd-ml-row .top { display: flex; align-items: baseline; justify-content: space-between; }
   .rd .dd-ml-row .top .lbl { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-  .rd .dd-ml-row .top .pred { font-family: var(--mono); font-size: 18px; font-weight: 600; font-feature-settings: 'tnum' 1; }
+  .rd .dd-ml-row .top .pred { font-family: var(--mono); font-size: 24px; font-weight: 700; font-feature-settings: 'tnum' 1; }
   .rd .dd-ml-row .top .pred.up { color: var(--green); }
   .rd .dd-ml-row .top .pred.down { color: var(--red); }
   .rd .dd-ml-row .bar {
-    height: 6px; background: var(--bg-3); border-radius: 3px; margin-top: 10px;
+    height: 8px; background: var(--bg-3); border-radius: 4px; margin-top: 12px;
     position: relative; overflow: hidden;
   }
   .rd .dd-ml-row .bar .fill { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--green); border-radius: 3px; transition: width .25s; }
@@ -580,6 +634,15 @@
   }
   .rd .dd-hrow:last-child { border-bottom: none; }
   .rd .dd-hrow:hover { background: var(--bg-2); }
+  /* The one row still open (unrealized, no trade_log return yet) gets a
+     distinct tint so "this is happening now" reads apart from settled history. */
+  .rd .dd-hrow.still-open { background: rgba(96,165,250,0.06); box-shadow: inset 3px 0 0 var(--blue-2); }
+  .rd .dd-hrow.still-open:hover { background: rgba(96,165,250,0.10); }
+  .rd .dd-hrow .open-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+    color: var(--blue-2);
+  }
   .rd .dd-hrow .sig {
     width: 32px; height: 32px; border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
@@ -596,6 +659,31 @@
   .rd .dd-hrow .ret.down { background: rgba(255,77,92,0.12); color: var(--red); }
   .rd .dd-hrow .ret.open { background: var(--bg-3); color: var(--ink-2); }
   .rd .dd-hrow .days { font-family: var(--mono); font-size: 11px; color: var(--ink-3); min-width: 60px; text-align: right; }
+
+  /* AI RESEARCH REPORT */
+  .rd .dd-ai-body { padding: 18px 22px 20px; }
+  .rd .dd-ai-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .rd .dd-ai-entry {
+    width: 200px; height: 30px; padding: 0 10px;
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px;
+    color: var(--ink); font-size: 12.5px; font-family: var(--sans);
+    transition: border-color .15s;
+  }
+  .rd .dd-ai-entry::placeholder { color: var(--ink-3); }
+  .rd .dd-ai-entry:focus { outline: none; border-color: rgba(96,165,250,0.5); }
+  .rd .dd-ai-status { margin-top: 16px; font-size: 12.5px; color: var(--ink-2); }
+  .rd .dd-ai-status.muted { color: var(--ink-3); }
+  .rd .dd-ai-status.err { color: var(--red); }
+  .rd .dd-ai-text {
+    margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 13.5px; line-height: 1.7; color: var(--ink-2);
+  }
+  /* pre-line, not the paragraph default: the model sometimes formats a
+     section as a "- bullet" list (single \n between items, no blank line),
+     which would otherwise collapse into one run-on line. */
+  .rd .dd-ai-p { margin: 0 0 12px; white-space: pre-line; }
+  .rd .dd-ai-p:last-child { margin-bottom: 0; }
+  .rd .dd-ai-p strong { color: var(--ink); font-weight: 600; }
 
   /* NEWS */
   .rd .dd-news-body { padding: 0; }

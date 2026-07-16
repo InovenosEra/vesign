@@ -1,7 +1,7 @@
 /* Screener tab — filter rail + ranked results table.
  * Data: signals/today (US), filtered/sorted/paginated client-side. Rows open the
  * shared ticker modal. Filters persist via "Save filter set"; column visibility
- * and the chosen sort persist too. */
+ * persists too (sort resets to the default each mount). */
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSignalsToday, WHITE_BG_LOGOS } from '../../api'
@@ -99,9 +99,8 @@ const DEFAULTS = {
   search: '',
 }
 
-// Column registry — single source of truth for the table, sorting, the Columns
-// picker, and CSV export. `cell` renders the table cell; `csv` returns the raw
-// value for export (defaults to the row's `key`). `sortable`/`hideable` gate the
+// Column registry — single source of truth for the table, sorting, and the
+// Columns picker. `cell` renders the table cell. `sortable`/`hideable` gate the
 // header click + the picker.
 // `width` is a fixed % of the table (table-layout:fixed — see research.css)
 // so column widths never shift when sorting/filtering changes which rows
@@ -115,11 +114,9 @@ const COLUMNS = [
       <div className="ticker-cell">
         <img className={'logo-mini' + (WHITE_BG_LOGOS.has(r.ticker) ? ' white-bg' : '')} src={LOGO(r.ticker)} alt={r.ticker} />
         <div className="tc-text"><div className="tk">{r.ticker}</div><div className="co" title={r.company || ''}>{r.company || ''}</div></div>
-      </div>),
-    csv: (r) => r.ticker },
+      </div>) },
   { key: 'sector', label: 'Sector', width: '9%',
-    cell: (r) => <span className="sector-pill" title={r.sector || ''}>{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span>,
-    csv: (r) => r.sector || '' },
+    cell: (r) => <span className="sector-pill" title={r.sector || ''}>{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span> },
   { key: 'close', label: 'Price', align: 'r', sortable: true, width: '10%',
     cell: (r, c) => r.close == null ? '—' : c.fmtPrice(r.close) },
   { key: 'day_change_pct', label: 'Day', align: 'r', sortable: true, width: '7%',
@@ -145,8 +142,7 @@ const COLUMNS = [
           <span className={dirClass(up)}>{pct(up)}</span>
         </div>
       )
-    },
-    csv: (r) => r.fair_value_upside == null ? '' : (r.fair_value_upside * 100).toFixed(2) },
+    } },
   { key: 'health_score', label: 'Health', align: 'r', sortable: true, width: '8%',
     cell: (r, c) => c.modelLocked
       ? <span className="health rd-blur">{healthDots(4)}</span>
@@ -156,14 +152,18 @@ const COLUMNS = [
       if (c.modelLocked) return <span className="rd-blur">▲ 00%</span>
       const ml = r.prediction_score == null ? null : r.prediction_score * 100
       return <span className={dirClass(ml)}>{ml == null ? '—' : pct(ml)}</span>
-    },
-    csv: (r) => r.prediction_score == null ? '' : (r.prediction_score * 100).toFixed(2) },
+    } },
   { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true, width: '5%',
     cell: (r) => r.pe_ttm == null ? <span className="muted">—</span> : num(r.pe_ttm, { fd: 1 }) },
   { key: 'week52_high', label: '52w high', align: 'r', sortable: true, width: '10%',
     cell: (r, c) => r.week52_high == null ? <span className="muted">—</span> : c.fmtPrice(r.week52_high) },
 ]
 const COL_BY_KEY = Object.fromEntries(COLUMNS.map(c => [c.key, c]))
+// Signal/Health/ML are nulled server-side below Max plan (see `modelLocked`
+// below) — sorting by them would silently no-op (every row compares equal)
+// while the header still claims to be sorted, so gate the header's clickable
+// affordance on the same condition that gates the values.
+const LOCKED_SORT_KEYS = new Set(['signal', 'health_score', 'prediction_score'])
 
 const FILTER_LS = 'rd-screener-filters'
 const COLS_LS = 'rd-screener-hidden-cols'
@@ -299,6 +299,7 @@ export default function Screener({ onCount }) {
 
   const visibleCols = COLUMNS.filter(c => !hidden.has(c.key))
   const ctx = { fmtPrice, maxUp, modelLocked }
+  const isSortable = (c) => c.sortable && !(modelLocked && LOCKED_SORT_KEYS.has(c.key))
 
   const sortLabel = COL_BY_KEY[sort.key]?.label || 'Predicted upside'
   const pages = pagerPages(curPage, pageCount)
@@ -427,8 +428,8 @@ export default function Screener({ onCount }) {
           <thead>
             <tr>
               {visibleCols.map(c => (
-                <th key={c.key} className={(c.align === 'r' ? 'r ' : '') + (c.sortable ? 'sortable' : '')}
-                  onClick={c.sortable ? () => toggleSort(c.key) : undefined}>
+                <th key={c.key} className={(c.align === 'r' ? 'r ' : '') + (isSortable(c) ? 'sortable' : '')}
+                  onClick={isSortable(c) ? () => toggleSort(c.key) : undefined}>
                   {c.label}{sort.key === c.key && <span className="arr">{sort.dir === 'desc' ? '↓' : '↑'}</span>}
                 </th>
               ))}

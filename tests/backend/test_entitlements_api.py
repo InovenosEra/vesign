@@ -52,6 +52,10 @@ def api():
         # Required by _build_open_trades: ML prediction fields at buy date
         conn.execute(text("""CREATE TABLE predictions (
             ticker TEXT, date TEXT, pred_5d REAL, pred_20d REAL, prediction_score REAL)"""))
+        # Required by /api/signals/markers: joins realized returns onto marker rows
+        conn.execute(text("""CREATE TABLE trade_log (
+            ticker TEXT, buy_date TEXT, buy_price REAL, sell_date TEXT, sell_price REAL,
+            return_pct REAL)"""))
         for i in range(3):
             conn.execute(text("INSERT INTO companies (ticker, company, market) VALUES (:t,:t,'US')"),
                          {"t": f"T{i}"})

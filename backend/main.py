@@ -1071,14 +1071,25 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
     # Overlay the live price onto `close` and keep `day_change_pct` consistent with
     # it: when a live price exists it's "today" vs the prior stored close; otherwise
     # the row keeps the last completed session's change computed in SQL.
+    # `fair_value_upside` must be recomputed too — it was computed from the stale
+    # stored close, so leaving it as-is drifts from the live `close` shown right
+    # next to it (same fix as research_ticker's live-overlay, backend/main.py
+    # around line 3560).
     live = _get_live_snapshot()["prices"]
-    rows = [
-        ({**r, "close": live[r["ticker"]],
-          "day_change_pct": ((live[r["ticker"]] - r["close"]) / r["close"] * 100)
-          if r.get("close") else r.get("day_change_pct")}
-         if live.get(r.get("ticker")) else r)
-        for r in rows
-    ]
+
+    def _overlay(r):
+        lp = live.get(r.get("ticker"))
+        if not lp:
+            return r
+        stored_close = r.get("close")
+        out = {**r, "close": lp,
+               "day_change_pct": ((lp - stored_close) / stored_close * 100) if stored_close else r.get("day_change_pct")}
+        target_mean = r.get("target_mean_price")
+        if target_mean and lp > 0:
+            out["fair_value_upside"] = (target_mean - lp) / lp
+        return out
+
+    rows = [_overlay(r) for r in rows]
     if signal and signal.upper() == "BUY":
         # BUY cards sorted by, in order: (1) quality tier Prime→Strong→Promising,
         # untiered last; (2) Health score, highest first; (3) analyst upside (the %
@@ -1494,7 +1505,10 @@ def search_tickers(q: str = Query(..., min_length=1), limit: int = Query(default
 @protected.get("/api/signals/markers")
 def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144),
                    user=Depends(get_current_user)):
-    """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay)."""
+    """Return all BUY/SELL signals for a ticker over the last N months (for chart overlay).
+    Each row also carries the realized outcome (`return_pct`/`closed`) from `trade_log`
+    where one applies, so the Deep-Dive signal-history table can show real win/loss
+    instead of a placeholder — see docs/superpowers/specs/2026-07-16-deep-dive-verdict-ux-design.md."""
     # The marker dates + actions ARE the model's signal history — Pro+ only.
     if ent.get_plan(user["id"]) not in ("pro", "max"):
         return []
@@ -1508,6 +1522,33 @@ def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144),
               AND DATE(date) >= DATE('now', :offset)
             ORDER BY date ASC
         """), conn, params={"t": ticker, "offset": f"-{months} months"})
+        trades = pd.read_sql(text("""
+            SELECT DATE(buy_date) AS buy_date, DATE(sell_date) AS sell_date, return_pct
+            FROM trade_log WHERE ticker = :t ORDER BY buy_date
+        """), conn, params={"t": ticker})
+
+    if not df.empty and not trades.empty:
+        df["date"] = pd.to_datetime(df["date"])
+        trades["buy_date"] = pd.to_datetime(trades["buy_date"])
+        trades["sell_date"] = pd.to_datetime(trades["sell_date"])
+        # merge_asof(backward) finds each row's most recent trade_log cycle whose
+        # buy_date is at/before it. A BUY row only inherits that cycle's outcome if
+        # it actually falls within it (date <= sell_date) — otherwise it's the first
+        # lot of the CURRENT, still-open position (not in trade_log yet). A SELL row
+        # always belongs to the matched cycle: it can't exist without a prior BUY in
+        # that same cycle, and the engine keeps firing SELL for a few days after the
+        # actual exit (see spec) — those later echoes still describe the same trade.
+        merged = pd.merge_asof(df.sort_values("date"), trades.sort_values("buy_date"),
+                                left_on="date", right_on="buy_date", direction="backward")
+        within_cycle = merged["sell_date"].notna() & (merged["date"] <= merged["sell_date"])
+        closed = within_cycle | (merged["signal"] == "SELL")
+        merged["return_pct"] = merged["return_pct"].where(closed)
+        merged["closed"] = closed
+        df = merged.drop(columns=["buy_date", "sell_date"])
+        df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+    else:
+        df["return_pct"] = None
+        df["closed"] = False
     # Use _records so NaN lot_seq (HOLD/SELL rows) becomes JSON null — raw NaN
     # in the response breaks browser JSON.parse and silently empties the chart markers.
     return _records(df)
