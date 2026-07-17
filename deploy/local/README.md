@@ -21,3 +21,23 @@ changed.
 `feat/ui-redesign` until launch, so nothing under `/opt/vesign` can come from
 this branch yet. See the script's own docstring and the "attestation" section
 of project memory for the daily-signal-attestation mechanism this feeds.
+
+## Signal attestation — full setup summary
+
+`vesign-attest.py` runs daily via root's crontab on the production droplet
+(`15 7 * * 1-6`, ~15 minutes after the 07:00 signal pipeline), reading
+`/opt/vesign/vesign.db` strictly read-only and writing private canonical
+JSON snapshots — user-facing fields only (`date`, `ticker`, `direction`,
+`tier`, `health`, `ml_5d`, `predicted_upside`; no VQS, no raw model
+features) — to `/root/vesign-attest/proof-archive/YYYY/YYYY-MM-DD.json`,
+which is never committed anywhere. It pushes only that day's SHA-256 to the
+public [vesign-proof](https://github.com/InovenosEra/vesign-proof) repo
+(`YYYY/YYYY-MM-DD.sha256`, working copy at `/root/vesign-proof`),
+authenticating via a repo-scoped deploy key (`/root/.ssh/vesign_proof_deploy`,
+SSH host alias `github-vesign-proof`) that has no access to this private
+repo. A one-time genesis attestation (`genesis-through-2026-07-16.sha256`)
+covers all 162,603 historical BUY/SELL signals back to 2018-01-02. To verify
+any published day once snapshots are released at launch: run
+`sha256sum YYYY-MM-DD.json` on the published snapshot and compare the
+result to the matching `.sha256` file in `vesign-proof` — a match proves
+that day's signals existed no later than that commit's timestamp.
