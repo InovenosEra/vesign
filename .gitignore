@@ -71,3 +71,9 @@ vesign_research.zip
 redesign-demo/
 
 .superpowers/
+
+# Private signal-attestation snapshots (deploy/local/vesign-attest.py). Only
+# the SHA-256 hash of these is ever pushed (to the separate public
+# vesign-proof repo); the snapshots themselves must never be committed here.
+proof-archive/
+
