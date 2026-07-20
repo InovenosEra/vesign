@@ -11,7 +11,7 @@ export const seeAllCents = (n, perRowCents) =>
 
 // --- Tier unlock pricing (mirrors backend.entitlements; rates come from
 // /api/signals/today/tiers so they stay single-sourced) -----------------------
-export const PER_TIER_RATE_CENTS = { 1: 30, 2: 20, 3: 5 }
+export const PER_TIER_RATE_CENTS = { 1: 50, 2: 30, 3: 10 }
 export const TIER_ALL_DISCOUNT_PCT = 0
 
 // Bucket a BUY row to a pricing/legend tier: 1 Prime, 2 Strong, else 3 Promising.

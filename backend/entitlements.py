@@ -32,7 +32,7 @@ def see_all_price_cents(n_signals: int, kind: str = "buy") -> int:
 
 # Per-tier unlock pricing (BUY only). Value-weighted: Prime dearest. A tier
 # unlocks atomically (no per-row), so the locked count is the full tier or zero.
-PER_TIER_RATE_CENTS = {1: 30, 2: 20, 3: 5}    # Prime, Strong, Promising (cents/signal)
+PER_TIER_RATE_CENTS = {1: 50, 2: 30, 3: 10}   # Prime, Strong, Promising (cents/signal)
 TIER_ALL_DISCOUNT_PCT = 0                       # no bundle discount — "Unlock all" = full sum
 
 
