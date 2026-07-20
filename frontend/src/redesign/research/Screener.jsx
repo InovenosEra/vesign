@@ -115,14 +115,14 @@ const COLUMNS = [
         <img className={'logo-mini' + (WHITE_BG_LOGOS.has(r.ticker) ? ' white-bg' : '')} src={LOGO(r.ticker)} alt={r.ticker} />
         <div className="tc-text"><div className="tk">{r.ticker}</div><div className="co" title={r.company || ''}>{r.company || ''}</div></div>
       </div>) },
-  { key: 'sector', label: 'Sector', width: '9%',
+  { key: 'sector', label: 'Sector', width: '8%',
     cell: (r) => <span className="sector-pill" title={r.sector || ''}>{SECTOR_ABBR[r.sector] || (r.industry || '').slice(0, 8) || '—'}</span> },
   { key: 'close', label: 'Price', align: 'r', sortable: true, width: '10%',
     cell: (r, c) => r.close == null ? '—' : c.fmtPrice(r.close) },
-  { key: 'day_change_pct', label: 'Day', align: 'r', sortable: true, width: '7%',
+  { key: 'day_change_pct', label: 'Day', align: 'r', sortable: true, width: '8%',
     cell: (r) => <span className={dirClass(r.day_change_pct)}>{r.day_change_pct == null ? '—' : pct(r.day_change_pct)}</span> },
   { key: 'market_cap', label: 'Mkt cap', align: 'r', sortable: true, width: '8%', cell: (r) => capB(r.market_cap) },
-  { key: 'signal', label: 'Signal', sortable: true, width: '7%',
+  { key: 'signal', label: 'Signal', sortable: true, width: '6%',
     cell: (r, c) => c.modelLocked
       ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>
       : <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
@@ -143,7 +143,7 @@ const COLUMNS = [
         </div>
       )
     } },
-  { key: 'health_score', label: 'Health', align: 'r', sortable: true, width: '8%',
+  { key: 'health_score', label: 'Health', align: 'r', sortable: true, width: '7%',
     cell: (r, c) => c.modelLocked
       ? <span className="health rd-blur">{healthDots(4)}</span>
       : <span className="health">{healthDots(r.health_score)}</span> },
@@ -153,8 +153,8 @@ const COLUMNS = [
       const ml = r.prediction_score == null ? null : r.prediction_score * 100
       return <span className={dirClass(ml)}>{ml == null ? '—' : pct(ml)}</span>
     } },
-  { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true, width: '5%',
-    cell: (r) => r.pe_ttm == null ? <span className="muted">—</span> : num(r.pe_ttm, { fd: 1 }) },
+  { key: 'pe_ttm', label: 'P/E', align: 'r', sortable: true, width: '7%',
+    cell: (r) => r.pe_ttm == null ? <span className="muted">—</span> : <span title={num(r.pe_ttm, { fd: 1 })}>{num(r.pe_ttm, { fd: 1 })}</span> },
   { key: 'week52_high', label: '52w high', align: 'r', sortable: true, width: '10%',
     cell: (r, c) => r.week52_high == null ? <span className="muted">—</span> : c.fmtPrice(r.week52_high) },
 ]
