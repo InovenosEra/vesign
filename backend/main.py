@@ -1075,6 +1075,23 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
     # stored close, so leaving it as-is drifts from the live `close` shown right
     # next to it (same fix as research_ticker's live-overlay, backend/main.py
     # around line 3560).
+    if signal and signal.upper() == "BUY":
+        # BUY cards sorted by, in order: (1) quality tier Prime→Strong→Promising,
+        # untiered last; (2) Health score, highest first; (3) analyst upside (the %
+        # under "Price Target"), highest first. Nulls sort last at each level.
+        # MUST run before gate_signals — redacted rows drop `tier`, so the order
+        # can't be reconstructed client-side. MUST also run on the stable,
+        # pre-live-overlay upside (below): the frontend polls this endpoint every
+        # 3s and paginates a fixed-size window over the result, so sorting by a
+        # value that's recomputed from the ticking live price every request causes
+        # cards near a rank boundary to swap pages every poll — they'd appear to
+        # flicker in and out of view even though nothing about the signal changed.
+        rows = sorted(rows, key=lambda r: (
+            r.get("tier") is None, r.get("tier") or 0,
+            r.get("health_score") is None, -(r.get("health_score") or 0),
+            r.get("fair_value_upside") is None, -(r.get("fair_value_upside") or 0),
+        ))
+
     live = _get_live_snapshot()["prices"]
 
     def _overlay(r):
@@ -1090,17 +1107,6 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
         return out
 
     rows = [_overlay(r) for r in rows]
-    if signal and signal.upper() == "BUY":
-        # BUY cards sorted by, in order: (1) quality tier Prime→Strong→Promising,
-        # untiered last; (2) Health score, highest first; (3) analyst upside (the %
-        # under "Price Target"), highest first. Nulls sort last at each level.
-        # MUST run before gate_signals — redacted rows drop `tier`, so the order
-        # can't be reconstructed client-side.
-        rows = sorted(rows, key=lambda r: (
-            r.get("tier") is None, r.get("tier") or 0,
-            r.get("health_score") is None, -(r.get("health_score") or 0),
-            r.get("fair_value_upside") is None, -(r.get("fair_value_upside") or 0),
-        ))
     if signal and signal.upper() in ("BUY", "SELL"):
         plan = ent.get_plan(user["id"])
         unlocks = ent.get_unlocks(user["id"])
