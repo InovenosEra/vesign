@@ -77,6 +77,14 @@ export function avgHealthWeighted(rows) {
   return den ? num / den : null
 }
 
+// Plain mean of prediction_score * 100 across holdings that have one — same
+// value/units as the Holdings table's per-row "ML" column, just averaged.
+export function avgMlPct(rows) {
+  const vals = rows.map(r => r.prediction_score).filter(v => v != null)
+  if (!vals.length) return null
+  return vals.reduce((s, v) => s + v, 0) / vals.length * 100
+}
+
 // Holding with the largest analyst-target upside vs its live price.
 export function topUpside(rows) {
   let best = null

@@ -11,8 +11,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCurrency } from '../../context/CurrencyContext'
 import { useMe } from '../../context/MeContext'
-import { LOGO } from '../fmt'
-import { buildBridge, signalMix, avgHealthWeighted, topUpside, weakestHealth, concentration } from './derive'
+import { LOGO, pct, dirClass } from '../fmt'
+import { buildBridge, signalMix, avgHealthWeighted, avgMlPct, topUpside, weakestHealth, concentration } from './derive'
 
 const LockGlyph = ({ size = 11 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
@@ -81,8 +81,7 @@ export default function CostValueBridge({ rows, totals }) {
   const mix = signalMix(rows)
   const rated = mix.BUY + mix.HOLD + mix.SELL
   const avgH = avgHealthWeighted(rows)
-  const mlVals = rows.map(r => r.prediction_score).filter(v => v != null)
-  const avgML = mlVals.length ? mlVals.reduce((s, v) => s + v, 0) / mlVals.length * 100 : null
+  const avgML = avgMlPct(rows)
   const up = topUpside(rows)
   const weak = weakestHealth(rows)
   const conc = concentration(rows, totals.totalValue)
@@ -200,8 +199,8 @@ export default function CostValueBridge({ rows, totals }) {
           </div>
 
           <div className="ir-row">
-            <span className="ir-k">Avg ML quality</span>
-            <span className="ir-v">{avgML == null ? '—' : `${avgML.toFixed(0)}%`}</span>
+            <span className="ir-k">Avg ML</span>
+            <span className="ir-v">{avgML == null ? '—' : <span className={dirClass(avgML)}>{pct(avgML, { fd: 1 })}</span>}</span>
           </div>
 
           <div className="ir-row">
