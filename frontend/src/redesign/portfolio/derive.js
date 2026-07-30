@@ -85,6 +85,19 @@ export function avgMlPct(rows) {
   return vals.reduce((s, v) => s + v, 0) / vals.length * 100
 }
 
+// Value-weighted mean analyst-target upside across holdings that have one —
+// the portfolio-level counterpart to topUpside's single best ticker.
+export function portfolioUpside(rows) {
+  let num = 0, den = 0
+  rows.forEach(r => {
+    if (r.target_mean_price != null && r.latest_close && r.value) {
+      const upside = (r.target_mean_price - r.latest_close) / r.latest_close * 100
+      num += upside * r.value; den += r.value
+    }
+  })
+  return den ? num / den : null
+}
+
 // Holding with the largest analyst-target upside vs its live price.
 export function topUpside(rows) {
   let best = null
@@ -121,11 +134,21 @@ export function buildBridge(rows, totals) {
   return { cost, value, segs, peak }
 }
 
-// Holding with the lowest company-health score (the watch-out).
+// Holding with the lowest company-health score (the watch-out). Ties on health
+// (common — it's a 1-5 integer) break on prediction_score ascending, so the pick
+// is the model's actual worst combined view, not whichever ticker sorts first.
+// ETFs are excluded — health scoring is a company-fundamentals read and doesn't
+// apply to a fund (same 'sector !== ETF' convention as the sector panels).
 export function weakestHealth(rows) {
   let worst = null
   rows.forEach(r => {
-    if (r.health_score != null && (worst == null || r.health_score < worst.health_score)) worst = r
+    if (r.sector === 'ETF') return
+    if (r.health_score == null) return
+    if (worst == null || r.health_score < worst.health_score) { worst = r; return }
+    if (r.health_score === worst.health_score) {
+      const rp = r.prediction_score, wp = worst.prediction_score
+      if (rp != null && (wp == null || rp < wp)) worst = r
+    }
   })
   return worst
 }

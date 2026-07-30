@@ -6,13 +6,13 @@
  *
  * Sits below the holdings table in a 2/3 + 1/3 row: the bridge on the left, a
  * vertical "Vesign's read" insights rail on the right (signal mix, health, ML,
- * biggest upside, watch-out, concentration, top driver). */
+ * biggest upside, watch-out, portfolio upside, top driver). */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCurrency } from '../../context/CurrencyContext'
 import { useMe } from '../../context/MeContext'
 import { LOGO, pct, dirClass } from '../fmt'
-import { buildBridge, signalMix, avgHealthWeighted, avgMlPct, topUpside, weakestHealth, concentration } from './derive'
+import { buildBridge, signalMix, avgHealthWeighted, avgMlPct, topUpside, weakestHealth, portfolioUpside } from './derive'
 
 const LockGlyph = ({ size = 11 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
@@ -84,7 +84,7 @@ export default function CostValueBridge({ rows, totals }) {
   const avgML = avgMlPct(rows)
   const up = topUpside(rows)
   const weak = weakestHealth(rows)
-  const conc = concentration(rows, totals.totalValue)
+  const portUp = portfolioUpside(rows)
   const driver = segs[0]   // biggest contributor (segs sorted by pnl desc)
   const posture = mix.SELL > 0
     ? { word: 'Cautious', cls: 'cau' }
@@ -215,13 +215,15 @@ export default function CostValueBridge({ rows, totals }) {
             <span className="ir-k">Watch-out</span>
             <span className="ir-v">
               {weak == null ? '—' : <><img className="ir-logo" src={LOGO(weak.ticker)} alt="" />{weak.ticker}
-                <span className="ir-muted">health {weak.health_score}/5</span></>}
+                <span className="ir-muted">
+                  health {weak.health_score}/5{weak.prediction_score != null && <>{' · ML '}{pct(weak.prediction_score * 100, { fd: 1 })}</>}
+                </span></>}
             </span>
           </div>
 
           <div className="ir-row">
-            <span className="ir-k">Concentration</span>
-            <span className="ir-v">{conc.label}<span className="ir-muted">top-5 {conc.top5Pct.toFixed(0)}%</span></span>
+            <span className="ir-k">Portfolio upside</span>
+            <span className="ir-v">{portUp == null ? '—' : <span className={dirClass(portUp)}>{pct(portUp, { fd: 0 })}</span>}</span>
           </div>
 
           <div className="ir-row">
