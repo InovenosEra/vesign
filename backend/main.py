@@ -5229,22 +5229,17 @@ _COMMODITY_TICKERS = [
 ]
 
 
-def _fetch_yf_quotes(pairs: list[tuple[str, str]]) -> dict | None:
-    """Pull current + prior close for a list of (ticker, label) from yfinance.
-
-    Returns {ticker: {price, prev_close}} on success, or None on hard failure
-    (the caller then falls back to the last cached value with stale=true).
-    FMP does not cover these symbols (currency/yield/futures), so there is no
-    second-source fallback inside this helper.
-    """
+def _fetch_yf_quotes_once(pairs: list[tuple[str, str]]) -> dict:
+    """Single yfinance batch attempt. Returns {ticker: {price, prev_close}},
+    omitting any ticker whose response was missing/empty/NaN."""
     try:
         raw = yf.download(
             " ".join(t for t, _ in pairs), period="5d", auto_adjust=False, progress=False
         )
         if raw is None or raw.empty:
-            return None
+            return {}
     except Exception:
-        return None
+        return {}
     out: dict = {}
     for ticker, _ in pairs:
         try:
@@ -5256,6 +5251,24 @@ def _fetch_yf_quotes(pairs: list[tuple[str, str]]) -> dict | None:
                 out[ticker] = {"price": float(closes.iloc[-1]), "prev_close": None}
         except Exception:
             continue
+    return out
+
+
+def _fetch_yf_quotes(pairs: list[tuple[str, str]]) -> dict | None:
+    """Pull current + prior close for a list of (ticker, label) from yfinance.
+
+    Returns {ticker: {price, prev_close}} on success, or None on hard failure
+    (the caller then falls back to the last cached value with stale=true).
+    FMP does not cover these symbols (currency/yield/futures), so there is no
+    second-source fallback inside this helper. Yahoo's multi-ticker batch
+    response occasionally comes back missing/NaN for a subset of symbols
+    (transient, not a per-symbol pattern) — one immediate retry for just the
+    gaps resolves most of these without waiting out the full cache TTL.
+    """
+    out = _fetch_yf_quotes_once(pairs)
+    missing = [(t, lbl) for t, lbl in pairs if t not in out]
+    if missing:
+        out.update(_fetch_yf_quotes_once(missing))
     return out or None
 
 
