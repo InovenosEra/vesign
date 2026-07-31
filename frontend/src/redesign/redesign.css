@@ -340,12 +340,9 @@
   .rd .earn-id { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
   .rd .earn-id .tk { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); flex-shrink: 0; }
   .rd .earn-id .co { font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rd .earn-metrics { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-shrink: 0; }
+  .rd .earn-metrics { display: grid; grid-template-columns: 40px 72px 66px 90px 44px; column-gap: 14px; align-items: center; flex-shrink: 0; }
   .rd .earn-metrics .em { font-family: var(--mono); font-size: 11px; color: var(--ink-2); white-space: nowrap; text-align: right; }
   .rd .earn-metrics .em i { color: var(--ink-3); font-style: normal; margin-right: 4px; }
-  .rd .earn-metrics .em-cap { min-width: 52px; }
-  .rd .earn-metrics .em-pe { min-width: 58px; }
-  .rd .earn-metrics .em-eps { min-width: 72px; }
   .rd .hdots { display: inline-flex; gap: 2.5px; }
   .rd .hdots .hd { width: 6px; height: 6px; border-radius: 50%; background: #6b7280; }
   .rd .hdots .hd.off { background: transparent; border: 1px solid var(--ink-3); box-sizing: border-box; }
