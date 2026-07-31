@@ -43,14 +43,27 @@ def test_regular_phase_fetches_once_within_ttl(snap_app):
     assert len(calls) == 1
 
 
-def test_pre_phase_uses_aftermarket_mid(snap_app):
+def test_pre_phase_uses_aftermarket_last_trade(snap_app):
+    bm, _ = snap_app
+    with patch.object(bm, "_phase_info", return_value={"phase": "pre"}), \
+         patch.object(bm, "fetch_aftermarket_trades_batch", return_value={"AAA": 111.5}), \
+         patch.object(bm, "fetch_aftermarket_quotes") as quotes_fn:
+        out = bm._get_live_snapshot()
+    assert out["phase"] == "pre"
+    assert out["prices"]["AAA"] == 111.5
+    quotes_fn.assert_not_called()  # no fallback needed — trade price covered every ticker
+
+
+def test_pre_phase_falls_back_to_mid_when_no_trade_print(snap_app):
     bm, _ = snap_app
     quotes = {"AAA": {"bidPrice": 110.0, "askPrice": 112.0}}
     with patch.object(bm, "_phase_info", return_value={"phase": "pre"}), \
-         patch.object(bm, "fetch_aftermarket_quotes", return_value=quotes):
+         patch.object(bm, "fetch_aftermarket_trades_batch", return_value={}), \
+         patch.object(bm, "fetch_aftermarket_quotes", return_value=quotes) as quotes_fn:
         out = bm._get_live_snapshot()
     assert out["phase"] == "pre"
     assert out["prices"]["AAA"] == 111.0
+    quotes_fn.assert_called_once_with(["AAA"])
 
 
 def test_idle_phase_no_fetch_empty_prices(snap_app):
@@ -68,7 +81,7 @@ def test_phase_change_flushes(snap_app):
          patch.object(bm, "fetch_live_prices", return_value={"AAA": 110.0}):
         bm._get_live_snapshot()
     with patch.object(bm, "_phase_info", return_value={"phase": "pre"}), \
-         patch.object(bm, "fetch_aftermarket_quotes", return_value={"AAA": {"bidPrice": 200.0, "askPrice": 200.0}}):
+         patch.object(bm, "fetch_aftermarket_trades_batch", return_value={"AAA": 200.0}):
         out = bm._get_live_snapshot()
     assert out["prices"]["AAA"] == 200.0
 

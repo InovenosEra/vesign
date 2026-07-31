@@ -570,6 +570,14 @@ def fetch_aftermarket_quotes(tickers: list[str]) -> dict:
     return _baq(tickers)
 
 
+def fetch_aftermarket_trades_batch(tickers: list[str]) -> dict:
+    """Wraps data.fmp.batch_aftermarket_trades for testability."""
+    from data.fmp import batch_aftermarket_trades as _bat
+    if not tickers:
+        return {}
+    return _bat(tickers)
+
+
 # ---------------------------------------------------------------------------
 # Pipeline state (module-level, single-process)
 # ---------------------------------------------------------------------------
@@ -4050,9 +4058,14 @@ def _do_snapshot_refresh(phase: str, tickers: list) -> None:
     try:
         if phase == "regular":
             fresh = fetch_live_prices(tickers)
-        else:  # pre / post
-            quotes = fetch_aftermarket_quotes(tickers)
-            fresh = {t: live_snapshot.mid_price(q) for t, q in quotes.items()}
+        else:  # pre / post — prefer actual last-trade price (matches third-party
+            # quote sites); bid/ask mid is a poor proxy on wide-spread thin names,
+            # so it's only a fallback for tickers with no extended-hours print.
+            fresh = {t: p for t, p in fetch_aftermarket_trades_batch(tickers).items() if p}
+            missing = [t for t in tickers if t not in fresh]
+            if missing:
+                quotes = fetch_aftermarket_quotes(missing)
+                fresh.update({t: live_snapshot.mid_price(q) for t, q in quotes.items()})
         fresh = {t: p for t, p in fresh.items() if p}
         with _snapshot_lock:
             if fresh:
@@ -4074,7 +4087,8 @@ def _get_live_snapshot() -> dict:
     never waits on the ~3s whole-universe fetch (the build exceeds the TTL, which used
     to make every other request block). Only the first call (no cache) or a phase
     change blocks until data exists. Single-flight via the refreshing flag.
-    regular -> batch-quote; pre/post -> aftermarket mid; idle -> empty."""
+    regular -> batch-quote; pre/post -> aftermarket last trade (mid-quote fallback
+    for no-print tickers); idle -> empty."""
     global _snapshot_cache, _snapshot_ts, _snapshot_phase, _snapshot_refreshing
     phase = _phase_info()["phase"]
     now = time.time()
