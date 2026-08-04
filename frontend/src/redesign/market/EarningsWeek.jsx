@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getEarningsWeek } from '../../api'
 import { num, LOGO, dayGroupHeader } from '../fmt'
 import { useTickerModal } from '../TickerModalContext'
+import { useMe } from '../../context/MeContext'
 import CalPager from './CalPager'
 
 const PAGE_SIZE = 10
@@ -32,6 +33,8 @@ function HealthDots({ score }) {
 
 export default function EarningsWeek() {
   const open = useTickerModal()
+  const me = useMe()
+  const modelLocked = me.plan !== 'max'   // health_score is Vesign-model output — Max only
   const [page, setPage] = useState(0)
   const { data } = useQuery({ queryKey: ['market-earnings-week', 14], queryFn: () => getEarningsWeek(14), refetchInterval: 600_000 })
   // FMP returns the window DESCENDING; sort ascending by date so the soonest
@@ -66,7 +69,9 @@ export default function EarningsWeek() {
                   <span className="co">{r.company}</span>
                 </div>
                 <div className="earn-metrics">
-                  <HealthDots score={r.health_score} />
+                  {modelLocked
+                    ? <span className="rd-blur"><HealthDots score={4} /></span>
+                    : <HealthDots score={r.health_score} />}
                   <span className="em em-cap"><i>Cap</i>{capFmt(r.market_cap)}</span>
                   <span className="em em-pe"><i>P/E</i>{peFmt(r.pe_ttm)}</span>
                   <span className="em em-eps"><i>EPS est</i>{r.eps_estimated == null ? '—' : num(r.eps_estimated)}</span>

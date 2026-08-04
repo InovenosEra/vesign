@@ -17,14 +17,14 @@ export const TIERS = [
   },
   {
     id: 'pro', name: 'Pro', price: '$19', period: '/ month',
-    blurb: 'The full signal feed, explained.',
-    features: ['Every BUY & SELL signal, same-day', 'Plain-language signal explanations', 'Portfolio tracking & alerts', 'Full research & screening tools'],
+    blurb: 'The full signal feed, on your terms.',
+    features: ['Every BUY & SELL signal, same-day', 'Pay-per-signal unlocks from your wallet', 'Portfolio tracking & alerts', 'Full research & screening tools'],
     cta: 'Start with Pro', featured: true,
   },
   {
     id: 'max', name: 'Max', price: '$49', period: '/ month',
     blurb: 'Everything, first.',
-    features: ['Everything in Pro', 'Earliest signal access', 'Extended signal history & exports', 'Priority support'],
+    features: ['Everything in Pro', 'Full Vesign model & Health scores — no unlocking', 'Extended signal history & exports', 'Priority support'],
     cta: 'Go Max', featured: false,
   },
 ]

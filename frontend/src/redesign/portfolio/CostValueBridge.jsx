@@ -41,7 +41,7 @@ export default function CostValueBridge({ rows, totals }) {
   const me = useMe()
   const navigate = useNavigate()
   // "Vesign's read" is the model's view — Pro+ only; blur it for Free.
-  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
+  const modelLocked = me.plan !== 'max'
   const [hover, setHover] = useState(null)   // { bar, x, y }
 
   const { cost, value, segs, peak } = buildBridge(rows, totals)
@@ -171,7 +171,7 @@ export default function CostValueBridge({ rows, totals }) {
             <div className="ir-lock-overlay">
               <span className="ir-lock-ico"><LockGlyph size={20} /></span>
               <div className="ir-lock-title">Vesign's read</div>
-              <button className="ir-lock-cta" onClick={() => navigate('/account')}>Upgrade to Pro</button>
+              <button className="ir-lock-cta" onClick={() => navigate('/account')}>Upgrade to Max</button>
             </div>
           )}
           <div className={modelLocked ? 'ir-body rd-blur' : 'ir-body'}>

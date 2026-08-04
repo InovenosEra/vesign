@@ -227,19 +227,20 @@ def _locked_row(kind, signal_date, reason, *, price_cents=None, token=None,
     return row
 
 
-# Vesign-model output columns gated from Free across every endpoint. Analyst-derived
-# upside (fair_value_upside aliased to (target_mean-close)/close in most queries) is
-# the allowed "Prediction" and is NOT here — except /api/signals/markers returns the
-# RAW model fair_value_upside, so that endpoint gates it explicitly.
+# Vesign-model output columns: Max-only across every endpoint (Free AND Pro are
+# gated). Analyst-derived upside (fair_value_upside aliased to
+# (target_mean-close)/close in most queries) is the allowed "Prediction" and is
+# NOT here — except /api/signals/markers returns the RAW model fair_value_upside,
+# so that endpoint gates it explicitly.
 MODEL_FIELDS = ("signal", "health_score", "prediction_score", "vqs", "vesign_score", "tier", "score")
 HOLDING_MODEL_FIELDS = ("signal", "health_score", "prediction_score")
 
 
 def redact_fields(rows, *, plan, fields):
-    """Return copies with the given model fields nulled for non-Pro/Max plans, so the
+    """Return copies with the given model fields nulled for non-Max plans, so the
     model output never leaves the server. NON-mutating (some callers pass shared/cached
     rows). Accepts a list of dicts or a single dict; returns the same shape."""
-    if plan in ("pro", "max"):
+    if plan == "max":
         return rows
     def _redact(d):
         return d if not d else {**d, **{f: None for f in fields if f in d}}

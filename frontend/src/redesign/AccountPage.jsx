@@ -29,9 +29,9 @@ const PLAN_TIERS = [
   { id: 'free', label: 'Free', price: 0, tagline: 'Get started',
     features: ['Top-10 daily signals preview', 'Real-time market data', '1 watchlist', 'Market & Research pages'] },
   { id: 'pro', label: 'Pro', price: 19, tagline: 'Pay as you go',
-    features: ['Everything in Free', 'Unlock any signal from your wallet ($0.10 each)', '5 watchlists', 'Full fundamentals & ML predictions'] },
+    features: ['Everything in Free', 'Unlock any signal from your wallet ($0.10 each)', '5 watchlists', 'Full fundamentals data'] },
   { id: 'max', label: 'Max', price: 49, tagline: 'Everything unlocked',
-    features: ['Everything in Pro', 'All signals unlocked — no per-signal cost', 'Unlimited watchlists', 'API access · Priority support'] },
+    features: ['Everything in Pro', 'Full Vesign model & Health scores — every signal, no unlocking', 'Unlimited watchlists', 'API access · Priority support'] },
 ]
 const TIER_BY_ID = Object.fromEntries(PLAN_TIERS.map(t => [t.id, t]))
 

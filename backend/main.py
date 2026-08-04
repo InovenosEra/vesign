@@ -1120,15 +1120,12 @@ def signals_today(signal: Optional[str] = None, market: Optional[str] = None,
         unlocks = ent.get_unlocks(user["id"])
         rows = ent.gate_signals(rows, kind=signal.upper(), plan=plan, unlocks=unlocks)
     else:
-        # Bare list or ?signal=HOLD (Research Screener): no per-card paywall, but the
-        # model classification is Max-only here. redact_fields treats "pro"/"max"
-        # alike (its generic Free-vs-rest gate, shared by Holdings/markers/etc.) —
-        # collapse Pro to the "free" branch for THIS endpoint only, rather than
-        # changing that shared function, so Holdings/markers/other callers keep
-        # their existing Pro+ access. Keep ticker, price, company and the analyst
-        # upside (fair_value_upside) visible regardless of plan.
+        # Bare list or ?signal=HOLD (Research Screener): no per-card paywall — the
+        # model classification is Max-only, same as every other redact_fields
+        # caller. Keep ticker, price, company and the analyst upside
+        # (fair_value_upside) visible regardless of plan.
         plan = ent.get_plan(user["id"])
-        rows = ent.redact_fields(rows, plan=(plan if plan == "max" else "free"), fields=ent.MODEL_FIELDS)
+        rows = ent.redact_fields(rows, plan=plan, fields=ent.MODEL_FIELDS)
     return rows
 
 
@@ -1153,12 +1150,12 @@ def signals_today_tiers(market: Optional[str] = None, user=Depends(get_current_u
 @protected.get("/api/signals/{ticker}/explanation")
 def signal_explanation(ticker: str, date: Optional[str] = Query(None),
                        user=Depends(get_current_user)):
-    """AI explanation for a signal (Pro/Max). Generated on first view, cached
+    """AI explanation for a signal (Max only). Generated on first view, cached
     per ticker+date. Narrates existing model data only — never a new signal.
     `date` is optional — omit it to use the ticker's latest signal date (the
     redesign modal is ticker-centric and has no specific date)."""
-    if ent.get_plan(user["id"]) not in ("pro", "max"):
-        raise HTTPException(status_code=403, detail="Pro or Max plan required")
+    if ent.get_plan(user["id"]) != "max":
+        raise HTTPException(status_code=403, detail="Max plan required")
     ticker = ticker.upper()
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker")
@@ -1523,8 +1520,8 @@ def signal_markers(ticker: str, months: int = Query(default=13, ge=1, le=144),
     Each row also carries the realized outcome (`return_pct`/`closed`) from `trade_log`
     where one applies, so the Deep-Dive signal-history table can show real win/loss
     instead of a placeholder — see docs/superpowers/specs/2026-07-16-deep-dive-verdict-ux-design.md."""
-    # The marker dates + actions ARE the model's signal history — Pro+ only.
-    if ent.get_plan(user["id"]) not in ("pro", "max"):
+    # The marker dates + actions ARE the model's signal history — Max only.
+    if ent.get_plan(user["id"]) != "max":
         return []
     with engine.connect() as conn:
         df = pd.read_sql(text("""
@@ -1846,9 +1843,10 @@ def watchlist_export(
 
     _prepare_export_df(df, "date", "last_update")
 
-    # Free users export their tickers + price/fundamentals, but not the Vesign-model
-    # columns (raw signals table carries the raw fair_value_upside too).
-    if ent.get_plan(user["id"]) not in ("pro", "max"):
+    # Free and Pro users export their tickers + price/fundamentals, but not the
+    # Vesign-model columns (raw signals table carries the raw fair_value_upside too)
+    # — Max only.
+    if ent.get_plan(user["id"]) != "max":
         drop = [c for c in (*ent.MODEL_FIELDS, "fair_value_upside") if c in df.columns]
         df = df.drop(columns=drop, errors="ignore")
 
@@ -3678,8 +3676,8 @@ def research_ticker(
 @protected.post("/api/research/{ticker}/ai-report")
 def research_ai_report(ticker: str, body: AIReportBody, user=Depends(get_current_user)):
     """Generate a Claude AI research note for a ticker."""
-    # The AI note is built from Vesign-model outputs — Pro+ only (like /explanation).
-    if ent.get_plan(user["id"]) not in ("pro", "max"):
+    # The AI note is built from Vesign-model outputs — Max only (like /explanation).
+    if ent.get_plan(user["id"]) != "max":
         raise HTTPException(status_code=403, detail={"code": "UPGRADE_REQUIRED"})
     ticker = ticker.strip().upper()
     if not _TICKER_RE.match(ticker):
@@ -5699,9 +5697,16 @@ def _get_market_earnings_week_cached(days: int = 7) -> dict:
 
 
 @protected.get("/api/market/earnings/week")
-def market_earnings_week(days: int = Query(7, ge=1, le=60)):
-    """Earnings calendar for the next `days` days starting today (FMP)."""
-    return _get_market_earnings_week_cached(days)
+def market_earnings_week(days: int = Query(7, ge=1, le=60), user=Depends(get_current_user)):
+    """Earnings calendar for the next `days` days starting today (FMP).
+    `health_score` is Vesign-model output — Max only. Redacted per-request
+    (not baked into the shared cache, which is keyed only by `days` and
+    reused across every plan)."""
+    data = _get_market_earnings_week_cached(days)
+    if ent.get_plan(user["id"]) != "max":
+        data = {**data, "earnings": ent.redact_fields(
+            data["earnings"], plan="free", fields=("health_score",))}
+    return data
 
 
 _IMPACT_TO_IMPORTANCE = {"low": 1, "medium": 2, "high": 3}

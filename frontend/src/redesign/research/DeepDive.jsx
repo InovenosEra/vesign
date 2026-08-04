@@ -218,7 +218,7 @@ export default function DeepDive({ ticker, setTicker }) {
   const me = useMe()
   const navigate = useNavigate()
   // Vesign-model fields (signal/health/ML) are Pro+; server nulls them for Free.
-  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
+  const modelLocked = me.plan !== 'max'
   const [range, setRange] = useState('1Y')   // active chart-range chip label
   const months = RANGES.find(([l]) => l === range)?.[1] || 12
   const [input, setInput] = useState(ticker)
@@ -424,7 +424,7 @@ export default function DeepDive({ ticker, setTicker }) {
       <div className={'dd-verdict-band ' + (modelLocked ? 'locked' : sigCls(r?.signal))}>
         <div className="vb-head">
           {modelLocked
-            ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>
+            ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Max"><LockGlyph /></span>
             : <span className={'sig-tag ' + sigCls(r?.signal)}><SignalGlyph signal={r?.signal} />{r?.signal || '—'}</span>}
           {r?.trade_count
             ? <span className="vb-since">{r.trade_count} historical trade{r.trade_count === 1 ? '' : 's'} · WR {r.win_rate != null ? r.win_rate.toFixed(0) : '—'}%</span>
@@ -436,7 +436,7 @@ export default function DeepDive({ ticker, setTicker }) {
             : <span className="muted">Not enough data yet for a read on {ticker}.</span>}
           {modelLocked && (
             <span className="vb-locked">
-              <LockGlyph size={10} /> Vesign model locked — <a onClick={() => navigate('/account')}>Upgrade to Pro</a>
+              <LockGlyph size={10} /> Vesign model locked — <a onClick={() => navigate('/account')}>Upgrade to Max</a>
             </span>
           )}
         </div>
@@ -574,7 +574,7 @@ export default function DeepDive({ ticker, setTicker }) {
             <div className="rd-lock-overlay">
               <span className="rd-lock-ico"><LockGlyph size={20} /></span>
               <div className="rd-lock-title">Vesign model</div>
-              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Pro</button>
+              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Max</button>
             </div>
           )}
           <div className={modelLocked ? 'rd-blur' : ''}>
@@ -614,7 +614,7 @@ export default function DeepDive({ ticker, setTicker }) {
             <div className="rd-lock-overlay">
               <span className="rd-lock-ico"><LockGlyph size={20} /></span>
               <div className="rd-lock-title">Vesign model</div>
-              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Pro</button>
+              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Max</button>
             </div>
           )}
           <div className={'dd-history-body' + (modelLocked ? ' rd-blur' : '')}>
@@ -663,7 +663,7 @@ export default function DeepDive({ ticker, setTicker }) {
             <div className="rd-lock-overlay">
               <span className="rd-lock-ico"><LockGlyph size={20} /></span>
               <div className="rd-lock-title">Vesign model</div>
-              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Pro</button>
+              <button className="rd-lock-cta" onClick={() => navigate('/account')}>Upgrade to Max</button>
             </div>
           )}
           <div className={'dd-ai-body' + (modelLocked ? ' rd-blur' : '')}>

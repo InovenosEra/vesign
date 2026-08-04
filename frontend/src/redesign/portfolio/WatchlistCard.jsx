@@ -23,7 +23,7 @@ function invalidateAfterMutation(qc, listId) {
 
 function TickerCard({ r, listId, onOpen, onRemove }) {
   const me = useMe()
-  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
+  const modelLocked = me.plan !== 'max'
   const qc = useQueryClient()
   const { fmtPrice } = useCurrency()
   const [draft, setDraft] = useState(r.targetPrice != null ? String(r.targetPrice) : '')

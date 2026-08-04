@@ -124,7 +124,7 @@ const COLUMNS = [
   { key: 'market_cap', label: 'Mkt cap', align: 'r', sortable: true, width: '8%', cell: (r) => capB(r.market_cap) },
   { key: 'signal', label: 'Signal', sortable: true, width: '6%',
     cell: (r, c) => c.modelLocked
-      ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>
+      ? <span className="sig-tag rd-lock-pill" title="Vesign signal — Upgrade to Max"><LockGlyph /></span>
       : <span className={'sig-tag ' + sigCls(r.signal)}>{r.signal || ''}</span> },
   { key: 'fair_value_upside', label: 'Pred. upside', sortable: true, width: '13%',
     // Left-aligned (not the usual `align:'r'` numeric-column convention) and

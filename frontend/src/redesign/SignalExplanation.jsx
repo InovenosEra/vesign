@@ -20,7 +20,7 @@ export default function SignalExplanation({ ticker, part = 'full' }) {
     staleTime: 600_000,
   })
   const note = isLoading ? 'Generating…'
-    : expl?.locked ? 'Upgrade to Pro or Max to see AI explanations.'
+    : expl?.locked ? 'Upgrade to Max to see AI explanations.'
     : (isError || !expl) ? 'Explanation unavailable — please try again.'
     : null
   if (note) return <div className="sig-why"><div className="sig-why-note">{note}</div></div>

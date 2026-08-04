@@ -76,7 +76,7 @@ export default function HoldingsTable({ rows, subhead }) {
   const me = useMe()
   // Vesign-model columns (signal/health/ML) are Pro+; the server nulls them for
   // Free, so a null value under a Free plan is a paywall lock (not missing data).
-  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
+  const modelLocked = me.plan !== 'max'
   const { fmtPrice } = useCurrency()
   const [expanded, setExpanded] = useState(() => new Set())
   const [adding, setAdding] = useState(false)
@@ -151,7 +151,7 @@ export default function HoldingsTable({ rows, subhead }) {
                         <span className="tk">{r.ticker}</span>
                         {r.signal
                           ? <span className={'sig-pill ' + (SIG_CLS[r.signal] || 'hold')}>{r.signal}</span>
-                          : modelLocked && <span className="sig-pill rd-lock-pill" title="Vesign signal — Upgrade to Pro"><LockGlyph /></span>}
+                          : modelLocked && <span className="sig-pill rd-lock-pill" title="Vesign signal — Upgrade to Max"><LockGlyph /></span>}
                       </div>
                     </td>
                     <td className="co-cell">

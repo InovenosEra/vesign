@@ -101,10 +101,10 @@ function MiniChart({ history }) {
 export default function SignalModalRd({ row, onClose }) {
   const { fmtPrice, symbol } = useCurrency()
   const me = useMe()
-  const canSeeSignal = me?.plan === 'pro' || me?.plan === 'max'   // BUY/SELL/HOLD is Pro+
-  // Server nulls Vesign-model fields (signal/health/ML) for Free; a null under
-  // Free is a paywall lock (blurred placeholder), not missing data.
-  const modelLocked = me?.plan !== 'pro' && me?.plan !== 'max'
+  const canSeeSignal = me?.plan === 'max'   // BUY/SELL/HOLD is Max-only
+  // Server nulls Vesign-model fields (signal/health/ML) for non-Max; a null is
+  // a paywall lock (blurred placeholder), not missing data.
+  const modelLocked = me?.plan !== 'max'
   const ticker = row?.ticker
   const [tab, setTab] = useState('m-overview')
   const [range, setRange] = useState('1Y')
@@ -311,8 +311,8 @@ export default function SignalModalRd({ row, onClose }) {
                 </div>
                 <div className="rd-lock-overlay">
                   <span className="rd-lock-ico"><LockGlyph size={20} /></span>
-                  <div className="rd-lock-title">Per-signal history is a Pro feature</div>
-                  <button className="rd-lock-cta" onClick={() => { onClose?.(); navigate('/account') }}>Upgrade to Pro</button>
+                  <div className="rd-lock-title">Per-signal history is a Max feature</div>
+                  <button className="rd-lock-cta" onClick={() => { onClose?.(); navigate('/account') }}>Upgrade to Max</button>
                 </div>
               </div>
             ) : (

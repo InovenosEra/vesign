@@ -17,7 +17,7 @@ const LockGlyph = () => (
 
 export default function WatchlistRead({ card }) {
   const me = useMe()
-  const modelLocked = me.plan !== 'pro' && me.plan !== 'max'
+  const modelLocked = me.plan !== 'max'
   const { signalMix, avgHealth, biggestUpside, nearTargetCount, tickerCount } = card
   const rated = signalMix.BUY + signalMix.HOLD + signalMix.SELL
 
@@ -74,7 +74,7 @@ export default function WatchlistRead({ card }) {
 
       {modelLocked && (
         <div className="wl-read-locked-strip">
-          <span className="msg">Signal + health analysis is a Pro feature</span>
+          <span className="msg">Signal + health analysis is a Max feature</span>
           <span className="cta">Upgrade to unlock →</span>
         </div>
       )}
