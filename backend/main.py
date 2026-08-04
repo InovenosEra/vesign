@@ -4347,15 +4347,17 @@ def _build_market_movers(mover_type: str, limit: int) -> dict:
 
 
 def _get_market_movers_cached(mover_type: str, limit: int) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"movers:{mover_type}:{limit}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
-        data = _build_market_movers(mover_type, limit)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_movers(mover_type, limit)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/movers")
@@ -4395,15 +4397,17 @@ def _build_market_highs_lows(hl_type: str, limit: int) -> dict:
 
 
 def _get_market_highs_lows_cached(hl_type: str, limit: int) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"highslows:{hl_type}:{limit}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
-        data = _build_market_highs_lows(hl_type, limit)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_highs_lows(hl_type, limit)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/highs-lows")
@@ -4454,15 +4458,17 @@ def _build_market_valuation(limit: int = 6) -> dict:
 
 
 def _get_market_valuation_cached(limit: int) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"valuation:{limit}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
             return c["data"]
-        data = _build_market_valuation(limit)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_valuation(limit)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/valuation")
@@ -4516,14 +4522,16 @@ def _build_market_breadth() -> dict:
 
 
 def _get_market_breadth_cached() -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("breadth")
         if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
-        data = _build_market_breadth()
-        _market_cache["breadth"] = {"t": now, "data": data}
-        return data
+    data = _build_market_breadth()
+    with _market_cache_lock:
+        _market_cache["breadth"] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/breadth")
@@ -4639,14 +4647,16 @@ def _build_market_sectors() -> dict:
 
 
 def _get_market_sectors_cached() -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("sectors")
         if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
-        data = _build_market_sectors()
-        _market_cache["sectors"] = {"t": now, "data": data}
-        return data
+    data = _build_market_sectors()
+    with _market_cache_lock:
+        _market_cache["sectors"] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/sectors")
@@ -4838,14 +4848,16 @@ def _build_market_tape() -> dict:
 
 
 def _get_market_tape_cached() -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get("tape")
         if c is not None and now - c["t"] < _LIVE_PANEL_TTL:
             return c["data"]
-        data = _build_market_tape()
-        _market_cache["tape"] = {"t": now, "data": data}
-        return data
+    data = _build_market_tape()
+    with _market_cache_lock:
+        _market_cache["tape"] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/tape")
@@ -4958,15 +4970,17 @@ def _build_market_analyst_changes(days: int, limit: int) -> dict:
 
 
 def _get_market_analyst_changes_cached(days: int, limit: int) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"analyst-changes:{days}:{limit}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _ANALYST_CACHE_TTL_SECONDS:
             return c["data"]
-        data = _build_market_analyst_changes(days, limit)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_analyst_changes(days, limit)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/analyst-changes/top")
@@ -5056,15 +5070,17 @@ def _build_market_grades(limit: int) -> dict:
 
 
 def _get_market_grades_cached(limit: int) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"grades:{limit}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _ANALYST_CACHE_TTL_SECONDS:
             return c["data"]
-        data = _build_market_grades(limit)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_grades(limit)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/grades/top")
@@ -5232,7 +5248,8 @@ def _fetch_yf_quotes_once(pairs: list[tuple[str, str]]) -> dict:
     omitting any ticker whose response was missing/empty/NaN."""
     try:
         raw = yf.download(
-            " ".join(t for t, _ in pairs), period="5d", auto_adjust=False, progress=False
+            " ".join(t for t, _ in pairs), period="5d", auto_adjust=False, progress=False,
+            timeout=10,
         )
         if raw is None or raw.empty:
             return {}
@@ -5278,7 +5295,7 @@ def _fetch_yf_intraday(tickers: list[str]) -> dict:
     """
     try:
         raw = yf.download(" ".join(tickers), period="1d", interval="5m",
-                          auto_adjust=False, progress=False)
+                          auto_adjust=False, progress=False, timeout=10)
         if raw is None or raw.empty:
             return {}
     except Exception:
@@ -5381,14 +5398,18 @@ def _build_yf_strip(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
 
 
 def _get_yf_strip_cached(pairs: list[tuple[str, str]], key: str, fetch=None) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
+    # Especially important here: this is a live yfinance call, the slowest/
+    # least-bounded dependency of any market-cache builder.
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
             return c["data"]
-        data = _build_yf_strip(pairs, key, fetch=fetch)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_yf_strip(pairs, key, fetch=fetch)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/commodities")
@@ -5449,15 +5470,19 @@ def _build_market_currencies(base: str) -> dict:
 
 
 def _get_market_currencies_cached(base: str) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
+    # Especially important here: this is a live yfinance call, the slowest/
+    # least-bounded dependency of any market-cache builder.
     key = f"currencies:{(base or 'ILS').upper()}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _MARKET_TTL_SECONDS:
             return c["data"]
-        data = _build_market_currencies(base)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_currencies(base)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/currencies")
@@ -5579,15 +5604,17 @@ def _parse_iso8601(s: str) -> datetime | None:
 
 
 def _get_market_news_cached(limit: int) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"news:{limit}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _NEWS_CACHE_TTL_SECONDS:
             return c["data"]
-        data = _build_market_news(limit)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_news(limit)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/news/top")
@@ -5685,15 +5712,17 @@ def _build_market_earnings_week(days: int = 7) -> dict:
 
 
 def _get_market_earnings_week_cached(days: int = 7) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"earnings_week:{days}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _CALENDAR_CACHE_TTL_SECONDS:
             return c["data"]
-        data = _build_market_earnings_week(days)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_earnings_week(days)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/earnings/week")
@@ -5757,15 +5786,17 @@ def _upcoming_market_holidays(start, end) -> list:
 
 
 def _get_market_economic_calendar_cached(days: int) -> dict:
+    # Build OUTSIDE the lock — see _get_market_analyst_activity_cached for why.
     key = f"econ:{days}"
     now = time.time()
     with _market_cache_lock:
         c = _market_cache.get(key)
         if c is not None and now - c["t"] < _CALENDAR_CACHE_TTL_SECONDS:
             return c["data"]
-        data = _build_market_economic_calendar(days)
-        _market_cache[key] = {"t": now, "data": data}
-        return data
+    data = _build_market_economic_calendar(days)
+    with _market_cache_lock:
+        _market_cache[key] = {"t": time.time(), "data": data}
+    return data
 
 
 @protected.get("/api/market/economic-calendar")
