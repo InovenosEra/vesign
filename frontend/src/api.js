@@ -207,6 +207,7 @@ export const removeTicker = (id, ticker) =>
 export const getUserHoldings = () => get('/holdings')
 export const addHolding = (body) => post('/holdings', body)
 export const deleteHolding = (holdingId) => del(`/holdings/${holdingId}`)
+export const updateHolding = (id, body) => patch(`/holdings/${id}`, body)
 export const getHoldingLots = (ticker, market = 'US') =>
   get(`/portfolio/holdings/lots?ticker=${encodeURIComponent(ticker)}&market=${market}`)
 

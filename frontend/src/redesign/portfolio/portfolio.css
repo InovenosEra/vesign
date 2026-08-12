@@ -622,6 +622,8 @@
 .lots-table td { padding: 4px 8px; }
 .lot-del { background: none; border: none; cursor: pointer; opacity: 0.6; }
 .lot-del:hover { opacity: 1; }
+.lot-edit { background: none; border: none; cursor: pointer; opacity: 0.6; margin-right: 6px; }
+.lot-edit:hover { opacity: 1; }
 .add-lot-btn { margin-top: 8px; background: transparent; border: 1px dashed var(--line-2); color: var(--ink-2); border-radius: 6px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
 .lots-empty { color: var(--ink-3); font-size: 12.5px; padding: 8px 0; }
 

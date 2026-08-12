@@ -1,4 +1,4 @@
-/* Expanded lot breakdown for one ticker: lists each lot with delete, plus a
+/* Expanded lot breakdown for one ticker: lists each lot with edit/delete, plus a
  * "+ Add lot" form (DCA). Driven by /api/portfolio/holdings/lots. */
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -11,6 +11,7 @@ export default function HoldingLots({ ticker, latestClose, colSpan }) {
   const qc = useQueryClient()
   const { fmtPrice, fmtAmount } = useCurrency()
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const { data: lots, isLoading } = useQuery({
     queryKey: ['portfolio-lots', ticker], queryFn: () => getHoldingLots(ticker),
   })
@@ -36,6 +37,16 @@ export default function HoldingLots({ ticker, latestClose, colSpan }) {
                 </tr></thead>
                 <tbody>
                   {lots.map(l => {
+                    if (editingId === l.id) {
+                      return (
+                        <tr key={l.id}>
+                          <td colSpan={6}>
+                            <AddHoldingForm presetTicker={l.ticker} editingLot={l}
+                              onDone={() => setEditingId(null)} />
+                          </td>
+                        </tr>
+                      )
+                    }
                     const cost = l.quantity * l.buy_price
                     const pnl = latestClose != null ? (latestClose - l.buy_price) * l.quantity : null
                     return (
@@ -46,6 +57,8 @@ export default function HoldingLots({ ticker, latestClose, colSpan }) {
                         <td className="r">{fmtPrice(cost)}</td>
                         <td className={'r ' + (pnl == null ? '' : pnl >= 0 ? 'up' : 'down')}>{pnl == null ? '—' : fmtAmount(pnl)}</td>
                         <td className="r">
+                          <button className="lot-edit" title="Edit lot" disabled={del.isPending}
+                            onClick={() => { setAdding(false); setEditingId(l.id) }}>✏️</button>
                           <button className="lot-del" title="Delete lot" disabled={del.isPending}
                             onClick={() => del.mutate(l)}>🗑</button>
                         </td>
@@ -57,7 +70,7 @@ export default function HoldingLots({ ticker, latestClose, colSpan }) {
             )}
           {adding
             ? <AddHoldingForm presetTicker={ticker} onDone={() => setAdding(false)} />
-            : <button className="add-lot-btn" onClick={() => setAdding(true)}>+ Add lot</button>}
+            : <button className="add-lot-btn" onClick={() => { setEditingId(null); setAdding(true) }}>+ Add lot</button>}
         </div>
       </td>
     </tr>

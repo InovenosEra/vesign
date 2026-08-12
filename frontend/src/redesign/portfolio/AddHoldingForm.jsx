@@ -1,21 +1,23 @@
-/* Add-holding / add-lot form. Used both for a brand-new ticker (no preset) and
- * for adding a lot to an existing ticker (presetTicker locks the symbol).
+/* Add-holding / add-lot form. Used both for a brand-new ticker (no preset),
+ * for adding a lot to an existing ticker (presetTicker locks the symbol),
+ * and for editing an existing lot (editingLot pre-fills the fields and
+ * submits to the update endpoint instead of create).
  * Holdings are user-scoped (not filed under any watchlist), so this form only
  * ever asks for ticker/shares/price/date. */
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { searchTickers, addHolding, getResearch } from '../../api'
+import { searchTickers, addHolding, updateHolding, getResearch } from '../../api'
 import { validateHolding } from './holdingForm'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-export default function AddHoldingForm({ presetTicker, onDone }) {
+export default function AddHoldingForm({ presetTicker, editingLot, onDone }) {
   const qc = useQueryClient()
   const [ticker, setTicker] = useState(presetTicker || '')
   const [q, setQ] = useState('')
-  const [shares, setShares] = useState('')
-  const [price, setPrice] = useState('')
-  const [date, setDate] = useState(today())
+  const [shares, setShares] = useState(editingLot ? String(editingLot.quantity) : '')
+  const [price, setPrice] = useState(editingLot ? String(editingLot.buy_price) : '')
+  const [date, setDate] = useState(editingLot ? editingLot.buy_date : today())
   const [err, setErr] = useState(null)
 
   const { data: sug } = useQuery({
@@ -23,9 +25,9 @@ export default function AddHoldingForm({ presetTicker, onDone }) {
     enabled: !presetTicker && q.trim().length >= 1,
   })
 
-  // Prefill price with the live/current price once a ticker is chosen.
+  // Prefill price with the live/current price once a ticker is chosen (new lots only).
   const { data: liveClose } = useQuery({
-    queryKey: ['hold-price', ticker], enabled: !!ticker, staleTime: 60_000,
+    queryKey: ['hold-price', ticker], enabled: !!ticker && !editingLot, staleTime: 60_000,
     queryFn: () => getResearch(ticker).then(r => (r?.close ?? null)),
   })
   useEffect(() => {
@@ -33,16 +35,15 @@ export default function AddHoldingForm({ presetTicker, onDone }) {
   }, [liveClose])  // only when the fetched price changes; leaves user edits intact
 
   const save = useMutation({
-    mutationFn: () => addHolding({
-      ticker: ticker.trim().toUpperCase(), quantity: Number(shares),
-      buy_price: Number(price), buy_date: date,
-    }),
+    mutationFn: () => editingLot
+      ? updateHolding(editingLot.id, { quantity: Number(shares), buy_price: Number(price), buy_date: date })
+      : addHolding({ ticker: ticker.trim().toUpperCase(), quantity: Number(shares), buy_price: Number(price), buy_date: date }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['portfolio-holdings'] })
       qc.invalidateQueries({ queryKey: ['portfolio-lots'] })
       onDone?.()
     },
-    onError: (e) => setErr(e?.message || 'Could not add holding'),
+    onError: (e) => setErr(e?.message || (editingLot ? 'Could not save lot' : 'Could not add holding')),
   })
 
   const submit = () => {
@@ -77,7 +78,7 @@ export default function AddHoldingForm({ presetTicker, onDone }) {
       <input className="ahf-input" type="date" max={today()} value={date}
         onChange={(e) => setDate(e.target.value)} />
       <button className="ahf-btn" disabled={save.isPending} onClick={submit}>
-        {save.isPending ? 'Adding…' : 'Add'}
+        {save.isPending ? (editingLot ? 'Saving…' : 'Adding…') : (editingLot ? 'Save' : 'Add')}
       </button>
       <button className="ahf-btn ghost" onClick={() => onDone?.()}>Cancel</button>
       {err && <div className="ahf-err">{err}</div>}
