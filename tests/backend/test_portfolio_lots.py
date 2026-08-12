@@ -135,3 +135,50 @@ def test_remove_ticker_does_not_error_and_removes_membership(lots_app):
     assert after_wl == 0       # ticker removed from watchlist
     assert after_holdings == 2  # holdings unchanged — the fix ensures we don't touch this table
     eng.dispose()
+
+
+def test_update_holding_updates_quantity_price_and_date(lots_app):
+    bm, client = lots_app
+    lots = client.get("/api/portfolio/holdings/lots?ticker=AAPL").json()
+    hid = lots[0]["id"]
+    r = client.patch(f"/api/holdings/{hid}",
+                      json={"quantity": 20, "buy_price": 150.0, "buy_date": "2026-02-15"})
+    assert r.status_code == 200
+    assert r.json() == {"id": hid, "ticker": "AAPL", "quantity": 20, "buy_price": 150.0, "buy_date": "2026-02-15"}
+    lots_after = client.get("/api/portfolio/holdings/lots?ticker=AAPL").json()
+    updated = next(l for l in lots_after if l["id"] == hid)
+    assert updated["quantity"] == 20
+    assert updated["buy_price"] == 150.0
+    assert updated["buy_date"] == "2026-02-15"
+
+
+def test_update_holding_rejects_bad_input(lots_app):
+    bm, client = lots_app
+    lots = client.get("/api/portfolio/holdings/lots?ticker=AAPL").json()
+    hid = lots[0]["id"]
+    base = {"quantity": 1, "buy_price": 100.0, "buy_date": "2026-01-01"}
+    assert client.patch(f"/api/holdings/{hid}", json={**base, "quantity": 0}).status_code == 400
+    assert client.patch(f"/api/holdings/{hid}", json={**base, "buy_price": -5}).status_code == 400
+    assert client.patch(f"/api/holdings/{hid}", json={**base, "buy_date": "2099-01-01"}).status_code == 400
+
+
+def test_update_holding_404_for_missing_or_foreign_lot(lots_app):
+    bm, client = lots_app
+    from sqlalchemy import create_engine, text
+    eng = create_engine(f"sqlite:///{os.environ['DB_PATH']}")
+    with eng.connect() as conn:
+        foreign_id = conn.execute(text("SELECT id FROM holdings WHERE user_id = 'someone-else'")).scalar()
+    eng.dispose()
+    body = {"quantity": 1, "buy_price": 10.0, "buy_date": "2026-01-01"}
+    assert client.patch(f"/api/holdings/{foreign_id}", json=body).status_code == 404
+    assert client.patch("/api/holdings/999999", json=body).status_code == 404
+
+
+def test_update_holding_ignores_ticker_field(lots_app):
+    bm, client = lots_app
+    lots = client.get("/api/portfolio/holdings/lots?ticker=AAPL").json()
+    hid = lots[0]["id"]
+    r = client.patch(f"/api/holdings/{hid}",
+                      json={"ticker": "MSFT", "quantity": 3, "buy_price": 50.0, "buy_date": "2026-01-10"})
+    assert r.status_code == 200
+    assert r.json()["ticker"] == "AAPL"   # ticker isn't part of HoldingUpdate — cannot be changed via this endpoint

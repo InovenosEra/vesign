@@ -1920,24 +1920,33 @@ class HoldingCreate(BaseModel):
     buy_price: float
     buy_date: str
 
-def _validate_and_normalize_holding(body: HoldingCreate, conn) -> tuple[str, object]:
-    tk = (body.ticker or "").strip().upper()
-    if not tk:
-        raise HTTPException(status_code=400, detail="ticker is required")
-    if body.quantity is None or body.quantity <= 0:
+class HoldingUpdate(BaseModel):
+    quantity: float
+    buy_price: float
+    buy_date: str
+
+def _validate_holding_fields(quantity: float, buy_price: float, buy_date: str):
+    if quantity is None or quantity <= 0:
         raise HTTPException(status_code=400, detail="quantity must be greater than 0")
-    if body.buy_price is None or body.buy_price < 0:
+    if buy_price is None or buy_price < 0:
         raise HTTPException(status_code=400, detail="buy_price must be >= 0")
     try:
         try:
-            bd = date.fromisoformat(body.buy_date)
+            bd = date.fromisoformat(buy_date)
         except ValueError:
             from datetime import datetime as _dt
-            bd = _dt.strptime(body.buy_date, "%Y-%m-%d").date()
+            bd = _dt.strptime(buy_date, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="buy_date must be YYYY-MM-DD")
     if bd > date.today():
         raise HTTPException(status_code=400, detail="buy_date cannot be in the future")
+    return bd
+
+def _validate_and_normalize_holding(body: HoldingCreate, conn) -> tuple[str, object]:
+    tk = (body.ticker or "").strip().upper()
+    if not tk:
+        raise HTTPException(status_code=400, detail="ticker is required")
+    bd = _validate_holding_fields(body.quantity, body.buy_price, body.buy_date)
     if not conn.execute(text("SELECT 1 FROM companies WHERE ticker = :t"), {"t": tk}).fetchone():
         raise HTTPException(status_code=400, detail=f"unknown ticker {tk}")
     return tk, bd
@@ -1968,6 +1977,22 @@ def delete_user_holding(holding_id: int, user=Depends(get_current_user)):
             text("DELETE FROM holdings WHERE id = :hid AND user_id = :uid"),
             {"hid": holding_id, "uid": user["id"]},
         )
+
+@protected.patch("/api/holdings/{holding_id}")
+def update_user_holding(holding_id: int, body: HoldingUpdate, user=Depends(get_current_user)):
+    bd = _validate_holding_fields(body.quantity, body.buy_price, body.buy_date)
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("UPDATE holdings SET quantity = :qty, buy_price = :price, buy_date = :date WHERE id = :hid AND user_id = :uid"),
+            {"qty": body.quantity, "price": body.buy_price, "date": bd.isoformat(), "hid": holding_id, "uid": user["id"]},
+        )
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="lot not found")
+        row = conn.execute(
+            text("SELECT id, ticker, quantity, buy_price, buy_date FROM holdings WHERE id = :hid"),
+            {"hid": holding_id},
+        ).fetchone()
+    return {"id": row[0], "ticker": row[1], "quantity": row[2], "buy_price": row[3], "buy_date": row[4]}
 
 
 # --- Historical trades ------------------------------------------------------
